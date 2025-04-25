@@ -1,0 +1,26 @@
+log_level: INFO
+
+storage:
+  # Storage persistence path
+  storage_path: /qdrant/storage
+  
+  # Optimization settings
+  optimizers:
+    # Default interval between forced flushes, seconds
+    flush_interval_sec: 5
+    # Number of segments to keep in memory per collection
+    max_segment_number: 5
+
+service:
+  # Host to bind the service on
+  host: 0.0.0.0
+  # HTTP port to bind the service on
+  http_port: 6333
+  # gRPC port to bind the service on
+  grpc_port: 6334
+  # Distributed deployment port
+  p2p_port: 6335
+
+# Telemetry settings
+telemetry:
+  disabled: false 
