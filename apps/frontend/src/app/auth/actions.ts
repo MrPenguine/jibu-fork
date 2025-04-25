@@ -90,13 +90,13 @@ export async function signInWithGoogle() {
   return { url: data.url }
 }
 
-export async function logout() {
+export async function logout(formData: FormData) {
   const supabase = await createClient()
   
   const { error } = await supabase.auth.signOut()
   
   if (error) {
-    return { error: error.message }
+    console.error("Logout error:", error.message)
   }
   
   revalidatePath('/', 'layout')
