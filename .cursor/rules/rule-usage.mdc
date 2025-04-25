@@ -1,0 +1,83 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Using Cursor Rules for Jibu Console Project
+
+This document explains how to effectively use cursor rules when working on the Jibu Console project.
+
+### Available Rules
+
+1. **Project Brief** (project-brief.mdc)
+   - Overview of the project goals and core features
+   - Use this to understand the high-level purpose of the project
+
+2. **Tech Stack** (tech-stack.mdc)
+   - Detailed technology choices for the project
+   - Reference when making technology decisions or adding dependencies
+
+3. **Architecture** (architecture.mdc)
+   - System architecture and data flow
+   - Use when designing new features to ensure alignment with architecture
+
+4. **Coding Style** (coding-style.mdc)
+   - Code formatting and conventions
+   - Reference when writing new code to maintain consistency
+
+5. **Testing Strategy** (testing-strategy.mdc)
+   - Testing approaches and frameworks
+   - Use when writing tests for new features
+
+6. **Glossary** (glossary.mdc)
+   - Domain-specific terminology
+   - Reference when you encounter unfamiliar terms
+
+7. **Sprints** (sprints.mdc)
+   - Planned implementation phases and features
+   - Use for prioritization and understanding the roadmap
+
+8. **Context** (context.mdc)
+   - Current project state and key information
+   - Reference and update regularly to maintain context
+
+9. **Memory Bank** (memory-bank.mdc)
+   - History of project actions and decisions
+   - Update after implementing significant features
+
+10. **Service Template** (service-template.mdc)
+    - Template for documenting service implementations
+    - Use before implementing a new service
+
+### When to Use Rules
+
+- **Starting a New Feature**: Read relevant rules to understand context and requirements
+- **Making Architecture Decisions**: Consult tech-stack.mdc and architecture.mdc
+- **Implementing a Service**: Create a service implementation document using the template
+- **After Completing Work**: Update memory-bank.mdc with your contributions
+
+### How to Update Rules
+
+1. Rules should be updated when:
+   - Project decisions change
+   - New technologies are adopted
+   - Significant features are implemented
+   - Architecture is modified
+
+2. When updating, maintain the same format and structure
+
+3. For service implementations:
+   - Create a new file using service-template.mdc as a guide
+   - Name it according to the service (e.g., clerk-auth.mdc)
+
+### Accessing Rules in Cursor
+
+You can leverage these rules by asking Cursor AI about them specifically:
+
+- "What does the architecture rule say about the backend structure?"
+- "Based on the glossary, what is a Knowledge Base?"
+- "According to the sprints document, when should we implement the Tool feature?"
+- "Help me create a service implementation document for the Azure STT service"
+
+Keep these rules updated as the project evolves to maintain their usefulness.
+

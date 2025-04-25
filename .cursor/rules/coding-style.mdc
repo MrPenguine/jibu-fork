@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Coding Style & Conventions
+
+**Formatting:**
+*   **Tool:** Prettier
+*   **Configuration:** Uses `.prettierrc` and `.prettierignore` at the root. Adhere strictly to Prettier formatting.
+
+**Linting:**
+*   **Tool:** ESLint
+*   **Configuration:** Uses `eslint.config.mjs` (likely flat config). Follow defined rules to maintain code quality and prevent errors.
+
+**Naming Conventions:**
+*   **Variables, Functions, Methods:** `camelCase`
+*   **Classes, Interfaces, Types, Enums, React Components:** `PascalCase`
+*   **Constants (if truly constant):** `UPPER_SNAKE_CASE`
+*   **Files:** `kebab-case` or `camelCase` for components/classes (follow existing patterns within `apps`/`libs`). Config files often match tool names (`tailwind.config.js`).
+*   **API Endpoints:** RESTful principles, `kebab-case` path segments (e.g., `/api/v1/knowledge-bases/{id}`).
+
+**Code Structure:**
+*   **Monorepo:** Adhere to the Nx structure (`apps/`, `libs/`). Place shared code in `libs`.
+*   **NestJS (Backend):** Use modules (`*.module.ts`), controllers (`*.controller.ts`), services (`*.service.ts`), providers, guards (`*.guard.ts`), strategies (`*.strategy.ts`). Group by feature domain. Use Dependency Injection.
+*   **Next.js (Frontend):** Organize components, hooks, utils, styles logically within the `src` directory (e.g., `/components`, `/hooks`, `/lib`, `/styles`). Follow conventions for App Router or Pages Router as established.
+*   **shadcn/ui:** Components are likely generated into `libs/shadcn-ui/src/components` or similar, based on `components.json`.
+
+**TypeScript:**
+*   **Typing:** Strive for strong typing. Use interfaces (`interface`) or types (`type`) appropriately. Avoid `any` where possible.
+*   **Modules:** Use ES modules (`import`/`export`).
+
+**Comments:**
+*   Use JSDoc/TSDoc for explaining complex functions, classes, and types.
+*   Add inline comments for non-obvious logic.
+
+**API Design (Backend):**
+*   Use NestJS decorators for routing (`@Get`, `@Post`, etc.), request/response handling (`@Body`, `@Param`, `@Query`), and validation (`ValidationPipe` with DTOs using `class-validator`).
+*   Use `@nestjs/swagger` for OpenAPI documentation.
+*   Return meaningful HTTP status codes.
+
+**Validation:**
+*   Use `class-validator` decorators in DTOs for backend request validation.
+*   Use Zod for shared types/validation logic and potentially frontend form validation schema (with React Hook Form).
+
+**Error Handling:**
+*   Use NestJS exception filters for consistent backend error responses.
+
+*   Handle frontend errors gracefully, providing user feedback.

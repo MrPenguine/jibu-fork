@@ -2,6 +2,12 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  // Skip middleware for callback routes to prevent redirect loops
+  // This ensures the OAuth callback can complete without interruption
+  if (request.nextUrl.pathname.startsWith('/api/auth/callback')) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -63,11 +69,11 @@ export async function updateSession(request: NextRequest) {
   // If user is signed in and they're trying to access the login page, redirect to dashboard
   if (
     user &&
-    (path === '/login' || path === '/auth')
+    (path === '/login' || path === '/auth' || path === '/')
   ) {
-    // Redirect to root
+    // Redirect to dashboard
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/'
+    redirectUrl.pathname = '/dashboard'
     return NextResponse.redirect(redirectUrl)
   }
 

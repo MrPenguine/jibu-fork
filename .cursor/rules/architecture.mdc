@@ -1,0 +1,59 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## System Architecture
+
+**Overall Structure:**
+*   **Monorepo:** Managed by Nx, containing distinct applications (`apps/`) and shared libraries (`libs/`).
+*   **Backend (`apps/backend`):** A modular monolith built with NestJS. Exposes a RESTful API (likely with OpenAPI spec). Handles business logic, data persistence, authentication validation, and communication with external services.
+*   **Frontend (`apps/frontend`):** A Next.js application serving the user interface. Interacts with the Backend API. Uses Server-Side Rendering (SSR) or Static Site Generation (SSG) where appropriate via Next.js.
+*   **Worker (`apps/worker` - *implied*):** A separate NestJS application (or process) for handling background jobs via BullMQ/Redis (e.g., file indexing, notifications, long-running tasks).
+*   **Shared UI Library (`libs/shadcn-ui`):** Contains reusable React components built with shadcn/ui and Tailwind CSS.
+
+**Key Architectural Patterns:**
+*   **Modular Design (Backend):** NestJS modules encapsulate features (e.g., `AuthModule`, `OrganizationModule`, `IntegrationsModule`, `AssistantModule`, `ToolModule`, `KnowledgeBaseModule`).
+*   **Dependency Injection (Backend):** Heavily utilized via NestJS for managing dependencies between services, controllers, repositories, etc.
+*   **Service Layer (Backend):** Business logic is primarily located in NestJS Services (`*.service.ts`).
+*   **Repository Pattern (Implicit):** Prisma acts as the data access layer, often injected into services.
+*   **Adapter Pattern (Integrations):** External services (STT, TTS, LLM, Payment, Storage, Telephony) are accessed through abstraction layers/interfaces (`ISttService`, `ITtsService`, etc.) defined likely within `IntegrationsModule` or similar. Concrete implementations (`AzureSttService`, `S3StorageService`) implement these interfaces.
+*   **Background Jobs/Queues:** BullMQ used for decoupling and processing asynchronous tasks.
+*   **Real-time Communication:** WebSockets handled by NestJS Gateways for streaming interactions.
+*   **Configuration Management:** Environment variables likely managed via a shared package (`packages/env-config` using Zod for validation). Credentials securely fetched via `CredentialService`.
+*   **RAG (Retrieval-Augmented Generation):** For Knowledge Bases, involving: File Ingestion -> Chunking -> Embedding -> Vector Store (Qdrant) -> Retrieval -> LLM Prompt Augmentation.
+*   **State Management (Frontend):** React Query for server state caching/synchronization. Zustand for global client-side state.
+
+**Data Flow (Typical Request):**
+1.  **Frontend:** User interacts -> API request triggered (using Fetch/Axios, potentially via React Query mutation/query).
+2.  **Backend API Gateway/Load Balancer:** Routes request to appropriate backend instance.
+3.  **Backend (NestJS):**
+    *   Middleware (Auth Guard, Rate Limiting) executes.
+    *   Controller receives request, validates DTO.
+    *   Controller calls appropriate Service method.
+    *   Service executes business logic, potentially:
+        *   Interacting with Prisma (Database).
+        *   Calling other services (via DI).
+        *   Fetching credentials (`CredentialService`).
+        *   Calling external services via Integration Adapters.
+        *   Dispatching jobs to BullMQ queue.
+        *   Retrieving data from Vector DB (`IVectorDbService`).
+    *   Service returns result to Controller.
+    *   Controller formats response.
+4.  **Frontend:** Receives response -> Updates UI (via React Query cache invalidation/update, Zustand state change).
+
+**Key Components (from Sprint Plan):**
+*   `AuthModule`, `OrganizationModule`, `UserModule`, `WebhookModule`
+*   `IntegrationsModule` (containing sub-modules/providers for STT, TTS, LLM, Storage, Payment, Telephony)
+*   `CredentialModule`, `EncryptionModule`
+*   `FileModule`
+*   `InteractionModule` / `CallService` (Orchestrating core AI pipeline)
+*   `AssistantModule` (Configuration CRUD)
+*   `BillingModule`
+*   `ToolModule`
+*   `KnowledgeBaseModule`, `IndexingProcessor` (Worker), `EmbeddingModule`, `VectorDbModule`
+*   `ApiKeyModule`
+*   `CallModule` (Logging)
+*   `CallGateway` (WebSockets)
+
+*   `PhoneNumberModule`

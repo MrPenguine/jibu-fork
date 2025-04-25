@@ -1,0 +1,74 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Service Implementation Template
+
+This template should be used to document the implementation details of a service before coding. 
+Replace [ServiceName] with the actual service name (e.g., SupabaseAuth, AzureStt).
+
+```
+# [ServiceName] Service Implementation
+
+## Purpose & Functionality
+- [Describe what this service does and its role in the system]
+- [List primary features and responsibilities]
+
+## Dependencies
+- **External Services:** [List any external APIs or services]
+- **Internal Dependencies:** [List dependent internal modules/services]
+- **Required Credentials:** [List required API keys or credentials]
+
+## Data Models
+- [List and describe relevant database models]
+- [Include relationships between models]
+
+## Implementation Details
+
+### Core Components
+- [List main classes/interfaces/functions to implement]
+- [Describe file structure]
+
+### Main Flows
+1. [Detailed description of first process flow]
+   - [Inputs]
+   - [Step 1]
+   - [Step 2]
+   - [...]
+   - [Outputs]
+
+2. [Detailed description of second process flow]
+   - [...]
+
+### Error Handling
+- [Common error cases and how to handle them]
+- [Retry strategies]
+- [Fallback mechanisms]
+
+### Security Considerations
+- [Security measures]
+- [Credential handling]
+- [Data protection]
+
+## API Interface
+```typescript
+// Interface definition
+interface I[ServiceName]Service {
+  // Method signatures with documentation
+  methodName(param1: Type, param2: Type): ReturnType;
+}
+```
+
+## Integration Test Plan
+- [Test scenarios]
+- [Mock requirements]
+- [Validation criteria]
+
+## Future Enhancements
+- [Planned features for future iterations]
+- [Potential optimizations]
+```
+
+To use this template, create a new file in the `.cursor/rules/` directory with the name of your service, e.g., `.cursor/rules/supabase-auth.mdc`. Then fill in the template with the specific implementation details of that service.
+

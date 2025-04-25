@@ -1,0 +1,100 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Supabase Auth Service Implementation for Backend
+
+## Purpose & Functionality
+- Implement secure authentication for the backend using Supabase Auth as the identity provider
+- Validate JWT tokens issued by Supabase Auth
+- Handle user synchronization between Supabase and application database via webhooks
+- Manage organization-level access control and permissions
+
+## Dependencies
+- **External Services:** Supabase Auth API
+- **Packages:**
+  - `@nestjs/passport`
+  - `passport`
+  - `passport-jwt`
+  - `jsonwebtoken`
+  - `@supabase/supabase-js`
+- **Required Credentials:** 
+  - Supabase URL
+  - Supabase API Key
+  - Supabase JWT Secret
+
+## Implementation Steps
+
+### 1. Set Up NestJS Auth Module
+Create the auth module with necessary components:
+```
+apps/backend/src/auth/
+├── auth.module.ts
+├── strategies/
+│   └── jwt.strategy.ts
+├── guards/
+│   └── jwt-auth.guard.ts
+├── services/
+│   └── sync.service.ts
+└── controllers/
+    └── webhook.controller.ts
+```
+
+### 2. JWT Validation
+Implement JWT validation for Supabase tokens:
+- Create a JwtStrategy that extracts and verifies the JWT from the Authorization header
+- Configure the strategy to use the Supabase JWT secret for validation
+- Extract the user ID and role from the token payload
+- Create a JwtAuthGuard to protect API endpoints
+
+### 3. Webhook Handling
+Set up webhook endpoints to receive Supabase Auth events:
+- Create a controller with webhooks for user-related events (`user.created`, `user.updated`, etc.)
+- Implement signature validation to verify webhook requests are from Supabase
+- Process webhook payloads to create or update users in the application database
+
+### 4. User Synchronization
+Implement user data synchronization between Supabase and the application database:
+- Extract user information from the webhook payload
+- Create or update user records in the database
+- Handle organization assignment for new users (create default organization if needed)
+- Update user profile information when changes occur in Supabase
+
+### 5. Organization Access Control
+Implement organization-level access control:
+- Validate user's membership and role within the requested organization
+- Create guards/decorators for role-based access control
+- Enforce multi-tenancy by filtering data based on organization ID
+
+## Security Considerations
+- Store Supabase credentials securely in environment variables
+- Validate webhook signatures to prevent spoofing
+- Set appropriate JWT expiration and refresh token handling
+- Use HTTPS for all communication
+- Implement proper error handling for auth failures
+- Rate limit authentication endpoints
+
+## API Endpoints
+- `POST /auth/webhook` - Receive and process Supabase Auth webhooks
+- `GET /auth/me` - Get current user information (for testing)
+
+## Environment Variables
+```
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_API_KEY=your-supabase-service-role-key
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+SUPABASE_WEBHOOK_SECRET=your-webhook-signing-secret
+```
+
+## Testing Strategy
+- Test JWT validation with valid and invalid tokens
+- Mock webhook payloads to test user synchronization
+- Test organization access control with different user roles
+- Verify error handling for various auth failure scenarios
+
+## Integration with Frontend
+- Frontend passes Supabase JWT in Authorization header for API requests
+- Backend validates the token and extracts user information
+- API responses are filtered based on user's organization access
+

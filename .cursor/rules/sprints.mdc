@@ -1,0 +1,113 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+**Jibu AI - Feature Implementation Sprints:**
+
+**Phase 1: Core Authentication, Organization & Service Setup**
+
+- **Sprint 1: Core Auth & Org Foundation**
+    - Implement Backend Clerk JWT Validation (AuthModule, JwtStrategy, JwtAuthGuard).
+    - Implement User/Org/Membership DB Sync & Default Org Creation (UserModule, OrganizationModule, WebhookModule listening to user.created, Clerk API calls).
+    - Implement Basic Org/User API (GET /organizations, GET /users/me).
+    - Basic Frontend Login/Signup working, displays Org context (using Clerk components).
+- **Sprint 2: External Service Abstractions & Init Checks**
+    - Implement IntegrationsModule structure (stt, tts, llm).
+    - Define Interfaces (ISttService, ITtsService, ILlmService) & Tokens.
+    - Implement initial concrete providers (AzureSttService, AzureTtsService, OpenRouterLlmService) with checkConnection() logic.
+    - Implement Factories providing interfaces.
+    - Implement HealthController endpoint (/health/integrations) to test connections.
+    - Implement Frontend Test Page section to call health check.
+- **Sprint 3: Credential Management (Backend & Basic UI)**
+    - Implement EncryptionModule & Service.
+    - Implement CredentialModule (Prisma model, Service using Encryption, Controller CRUD API).
+    - Implement *basic* "Provider Keys" UI on Frontend for adding/viewing/deleting credentials (initially focusing on Azure, OpenRouter, maybe Google for later). Handle OAuth initiation/callback for Google.
+    - Update Integration Services (Azure*, OpenRouter*) to use CredentialService to fetch keys instead of direct .env (tested via /health/integrations).
+
+**Phase 2: Core AI Pipeline & Basic Assistant Config**
+
+- **Sprint 4: File Storage & Management (Backend & Basic UI)**
+    - Implement Storage Integration Adapter (IStorageService, S3StorageService).
+    - Implement FileModule (Prisma model, Service coordinating metadata & storage, Controller API for upload/list/download/delete).
+    - Implement *basic* "Files" UI on Frontend for upload & listing.
+- **Sprint 5: Core Voice Pipeline (STT->Convert->LLM->TTS)**
+    - Implement AudioService (core/audio) for WebM->WAV conversion using ffmpeg (update Dockerfile).
+    - Implement full transcribe and synthesize methods in STT/TTS providers.
+    - Implement InteractionModule (Controller for audio I/O, Service orchestrating STT->Convert->LLM->TTS). **Use default configs initially.**
+    - Implement VoiceInteractionButton on Frontend Test Page for end-to-end testing.
+- **Sprint 6: Assistant Config Backend & Basic UI**
+    - Implement AssistantModule (Prisma model with basic fields + JSONB for stt/tts/llmConfig, systemPrompt, firstMessage; Service for CRUD; Controller API). Enforce Org ownership.
+    - Implement basic "Assistants" list UI on Frontend. Implement "Create Assistant" modal (Name only). Implement basic Detail page showing Assistant ID/Name.
+- **Sprint 7: Dynamic Config Loading & Assistant Test Chat**
+    - Modify InteractionService (or CallService introduction) to accept assistantId, load config from DB (via AssistantService/Prisma), and pass specific configs to ISttService, ITtsService, ILlmService.
+    - Implement "Chat with Assistant" panel (Text-based) on Frontend Assistant Detail page, calling the backend interaction endpoint.
+
+**Phase 3: MVP Features & Core Management UIs**
+
+- **Sprint 8: Agent Management UI (Full Configuration)**
+    - Enhance Frontend Assistant Detail page UI to allow configuring STT/TTS/LLM providers, models, system prompts, first messages via API calls.
+- **Sprint 9: Billing & Plans Foundation (Backend)**
+    - **Goal:** Set up basic subscription plans and usage tracking needed to gate features later.
+    - Implement BillingModule (Prisma models for Plan, Subscription, Usage Record?).
+    - Implement IPaymentService adapter (integrations/payment/) for Stripe (or chosen provider). Requires Credentials.
+    - Implement basic service logic (BillingService) to assign a default plan (e.g., "Free") on Org creation and potentially track basic usage metrics (e.g., function calls, placeholder for minutes).
+    - **No UI yet.**
+- **Sprint 10: Tool Definition Backend & UI**
+    - Implement ToolModule (Backend CRUD for Tool definitions, test endpoint).
+    - Implement Frontend UI (/tools) for managing Tools (focus on "Function" type).
+    - Update Assistant Config UI/API to allow linking Tools.
+- **Sprint 11: Tool Execution in Call**
+    - Refine LLM prompting/parsing for Tool Calls.
+    - Modify CallService/InteractionService to parse tool calls, inject ToolService & CredentialService, securely execute "Function" tools (proxy request), feed result back to LLM.
+- **Sprint 12: Knowledge Base Foundation (Backend API)**
+    - Implement KnowledgeBaseModule (Prisma models - KB, KBSource; Service for KB CRUD & File Linking; Controller API).
+    - Implement QueueModule ('indexing' queue) & basic IndexingProcessor (fetches file, chunks text - uses core/chunking service). Requires FileModule.
+    - Update Assistant Config API/UI to link a KB.
+- **Sprint 13: KB Indexing Pipeline (Embeddings & Vector Store)**
+    - Implement EmbeddingModule & VectorDbModule in integrations/. Setup Vector DB instance.
+    - Update IndexingProcessor to call Embedding service and upsert vectors into Vector DB. Implement de-indexing job.
+- **Sprint 14: KB Retrieval (RAG) in Call**
+    - Modify CallService to perform embedding search via IVectorDbService (if KB linked), inject context into LLM prompt.
+
+**Phase 4: Communication Channels & Advanced Features**
+
+- **Sprint 15: API Key Management (Platform Keys)**
+    - Implement ApiKeyModule (Backend CRUD + Hashing).
+    - Implement core/auth/ApiKeyStrategy & Guard.
+    - Implement Frontend UI (/api-keys).
+    - Apply ApiKeyGuard to POST /call and other relevant programmatic endpoints.
+- **Sprint 16: Call Logging & History (Backend & UI)**
+    - Implement Call model persistence in CallService (log stages, transcript, status, etc.).
+    - Implement GET /call log retrieval API in CallController.
+    - Implement Frontend UI (/call-history) with filtering and detail view (initially without audio player).
+- **Sprint 17: WebSocket Integration (Foundation)**
+    - Implement CallGateway (WebSocket handler). Basic connection management and WS authentication (using JWT). Update AppModule.
+- **Sprint 18: Real-time Streaming Pipeline (STT->LLM->TTS over WS)**
+    - Refactor integrations services (STT, LLM, TTS) for streaming I/O.
+    - Refactor CallService and CallGateway to handle chunk-based processing and event emission.
+    - Refactor Frontend VoiceInteractionButton to use WebSockets for audio I/O and playback (using Media Source Extensions).
+- **Sprint 19: Telephony Foundation (Backend)**
+    - Implement PhoneNumberModule (Backend CRUD).
+    - Implement ITelephonyService adapter (e.g., TwilioTelephonyService in integrations/) using CredentialService.
+    - Implement WebhookModule handler for *incoming calls* from Twilio/AT.
+- **Sprint 20: Basic Telephony Interaction (No Streaming Yet)**
+    - Link Phone Numbers to Assistants in DB/UI.
+    - Webhook handler finds Assistant config, CallService answers via ITelephonyService, plays TTS greeting, records user speech, processes via STT/LLM, logs result (no audio back yet).
+
+**Phase 5: Polish, Scaling & Advanced Features**
+
+- **Sprint 21+:** (Prioritize based on business needs)
+    - **Full Telephony Interaction:** Integrate streaming pipeline with ITelephonyService (e.g., Twilio Media Streams).
+    - **Billing UI & Logic:** Frontend for plan selection, credit purchase, usage display. Backend webhooks for payment events. Enforce limits based on plan/credits.
+    - **Observability:** Implement API/Webhook log viewing (ObservabilityModule). Integrate distributed tracing (OpenTelemetry). Setup monitoring/alerting .
+    - **Testing Framework:** Implement TestingModule backend & UI.
+    - **Workflows:** Implement WorkflowModule backend & UI (using React Flow). Modify CallService to execute workflows.
+    - **Squads:** Implement SquadModule backend & UI. Modify CallService to handle squad routing/logic.
+    - **Voice Library:** Implement VoiceLibraryModule backend & UI (browsing, cloning via queue).
+    - **Add More Integrations:** Google Drive/Sheets indexing/tools, SharePoint, other STT/TTS/LLM providers.
+    - **Advanced AuthZ:** Granular permissions beyond basic roles.
+    - **Interruption Handling:** Implement barge-in.
+    - **Performance Optimizations:** Deeper caching, query tuning, infrastructure scaling.
+
+    - **Security Hardening & Compliance:** Audits, penetration testing, specific compliance features (HIPAA BAA implementation if needed).

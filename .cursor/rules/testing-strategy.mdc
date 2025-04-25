@@ -1,0 +1,39 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Testing Strategy
+
+**Frameworks:**
+*   **Unit & Integration Tests:** Jest (configured via `jest.config.js` files in relevant apps/libs). Utilize `@nestjs/testing` for backend testing utilities.
+*   **End-to-End (E2E) Tests:** Playwright or Cypress (Planned - specific choice TBD).
+
+**Types of Tests & Scope:**
+*   **Unit Tests:**
+    *   Focus: Individual functions, classes, NestJS services, utility functions, React components (isolated logic), shared library functions.
+    *   Mocking: External dependencies (DB calls, external APIs, other services) should be mocked using Jest mocks (`jest.fn()`, `jest.spyOn`).
+*   **Integration Tests:**
+    *   Focus: Interaction between multiple units within an application boundary.
+        *   Backend: Test NestJS modules, controller endpoints (using `supertest` via `@nestjs/testing`), service interactions, database interactions (potentially against a test database).
+        *   Frontend: Test component interactions, state management logic, page-level integration.
+*   **E2E Tests:**
+    *   Focus: Full user flows through the application (Frontend UI -> Backend API -> Database/External Services).
+    *   Tooling: Playwright/Cypress will interact with the browser like a real user.
+
+**Location:**
+*   Tests should reside alongside the code they test (e.g., `*.spec.ts` or `*.test.ts` files). E2E tests might live in a separate `e2e` directory within apps or at the root.
+
+**CI/CD:**
+*   All test suites (unit, integration, E2E) should be run automatically as part of the CI/CD pipeline (GitHub Actions) on pushes and pull requests.
+
+**Coverage:**
+*   Aim for reasonable code coverage, focusing on critical business logic and complex functions. Specific percentage targets TBD.
+
+**Specific Considerations:**
+*   **NestJS Testing:** Leverage `@nestjs/testing`'s `Test.createTestingModule` for setting up test environments with mocked providers.
+*   **Prisma:** Mock Prisma client calls in unit tests. For integration tests, consider strategies like test database setup/teardown or Prisma mocking libraries.
+*   **External APIs:** Mock external API calls during testing using libraries like `nock` or Jest mocks.
+*   **Queues (BullMQ):** Test that jobs are correctly added to the queue. Test worker processors in isolation, mocking dependencies.
+
+*   **Frontend:** Use React Testing Library (often included with Next.js/Jest setup) for component testing.

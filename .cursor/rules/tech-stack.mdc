@@ -1,0 +1,74 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Technology Stack
+
+This project is a monorepo managed by **Nx** and **pnpm**.
+
+**I. Core Backend (`apps/backend`, `apps/worker`)**
+*   **Runtime:** Node.js (Latest LTS)
+*   **Framework:** NestJS
+*   **Language:** TypeScript
+*   **Database:** PostgreSQL
+*   **ORM:** Prisma
+*   **Authentication Provider:** Supabase Auth (JWT validation backend-side)
+*   **Background Queues:** BullMQ
+*   **Queue Broker / Cache:** Redis
+*   **API Spec:** OpenAPI (Swagger) via `@nestjs/swagger`
+*   **Validation:** `class-validator`, `class-transformer`, Zod (potentially from shared packages)
+*   **HTTP Client:** `@nestjs/axios`
+*   **WebSockets:** NestJS Gateways (`@nestjs/websockets`)
+*   **Rate Limiting:** `@nestjs/throttler`
+*   **Health Checks:** `@nestjs/terminus`
+*   **Security Middleware:** Helmet
+
+**II. Core Frontend (`apps/frontend`)**
+*   **Framework:** Next.js (App Router likely)
+*   **Language:** TypeScript
+*   **UI Components:** shadcn/ui (`libs/shadcn-ui`)
+*   **Styling:** Tailwind CSS (configured via `tailwind.config.js`, `postcss.config.js`)
+*   **State Management:**
+    *   Server State / Caching: React Query (TanStack Query)
+    *   Client State: Zustand
+*   **Forms:** React Hook Form
+*   **Authentication Client:** Supabase Client library (`@supabase/auth-helpers-nextjs` or similar)
+*   **HTTP Client:** Fetch API or Axios
+
+**III. Shared Packages (`packages/` - *if applicable*)**
+*   **Purpose:** Likely for shared types, validation schemas (Zod), constants, SDKs, logging utilities, env config.
+*   **Language:** TypeScript
+
+**IV. Infrastructure & DevOps (`infra/`, `.github/`, `docker-compose.yaml`)**
+*   **Containerization:** Docker, Docker Compose (for local dev)
+*   **IaC:** Terraform (planned)
+*   **Cloud Provider:** TBD (AWS/GCP/Azure) - Requires DB, Cache, Queue, Object Storage, Compute, LB, IAM etc.
+*   **CI/CD:** GitHub Actions (implied by `.github/`)
+*   **Secrets Management:** Cloud Provider specific (e.g., AWS Secrets Manager) or HashiCorp Vault.
+*   **Vector Database:** Qdrant (from `qdrant_config.yaml`)
+
+**V. Monitoring, Observability & Status**
+*   **Status Page:** BetterStack (`status.jibu.ai`)
+*   **Logging:** Pino/Winston (via shared logger), aggregated externally (Datadog, Logtail, etc.)
+*   **APM & Tracing:** OpenTelemetry standard, backend TBD (Datadog, Sentry, etc.)
+*   **Error Tracking:** Sentry or similar
+*   **Metrics:** Prometheus/Grafana or Cloud Provider tools
+*   **Frontend Tracking:** PostHog/Mixpanel/etc.
+
+**VI. Key External Services (Examples from Sprint Plan)**
+*   **Auth:** Supabase
+*   **Payment:** Stripe
+*   **LLM:** OpenRouter, OpenAI, Anthropic, Google
+*   **STT:** Azure STT, Deepgram, AssemblyAI
+*   **TTS:** Azure TTS, ElevenLabs, PlayHT
+*   **Telephony:** Twilio (planned)
+*   **File Storage:** AWS S3
+
+**VII. Development Tooling**
+*   **Monorepo Manager:** Nx (`nx.json`, `project.json`)
+*   **Package Manager:** pnpm (`pnpm-lock.yaml`)
+*   **Linters/Formatters:** ESLint (`eslint.config.mjs`), Prettier (`.prettierrc`, `.prettierignore`)
+*   **Testing:** Jest (Unit/Integration - `jest.config.js`), Playwright/Cypress (E2E - planned)
+
+*   **Version Control:** Git

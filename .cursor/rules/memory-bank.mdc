@@ -1,0 +1,43 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+## Project Memory Bank
+
+This document tracks all significant actions and decisions made during project development, serving as a project history.
+
+**Project Initialization:**
+- [YYYY-MM-DD] Created Nx monorepo with pnpm
+- [YYYY-MM-DD] Added Next.js frontend application
+- [YYYY-MM-DD] Added NestJS backend application
+- [YYYY-MM-DD] Configured shadcn/ui for frontend components
+- [YYYY-MM-DD] Set up Tailwind CSS for styling
+
+**Authentication & Authorization:**
+- [Not Started] Supabase Auth integration
+
+**Database & ORM:**
+- [Not Started] PostgreSQL setup
+- [Not Started] Prisma schema definition and migration
+
+**AI Service Integrations:**
+- [Not Started] Azure STT/TTS integration
+- [Not Started] OpenRouter LLM integration
+
+**Frontend Features:**
+- [Not Started] Authentication UI
+- [Not Started] Organization management
+- [Not Started] Assistant configuration
+
+**Backend Features:**
+- [Not Started] User/Organization API
+- [Not Started] Assistant configuration API
+- [Not Started] AI processing pipeline
+
+**CI/CD & DevOps:**
+- [Not Started] GitHub Actions setup
+- [Not Started] Docker configuration
+
+This memory bank will be updated after each significant implementation step or decision.
+
