@@ -1,4 +1,4 @@
-import { Button } from '@libs/shadcn-ui/';
+import { Button } from '@libs/shadcn-ui';
 
 export default function Index() {
   /*

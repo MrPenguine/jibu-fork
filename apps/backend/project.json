@@ -9,18 +9,28 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "webpack-cli build",
-        "args": ["--node-env=production", "--config", "apps/backend/webpack.config.js"]
+        "args": [
+          "--node-env=production",
+          "--config",
+          "webpack.config.js"
+        ]
       },
       "configurations": {
         "development": {
-          "args": ["--node-env=development", "--config", "apps/backend/webpack.config.js"]
+          "args": [
+            "--node-env=development",
+            "--config",
+            "webpack.config.js"
+          ]
         }
       }
     },
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "buildTarget": "backend:build",
         "runBuildTargetDependencies": false
@@ -36,7 +46,9 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
       "options": {
         "jestConfig": "apps/backend/jest.config.js",
         "passWithNoTests": true
