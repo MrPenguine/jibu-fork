@@ -22,9 +22,9 @@ export default function OrganizationSettingsPage() {
   return (
     <div className="container max-w-4xl py-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Organization Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{activeOrganization.name}</h1>
         <p className="text-muted-foreground">
-          Manage your organization settings and preferences.
+          Manage organization settings and preferences.
         </p>
       </div>
 
