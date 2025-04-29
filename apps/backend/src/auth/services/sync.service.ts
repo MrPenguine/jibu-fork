@@ -35,15 +35,27 @@ export class UserSyncService {
   /**
    * Create a new user in our database
    */
-  private async createUser(userData: any): Promise<any> {
+  private async createUser(supabaseUser: any): Promise<any> {
+    const userMetadata = supabaseUser.user_metadata || {};
+    const appMetadata = supabaseUser.app_metadata || {};
+
     // Create the user
     const user = await this.prisma.user.create({
       data: {
-        id: userData.id,
-        email: userData.email,
-        firstName: userData.user_metadata?.first_name,
-        lastName: userData.user_metadata?.last_name,
-        imageUrl: userData.user_metadata?.avatar_url,
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        emailConfirmed: !!supabaseUser.email_confirmed_at,
+        firstName: userMetadata.first_name,
+        lastName: userMetadata.last_name,
+        fullName: userMetadata.full_name,
+        imageUrl: userMetadata.avatar_url || userMetadata.picture, // Handle different possible fields
+        provider: appMetadata.provider,
+        providerIds: appMetadata.providers || [], // Ensure it's an array
+        lastSignInAt: supabaseUser.last_sign_in_at ? new Date(supabaseUser.last_sign_in_at) : null,
+        phoneNumber: supabaseUser.phone,
+        phoneConfirmed: !!supabaseUser.phone_confirmed_at,
+        isAnonymous: supabaseUser.is_anonymous || false,
+        metadata: userMetadata, // Store the raw metadata
       },
     });
 
@@ -67,14 +79,27 @@ export class UserSyncService {
   /**
    * Update an existing user in our database
    */
-  private async updateUser(userData: any): Promise<any> {
+  private async updateUser(supabaseUser: any): Promise<any> {
+    const userMetadata = supabaseUser.user_metadata || {};
+    const appMetadata = supabaseUser.app_metadata || {};
+
     const user = await this.prisma.user.update({
-      where: { id: userData.id },
+      where: { id: supabaseUser.id },
       data: {
-        email: userData.email,
-        firstName: userData.user_metadata?.first_name,
-        lastName: userData.user_metadata?.last_name,
-        imageUrl: userData.user_metadata?.avatar_url,
+        email: supabaseUser.email,
+        emailConfirmed: !!supabaseUser.email_confirmed_at,
+        firstName: userMetadata.first_name,
+        lastName: userMetadata.last_name,
+        fullName: userMetadata.full_name,
+        imageUrl: userMetadata.avatar_url || userMetadata.picture,
+        provider: appMetadata.provider,
+        providerIds: appMetadata.providers || [],
+        lastSignInAt: supabaseUser.last_sign_in_at ? new Date(supabaseUser.last_sign_in_at) : null,
+        phoneNumber: supabaseUser.phone,
+        phoneConfirmed: !!supabaseUser.phone_confirmed_at,
+        isAnonymous: supabaseUser.is_anonymous || false,
+        metadata: userMetadata,
+        updatedAt: new Date(), // Explicitly set updatedAt
       },
     });
 
@@ -95,4 +120,4 @@ export class UserSyncService {
     
     this.logger.log(`User deleted: ${userId}`);
   }
-} 
+}

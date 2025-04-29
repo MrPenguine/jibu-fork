@@ -8,10 +8,10 @@ alwaysApply: false
 **Phase 1: Core Authentication, Organization & Service Setup**
 
 - **Sprint 1: Core Auth & Org Foundation**
-    - Implement Backend Clerk JWT Validation (AuthModule, JwtStrategy, JwtAuthGuard).
+    - Implement Backend Supabase JWT Validation (AuthModule, JwtStrategy, JwtAuthGuard).
     - Implement User/Org/Membership DB Sync & Default Org Creation (UserModule, OrganizationModule, WebhookModule listening to user.created, Clerk API calls).
     - Implement Basic Org/User API (GET /organizations, GET /users/me).
-    - Basic Frontend Login/Signup working, displays Org context (using Clerk components).
+    - Basic Frontend Login/Signup working, displays Org context.
 - **Sprint 2: External Service Abstractions & Init Checks**
     - Implement IntegrationsModule structure (stt, tts, llm).
     - Define Interfaces (ISttService, ITtsService, ILlmService) & Tokens.

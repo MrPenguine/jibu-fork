@@ -8,16 +8,25 @@ datasource db {
 }
 
 model User {
-  id          String   @id // Supabase User ID
-  email       String   @unique
-  firstName   String?
-  lastName    String?
-  imageUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  memberships OrganizationMembership[] // Relation field
-  files       File[]   // Reverse relation
-  // apiKeys     ApiKey[] // Add relations as models are created
+  id                String   @id // Supabase User ID
+  email             String   @unique
+  emailConfirmed    Boolean  @default(false)
+  firstName         String?
+  lastName          String?
+  fullName          String?  // Added from user_metadata.full_name
+  imageUrl          String?  // This will store the avatar_url/picture from Supabase
+  provider          String?  // Authentication provider (e.g., "google")
+  providerIds       String[] // Array of provider IDs
+  lastSignInAt      DateTime?
+  phoneNumber       String?  // From Supabase phone field
+  phoneConfirmed    Boolean  @default(false)
+  isAnonymous       Boolean  @default(false)
+  metadata          Json?    // For storing additional user_metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  memberships       OrganizationMembership[] // Relation field
+  files             File[]   // Reverse relation
+  // apiKeys         ApiKey[] // Add relations as models are created
 }
 
 model Organization {
@@ -85,4 +94,4 @@ model File {
 
   @@index([organizationId])
   @@index([userId])
-} 
+}

@@ -90,19 +90,19 @@ export class WebhookController {
     
     if (!webhookSecret) {
       this.logger.warn('SUPABASE_WEBHOOK_SECRET not set, skipping signature verification');
-      return; // Or throw if secret is mandatory in production
+      return;
     }
-
+  
     if (!signature) {
       this.logger.error('Missing signature header');
       throw new UnauthorizedException('Missing signature header');
     }
-
+  
     if (!timestamp) {
       this.logger.error('Missing timestamp header');
       throw new UnauthorizedException('Missing timestamp header');
     }
-
+  
     try {
       // Extract the signature part after 'v1,'
       const signatureParts = signature.split(',');
@@ -113,10 +113,13 @@ export class WebhookController {
       
       const receivedSignatureBase64 = signatureParts[1];
       
-      // Supabase uses timestamp.body format for signature calculation
+      // Log the raw data for debugging
+      this.logger.debug(`Timestamp: ${timestamp}`);
+      this.logger.debug(`Raw Body (first 100 chars): ${rawBody.toString('utf8').substring(0, 100)}...`);
+      
+      // Make sure to use the exact format Supabase expects
       const hmac = crypto.createHmac('sha256', webhookSecret);
-      // Ensure rawBody is treated as UTF8 string as per Supabase docs/common practice
-      hmac.update(`${timestamp}.${rawBody.toString('utf8')}`); 
+      hmac.update(`${timestamp}.${rawBody.toString('utf8')}`);
       const computedSignatureBase64 = hmac.digest('base64');
       
       this.logger.debug(`Expected signature: ${computedSignatureBase64}`);
@@ -125,22 +128,19 @@ export class WebhookController {
       // Securely compare signatures
       const expectedBuffer = Buffer.from(computedSignatureBase64, 'base64');
       const receivedBuffer = Buffer.from(receivedSignatureBase64, 'base64');
-
+  
       if (expectedBuffer.length !== receivedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
         this.logger.error('Signature verification failed (timing safe comparison)');
         throw new UnauthorizedException('Invalid webhook signature');
       }
-
+  
       this.logger.log('Signature verification successful');
-
     } catch (error) {
-      // Catch specific errors if needed, otherwise rethrow
+      // Rethrow or handle errors
       this.logger.error(`Signature verification error: ${error.message}`);
-      // Ensure the original error type is preserved if it's already UnauthorizedException
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      // Wrap other errors
       throw new UnauthorizedException(`Signature verification failed: ${error.message}`);
     }
   }
