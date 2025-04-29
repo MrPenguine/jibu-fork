@@ -34,7 +34,7 @@
     "../../dist/apps/frontend/.next/types/**/*.ts",
     "next-env.d.ts",
     ".next/types/**/*.ts"
-  ],
+, "../../libs/shadcn-ui/src/components/CreateOrganizationModal.tsx", "../../libs/shadcn-ui/src/components/CustomAppSidebar.tsx", "../../libs/shadcn-ui/src/components/OrganizationList.tsx", "../../libs/shadcn-ui/src/components/OrganizationSwitcher.tsx", "../../libs/shadcn-ui/src/components/UserProfile.tsx", "../../libs/shadcn-ui/src/components/CurrentOrganization.tsx"  ],
   "exclude": [
     "node_modules",
     "jest.config.ts",

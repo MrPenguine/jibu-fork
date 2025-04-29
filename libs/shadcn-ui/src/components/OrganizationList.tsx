@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { fetchAPI } from '../utils/api';
+import { fetchAPI } from '../../../../apps/frontend/src/utils/api';
 
 interface Organization {
   id: string;

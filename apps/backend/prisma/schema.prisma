@@ -22,11 +22,15 @@ model User {
   phoneConfirmed    Boolean  @default(false)
   isAnonymous       Boolean  @default(false)
   metadata          Json?    // For storing additional user_metadata
+  lastOrgId         String?  // Store the ID of the last organization the user accessed
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   memberships       OrganizationMembership[] // Relation field
   files             File[]   // Reverse relation
+  lastOrg           Organization? @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
   // apiKeys         ApiKey[] // Add relations as models are created
+  
+  @@index([lastOrgId])
 }
 
 model Organization {
@@ -38,6 +42,7 @@ model Organization {
   memberships OrganizationMembership[] // Relation field
   credentials Credential[] // Relation to credentials
   files       File[]   // Reverse relation
+  usersLastOrg User[]  @relation("UserLastOrg") // Users who have this as their last organization
   // Add other org fields: globalWebhookUrl, etc.
 }
 

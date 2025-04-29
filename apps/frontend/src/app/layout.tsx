@@ -1,4 +1,6 @@
 import './global.css';
+import { SidebarProvider } from "@libs/shadcn-ui/components/ui/sidebar"
+import { OrganizationProvider } from "../utils/organizationContext"
 
 export const metadata = {
   title: 'Jibu AI Console',
@@ -16,7 +18,11 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
-        {children}
+        <SidebarProvider>
+          <OrganizationProvider>
+            {children}
+          </OrganizationProvider>
+        </SidebarProvider>
       </body>
     </html>
   );

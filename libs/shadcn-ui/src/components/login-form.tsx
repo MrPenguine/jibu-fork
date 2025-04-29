@@ -12,6 +12,7 @@ import {
 import { Input } from "@libs/shadcn-ui/components/ui/input"
 import { Label } from "@libs/shadcn-ui/components/ui/label"
 import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
 
 type FormMode = "login" | "signup" | "forgot-password"
 
@@ -24,6 +25,7 @@ export function LoginForm({
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
   const router = useRouter()
 
   const titles = {
@@ -130,20 +132,32 @@ export function LoginForm({
           }
         }
         
-        // If login is successful, redirect to dashboard
+        // If login is successful, show loading state while fetching last organization
         if (mode === "login") {
+          setIsLoggingIn(true)
+          // We'll let the middleware/navigation handle the redirect
+          // This gives time for the lastOrg processing to happen
           router.push("/")
           router.refresh()
         }
       } catch (err) {
         setError("An unexpected error occurred")
         console.error(err)
+        setIsLoggingIn(false)
       }
     })
   }
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("flex flex-col gap-6 relative", className)} {...props}>
+      {isLoggingIn && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-lg">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-4 text-center text-sm font-medium">Logging in...</p>
+          <p className="text-center text-xs text-muted-foreground mt-1">Fetching your organization</p>
+        </div>
+      )}
+      
       <Card className="border-none">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">{titles[mode]}</CardTitle>
@@ -167,7 +181,7 @@ export function LoginForm({
                     variant="outline" 
                     className="w-full" 
                     onClick={handleGoogleSignIn}
-                    disabled={isPending}
+                    disabled={isPending || isLoggingIn}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="mr-2 h-4 w-4">
                       <path
@@ -196,7 +210,7 @@ export function LoginForm({
                     type="email"
                     placeholder="m@example.com"
                     required
-                    disabled={isPending}
+                    disabled={isPending || isLoggingIn}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
@@ -211,7 +225,7 @@ export function LoginForm({
                           type="button"
                           onClick={() => setMode("forgot-password")}
                           className="ml-auto text-sm underline-offset-4 hover:underline"
-                          disabled={isPending}
+                          disabled={isPending || isLoggingIn}
                         >
                           Forgot your password?
                         </button>
@@ -221,14 +235,14 @@ export function LoginForm({
                       id="password" 
                       type="password" 
                       required 
-                      disabled={isPending}
+                      disabled={isPending || isLoggingIn}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
                 )}
                 
-                <Button type="submit" className="w-full" disabled={isPending}>
+                <Button type="submit" className="w-full" disabled={isPending || isLoggingIn}>
                   {isPending ? "Loading..." : buttonTexts[mode]}
                 </Button>
               </div>
@@ -242,7 +256,7 @@ export function LoginForm({
                         type="button"
                         onClick={() => setMode("signup")}
                         className="underline underline-offset-4"
-                        disabled={isPending}
+                        disabled={isPending || isLoggingIn}
                       >
                         Sign up
                       </button>
@@ -254,7 +268,7 @@ export function LoginForm({
                         type="button"
                         onClick={() => setMode("login")}
                         className="underline underline-offset-4"
-                        disabled={isPending}
+                        disabled={isPending || isLoggingIn}
                       >
                         Login
                       </button>
@@ -269,7 +283,7 @@ export function LoginForm({
                     type="button"
                     onClick={() => setMode("login")}
                     className="underline underline-offset-4"
-                    disabled={isPending}
+                    disabled={isPending || isLoggingIn}
                   >
                     Back to login
                   </button>
