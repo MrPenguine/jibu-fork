@@ -1,7 +1,7 @@
 "use client"
 
 import { GalleryVerticalEnd } from "lucide-react"
-import { LoginForm } from "@libs/shadcn-ui/components/login-form"
+import { LoginForm } from "@libs/shadcn-ui/components/auth/login-form"
 
 export default function LoginPage() {
   return (

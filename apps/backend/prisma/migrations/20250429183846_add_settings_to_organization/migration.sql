@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Organization" ADD COLUMN     "email" TEXT,
+ADD COLUMN     "settings" JSONB;

@@ -9,14 +9,14 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose
-} from "./ui/dialog"
-import { Button } from "./ui/button"
-import { Input } from "./ui/input"
-import { Label } from "./ui/label"
+} from "../ui/dialog"
+import { Button } from "../ui/button"
+import { Input } from "../ui/input"
+import { Label } from "../ui/label"
 import { useRouter } from 'next/navigation'
 import { LoaderCircle } from 'lucide-react'
-import { fetchAPI } from '../../../../apps/frontend/src/utils/api'
-import { useOrganization } from '../../../../apps/frontend/src/utils/organizationContext'
+import { fetchAPI } from '../../../../../apps/frontend/src/utils/api'
+import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext'
 
 interface CreateOrganizationModalProps {
   open: boolean

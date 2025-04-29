@@ -14,9 +14,9 @@ import {
   SquareTerminal,
 } from "lucide-react"
 
-import { NavMain } from "@libs/shadcn-ui/components/nav-main"
-import { NavProjects } from "@libs/shadcn-ui/components/nav-projects"
-import { NavUser } from "@libs/shadcn-ui/components/nav-user"
+import { NavMain } from "@libs/shadcn-ui/components/nav/nav-main"
+import { NavProjects } from "@libs/shadcn-ui/components/nav/nav-projects"
+import { NavUser } from "@libs/shadcn-ui/components/nav/nav-user"
 import {
   Sidebar,
   SidebarContent,
@@ -24,7 +24,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@libs/shadcn-ui/components/ui/sidebar"
-import { OrganizationSwitcher } from "@libs/shadcn-ui/components/OrganizationSwitcher"
+import { OrganizationSwitcher } from "@libs/shadcn-ui/components/organization/OrganizationSwitcher"
 
 // Sample data for navigation items
 const navData = {
@@ -137,6 +137,12 @@ const navData = {
       icon: Map,
     },
   ],
+  overview: {
+    title: "Overview",
+    url: "/",
+    icon: PieChart,
+    isActive: true,
+  },
 }
 
 export function CustomAppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

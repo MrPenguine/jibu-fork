@@ -58,6 +58,7 @@
     "nx": "20.8.0",
     "postcss": "8.4.38",
     "prettier": "^2.6.2",
+    "prisma": "^6.6.0",
     "tailwind-merge": "^3.2.0",
     "tailwindcss": "3.4.3",
     "tailwindcss-animate": "^1.0.7",
@@ -65,8 +66,7 @@
     "tslib": "^2.3.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.19.0",
-    "webpack-cli": "^5.1.4",
-    "prisma": "^6.6.0"
+    "webpack-cli": "^5.1.4"
   },
   "nx": {},
   "dependencies": {
@@ -83,6 +83,8 @@
     "@radix-ui/react-label": "^2.1.4",
     "@radix-ui/react-separator": "^1.1.4",
     "@radix-ui/react-slot": "^1.2.0",
+    "@radix-ui/react-switch": "^1.2.2",
+    "@radix-ui/react-toast": "^1.2.11",
     "@radix-ui/react-tooltip": "^1.2.4",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",

@@ -36,6 +36,8 @@ model User {
 model Organization {
   id          String   @id @default(uuid())
   name        String
+  email       String?
+  settings    Json?    // Store organization settings as JSON
   // ownerId     String // Decide if needed, maybe just check role in membership
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

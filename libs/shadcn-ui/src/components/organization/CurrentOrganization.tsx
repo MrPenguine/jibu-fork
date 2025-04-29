@@ -2,18 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { Building2, Settings } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
-import { useOrganization } from '../../../../apps/frontend/src/utils/organizationContext';
+import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext';
 
 export default function CurrentOrganization() {
   const router = useRouter();
   const { activeOrganization, loading, error } = useOrganization();
 
   const handleSettings = () => {
-    if (activeOrganization) {
-      router.push(`/organizations/${activeOrganization.id}/settings`);
-    }
+    router.push(`/organizations/settings`);
   };
 
   if (loading) {

@@ -8,16 +8,17 @@ import {
   Command,
   Frame,
   GalleryVerticalEnd,
+  Home,
   Map,
   PieChart,
   Settings2,
   SquareTerminal,
 } from "lucide-react"
 
-import { NavMain } from "@libs/shadcn-ui/components/nav-main"
-import { NavProjects } from "@libs/shadcn-ui/components/nav-projects"
-import { NavUser } from "@libs/shadcn-ui/components/nav-user"
-import { TeamSwitcher } from "@libs/shadcn-ui/components/team-switcher"
+import { NavMain } from "@libs/shadcn-ui/components/nav/nav-main"
+import { NavProjects } from "@libs/shadcn-ui/components/nav/nav-projects"
+import { NavUser } from "@libs/shadcn-ui/components/nav/nav-user"
+import { TeamSwitcher } from "@libs/shadcn-ui/components/organization/team-switcher"
 import {
   Sidebar,
   SidebarContent,
@@ -52,10 +53,15 @@ const data = {
   ],
   navMain: [
     {
+      title: "Overview",
+      url: "/",
+      icon: Home,
+      isActive: true,
+    },  
+    {
       title: "Playground",
       url: "#",
       icon: SquareTerminal,
-      isActive: true,
       items: [
         {
           title: "History",

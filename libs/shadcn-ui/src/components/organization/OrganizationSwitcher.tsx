@@ -17,9 +17,9 @@ import {
   useSidebar,
 } from "@libs/shadcn-ui/components/ui/sidebar"
 import { useRouter } from 'next/navigation'
-import { Dialog } from "./ui/dialog"
+import { Dialog } from "../ui/dialog"
 import { CreateOrganizationModal } from "./CreateOrganizationModal"
-import { useOrganization } from '../../../../apps/frontend/src/utils/organizationContext'
+import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext'
 
 export function OrganizationSwitcher() {
   const { isMobile } = useSidebar()

@@ -1,8 +1,8 @@
 import { createClient } from "../../utils/supabase/server"
 import { redirect } from "next/navigation"
-import UserProfile from "../../../../../libs/shadcn-ui/src/components/UserProfile"
-import OrganizationList from "../../../../../libs/shadcn-ui/src/components/OrganizationList"
-import CurrentOrganization from "../../../../../libs/shadcn-ui/src/components/CurrentOrganization"
+import UserProfile from "../../../../../libs/shadcn-ui/src/components/user/UserProfile"
+import OrganizationList from "../../../../../libs/shadcn-ui/src/components/organization/OrganizationList"
+import CurrentOrganization from "../../../../../libs/shadcn-ui/src/components/organization/CurrentOrganization"
 
 export default async function Page() {
   // Check if user is authenticated

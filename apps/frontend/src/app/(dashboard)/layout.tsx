@@ -1,5 +1,5 @@
 import { SidebarProvider } from "@libs/shadcn-ui/components/ui/sidebar"
-import { CustomAppSidebar } from "../../../../../libs/shadcn-ui/src/components/CustomAppSidebar"
+import { CustomAppSidebar } from "../../../../../libs/shadcn-ui/src/components/organization/CustomAppSidebar"
 import { SidebarInset, SidebarTrigger } from "@libs/shadcn-ui/components/ui/sidebar"
 import { Separator } from "@libs/shadcn-ui/components/ui/separator"
 import {
@@ -12,6 +12,7 @@ import {
 } from "@libs/shadcn-ui/components/ui/breadcrumb"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { logout } from "../auth/actions"
+import { Toaster } from "@libs/shadcn-ui/components/ui/toaster"
 
 export default function DashboardLayout({
   children,
@@ -54,6 +55,7 @@ export default function DashboardLayout({
           </div>
         </SidebarInset>
       </SidebarProvider>
+      <Toaster />
     </div>
   )
 } 
