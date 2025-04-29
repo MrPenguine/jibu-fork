@@ -7,6 +7,7 @@ import { WebhookController } from './controllers/webhook.controller';
 import { UserController } from './controllers/user.controller';
 import { OrganizationController } from './controllers/organization.controller';
 import { DatabaseModule } from '../database/database.module';
+import { SupabaseWebhookGuard } from './guards/supabase-webhook.guard'; // Import the guard
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { DatabaseModule } from '../database/database.module';
     DatabaseModule,
   ],
   controllers: [WebhookController, UserController, OrganizationController],
-  providers: [JwtStrategy, UserSyncService],
+  providers: [JwtStrategy, UserSyncService, SupabaseWebhookGuard], // Add SupabaseWebhookGuard here
   exports: [UserSyncService],
 })
-export class AuthModule {} 
+export class AuthModule {}

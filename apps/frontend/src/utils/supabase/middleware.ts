@@ -69,11 +69,11 @@ export async function updateSession(request: NextRequest) {
   // If user is signed in and they're trying to access the login page, redirect to dashboard
   if (
     user &&
-    (path === '/login' || path === '/auth' || path === '/')
+    (path === '/login' || path === '/auth')
   ) {
     // Redirect to dashboard
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/dashboard'
+    redirectUrl.pathname = '/'
     return NextResponse.redirect(redirectUrl)
   }
 

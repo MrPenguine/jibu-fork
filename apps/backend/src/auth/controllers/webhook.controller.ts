@@ -1,9 +1,10 @@
-import { Controller, Post, Body, Headers, Logger, UnauthorizedException, HttpCode, Get, Param, Req } from '@nestjs/common';
+import { Controller, Post, Body, Logger, UnauthorizedException, HttpCode, Get, Param, Req, UseGuards } from '@nestjs/common'; // Added UseGuards
 import { Request } from 'express';
 import { UserSyncService } from '../services/sync.service';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../decorators/public.decorator';
-import * as crypto from 'crypto';
+import { SupabaseWebhookGuard } from '../guards/supabase-webhook.guard'; // Import the guard
+// Removed crypto import as it's now handled by the guard
 
 @Controller('auth/webhook')
 export class WebhookController {
@@ -19,45 +20,17 @@ export class WebhookController {
    * This endpoint receives events from Supabase Auth such as user creation, updates, and deletions
    */
   @Public() // This needs to be public as Supabase won't have a JWT to authenticate
+  @UseGuards(SupabaseWebhookGuard) // Apply the webhook guard for signature verification
   @Post()
   @HttpCode(200)
   async handleWebhook(
-    @Req() req: Request,
+    @Req() req: Request, // Guard now handles headers and rawBody access
     @Body() payload: any,
-    @Headers('webhook-signature') signature: string,
-    @Headers('webhook-timestamp') timestamp: string,
-    @Headers() headers: any,
+    // Removed signature, timestamp, and headers parameters as they are handled by the guard
   ) {
     try {
-      this.logger.log('Received headers:', JSON.stringify(headers));
       this.logger.log('Received payload:', JSON.stringify(payload));
-      
-      const rawBody = (req as any).rawBody;
-      if (!rawBody) {
-        this.logger.error('Raw body is not available. Ensure rawBody: true is set in NestFactory.create.');
-        throw new UnauthorizedException('Internal server error: Raw body missing');
-      }
-      
-      // If we have a signature header, verify it
-      if (signature && timestamp) {
-        // Optional: Bypass verification in development
-        if (process.env.DISABLE_WEBHOOK_VERIFICATION === 'true') {
-          this.logger.warn('Webhook verification disabled for development');
-        } else {
-          try {
-            this.verifySignature(rawBody, signature, timestamp);
-          } catch (error) {
-            this.logger.error(`Signature verification failed: ${error.message}`);
-            throw new UnauthorizedException('Invalid webhook signature');
-          }
-        }
-      } else {
-        // For development/testing purposes, allow requests without signatures
-        this.logger.warn('Request missing signature or timestamp headers');
-        if (process.env.NODE_ENV === 'production' && process.env.DISABLE_WEBHOOK_VERIFICATION !== 'true') {
-          throw new UnauthorizedException('Signature verification required in production');
-        }
-      }
+      // Signature verification is now handled by the SupabaseWebhookGuard
 
       // Handle based on payload format
       if (payload.type && payload.table) {
@@ -82,68 +55,7 @@ export class WebhookController {
     }
   }
 
-  /**
-   * Verify the webhook signature to ensure it's from Supabase
-   */
-  private verifySignature(rawBody: Buffer, signature: string, timestamp: string): void {
-    const webhookSecret = this.configService.get<string>('SUPABASE_WEBHOOK_SECRET');
-    
-    if (!webhookSecret) {
-      this.logger.warn('SUPABASE_WEBHOOK_SECRET not set, skipping signature verification');
-      return;
-    }
-  
-    if (!signature) {
-      this.logger.error('Missing signature header');
-      throw new UnauthorizedException('Missing signature header');
-    }
-  
-    if (!timestamp) {
-      this.logger.error('Missing timestamp header');
-      throw new UnauthorizedException('Missing timestamp header');
-    }
-  
-    try {
-      // Extract the signature part after 'v1,'
-      const signatureParts = signature.split(',');
-      if (signatureParts.length !== 2 || signatureParts[0] !== 'v1') {
-        this.logger.error('Invalid signature format');
-        throw new UnauthorizedException('Invalid signature format');
-      }
-      
-      const receivedSignatureBase64 = signatureParts[1];
-      
-      // Log the raw data for debugging
-      this.logger.debug(`Timestamp: ${timestamp}`);
-      this.logger.debug(`Raw Body (first 100 chars): ${rawBody.toString('utf8').substring(0, 100)}...`);
-      
-      // Make sure to use the exact format Supabase expects
-      const hmac = crypto.createHmac('sha256', webhookSecret);
-      hmac.update(`${timestamp}.${rawBody.toString('utf8')}`);
-      const computedSignatureBase64 = hmac.digest('base64');
-      
-      this.logger.debug(`Expected signature: ${computedSignatureBase64}`);
-      this.logger.debug(`Received signature: ${receivedSignatureBase64}`);
-      
-      // Securely compare signatures
-      const expectedBuffer = Buffer.from(computedSignatureBase64, 'base64');
-      const receivedBuffer = Buffer.from(receivedSignatureBase64, 'base64');
-  
-      if (expectedBuffer.length !== receivedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
-        this.logger.error('Signature verification failed (timing safe comparison)');
-        throw new UnauthorizedException('Invalid webhook signature');
-      }
-  
-      this.logger.log('Signature verification successful');
-    } catch (error) {
-      // Rethrow or handle errors
-      this.logger.error(`Signature verification error: ${error.message}`);
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-      throw new UnauthorizedException(`Signature verification failed: ${error.message}`);
-    }
-  }
+  // Removed the verifySignature method as it's now handled by SupabaseWebhookGuard
 
   // Handler for row-level changes (e.g., database webhooks)
   private async handleTableChanges(payload: any) {
