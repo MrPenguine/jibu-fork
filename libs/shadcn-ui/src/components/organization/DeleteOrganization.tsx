@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -17,6 +17,16 @@ export default function DeleteOrganization() {
 
   const handleDelete = async () => {
     if (!activeOrganization) return;
+    
+    // Role-based access control - only owners can delete organizations
+    if (activeOrganization.role !== 'owner') {
+      toast({
+        title: "Permission Denied",
+        description: "Only organization owners can delete organizations.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (confirmText !== activeOrganization.name) {
       toast({
@@ -56,6 +66,30 @@ export default function DeleteOrganization() {
 
   if (!activeOrganization) {
     return null;
+  }
+  
+  // If user is not an owner, show permission denied
+  if (activeOrganization.role !== 'owner') {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight">Delete Organization</h2>
+          <p className="text-destructive-foreground/80">
+            Only organization owners can delete organizations.
+          </p>
+        </div>
+        
+        <div className="p-6 bg-card rounded-lg border space-y-4">
+          <div className="flex items-center gap-3 text-destructive">
+            <ShieldAlert className="h-8 w-8" />
+            <div>
+              <h3 className="font-semibold">Permission Denied</h3>
+              <p>Your role: {activeOrganization.role}. Required role: owner</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

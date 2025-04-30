@@ -2,6 +2,8 @@ import { Controller, Get, Post, Put, Delete, UseGuards, Request, Body, Param } f
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { OrganizationService } from './organization.service';
 import { CreateOrganizationDto, UpdateOrganizationDto } from './dto/organization.dto';
+import { OrgRoleGuard } from '../../../core/auth/guards/org-role.guard';
+import { Roles } from '../../../core/auth/decorators/roles.decorator';
 
 @Controller('organizations')
 export class OrganizationController {
@@ -37,7 +39,8 @@ export class OrganizationController {
   /**
    * Update an organization - requires owner or admin role
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrgRoleGuard)
+  @Roles('admin', 'owner')
   @Put(':id')
   async updateOrganization(
     @Request() req: any, 
@@ -50,7 +53,8 @@ export class OrganizationController {
   /**
    * Delete an organization - requires owner role
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrgRoleGuard)
+  @Roles('owner')
   @Delete(':id')
   async deleteOrganization(@Request() req: any, @Param('id') id: string) {
     return this.organizationService.deleteOrganization(req.user.id, id);
