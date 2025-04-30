@@ -1,36 +1,20 @@
-import { Controller, Post, Body, Logger, UnauthorizedException, HttpCode, Get, Param, Req, UseGuards } from '@nestjs/common'; // Added UseGuards
-import { Request } from 'express';
-import { UserSyncService } from '../services/sync.service';
-import { ConfigService } from '@nestjs/config';
-import { Public } from '../decorators/public.decorator';
-import { SupabaseWebhookGuard } from '../guards/supabase-webhook.guard'; // Import the guard
-// Removed crypto import as it's now handled by the guard
+import { Injectable, Logger, Inject } from '@nestjs/common';
+import { UserSyncService } from '../core/sync/sync.service';
 
-@Controller('auth/webhook')
-export class WebhookController {
-  private readonly logger = new Logger(WebhookController.name);
+@Injectable()
+export class WebhookService {
+  private readonly logger = new Logger(WebhookService.name);
 
   constructor(
-    private readonly userSyncService: UserSyncService,
-    private readonly configService: ConfigService,
+    @Inject(UserSyncService) private readonly userSyncService: UserSyncService,
   ) {}
 
   /**
-   * Process Supabase auth webhooks
-   * This endpoint receives events from Supabase Auth such as user creation, updates, and deletions
+   * Process webhook payload and route to appropriate handler
    */
-  @Public() // This needs to be public as Supabase won't have a JWT to authenticate
-  @UseGuards(SupabaseWebhookGuard) // Apply the webhook guard for signature verification
-  @Post()
-  @HttpCode(200)
-  async handleWebhook(
-    @Req() req: Request, // Guard now handles headers and rawBody access
-    @Body() payload: any,
-    // Removed signature, timestamp, and headers parameters as they are handled by the guard
-  ) {
+  async processWebhook(payload: any) {
     try {
-      this.logger.log('Received payload:', JSON.stringify(payload));
-      // Signature verification is now handled by the SupabaseWebhookGuard
+      this.logger.log('Processing payload:', JSON.stringify(payload));
 
       // Handle based on payload format
       if (payload.type && payload.table) {
@@ -41,23 +25,21 @@ export class WebhookController {
         return this.handleAuthEvent(payload);
       } else if (payload.user_id && payload.claims) {
         // Potentially another auth webhook format (custom?)
-        // Adjust this condition based on actual observed payloads if needed
         this.logger.log('Processing potential custom auth event format');
-        return this.handleAuthEvent(payload); // Assuming it can be handled similarly
+        return this.handleAuthEvent(payload); 
       } else {
         this.logger.warn('Unknown webhook format', JSON.stringify(payload));
         return { success: false, message: 'Unknown webhook format' };
       }
     } catch (error) {
       this.logger.error(`Error processing webhook: ${error.message}`, error.stack);
-      // Return 200 anyway to prevent Supabase from retrying too aggressively
       return { success: false, error: error.message };
     }
   }
 
-  // Removed the verifySignature method as it's now handled by SupabaseWebhookGuard
-
-  // Handler for row-level changes (e.g., database webhooks)
+  /**
+   * Handle row-level changes (e.g., database webhooks)
+   */
   private async handleTableChanges(payload: any) {
     const { type, table, record, old_record } = payload;
     this.logger.log(`Processing table change: ${type} on ${table}`);
@@ -79,12 +61,10 @@ export class WebhookController {
     return { success: true };
   }
 
-  // Handler for Supabase Auth events
+  /**
+   * Handle Supabase Auth events
+   */
   private async handleAuthEvent(payload: any) {
-    // Handle the structure observed in logs or documented by Supabase Auth webhooks
-    // This might be { type: 'auth', event: 'user.created', record: {...} }
-    // Or it might be { user_id: '...', claims: {...} } as suggested in advice
-    
     if (payload.type === 'auth' && payload.event && payload.record) {
       // Standard Supabase Auth webhook format
       const { event, record } = payload;
@@ -108,9 +88,7 @@ export class WebhookController {
         const userData = {
           id: user_id,
           email: claims.email,
-          // Map other relevant claims to your user model
-          raw_user_meta_data: claims.user_metadata || {}, // Adjust based on your UserSyncService needs
-          // Add other fields as necessary, e.g., phone, created_at, updated_at if available in claims
+          raw_user_meta_data: claims.user_metadata || {},
         };
         await this.userSyncService.syncUserFromSupabase(userData);
       } else {
@@ -125,18 +103,13 @@ export class WebhookController {
   }
 
   /**
-   * Test endpoint to manually trigger a user sync
-   * For debugging purposes only - should be disabled in production
+   * Test sync for a specific user
    */
-  @Public()
-  @Get('test-sync/:userId')
-  async testSync(@Param('userId') userId: string) {
+  async testUserSync(userId: string) {
     this.logger.log(`Manual test sync for user: ${userId}`);
     
     try {
-      // Fetch user from Supabase
-      // Note: In a real implementation, you would fetch from Supabase admin API
-      // This is a simplified version for testing
+      // Mock user data for testing
       const mockUserData = {
         id: userId,
         email: `test-${userId}@example.com`,
@@ -153,4 +126,4 @@ export class WebhookController {
       return { success: false, error: error.message };
     }
   }
-}
+} 

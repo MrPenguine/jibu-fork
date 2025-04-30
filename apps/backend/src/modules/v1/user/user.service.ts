@@ -1,30 +1,14 @@
-import { Controller, Get, UseGuards, Request, Post, Body } from '@nestjs/common';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { PrismaService } from '../../database/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../../core/database/prisma.service';
 
-@Controller('users')
-export class UserController {
+@Injectable()
+export class UserService {
   constructor(private prisma: PrismaService) {}
-
-  /**
-   * Get current user information
-   * This endpoint is protected by the JwtAuthGuard
-   */
-  @UseGuards(JwtAuthGuard)
-  @Get('me')
-  async getCurrentUser(@Request() req: any) {
-    // The user object is attached to the request by the JwtStrategy
-    return req.user;
-  }
 
   /**
    * Get the user's last organization or a default one if not set
    */
-  @UseGuards(JwtAuthGuard)
-  @Get('last-organization')
-  async getLastOrganization(@Request() req: any) {
-    const userId = req.user.id;
-
+  async getLastOrganization(userId: string) {
     // Get the user with their last organization
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -46,7 +30,7 @@ export class UserController {
     });
 
     if (!membership) {
-      throw new Error('User has no organizations');
+      throw new NotFoundException('User has no organizations');
     }
 
     // Update the user's lastOrgId
@@ -64,12 +48,7 @@ export class UserController {
   /**
    * Update the user's last organization
    */
-  @UseGuards(JwtAuthGuard)
-  @Post('last-organization')
-  async updateLastOrganization(@Request() req: any, @Body() body: { organizationId: string }) {
-    const userId = req.user.id;
-    const { organizationId } = body;
-
+  async updateLastOrganization(userId: string, organizationId: string) {
     // Verify that the user is a member of the organization
     const membership = await this.prisma.organizationMembership.findFirst({
       where: {
@@ -79,7 +58,7 @@ export class UserController {
     });
 
     if (!membership) {
-      throw new Error('User is not a member of this organization');
+      throw new NotFoundException('User is not a member of this organization');
     }
 
     // Update the user's lastOrgId
@@ -93,4 +72,4 @@ export class UserController {
       organization: updatedUser.lastOrg,
     };
   }
-} 
+}
