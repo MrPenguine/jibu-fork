@@ -4,7 +4,7 @@ import { Separator } from "@libs/shadcn-ui/components/ui/separator";
 import OrganizationSettings from "@libs/shadcn-ui/components/organization/OrganizationSettings";
 import ServerUrlSettings from "@libs/shadcn-ui/components/organization/ServerUrlSettings";
 import DeleteOrganization from "@libs/shadcn-ui/components/organization/DeleteOrganization";
-import RoleGuard from "@libs/shadcn-ui/components/organization/RoleGuard";
+import { RoleGuard } from "@libs/shadcn-ui/components/organization/RoleGuard";
 import { useOrganization } from "../../../../utils/organizationContext";
 
 export default function OrganizationSettingsPage() {

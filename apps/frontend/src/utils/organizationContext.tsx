@@ -247,7 +247,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     
     // Try to update on the backend
     try {
-      await fetchAPI('/users/update-last-organization', {
+      await fetchAPI('/users/last-organization', {
         method: 'POST',
         body: JSON.stringify({ organizationId: org.id })
       });
@@ -256,8 +256,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       // Continue even if API fails
     }
     
-    // Force a hard refresh of the page to ensure all components update
-    window.location.reload();
+    // Force a soft reload to ensure the components update correctly
+    // Use the current path to avoid redirecting the user
+    const currentPath = window.location.pathname;
+    window.location.href = currentPath;
   };
 
   // Fetch organizations on initial load

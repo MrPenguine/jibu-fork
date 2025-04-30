@@ -22,6 +22,26 @@ export class UserController {
   }
 
   /**
+   * Get user context including organization information
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('context')
+  async getUserContext(@Request() req: any) {
+    // JWT strategy already enriches the request.user object
+    return {
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
+      },
+      orgId: req.user.orgId,
+      orgName: req.user.orgName,
+      orgRole: req.user.orgRole,
+    };
+  }
+
+  /**
    * Get the user's last organization or a default one if not set
    */
   @UseGuards(JwtAuthGuard)
