@@ -26,9 +26,9 @@ import {
 } from "@libs/shadcn-ui/components/ui/sidebar"
 
 export function NavProjects({
-  projects,
+  organization,
 }: {
-  projects: {
+  organization: {
     name: string
     url: string
     icon: LucideIcon
@@ -38,9 +38,9 @@ export function NavProjects({
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Projects</SidebarGroupLabel>
+      <SidebarGroupLabel>Organization</SidebarGroupLabel>
       <SidebarMenu>
-        {projects.map((item) => (
+        {organization.map((item) => (
           <SidebarMenuItem key={item.name}>
             <SidebarMenuButton asChild>
               <a href={item.url}>

@@ -6,12 +6,15 @@ import {
   BookOpen,
   Bot,
   Command,
+  CreditCard,
   Frame,
   GalleryVerticalEnd,
+  Key,
   Map,
   PieChart,
   Settings2,
   SquareTerminal,
+  Users,
 } from "lucide-react"
 
 import { NavMain } from "@libs/shadcn-ui/components/nav/nav-main"
@@ -120,21 +123,26 @@ const navData = {
       ],
     },
   ],
-  projects: [
+  Organization: [
     {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
+      name: "Settings",
+      url: "/organizations/settings",
+      icon: Settings2,
     },
     {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
+      name: "Members",
+      url: "/organizations/members",
+      icon: Users,
     },
     {
-      name: "Travel",
-      url: "#",
-      icon: Map,
+      name: "Billing",
+      url: "/organizations/billing",
+      icon: CreditCard,
+    },
+    {
+      name: "API Keys",
+      url: "/organizations/api-keys",
+      icon: Key,
     },
   ],
   overview: {
@@ -153,7 +161,7 @@ export function CustomAppSidebar({ ...props }: React.ComponentProps<typeof Sideb
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navData.navMain} />
-        <NavProjects projects={navData.projects} />
+        <NavProjects organization={navData.Organization} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={navData.user} />
