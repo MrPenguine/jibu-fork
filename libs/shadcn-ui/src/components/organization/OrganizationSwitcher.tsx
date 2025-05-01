@@ -58,6 +58,8 @@ export function OrganizationSwitcher() {
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false)
+  const [showAllInvitations, setShowAllInvitations] = React.useState(false)
+  const [expandedInvitationId, setExpandedInvitationId] = React.useState<string | null>(null)
   const { 
     activeOrganization, 
     organizations, 
@@ -79,30 +81,135 @@ export function OrganizationSwitcher() {
     router.push(`/organizations/${orgId}/settings`);
   };
 
-  // Filter organizations by status
-  const activeOrganizations = organizations.filter(org => 
-    !org.status || org.status === 'active'
-  );
-  
-  // Find organizations with pending status
+  // Find organizations with pending status first
   const pendingOrganizations = organizations.filter(org => 
     org.status === 'pending'
   );
+
+  // Get IDs of all pending organizations for more reliable filtering
+  const pendingOrgIds = pendingOrganizations.map(org => org.id);
+
+  // Get IDs of all organizations in incoming invitations
+  const invitationOrgIds = incomingInvitations
+    .filter(invite => invite.organization)
+    .map(invite => invite.organization?.id)
+    .filter(Boolean) as string[];
+
+  // Combined set of IDs to exclude from active organizations
+  const excludeOrgIds = [...pendingOrgIds, ...invitationOrgIds];
+
+  // Filter active organizations, excluding any that are pending or in invitations
+  const activeOrganizations = organizations.filter(organization => 
+    (!organization.status || organization.status === 'active') && 
+    !excludeOrgIds.includes(organization.id)
+  );
   
-  // Count all pending items (invitations + pending orgs)
-  const totalPendingCount = incomingInvitations.length + pendingOrganizations.length;
+  // Improved calculation for totalPendingCount to prevent duplicates
+  const directInvitationsCount = incomingInvitations.filter(invite => 
+    !organizations.some(org => org.id === invite.organization?.id)
+  ).length;
+
+  const pendingOrganizationsCount = pendingOrganizations.length;
+
+  // Calculate total without duplicates
+  const totalPendingCount = directInvitationsCount + pendingOrganizationsCount;
   
   // Check if we have any pending items to show
   const hasPendingItems = totalPendingCount > 0;
 
-  // Add detailed debug logging
+  // Update the logging to help troubleshoot the count issue
   React.useEffect(() => {
     console.log('OrganizationSwitcher - Organizations:', organizations);
     console.log('OrganizationSwitcher - activeOrganizations:', activeOrganizations);
     console.log('OrganizationSwitcher - pendingOrganizations:', pendingOrganizations);
     console.log('OrganizationSwitcher - incomingInvitations:', incomingInvitations);
+    console.log('OrganizationSwitcher - Direct invitations count:', incomingInvitations.filter(invite => 
+      !organizations.some(org => org.id === invite.organization?.id)
+    ).length);
     console.log('OrganizationSwitcher - totalPendingCount:', totalPendingCount);
   }, [organizations, activeOrganizations, pendingOrganizations, incomingInvitations, totalPendingCount]);
+
+  // Add logic to prioritize owner organizations when invitations are pending
+  React.useEffect(() => {
+    // Only run if there are pending invitations and the active organization has a pending state
+    if (
+      (totalPendingCount > 0 || pendingOrganizations.length > 0) && 
+      activeOrganization &&
+      (
+        pendingOrgIds.includes(activeOrganization.id) || 
+        invitationOrgIds.includes(activeOrganization.id) || 
+        activeOrganization.status === 'pending'
+      )
+    ) {
+      console.log('Active organization is pending - switching to owned organization');
+      
+      // Find an organization where the user is an owner
+      const ownedOrg = activeOrganizations.find(org => org.role === 'owner');
+      
+      // If found, switch to it
+      if (ownedOrg) {
+        console.log('Switching to owned organization:', ownedOrg);
+        switchOrganization(ownedOrg);
+      } else {
+        // Fallback to any active organization (if there is one)
+        const firstActiveOrg = activeOrganizations[0];
+        if (firstActiveOrg && firstActiveOrg.id !== activeOrganization.id) {
+          console.log('Switching to first active organization:', firstActiveOrg);
+          switchOrganization(firstActiveOrg);
+        }
+      }
+    }
+  }, [
+    activeOrganization,
+    activeOrganizations,
+    pendingOrgIds,
+    invitationOrgIds,
+    totalPendingCount,
+    pendingOrganizations.length,
+    switchOrganization
+  ]);
+
+  // Define the maximum number of invitations to show before "Show more" button
+  const MAX_VISIBLE_INVITATIONS = 2;
+  
+  // Handle invitation click to toggle expanded state
+  const handleInvitationClick = (id: string) => {
+    setExpandedInvitationId(expandedInvitationId === id ? null : id);
+  };
+
+  // Get all pending items (direct invitations and pending organizations)
+  const getAllPendingItems = () => {
+    const directInvitations = incomingInvitations.filter(invite => 
+      !organizations.some(org => org.id === invite.organization?.id)
+    );
+    
+    const pendingOrgsWithInvitations = pendingOrganizations.map(org => {
+      const matchingInvitation = incomingInvitations.find(
+        invite => invite.organization?.id === org.id
+      );
+      
+      return {
+        ...org,
+        invitationId: matchingInvitation?.id || `pending-${org.id}`,
+        matchingInvitation
+      };
+    });
+    
+    return [...directInvitations.map(invite => ({
+      id: invite.id,
+      name: invite.organization?.name || "Organization",
+      role: invite.role,
+      type: 'direct',
+      invitation: invite
+    })), ...pendingOrgsWithInvitations.map(org => ({
+      id: org.invitationId,
+      name: org.name,
+      role: org.matchingInvitation?.role || 'member',
+      type: 'pending',
+      organization: org,
+      invitation: org.matchingInvitation
+    }))];
+  };
 
   if (loading || !activeOrganization) {
     return (
@@ -167,7 +274,7 @@ export function OrganizationSwitcher() {
                 </div>
                 <div className="relative ml-auto">
                   {totalPendingCount > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white shadow-sm ring-1 ring-white dark:ring-gray-800">
+                    <span className="absolute -left-1 -top-3 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white shadow-sm ring-1 ring-white dark:ring-gray-800">
                       {totalPendingCount}
                     </span>
                   )}
@@ -243,114 +350,61 @@ export function OrganizationSwitcher() {
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-xs text-muted-foreground mb-1 flex items-center">
                     <Bell className="h-3 w-3 mr-1 text-red-500" /> PENDING INVITATIONS
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-medium dark:bg-red-900/30 dark:text-red-400">
-                      {totalPendingCount}
-                    </span>
+                    {totalPendingCount > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-medium dark:bg-red-900/30 dark:text-red-400">
+                        {totalPendingCount}
+                      </span>
+                    )}
                   </DropdownMenuLabel>
                   
-                  {/* Only direct invitations that don't have a matching organization yet */}
-                  {incomingInvitations
-                    .filter(invite => 
-                      !organizations.some(org => org.id === invite.organization?.id)
-                    )
-                    .map((invite) => (
+                  {/* Combined invitations list with accordion behavior */}
+                  {getAllPendingItems()
+                    .slice(0, showAllInvitations ? undefined : MAX_VISIBLE_INVITATIONS)
+                    .map((item) => (
                       <DropdownMenuItem
-                        key={invite.id}
-                        className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-default hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl"
+                        key={item.id}
+                        className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl mb-1"
                         onSelect={(e) => {
                           // Prevent the dropdown from closing when selecting this item
                           e.preventDefault();
-                        }}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium">
-                              {invite.organization?.name?.charAt(0).toUpperCase() || "O"}
-                            </div>
-                            <div className="max-w-[140px]">
-                              <p className="text-sm font-medium truncate">{invite.organization?.name || "Organization"}</p>
-                              <p className="text-xs text-gray-500 truncate">
-                                Invited as {invite.role}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-xs rounded-xl border-0 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                console.log(`Accepting invitation ${invite.id}`);
-                                acceptInvitation(invite.id)
-                                  .then(() => {
-                                    console.log('Invitation accepted successfully');
-                                  })
-                                  .catch((err: Error) => {
-                                    console.error('Error accepting invitation:', err);
-                                  });
-                              }}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 px-2 text-xs rounded-xl border-0 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                console.log(`Rejecting invitation ${invite.id}`);
-                                rejectInvitation(invite.id)
-                                  .then(() => {
-                                    console.log('Invitation rejected successfully');
-                                  })
-                                  .catch((err: Error) => {
-                                    console.error('Error rejecting invitation:', err);
-                                  });
-                              }}
-                            >
-                              Decline
-                            </Button>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  
-                  {/* Pending organizations that already have entries in the organizations list */}
-                  {pendingOrganizations.map((org) => {
-                    // Find matching invitation for this organization
-                    const matchingInvitation = incomingInvitations.find(
-                      invite => invite.organization?.id === org.id
-                    );
-                    
-                    return (
-                      <DropdownMenuItem
-                        key={`pending-${org.id}`}
-                        className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-default hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl"
-                        onSelect={(e) => {
-                          // Prevent the dropdown from closing when selecting this item
-                          e.preventDefault();
+                          handleInvitationClick(item.id);
                         }}
                       >
                         <div className="flex flex-col w-full">
                           <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 font-medium">
-                                {org.name.charAt(0).toUpperCase()}
+                              <div className={`flex h-8 w-8 items-center justify-center rounded-xl border-0 
+                                ${item.type === 'direct' 
+                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                                  : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'} font-medium`}
+                              >
+                                {item.name.charAt(0).toUpperCase()}
                               </div>
                               <div className="max-w-[140px]">
-                                <p className="text-sm font-medium truncate">{org.name}</p>
-                                <div className="flex items-center">
-                                  <Clock className="h-3 w-3 mr-1 text-yellow-500" />
-                                  <p className="text-xs text-yellow-500">Pending approval</p>
-                                </div>
+                                <p className="text-sm font-medium truncate">{item.name}</p>
+                                {item.type === 'direct' ? (
+                                  <p className="text-xs text-gray-500 truncate">
+                                    Invited as {item.role}
+                                  </p>
+                                ) : (
+                                  <div className="flex items-center">
+                                    <Clock className="h-3 w-3 mr-1 text-yellow-500" />
+                                    <p className="text-xs text-yellow-500">Pending approval</p>
+                                  </div>
+                                )}
                               </div>
+                            </div>
+                            <div className="flex items-center">
+                              <ChevronRight 
+                                className={`h-4 w-4 text-muted-foreground transition-transform ${
+                                  expandedInvitationId === item.id ? 'rotate-90' : ''
+                                }`} 
+                              />
                             </div>
                           </div>
                           
-                          {matchingInvitation && (
+                          {/* Expanded section with accept/decline buttons */}
+                          {expandedInvitationId === item.id && item.invitation && (
                             <div className="ml-11 mt-2 flex items-center gap-1">
                               <Button
                                 size="sm"
@@ -359,16 +413,22 @@ export function OrganizationSwitcher() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
-                                  console.log(`Accepting invitation for ${org.name}`);
-                                  if (matchingInvitation) {
-                                    acceptInvitation(matchingInvitation.id)
-                                      .then(() => {
-                                        console.log('Invitation accepted successfully');
-                                      })
-                                      .catch((err: Error) => {
-                                        console.error('Error accepting invitation:', err);
-                                      });
-                                  }
+                                  const invitationId = item.invitation?.id;
+                                  if (!invitationId) return;
+                                  
+                                  console.log(`Accepting invitation ${invitationId}`);
+                                  acceptInvitation(invitationId)
+                                    .then(() => {
+                                      console.log('Invitation accepted successfully');
+                                      setExpandedInvitationId(null);
+                                      // Refresh the organizations data
+                                      refreshOrganizations();
+                                      // Reload the page to ensure all contexts are updated
+                                      window.location.reload();
+                                    })
+                                    .catch((err: Error) => {
+                                      console.error('Error accepting invitation:', err);
+                                    });
                                 }}
                               >
                                 Accept
@@ -380,16 +440,18 @@ export function OrganizationSwitcher() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
-                                  console.log(`Rejecting invitation for ${org.name}`);
-                                  if (matchingInvitation) {
-                                    rejectInvitation(matchingInvitation.id)
-                                      .then(() => {
-                                        console.log('Invitation rejected successfully');
-                                      })
-                                      .catch((err: Error) => {
-                                        console.error('Error rejecting invitation:', err);
-                                      });
-                                  }
+                                  const invitationId = item.invitation?.id;
+                                  if (!invitationId) return;
+                                  
+                                  console.log(`Rejecting invitation ${invitationId}`);
+                                  rejectInvitation(invitationId)
+                                    .then(() => {
+                                      console.log('Invitation rejected successfully');
+                                      setExpandedInvitationId(null);
+                                    })
+                                    .catch((err: Error) => {
+                                      console.error('Error rejecting invitation:', err);
+                                    });
                                 }}
                               >
                                 Decline
@@ -398,8 +460,24 @@ export function OrganizationSwitcher() {
                           )}
                         </div>
                       </DropdownMenuItem>
-                    );
-                  })}
+                    ))}
+
+                  {/* Show more/less button when there are more than MAX_VISIBLE_INVITATIONS */}
+                  {totalPendingCount > MAX_VISIBLE_INVITATIONS && (
+                    <div 
+                      className="flex justify-center py-1 my-1 text-xs text-primary cursor-pointer hover:underline"
+                      onClick={() => {
+                        setShowAllInvitations(!showAllInvitations);
+                        // Reset expanded invitation when toggling show all
+                        setExpandedInvitationId(null);
+                      }}
+                    >
+                      {showAllInvitations 
+                        ? "Show less invitations" 
+                        : `Show ${totalPendingCount - MAX_VISIBLE_INVITATIONS} more invitation${totalPendingCount - MAX_VISIBLE_INVITATIONS > 1 ? 's' : ''}`
+                      }
+                    </div>
+                  )}
                 </>
               )}
               

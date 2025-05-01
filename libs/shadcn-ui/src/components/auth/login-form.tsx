@@ -1,16 +1,16 @@
 "use client"
 import { useState, useTransition } from "react"
 import { cn } from "../../lib/utils"
-import { Button } from "@libs/shadcn-ui/components/ui/button"
+import { Button } from "../ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@libs/shadcn-ui/components/ui/card"
-import { Input } from "@libs/shadcn-ui/components/ui/input"
-import { Label } from "@libs/shadcn-ui/components/ui/label"
+} from "../ui/card"
+import { Input } from "../ui/input"
+import { Label } from "../ui/label"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
@@ -51,6 +51,8 @@ export function LoginForm({
     "signup": "Sign up with Google",
     "forgot-password": "Login with Google"
   }
+
+  const isLoading = isPending || isLoggingIn
 
   const handleGoogleSignIn = () => {
     startTransition(async () => {
@@ -151,14 +153,14 @@ export function LoginForm({
   return (
     <div className={cn("flex flex-col gap-6 relative", className)} {...props}>
       {isLoggingIn && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-lg">
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-2xl">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="mt-4 text-center text-sm font-medium">Logging in...</p>
           <p className="text-center text-xs text-muted-foreground mt-1">Fetching your organization</p>
         </div>
       )}
       
-      <Card className="border-none">
+      <Card className="border-none rounded-2xl shadow-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">{titles[mode]}</CardTitle>
           <CardDescription>
@@ -169,7 +171,7 @@ export function LoginForm({
           <form onSubmit={handleSubmit}>
             <div className="grid gap-6">
               {error && (
-                <div className="rounded-md bg-red-50 p-3 text-sm text-red-500">
+                <div className="rounded-xl bg-red-50 p-3 text-sm text-red-500">
                   {error}
                 </div>
               )}
@@ -179,9 +181,9 @@ export function LoginForm({
                   <Button 
                     type="button" 
                     variant="outline" 
-                    className="w-full" 
+                    className="w-full rounded-xl" 
                     onClick={handleGoogleSignIn}
-                    disabled={isPending || isLoggingIn}
+                    disabled={isLoading}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="mr-2 h-4 w-4">
                       <path
@@ -204,47 +206,64 @@ export function LoginForm({
               
               <div className="grid gap-6">
                 <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    required
-                    disabled={isPending || isLoggingIn}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                
-                {mode !== "forgot-password" && (
-                  <div className="grid gap-2">
-                    <div className="flex items-center">
-                      <Label htmlFor="password">Password</Label>
-                      {mode === "login" && (
-                        <button
-                          type="button"
-                          onClick={() => setMode("forgot-password")}
-                          className="ml-auto text-sm underline-offset-4 hover:underline"
-                          disabled={isPending || isLoggingIn}
-                        >
-                          Forgot your password?
-                        </button>
-                      )}
-                    </div>
-                    <Input 
-                      id="password" 
-                      type="password" 
-                      required 
-                      disabled={isPending || isLoggingIn}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                  <div className="grid gap-1">
+                    <Label className="ml-1 text-sm font-medium dark:text-gray-400" htmlFor="email">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="name@example.com"
+                      required
+                      className="rounded-xl"
+                      disabled={isLoading}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
-                )}
-                
-                <Button type="submit" className="w-full" disabled={isPending || isLoggingIn}>
-                  {isPending ? "Loading..." : buttonTexts[mode]}
-                </Button>
+                  
+                  {mode !== "forgot-password" && (
+                    <div className="grid gap-1">
+                      <div className="flex items-center">
+                        <Label className="ml-1 text-sm font-medium dark:text-gray-400" htmlFor="password">
+                          Password
+                        </Label>
+                        {mode === "login" && (
+                          <button
+                            type="button"
+                            onClick={() => setMode("forgot-password")}
+                            className="ml-auto text-xs text-primary underline-offset-4 hover:underline"
+                            disabled={isLoading}
+                          >
+                            Forgot password?
+                          </button>
+                        )}
+                      </div>
+                      <Input 
+                        id="password" 
+                        type="password"
+                        placeholder="••••••••" 
+                        required
+                        className="rounded-xl" 
+                        disabled={isLoading}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full mt-2 rounded-xl" 
+                    size="lg"
+                    disabled={isLoading}
+                  >
+                    {isLoading && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {buttonTexts[mode]}
+                  </Button>
+                </div>
               </div>
               
               {mode !== "forgot-password" && (
@@ -255,8 +274,8 @@ export function LoginForm({
                       <button
                         type="button"
                         onClick={() => setMode("signup")}
-                        className="underline underline-offset-4"
-                        disabled={isPending || isLoggingIn}
+                        className="text-primary underline underline-offset-4"
+                        disabled={isLoading}
                       >
                         Sign up
                       </button>
@@ -267,8 +286,8 @@ export function LoginForm({
                       <button
                         type="button"
                         onClick={() => setMode("login")}
-                        className="underline underline-offset-4"
-                        disabled={isPending || isLoggingIn}
+                        className="text-primary underline underline-offset-4"
+                        disabled={isLoading}
                       >
                         Login
                       </button>
@@ -282,8 +301,8 @@ export function LoginForm({
                   <button
                     type="button"
                     onClick={() => setMode("login")}
-                    className="underline underline-offset-4"
-                    disabled={isPending || isLoggingIn}
+                    className="text-primary underline underline-offset-4"
+                    disabled={isLoading}
                   >
                     Back to login
                   </button>

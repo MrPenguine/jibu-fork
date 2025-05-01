@@ -38,7 +38,7 @@ interface EmailStatus {
 
 export function InviteMembers({ isOpen, onClose, organizationId }: InviteMembersProps) {
   const { toast } = useToast()
-  const { activeOrganization, inviteMembers } = useOrganization()
+  const { activeOrganization, inviteMembers, refreshOrganizations } = useOrganization()
   const [emailsWithStatus, setEmailsWithStatus] = React.useState<EmailStatus[]>([])
   const [currentEmail, setCurrentEmail] = React.useState("")
   const [role, setRole] = React.useState("editor")
@@ -169,7 +169,25 @@ export function InviteMembers({ isOpen, onClose, organizationId }: InviteMembers
       })
       
       setEmailsWithStatus([])
-      onClose()
+      
+      // Force a refresh of the organization context to update member lists
+      if (typeof window !== 'undefined') {
+        // Small delay to ensure API operations complete
+        setTimeout(() => {
+          // Refresh organization data before closing
+          if (refreshOrganizations) {
+            refreshOrganizations()
+          }
+          
+          // Close the modal after sending invitations
+          onClose()
+          
+          // Optional: Force a refresh of the page to ensure all components update
+          // window.location.reload()
+        }, 300)
+      } else {
+        onClose()
+      }
     } catch (error) {
       console.error("Error sending invitations:", error)
       toast({

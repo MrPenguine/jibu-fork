@@ -56,12 +56,29 @@ interface Member {
   updatedAt: string
 }
 
+interface Invitation {
+  id: string;
+  email?: string;
+  role?: string;
+  status?: string;
+  organization?: {
+    id: string;
+    name?: string;
+    email?: string;
+  };
+}
+
 interface MembersListProps {
   organizationId?: string
 }
 
 export function MembersList({ organizationId }: MembersListProps) {
-  const { activeOrganization } = useOrganization()
+  const { 
+    activeOrganization, 
+    refreshOrganizations, 
+    incomingInvitations = [], 
+    rejectInvitation 
+  } = useOrganization()
   const [isInviteModalOpen, setIsInviteModalOpen] = React.useState(false)
   const [members, setMembers] = React.useState<Member[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -177,6 +194,11 @@ export function MembersList({ organizationId }: MembersListProps) {
       return false;
     }
     
+    // Cannot remove members with pending status - should wait for them to accept/reject
+    if (member.status === 'pending') {
+      return false;
+    }
+    
     // Owner can delete anyone except owners
     if (userRole === 'owner') {
       return member.role !== 'owner';
@@ -197,6 +219,28 @@ export function MembersList({ organizationId }: MembersListProps) {
     return userRole !== 'owner';
   }
 
+  // Function to sort members list so current user is first
+  const sortMembersWithCurrentUserFirst = (membersList: Member[]) => {
+    return [...membersList].sort((a, b) => {
+      // Current user comes first
+      if (isCurrentUser(a)) return -1;
+      if (isCurrentUser(b)) return 1;
+      
+      // Then sort by role (owner first, then admin, then editor)
+      if (a.role !== b.role) {
+        const roleOrder: Record<string, number> = { 
+          owner: 0, 
+          admin: 1, 
+          editor: 2 
+        };
+        return (roleOrder[a.role] || 999) - (roleOrder[b.role] || 999);
+      }
+      
+      // Then sort alphabetically by email
+      return a.email.localeCompare(b.email);
+    });
+  };
+
   // Fetch members when component mounts
   React.useEffect(() => {
     const fetchMembers = async () => {
@@ -210,7 +254,8 @@ export function MembersList({ organizationId }: MembersListProps) {
         setError(null)
         
         const data = await fetchAPI(`/organizations/${targetOrgId}/members`)
-        setMembers(data)
+        // Sort the members to ensure current user is first
+        setMembers(sortMembersWithCurrentUserFirst(data))
       } catch (err) {
         console.error('Error fetching members:', err)
         setError(err instanceof Error ? err.message : 'Failed to fetch members')
@@ -220,14 +265,15 @@ export function MembersList({ organizationId }: MembersListProps) {
     }
     
     fetchMembers()
-  }, [targetOrgId])
+  }, [targetOrgId, currentUserEmail])
   
   // Function to refresh members list
   const refreshMembers = () => {
     setIsLoading(true)
     fetchAPI(`/organizations/${targetOrgId}/members`)
       .then(data => {
-        setMembers(data)
+        // Sort the members to ensure current user is first
+        setMembers(sortMembersWithCurrentUserFirst(data))
         setIsLoading(false)
       })
       .catch(err => {
@@ -237,21 +283,57 @@ export function MembersList({ organizationId }: MembersListProps) {
       })
   }
   
-  // Function to delete a member
+  // Function to delete a member and any associated pending invitations
   const deleteMember = async () => {
     if (!memberToDelete) return
 
     try {
       setIsDeleting(true)
+      
+      // First delete the member from the organization
       await fetchAPI(`/organizations/${targetOrgId}/members/${memberToDelete.id}`, {
         method: 'DELETE'
       })
+      
+      // Let's also check for and delete any pending invitations for this email
+      try {
+        // First, get all pending invitations for this organization
+        const orgInvitations = await fetchAPI(`/organizations/${targetOrgId}/invitations`);
+        
+        // Filter to find any that match the email of the member being deleted
+        const matchingInvitations = orgInvitations.filter((invite: any) => 
+          invite.email?.toLowerCase() === memberToDelete.email.toLowerCase()
+        );
+        
+        if (matchingInvitations.length > 0) {
+          console.log(`Found ${matchingInvitations.length} pending invitations for ${memberToDelete.email}`);
+          
+          // Delete each invitation directly through the API
+          for (const invitation of matchingInvitations) {
+            try {
+              // Call the reject invitation endpoint directly
+              await fetchAPI(`/organizations/${targetOrgId}/invitations/${invitation.id}/reject`, {
+                method: 'POST'
+              });
+              console.log(`Deleted invitation ${invitation.id} for ${memberToDelete.email}`);
+            } catch (inviteErr) {
+              console.error(`Error deleting invitation ${invitation.id}:`, inviteErr);
+            }
+          }
+        }
+      } catch (inviteListErr) {
+        console.error('Error fetching or processing invitations:', inviteListErr);
+        // Continue with the process even if this part fails
+      }
       
       toast({
         title: "Member removed",
         description: `${memberToDelete.email} has been removed from the organization.`,
       })
+      
+      // Refresh both members list and organization data to ensure UI is up-to-date
       refreshMembers()
+      refreshOrganizations()
     } catch (err) {
       console.error('Error deleting member:', err)
       toast({
