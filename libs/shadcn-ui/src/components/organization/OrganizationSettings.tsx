@@ -11,7 +11,11 @@ import { Switch } from "../ui/switch";
 import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext';
 import { toast } from "../ui/use-toast";
 
-export default function OrganizationSettings() {
+export interface OrganizationSettingsProps {
+  readOnly?: boolean;
+}
+
+export default function OrganizationSettings({ readOnly = false }: OrganizationSettingsProps) {
   const { activeOrganization, loading, updateOrganization } = useOrganization();
   const [isSaving, setIsSaving] = useState(false);
   
@@ -90,6 +94,8 @@ export default function OrganizationSettings() {
             id="name" 
             value={organizationName} 
             onChange={(e) => setOrganizationName(e.target.value)} 
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
         
@@ -99,6 +105,8 @@ export default function OrganizationSettings() {
             id="email" 
             value={organizationEmail} 
             onChange={(e) => setOrganizationEmail(e.target.value)} 
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
         
@@ -158,7 +166,7 @@ export default function OrganizationSettings() {
               </Tooltip>
             </TooltipProvider>
           </div>
-          <Select value={channel} onValueChange={setChannel}>
+          <Select value={channel} onValueChange={setChannel} disabled={readOnly}>
             <SelectTrigger>
               <SelectValue placeholder="Select channel" />
             </SelectTrigger>
@@ -187,7 +195,9 @@ export default function OrganizationSettings() {
           <Input 
             id="callConcurrency" 
             value={callConcurrencyLimit} 
-            onChange={(e) => setCallConcurrencyLimit(e.target.value)} 
+            onChange={(e) => setCallConcurrencyLimit(e.target.value)}
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
         
@@ -214,7 +224,8 @@ export default function OrganizationSettings() {
             <Switch 
               id="hipaa" 
               checked={hipaaEnabled} 
-              onCheckedChange={setHipaaEnabled} 
+              onCheckedChange={setHipaaEnabled}
+              disabled={readOnly}
             />
           </div>
         </div>
@@ -242,22 +253,29 @@ export default function OrganizationSettings() {
             <Switch 
               id="pci" 
               checked={pciEnabled} 
-              onCheckedChange={setPciEnabled} 
+              onCheckedChange={setPciEnabled}
+              disabled={readOnly}
             />
           </div>
         </div>
       </div>
 
-      <div className="flex justify-end mt-6">
-        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+      {!readOnly && (
+        <Button
+          className="w-full"
+          onClick={handleSave}
+          disabled={isSaving}
+        >
           {isSaving ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Saving...
             </>
-          ) : 'Save Changes'}
+          ) : (
+            "Save Changes"
+          )}
         </Button>
-      </div>
+      )}
     </div>
   );
 } 

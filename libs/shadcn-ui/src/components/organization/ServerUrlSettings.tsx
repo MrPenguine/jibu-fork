@@ -15,7 +15,11 @@ interface HeaderRow {
   id: string;
 }
 
-export default function ServerUrlSettings() {
+export interface ServerUrlSettingsProps {
+  readOnly?: boolean;
+}
+
+export default function ServerUrlSettings({ readOnly = false }: ServerUrlSettingsProps) {
   const { activeOrganization, updateOrganization } = useOrganization();
   const [isSaving, setIsSaving] = useState(false);
   
@@ -32,6 +36,7 @@ export default function ServerUrlSettings() {
   );
 
   const addRow = () => {
+    if (readOnly) return;
     const newRow = {
       name: "",
       value: "",
@@ -41,16 +46,19 @@ export default function ServerUrlSettings() {
   };
 
   const updateHeader = (id: string, field: "name" | "value", value: string) => {
+    if (readOnly) return;
     setHeaders(headers.map(header => 
       header.id === id ? { ...header, [field]: value } : header
     ));
   };
 
   const removeHeader = (id: string) => {
+    if (readOnly) return;
     setHeaders(headers.filter(header => header.id !== id));
   };
 
   const clearAll = () => {
+    if (readOnly) return;
     setHeaders([]);
   };
 
@@ -106,6 +114,8 @@ export default function ServerUrlSettings() {
             onChange={(e) => setServerUrl(e.target.value)} 
             placeholder="No Server URL"
             className="mt-1"
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
         
@@ -137,6 +147,8 @@ export default function ServerUrlSettings() {
             max="120"
             type="number"
             className="mt-1"
+            readOnly={readOnly}
+            disabled={readOnly}
           />
         </div>
         
@@ -166,60 +178,70 @@ export default function ServerUrlSettings() {
                 <div key={header.id} className="flex gap-2">
                   <Input 
                     value={header.name} 
-                    onChange={(e) => updateHeader(header.id, "name", e.target.value)} 
+                    onChange={(e) => updateHeader(header.id, "name", e.target.value)}
                     placeholder="Header Name"
                     className="flex-1"
+                    readOnly={readOnly}
+                    disabled={readOnly}
                   />
                   <Input 
                     value={header.value} 
                     onChange={(e) => updateHeader(header.id, "value", e.target.value)} 
                     placeholder="Header Value"
                     className="flex-1"
+                    readOnly={readOnly}
+                    disabled={readOnly}
                   />
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => removeHeader(header.id)}
-                  >
-                    ✕
-                  </Button>
+                  {!readOnly && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => removeHeader(header.id)}
+                    >
+                      ✕
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           )}
           
-          <Button 
-            variant="outline" 
-            onClick={addRow}
-            className="flex items-center mt-2"
-          >
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add Row
-          </Button>
+          {!readOnly && (
+            <Button 
+              variant="outline" 
+              onClick={addRow}
+              className="flex items-center mt-2"
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Add Row
+            </Button>
+          )}
         </div>
       </div>
       
-      <div className="flex justify-end gap-3 mt-8">
-        <Button 
-          variant="outline" 
-          onClick={clearAll}
-          className="rounded-xl border-0"
-        >
-          Clear
-        </Button>
-        <Button 
-          onClick={saveSettings}
-          disabled={isSaving}
-          className="gap-2 rounded-xl border-0"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : 'Save'}
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="flex justify-end gap-3 mt-8">
+          <Button 
+            variant="outline" 
+            onClick={clearAll}
+            className="rounded-xl border-0"
+          >
+            Clear
+          </Button>
+          <Button 
+            onClick={saveSettings}
+            disabled={isSaving}
+            className="gap-2 rounded-xl border-0"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : 'Save'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 } 

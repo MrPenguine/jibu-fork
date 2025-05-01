@@ -15,6 +15,8 @@ import ServerUrlSettings from "@libs/shadcn-ui/components/organization/ServerUrl
 import DeleteOrganization from "@libs/shadcn-ui/components/organization/DeleteOrganization";
 import { RoleGuard } from "@libs/shadcn-ui/components/organization/RoleGuard";
 import { useOrganization } from "../../../../utils/organizationContext";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@libs/shadcn-ui/components/ui/alert";
 
 export default function OrganizationSettingsPage() {
   const { activeOrganization, loading } = useOrganization();
@@ -40,6 +42,8 @@ export default function OrganizationSettingsPage() {
     );
   }
 
+  const isEditor = activeOrganization.role === 'editor';
+
   return (
     <div className="w-full px-6 pb-6 pt-0">
       <div className="max-w-[1600px] mx-auto">
@@ -52,59 +56,100 @@ export default function OrganizationSettingsPage() {
 
         <Separator className="mt-6" />
 
+        {isEditor && (
+          <div className="mt-6">
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                You have view-only access to organization settings. Contact an admin or owner for changes.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         <div className="flex justify-center mt-8">
           <div className="w-full md:w-2/3">
-            <RoleGuard allowedRoles={["owner", "admin"]}>
+            {isEditor ? (
               <CustomCard>
                 <CustomCardHeader>
                   <CardTitle>Organization Settings</CardTitle>
                   <CardDescription>
-                    Update your organization's basic information
+                    View your organization's basic information
                   </CardDescription>
                 </CustomCardHeader>
                 <CustomCardContent>
-                  <OrganizationSettings />
+                  <OrganizationSettings readOnly={true} />
                 </CustomCardContent>
               </CustomCard>
-            </RoleGuard>
+            ) : (
+              <RoleGuard allowedRoles={["owner", "admin"]}>
+                <CustomCard>
+                  <CustomCardHeader>
+                    <CardTitle>Organization Settings</CardTitle>
+                    <CardDescription>
+                      Update your organization's basic information
+                    </CardDescription>
+                  </CustomCardHeader>
+                  <CustomCardContent>
+                    <OrganizationSettings />
+                  </CustomCardContent>
+                </CustomCard>
+              </RoleGuard>
+            )}
           </div>
         </div>
         
         <div className="flex justify-center mt-8">
           <div className="w-full md:w-2/3">
-            <RoleGuard allowedRoles={["owner", "admin"]}>
+            {isEditor ? (
               <CustomCard>
                 <CustomCardHeader>
                   <CardTitle>Server URLs</CardTitle>
                   <CardDescription>
-                    Configure server URLs for your organization
+                    View server URLs for your organization
                   </CardDescription>
                 </CustomCardHeader>
                 <CustomCardContent>
-                  <ServerUrlSettings />
+                  <ServerUrlSettings readOnly={true} />
                 </CustomCardContent>
               </CustomCard>
-            </RoleGuard>
+            ) : (
+              <RoleGuard allowedRoles={["owner", "admin"]}>
+                <CustomCard>
+                  <CustomCardHeader>
+                    <CardTitle>Server URLs</CardTitle>
+                    <CardDescription>
+                      Configure server URLs for your organization
+                    </CardDescription>
+                  </CustomCardHeader>
+                  <CustomCardContent>
+                    <ServerUrlSettings />
+                  </CustomCardContent>
+                </CustomCard>
+              </RoleGuard>
+            )}
           </div>
         </div>
         
-        <div className="flex justify-center mt-8">
-          <div className="w-full md:w-2/3">
-            <RoleGuard allowedRoles={["owner"]}>
-              <CustomDangerCard>
-                <CustomCardHeader>
-                  <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                  <CardDescription>
-                    Permanently delete this organization and all associated data
-                  </CardDescription>
-                </CustomCardHeader>
-                <CustomCardContent>
-                  <DeleteOrganization />
-                </CustomCardContent>
-              </CustomDangerCard>
-            </RoleGuard>
+        {!isEditor && (
+          <div className="flex justify-center mt-8">
+            <div className="w-full md:w-2/3">
+              <RoleGuard allowedRoles={["owner"]}>
+                <CustomDangerCard>
+                  <CustomCardHeader>
+                    <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                    <CardDescription>
+                      Permanently delete this organization and all associated data
+                    </CardDescription>
+                  </CustomCardHeader>
+                  <CustomCardContent>
+                    <DeleteOrganization />
+                  </CustomCardContent>
+                </CustomDangerCard>
+              </RoleGuard>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
