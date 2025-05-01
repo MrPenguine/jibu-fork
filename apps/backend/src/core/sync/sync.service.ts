@@ -66,10 +66,17 @@ export class UserSyncService {
         memberships: {
           create: {
             userId: user.id,
-            role: 'admin', // Default role is admin for created org
+            role: 'owner', // Default role is owner for created org
+            status: 'active', // Ensure the membership is active
           },
         },
       },
+    });
+
+    // Update the user's lastOrgId to point to this organization
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastOrgId: organization.id }
     });
 
     this.logger.log(`Created new user and organization: ${user.id}, ${organization.id}`);

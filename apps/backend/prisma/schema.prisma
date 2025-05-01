@@ -28,7 +28,7 @@ model User {
   memberships       OrganizationMembership[] // Relation field
   files             File[]   // Reverse relation
   lastOrg           Organization? @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
-  // apiKeys         ApiKey[] // Add relations as models are created
+  sentInvitations   Invitation[] // Invitations sent by this user
   
   @@index([lastOrgId])
 }
@@ -38,30 +38,53 @@ model Organization {
   name        String
   email       String?
   settings    Json?    // Store organization settings as JSON
-  // ownerId     String // Decide if needed, maybe just check role in membership
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   memberships OrganizationMembership[] // Relation field
   credentials Credential[] // Relation to credentials
   files       File[]   // Reverse relation
   usersLastOrg User[]  @relation("UserLastOrg") // Users who have this as their last organization
-  // Add other org fields: globalWebhookUrl, etc.
+  invitations Invitation[] // Invitations for this organization
 }
 
 model OrganizationMembership {
   id             String   @id @default(uuid())
   organizationId String
-  userId         String
+  userId         String?  // Optional to handle invitations for non-users
+  email          String?  // Store email for pending memberships with no user
   role           String
+  status         String   @default("pending") // Status: "pending", "active", "revoked"
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, userId]) // Composite unique key
   @@index([userId])
   @@index([organizationId])
+  @@index([email])
+}
+
+model Invitation {
+  id             String   @id @default(uuid())
+  email          String
+  organizationId String
+  role           String
+  token          String   @unique
+  status         String   @default("pending") // Status: "pending", "accepted", "revoked", "expired"
+  invitedById    String
+  message        String?  // Optional message to include with invitation
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  expiresAt      DateTime
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy     User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([invitedById])
+  @@index([token])
+  @@index([email])
 }
 
 model Credential {
@@ -83,21 +106,19 @@ model Credential {
 }
 
 model File {
-  id               String    @id @default(uuid())
-  name             String    // Original filename
-  storageProvider  String    // e.g., 's3'
-  storageKey       String    @unique // Unique path in storage (e.g., orgId/uuid/filename)
-  mimeType         String    // e.g., 'application/pdf'
-  sizeBytes        Int       // File size in bytes
-  organizationId   String    // Foreign key to Org
-  userId           String    // Foreign key to User
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id             String   @id @default(uuid())
+  name           String
+  storageProvider String
+  storageKey      String  @unique
+  mimeType        String
+  sizeBytes       Int
+  organizationId  String
+  userId          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Future relation for KnowledgeBase (Sprint KB-1)
-  // knowledgeBaseSources KnowledgeBaseSource[]
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([userId])

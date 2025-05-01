@@ -38,6 +38,7 @@ export class UserController {
       orgId: req.user.orgId,
       orgName: req.user.orgName,
       orgRole: req.user.orgRole,
+      membershipStatus: req.user.membershipStatus || 'active',
     };
   }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronsUpDown, Plus, Building2, Settings, ChevronRight, Bell, Loader2 } from "lucide-react"
+import { ChevronsUpDown, Plus, Building2, Settings, ChevronRight, Bell, Loader2, Clock } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,12 +22,12 @@ import { CreateOrganizationModal } from "./CreateOrganizationModal"
 import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext'
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 
-// Extend the Organization type to include memberStatus
+// Extend the Organization type to include status
 interface ExtendedOrganization {
   id: string;
   name: string;
   role: string;
-  memberStatus?: string;
+  status?: string;
   email?: string;
   settings?: any;
 }
@@ -79,30 +79,30 @@ export function OrganizationSwitcher() {
     router.push(`/organizations/${orgId}/settings`);
   };
 
-  // Count of pending invitations
-  const pendingInvitationsCount = incomingInvitations?.length || 0;
-  
-  // Create a section for invited organizations
-  const hasInvitedOrganizations = incomingInvitations && incomingInvitations.length > 0;
-
-  // Filter out any organizations that are not active yet (pending invitation)
-  const activeOrganizations = (organizations as ExtendedOrganization[]).filter(org => 
-    !org.memberStatus || org.memberStatus === 'active'
+  // Filter organizations by status
+  const activeOrganizations = organizations.filter(org => 
+    !org.status || org.status === 'active'
   );
+  
+  // Find organizations with pending status
+  const pendingOrganizations = organizations.filter(org => 
+    org.status === 'pending'
+  );
+  
+  // Count all pending items (invitations + pending orgs)
+  const totalPendingCount = incomingInvitations.length + pendingOrganizations.length;
+  
+  // Check if we have any pending items to show
+  const hasPendingItems = totalPendingCount > 0;
 
-  // Add more detailed debug logging 
+  // Add detailed debug logging
   React.useEffect(() => {
-    console.log('OrganizationSwitcher - incomingInvitations:', incomingInvitations);
-    console.log('OrganizationSwitcher - pendingInvitationsCount:', pendingInvitationsCount);
-    console.log('OrganizationSwitcher - hasInvitedOrganizations:', hasInvitedOrganizations);
-    console.log('OrganizationSwitcher - organizations (unfiltered):', organizations);
+    console.log('OrganizationSwitcher - Organizations:', organizations);
     console.log('OrganizationSwitcher - activeOrganizations:', activeOrganizations);
-    
-    // Force component to rerender if invitations change
-    if (pendingInvitationsCount > 0) {
-      console.log('Has pending invitations, ensuring notification badge is visible');
-    }
-  }, [incomingInvitations, pendingInvitationsCount, hasInvitedOrganizations, organizations]);
+    console.log('OrganizationSwitcher - pendingOrganizations:', pendingOrganizations);
+    console.log('OrganizationSwitcher - incomingInvitations:', incomingInvitations);
+    console.log('OrganizationSwitcher - totalPendingCount:', totalPendingCount);
+  }, [organizations, activeOrganizations, pendingOrganizations, incomingInvitations, totalPendingCount]);
 
   if (loading || !activeOrganization) {
     return (
@@ -122,7 +122,7 @@ export function OrganizationSwitcher() {
     )
   }
 
-  // If we have no organizations from API, but we're not loading anymore,
+  // If we have no active organizations, but we're not loading anymore,
   // show a message or UI to create first organization
   if (activeOrganizations.length === 0 && !loading) {
     return (
@@ -166,9 +166,9 @@ export function OrganizationSwitcher() {
                   <span className="truncate text-xs text-gray-500 capitalize">{activeOrganization.role}</span>
                 </div>
                 <div className="relative ml-auto">
-                  {pendingInvitationsCount > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white">
-                      {pendingInvitationsCount}
+                  {totalPendingCount > 0 && (
+                    <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white shadow-sm ring-1 ring-white dark:ring-gray-800">
+                      {totalPendingCount}
                     </span>
                   )}
                   <ChevronsUpDown className="h-4 w-4 text-violet-600/70 dark:text-violet-400/70 mr-1" />
@@ -211,7 +211,7 @@ export function OrganizationSwitcher() {
                 </DropdownMenuItem>
               )}
               
-              {/* Other organizations */}
+              {/* Other active organizations */}
               {activeOrganizations
                 .filter(org => org.id !== activeOrganization?.id)
                 .map((org) => (
@@ -237,24 +237,23 @@ export function OrganizationSwitcher() {
                   </DropdownMenuItem>
                 ))}
 
-              {/* Invited organizations section */}
-              {hasInvitedOrganizations && (
+              {/* Invitations section - both pending organizations and direct invitations */}
+              {(pendingOrganizations.length > 0 || incomingInvitations.length > 0) && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground mb-1">
-                    PENDING INVITATIONS
+                  <DropdownMenuLabel className="text-xs text-muted-foreground mb-1 flex items-center">
+                    <Bell className="h-3 w-3 mr-1 text-red-500" /> PENDING INVITATIONS
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-medium dark:bg-red-900/30 dark:text-red-400">
+                      {totalPendingCount}
+                    </span>
                   </DropdownMenuLabel>
                   
-                  {incomingInvitations.map((invite: Invitation) => {
-                    console.log('Rendering invitation:', invite.id, invite.organization?.name);
-                    // Find if the organization is already in the list
-                    const isPendingMembership = organizations.some(
-                      (org: ExtendedOrganization) => 
-                        org.id === invite.organization?.id && 
-                        org.memberStatus === 'pending'
-                    );
-
-                    return (
+                  {/* Only direct invitations that don't have a matching organization yet */}
+                  {incomingInvitations
+                    .filter(invite => 
+                      !organizations.some(org => org.id === invite.organization?.id)
+                    )
+                    .map((invite) => (
                       <DropdownMenuItem
                         key={invite.id}
                         className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-default hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl"
@@ -265,13 +264,13 @@ export function OrganizationSwitcher() {
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-gray-100 dark:bg-gray-800 text-violet-600 dark:text-violet-400 font-medium">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium">
                               {invite.organization?.name?.charAt(0).toUpperCase() || "O"}
                             </div>
                             <div className="max-w-[140px]">
                               <p className="text-sm font-medium truncate">{invite.organization?.name || "Organization"}</p>
                               <p className="text-xs text-gray-500 truncate">
-                                {isPendingMembership ? 'Membership pending approval' : `Invited as ${invite.role}`}
+                                Invited as {invite.role}
                               </p>
                             </div>
                           </div>
@@ -279,11 +278,11 @@ export function OrganizationSwitcher() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-6 px-2 text-xs rounded-xl border-0"
+                              className="h-6 px-2 text-xs rounded-xl border-0 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                console.log(`Accepting invitation ${invite.id} for ${invite.organization?.name}`);
+                                console.log(`Accepting invitation ${invite.id}`);
                                 acceptInvitation(invite.id)
                                   .then(() => {
                                     console.log('Invitation accepted successfully');
@@ -298,11 +297,11 @@ export function OrganizationSwitcher() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-6 px-2 text-xs rounded-xl border-0"
+                              className="h-6 px-2 text-xs rounded-xl border-0 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                console.log(`Rejecting invitation ${invite.id} for ${invite.organization?.name}`);
+                                console.log(`Rejecting invitation ${invite.id}`);
                                 rejectInvitation(invite.id)
                                   .then(() => {
                                     console.log('Invitation rejected successfully');
@@ -317,12 +316,92 @@ export function OrganizationSwitcher() {
                           </div>
                         </div>
                       </DropdownMenuItem>
+                    ))}
+                  
+                  {/* Pending organizations that already have entries in the organizations list */}
+                  {pendingOrganizations.map((org) => {
+                    // Find matching invitation for this organization
+                    const matchingInvitation = incomingInvitations.find(
+                      invite => invite.organization?.id === org.id
+                    );
+                    
+                    return (
+                      <DropdownMenuItem
+                        key={`pending-${org.id}`}
+                        className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-default hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl"
+                        onSelect={(e) => {
+                          // Prevent the dropdown from closing when selecting this item
+                          e.preventDefault();
+                        }}
+                      >
+                        <div className="flex flex-col w-full">
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 font-medium">
+                                {org.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="max-w-[140px]">
+                                <p className="text-sm font-medium truncate">{org.name}</p>
+                                <div className="flex items-center">
+                                  <Clock className="h-3 w-3 mr-1 text-yellow-500" />
+                                  <p className="text-xs text-yellow-500">Pending approval</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {matchingInvitation && (
+                            <div className="ml-11 mt-2 flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-xs rounded-xl border-0 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  console.log(`Accepting invitation for ${org.name}`);
+                                  if (matchingInvitation) {
+                                    acceptInvitation(matchingInvitation.id)
+                                      .then(() => {
+                                        console.log('Invitation accepted successfully');
+                                      })
+                                      .catch((err: Error) => {
+                                        console.error('Error accepting invitation:', err);
+                                      });
+                                  }
+                                }}
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 px-2 text-xs rounded-xl border-0 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  console.log(`Rejecting invitation for ${org.name}`);
+                                  if (matchingInvitation) {
+                                    rejectInvitation(matchingInvitation.id)
+                                      .then(() => {
+                                        console.log('Invitation rejected successfully');
+                                      })
+                                      .catch((err: Error) => {
+                                        console.error('Error rejecting invitation:', err);
+                                      });
+                                  }
+                                }}
+                              >
+                                Decline
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </DropdownMenuItem>
                     );
                   })}
                 </>
               )}
-
-              {/* Remove redundant OrganizationInvites component */}
               
               <DropdownMenuSeparator />
               

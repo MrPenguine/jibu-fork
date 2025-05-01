@@ -37,6 +37,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Get organization role if a last organization is set
     let orgRole = null;
+    let membershipStatus = null;
     if (user.lastOrgId) {
       const membership = await this.prismaService.organizationMembership.findFirst({
         where: {
@@ -46,6 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       });
       
       orgRole = membership?.role;
+      membershipStatus = membership?.status;
     }
 
     // Return enriched user information with org context
@@ -57,6 +59,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       orgId: user.lastOrgId,
       orgName: user.lastOrg?.name,
       orgRole: orgRole,
+      membershipStatus: membershipStatus,
     };
   }
 } 

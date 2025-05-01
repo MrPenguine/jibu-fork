@@ -119,7 +119,7 @@ const navData = {
     },
     {
       title: "Members",
-      url: "#",
+      url: "/organizations/members",
     },
     {
       title: "Org Settings",

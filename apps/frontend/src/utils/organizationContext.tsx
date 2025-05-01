@@ -8,6 +8,7 @@ export interface Organization {
   id: string;
   name: string;
   role: string;
+  status?: string;
   email?: string;
   settings?: {
     channel?: string;
@@ -18,6 +19,24 @@ export interface Organization {
     timeoutSeconds?: number;
     headers?: { name: string; value: string }[];
   };
+}
+
+// Define invitation interface
+export interface Invitation {
+  id: string;
+  organization: {
+    id: string;
+    name: string;
+  };
+  role: string;
+  invitedBy: {
+    id: string;
+    email: string;
+    fullName?: string;
+  };
+  invitedAt: string;
+  expiresAt: string;
+  message?: string;
 }
 
 // Define organization update interface
@@ -41,10 +60,14 @@ interface OrganizationContextType {
   organizations: Organization[];
   loading: boolean;
   error: string | null;
+  incomingInvitations: Invitation[];
   switchOrganization: (org: Organization) => Promise<void>;
   refreshOrganizations: () => Promise<void>;
   updateOrganization: (orgId: string, data: OrganizationUpdateData) => Promise<Organization>;
   deleteOrganization: (orgId: string) => Promise<void>;
+  inviteMembers: (orgId: string, emails: string[], role: string, message?: string) => Promise<void>;
+  acceptInvitation: (invitationId: string) => Promise<void>;
+  rejectInvitation: (invitationId: string) => Promise<void>;
 }
 
 // Create the context with default values
@@ -53,10 +76,14 @@ const OrganizationContext = createContext<OrganizationContextType>({
   organizations: [],
   loading: true,
   error: null,
+  incomingInvitations: [],
   switchOrganization: async () => {},
   refreshOrganizations: async () => {},
   updateOrganization: async () => ({ id: '', name: '', role: '' }),
   deleteOrganization: async () => {},
+  inviteMembers: async () => {},
+  acceptInvitation: async () => {},
+  rejectInvitation: async () => {},
 });
 
 // Custom hook to use the organization context
@@ -66,8 +93,21 @@ export const useOrganization = () => useContext(OrganizationContext);
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [activeOrganization, setActiveOrganization] = useState<Organization | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [incomingInvitations, setIncomingInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Function to fetch invitations
+  const fetchInvitations = async () => {
+    try {
+      const invitationsData = await fetchAPI('/invitations');
+      console.log('Invitations fetched:', invitationsData);
+      setIncomingInvitations(invitationsData || []);
+    } catch (error) {
+      console.error('Error fetching invitations:', error);
+      // Just log the error, don't set the error state, as this is auxiliary data
+    }
+  };
 
   // Function to fetch organizations and active org
   const refreshOrganizations = async () => {
@@ -78,9 +118,19 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       // Get all organizations first
       const orgsData = await fetchAPI('/organizations');
       console.log('Organizations fetched:', orgsData);
-      setOrganizations(orgsData);
       
-      if (orgsData.length === 0) {
+      // Ensure that each organization has its status field (default to 'active' if not set)
+      const organizationsWithStatus = orgsData.map((org: Organization) => ({
+        ...org,
+        status: org.status || 'active'
+      }));
+      
+      setOrganizations(organizationsWithStatus);
+      
+      // Fetch invitations
+      await fetchInvitations();
+      
+      if (organizationsWithStatus.length === 0) {
         console.warn('User has no organizations');
         setLoading(false);
         return;
@@ -96,7 +146,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       
       // If we have an active organization ID in localStorage, use it
       if (activeOrgId) {
-        const activeOrg = orgsData.find(
+        const activeOrg = organizationsWithStatus.find(
           (org: Organization) => org.id === activeOrgId
         );
         
@@ -111,7 +161,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         const userData = await fetchAPI('/users/me');
         
         if (userData && userData.lastOrganizationId) {
-          const activeOrgFromApi = orgsData.find(
+          const activeOrgFromApi = organizationsWithStatus.find(
             (org: Organization) => org.id === userData.lastOrganizationId
           );
           
@@ -129,26 +179,56 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           }
         }
         
-        // If neither localStorage nor API has a valid active org, use the first one
-        setActiveOrganization(orgsData[0]);
+        // If neither localStorage nor API has a valid active org, find the first active one
+        const firstActiveOrg = organizationsWithStatus.find((org: Organization) => 
+          !org.status || org.status === 'active'
+        );
         
-        // Store the first org ID in localStorage
-        try {
-          localStorage.setItem('activeOrganizationId', orgsData[0].id);
-        } catch (storageError) {
-          console.error('Error saving to localStorage:', storageError);
+        if (firstActiveOrg) {
+          setActiveOrganization(firstActiveOrg);
+          
+          // Store the first org ID in localStorage
+          try {
+            localStorage.setItem('activeOrganizationId', firstActiveOrg.id);
+          } catch (storageError) {
+            console.error('Error saving to localStorage:', storageError);
+          }
+        } else if (organizationsWithStatus.length > 0) {
+          // If there are no active orgs but we have organizations, use the first one (likely pending)
+          setActiveOrganization(organizationsWithStatus[0]);
+          
+          try {
+            localStorage.setItem('activeOrganizationId', organizationsWithStatus[0].id);
+          } catch (storageError) {
+            console.error('Error saving to localStorage:', storageError);
+          }
         }
       } catch (userError) {
         console.error('Error fetching user data:', userError);
         
-        // Fallback to first organization
-        setActiveOrganization(orgsData[0]);
+        // Find the first active organization
+        const firstActiveOrg = organizationsWithStatus.find((org: Organization) => 
+          !org.status || org.status === 'active'
+        );
         
-        // Store in localStorage
-        try {
-          localStorage.setItem('activeOrganizationId', orgsData[0].id);
-        } catch (storageError) {
-          console.error('Error saving to localStorage:', storageError);
+        if (firstActiveOrg) {
+          setActiveOrganization(firstActiveOrg);
+          
+          // Store in localStorage
+          try {
+            localStorage.setItem('activeOrganizationId', firstActiveOrg.id);
+          } catch (storageError) {
+            console.error('Error saving to localStorage:', storageError);
+          }
+        } else if (organizationsWithStatus.length > 0) {
+          // If no active orgs, use the first one
+          setActiveOrganization(organizationsWithStatus[0]);
+          
+          try {
+            localStorage.setItem('activeOrganizationId', organizationsWithStatus[0].id);
+          } catch (storageError) {
+            console.error('Error saving to localStorage:', storageError);
+          }
         }
       }
     } catch (err) {
@@ -262,6 +342,68 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     window.location.href = currentPath;
   };
 
+  // Function to invite members to an organization
+  const inviteMembers = async (orgId: string, emails: string[], role: string, message?: string) => {
+    try {
+      const response = await fetchAPI(`/organizations/${orgId}/invitations`, {
+        method: 'POST',
+        body: JSON.stringify({
+          emails,
+          role,
+          message
+        })
+      });
+      
+      // Refresh organizations to get updated membership data
+      await refreshOrganizations();
+      
+      return response;
+    } catch (error) {
+      console.error('Error inviting members:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to invite members';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+  
+  // Function to accept an invitation
+  const acceptInvitation = async (invitationId: string) => {
+    try {
+      await fetchAPI(`/invitations/${invitationId}/respond`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'accept' })
+      });
+      
+      // Refresh organizations to include the newly accepted organization
+      await refreshOrganizations();
+    } catch (error) {
+      console.error('Error accepting invitation:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to accept invitation';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+  
+  // Function to reject an invitation
+  const rejectInvitation = async (invitationId: string) => {
+    try {
+      await fetchAPI(`/invitations/${invitationId}/respond`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'reject' })
+      });
+      
+      // Remove the invitation from the list
+      setIncomingInvitations(prevInvitations => 
+        prevInvitations.filter(invitation => invitation.id !== invitationId)
+      );
+    } catch (error) {
+      console.error('Error rejecting invitation:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reject invitation';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
   // Fetch organizations on initial load
   useEffect(() => {
     refreshOrganizations();
@@ -274,10 +416,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         organizations,
         loading,
         error,
+        incomingInvitations,
         switchOrganization,
         refreshOrganizations,
         updateOrganization,
         deleteOrganization,
+        inviteMembers,
+        acceptInvitation,
+        rejectInvitation,
       }}
     >
       {children}

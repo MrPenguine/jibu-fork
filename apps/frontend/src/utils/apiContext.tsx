@@ -20,6 +20,7 @@ interface ApiContextType {
   orgId: string | null;
   orgName: string | null;
   orgRole: string | null;
+  membershipStatus: string | null;
   organizations: Organization[];
   activeOrganization: Organization | null;
   loading: boolean;
@@ -38,6 +39,7 @@ const ApiContext = createContext<ApiContextType>({
   orgId: null,
   orgName: null,
   orgRole: null,
+  membershipStatus: null,
   organizations: [],
   activeOrganization: null,
   loading: true,
@@ -59,6 +61,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [orgRole, setOrgRole] = useState<string | null>(null);
+  const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [activeOrganization, setActiveOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +119,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         setOrgId(null);
         setOrgName(null);
         setOrgRole(null);
+        setMembershipStatus(null);
         setOrganizations([]);
         setActiveOrganization(null);
         setLoading(false);
@@ -139,6 +143,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       setOrgId(context.orgId);
       setOrgName(context.orgName);
       setOrgRole(context.orgRole);
+      setMembershipStatus(context.membershipStatus);
       
       // Get all organizations
       const orgsResponse = await fetch(`${API_BASE_URL}/organizations`, {
@@ -184,6 +189,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       setOrgId(org.id);
       setOrgName(org.name);
       setOrgRole(org.role);
+      setMembershipStatus(org.status || 'active');
       
       // Store in localStorage
       try {
@@ -258,6 +264,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
           setOrgId(null);
           setOrgName(null);
           setOrgRole(null);
+          setMembershipStatus(null);
           
           // Clear localStorage
           try {
@@ -297,6 +304,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     orgId,
     orgName,
     orgRole,
+    membershipStatus,
     organizations,
     activeOrganization,
     loading,

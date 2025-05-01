@@ -5,13 +5,19 @@ export class CreateOrganizationDto {
 export class UpdateOrganizationDto {
   name?: string;
   email?: string;
-  settings?: {
-    channel?: string;
-    callConcurrencyLimit?: number;
-    hipaaEnabled?: boolean;
-    pciEnabled?: boolean;
-    serverUrl?: string;
-    timeoutSeconds?: number;
-    headers?: { name: string; value: string }[];
-  };
+  settings?: Record<string, any>;
+}
+
+export class InviteMembersDto {
+  emails: string[];
+  role: string;
+  message?: string;
+}
+
+export class RespondToInvitationDto {
+  action: 'accept' | 'reject';
+}
+
+export class UpdateMemberRoleDto {
+  role: string;
 } 
