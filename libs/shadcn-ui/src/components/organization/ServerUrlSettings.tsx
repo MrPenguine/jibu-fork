@@ -99,12 +99,12 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
   };
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-10">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
+    <div className="space-y-8">
+      <div className="space-y-8">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 mb-2">
             <Label htmlFor="serverUrl" className="flex items-center">
-              <Link className="h-4 w-4 mr-2" />
+              <Link className="h-4 w-4 mr-1.5 text-primary" />
               Server URL
             </Label>
           </div>
@@ -113,22 +113,22 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
             value={serverUrl} 
             onChange={(e) => setServerUrl(e.target.value)} 
             placeholder="No Server URL"
-            className="mt-1"
+            className="mt-1 rounded-xl"
             readOnly={readOnly}
             disabled={readOnly}
           />
         </div>
         
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="timeoutSeconds">
-              <Info className="h-4 w-4 mr-2" />
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Label htmlFor="timeoutSeconds" className="flex items-center">
+              <Info className="h-4 w-4 mr-1.5 text-primary" />
               Timeout Seconds
             </Label>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <Info className="h-4 w-4 text-muted-foreground hover:text-primary cursor-help transition-colors" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>This is the timeout in seconds for the request to your server. Must be between 1 and 120 seconds.</p>
@@ -136,7 +136,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
               </Tooltip>
             </TooltipProvider>
           </div>
-          <p className="text-sm text-muted-foreground mb-3">
+          <p className="text-sm text-muted-foreground mb-2">
             This is the timeout in seconds for the request to your server. Must be between 1 and 120 seconds.
           </p>
           <Input 
@@ -146,21 +146,22 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
             min="1"
             max="120"
             type="number"
-            className="mt-1"
+            className="rounded-xl"
             readOnly={readOnly}
             disabled={readOnly}
           />
         </div>
         
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Label>
-              <Label htmlFor="headers">Headers</Label>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Label className="flex items-center">
+              <Info className="h-4 w-4 mr-1.5 text-primary" />
+              Headers
             </Label>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <Info className="h-4 w-4 text-muted-foreground hover:text-primary cursor-help transition-colors" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>These are the custom headers to include in the request sent to your server. Each key-value pair represents a header name and its value.</p>
@@ -168,19 +169,19 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
               </Tooltip>
             </TooltipProvider>
           </div>
-          <p className="text-sm text-muted-foreground mb-5">
+          <p className="text-sm text-muted-foreground mb-2">
             These are the custom headers to include in the request sent to your server. Each key-value pair represents a header name and its value.
           </p>
           
           {headers.length > 0 && (
-            <div className="space-y-3 mb-5">
+            <div className="space-y-2 mb-3">
               {headers.map((header) => (
-                <div key={header.id} className="flex gap-2">
+                <div key={header.id} className="flex gap-2 items-center">
                   <Input 
                     value={header.name} 
                     onChange={(e) => updateHeader(header.id, "name", e.target.value)}
                     placeholder="Header Name"
-                    className="flex-1"
+                    className="flex-1 rounded-xl"
                     readOnly={readOnly}
                     disabled={readOnly}
                   />
@@ -188,7 +189,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
                     value={header.value} 
                     onChange={(e) => updateHeader(header.id, "value", e.target.value)} 
                     placeholder="Header Value"
-                    className="flex-1"
+                    className="flex-1 rounded-xl"
                     readOnly={readOnly}
                     disabled={readOnly}
                   />
@@ -197,6 +198,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
                       variant="ghost" 
                       size="icon" 
                       onClick={() => removeHeader(header.id)}
+                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-0 flex items-center justify-center"
                     >
                       ✕
                     </Button>
@@ -210,9 +212,9 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
             <Button 
               variant="outline" 
               onClick={addRow}
-              className="flex items-center mt-2"
+              className="flex items-center rounded-xl"
             >
-              <PlusCircle className="h-4 w-4 mr-2" />
+              <PlusCircle className="h-4 w-4 mr-2 text-primary" />
               Add Row
             </Button>
           )}
@@ -220,7 +222,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
       </div>
       
       {!readOnly && (
-        <div className="flex justify-end gap-3 mt-8">
+        <div className="flex justify-end gap-3 pt-3">
           <Button 
             variant="outline" 
             onClick={clearAll}
