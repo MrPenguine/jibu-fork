@@ -622,15 +622,31 @@ export class OrganizationService {
       throw new HttpException('Member not found in this organization.', HttpStatus.NOT_FOUND);
     }
 
-    // Check if current user can remove this member based on roles
-    if (userMembership.role === 'owner') {
-      // Owner can remove anyone except themselves
-      if (memberToRemove.userId === userId) {
+    // Special case: User is removing themselves (leaving the organization)
+    const isSelfRemoval = memberToRemove.userId === userId;
+    
+    if (isSelfRemoval) {
+      // Owner can't leave without transferring ownership first
+      if (memberToRemove.role === 'owner') {
         throw new HttpException(
           'You cannot remove yourself as an owner. Transfer ownership first.',
           HttpStatus.FORBIDDEN
         );
       }
+      
+      // User is leaving the organization - allow this regardless of role
+      await this.prisma.organizationMembership.delete({
+        where: { id: memberId },
+      });
+      
+      return { message: 'You have left the organization successfully.' };
+    }
+    
+    // Normal case: User is removing someone else
+    
+    // Check if current user can remove this member based on roles
+    if (userMembership.role === 'owner') {
+      // Owner can remove anyone except themselves (handled above)
     } else if (userMembership.role === 'admin') {
       // Admin can remove editors only, not owners or other admins
       if (memberToRemove.role === 'owner' || memberToRemove.role === 'admin') {
@@ -653,5 +669,150 @@ export class OrganizationService {
     });
 
     return { message: 'Member removed successfully.' };
+  }
+
+  /**
+   * Transfer ownership to another member
+   */
+  async transferOwnership(userId: string, organizationId: string, newOwnerId: string) {
+    // Check if the current user is the owner of the organization
+    const currentOwnerMembership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId,
+        organizationId,
+        role: 'owner',
+        status: 'active',
+      },
+    });
+
+    if (!currentOwnerMembership) {
+      throw new HttpException(
+        'Access denied. Only the current owner can transfer ownership.',
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    // Check if the new owner is a member of the organization
+    const newOwnerMembership = await this.prisma.organizationMembership.findUnique({
+      where: { id: newOwnerId },
+      include: { user: { select: { id: true, email: true } } },
+    });
+
+    if (!newOwnerMembership || newOwnerMembership.organizationId !== organizationId) {
+      throw new HttpException('The specified member was not found in this organization.', HttpStatus.NOT_FOUND);
+    }
+
+    if (newOwnerMembership.status !== 'active') {
+      throw new HttpException(
+        'Cannot transfer ownership to a member with a non-active status.',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    // Perform the transfer in a transaction
+    await this.prisma.$transaction(async (tx) => {
+      // Demote the current owner to admin
+      await tx.organizationMembership.update({
+        where: { id: currentOwnerMembership.id },
+        data: { role: 'admin' },
+      });
+
+      // Promote the new member to owner
+      await tx.organizationMembership.update({
+        where: { id: newOwnerId },
+        data: { role: 'owner' },
+      });
+    });
+
+    return {
+      message: 'Ownership transferred successfully.',
+      newOwner: {
+        id: newOwnerMembership.id,
+        userId: newOwnerMembership.userId,
+        email: newOwnerMembership.user?.email,
+      },
+    };
+  }
+
+  /**
+   * Validate an email address before invitation
+   * Checks if user exists, if they are already a member, and if they have a pending invitation
+   */
+  async validateEmail(userId: string, organizationId: string, email: string) {
+    // Check if user has permission to invite members
+    const userMembership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        userId,
+        organizationId,
+        status: 'active',
+        role: { in: ['owner', 'admin'] }
+      },
+    });
+
+    if (!userMembership) {
+      throw new HttpException(
+        'Access denied. Only owners and admins can invite members.',
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    // Check if the email is already registered to an active member in this organization
+    const existingMembership = await this.prisma.organizationMembership.findFirst({
+      where: {
+        organizationId,
+        OR: [
+          { 
+            user: {
+              email
+            } 
+          }
+        ],
+        status: 'active'
+      }
+    });
+
+    if (existingMembership) {
+      return {
+        valid: false,
+        reason: 'exists',
+        message: 'This user is already a member of this organization.'
+      };
+    }
+
+    // Check if there's a pending invitation for this email
+    const pendingInvitation = await this.prisma.invitation.findFirst({
+      where: {
+        email,
+        organizationId,
+        status: 'pending'
+      }
+    });
+
+    if (pendingInvitation) {
+      return {
+        valid: false,
+        reason: 'already-invited',
+        message: 'An invitation has already been sent to this email address.'
+      };
+    }
+
+    // Check if the email exists in the system
+    const user = await this.prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      return {
+        valid: false,
+        reason: 'not-registered',
+        message: 'This email is not registered. The user needs to sign up first.'
+      };
+    }
+
+    // Email validation passed
+    return {
+      valid: true,
+      message: 'User exists and can be invited.'
+    };
   }
 } 

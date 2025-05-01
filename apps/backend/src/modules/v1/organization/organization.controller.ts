@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Patch, Delete, UseGuards, Request, Body, Param } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { OrganizationService } from './organization.service';
-import { CreateOrganizationDto, UpdateOrganizationDto, InviteMembersDto, RespondToInvitationDto, UpdateMemberRoleDto } from './dto/organization.dto';
+import { CreateOrganizationDto, UpdateOrganizationDto, InviteMembersDto, RespondToInvitationDto, UpdateMemberRoleDto, TransferOwnershipDto } from './dto/organization.dto';
 import { OrgRoleGuard } from '../../../core/auth/guards/org-role.guard';
 import { Roles } from '../../../core/auth/decorators/roles.decorator';
 
@@ -107,6 +107,33 @@ export class OrganizationController {
     @Param('memberId') memberId: string
   ) {
     return this.organizationService.removeMember(req.user.id, orgId, memberId);
+  }
+  
+  /**
+   * Transfer ownership to another member - requires owner role
+   */
+  @UseGuards(JwtAuthGuard, OrgRoleGuard)
+  @Roles('owner')
+  @Post(':id/transfer-ownership')
+  async transferOwnership(
+    @Request() req: any, 
+    @Param('id') orgId: string, 
+    @Body() transferDto: TransferOwnershipDto
+  ) {
+    return this.organizationService.transferOwnership(req.user.id, orgId, transferDto.newOwnerId);
+  }
+
+  /**
+   * Validate an email before invitation
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/validate-email')
+  async validateEmail(
+    @Request() req: any, 
+    @Param('id') orgId: string, 
+    @Body() data: { email: string }
+  ) {
+    return this.organizationService.validateEmail(req.user.id, orgId, data.email);
   }
 }
 

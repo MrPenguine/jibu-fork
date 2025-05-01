@@ -43,107 +43,12 @@ import {
   TooltipTrigger,
 } from "@libs/shadcn-ui/components/ui/tooltip"
 
-// Navigation data
-const navData = {
-  user: {
-    name: "User",
-    email: "user@example.com",
-    avatar: "/avatars/default.jpg",
-  },
-  overview: [
-    {
-      title: "Dashboard",
-      url: "/",
-    }
-  ],
-  build: [
-    {
-      title: "Assistants",
-      url: "#",
-    },
-    {
-      title: "Workflows",
-      url: "#",
-    },
-    {
-      title: "Phone Numbers",
-      url: "#",
-    },
-    {
-      title: "Tools",
-      url: "#",
-    },
-    {
-      title: "Files",
-      url: "#",
-    },
-    {
-      title: "Squads",
-      url: "#",
-    },
-    {
-      title: "Provider Keys",
-      url: "#",
-    },
-  ],
-  test: [
-    {
-      title: "Voice Test Suites",
-      url: "#",
-    },
-  ],
-  observe: [
-    {
-      title: "Call Logs",
-      url: "#",
-    },
-    {
-      title: "API Logs",
-      url: "#",
-    },
-    {
-      title: "Webhook Logs",
-      url: "#",
-    },
-  ],
-  community: [
-    {
-      title: "Voice Library",
-      url: "#",
-    },
-  ],
-  orgSettings: [
-    {
-      title: "Billing & Addons",
-      url: "#",
-    },
-    {
-      title: "Members",
-      url: "/organizations/members",
-    },
-    {
-      title: "Org Settings",
-      url: "/organizations/settings",
-    },
-    {
-      title: "API Keys",
-      url: "#",
-    },
-  ],
-  accountSettings: [
-    {
-      title: "Profile",
-      url: "#",
-    },
-  ],
-}
-
 // Custom NavPlayground component with active state styling and tooltip
 function CustomNavPlayground({ 
   items, 
   title 
 }: { 
-  items: { title: string; url: string }[]; 
+  items: { title: string; url: string; icon?: React.ReactNode }[]; 
   title: string;
 }) {
   const pathname = usePathname();
@@ -177,10 +82,10 @@ function CustomNavPlayground({
                         )}
                       >
                         <a href={item.url}>
-                          <LayoutGrid className={cn(
+                          {item.icon || <LayoutGrid className={cn(
                             "size-4 transition-transform group-hover/nav-item:scale-110",
                             isActive ? "text-violet-700 dark:text-violet-300" : ""
-                          )} />
+                          )} />}
                           <span>{item.title}</span>
                         </a>
                       </SidebarMenuButton>
@@ -205,10 +110,10 @@ function CustomNavPlayground({
                   className={itemClassName}
                 >
                   <a href={item.url}>
-                    <LayoutGrid className={cn(
+                    {item.icon || <LayoutGrid className={cn(
                       "size-4",
                       isActive ? "text-violet-700 dark:text-violet-300" : ""
-                    )} />
+                    )} />}
                     <span>{item.title}</span>
                   </a>
                 </SidebarMenuButton>
@@ -225,6 +130,119 @@ export function CustomAppSidebar({ className, ...props }: React.ComponentProps<t
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   
+  // Updated navigation data with appropriate icons
+  const navData = {
+    user: {
+      name: "User",
+      email: "user@example.com",
+      avatar: "/avatars/default.jpg",
+    },
+    overview: [
+      {
+        title: "Dashboard",
+        url: "/",
+        icon: <LayoutDashboard className="size-4" />
+      }
+    ],
+    build: [
+      {
+        title: "Assistants",
+        url: "#",
+        icon: <MessageSquare className="size-4" />
+      },
+      {
+        title: "Workflows",
+        url: "#",
+        icon: <FileCog className="size-4" />
+      },
+      {
+        title: "Phone Numbers",
+        url: "#",
+        icon: <CreditCard className="size-4" />
+      },
+      {
+        title: "Tools",
+        url: "#",
+        icon: <Wrench className="size-4" />
+      },
+      {
+        title: "Files",
+        url: "#",
+        icon: <Files className="size-4" />
+      },
+      {
+        title: "Squads",
+        url: "#",
+        icon: <Users className="size-4" />
+      },
+      {
+        title: "Provider Keys",
+        url: "#",
+        icon: <Key className="size-4" />
+      },
+    ],
+    test: [
+      {
+        title: "Voice Test Suites",
+        url: "#",
+        icon: <PieChart className="size-4" />
+      },
+    ],
+    observe: [
+      {
+        title: "Call Logs",
+        url: "#",
+        icon: <FileCog className="size-4" />
+      },
+      {
+        title: "API Logs",
+        url: "#",
+        icon: <FileCog className="size-4" />
+      },
+      {
+        title: "Webhook Logs",
+        url: "#",
+        icon: <FileCog className="size-4" />
+      },
+    ],
+    community: [
+      {
+        title: "Voice Library",
+        url: "#",
+        icon: <LayoutGrid className="size-4" />
+      },
+    ],
+    orgSettings: [
+      {
+        title: "Billing & Addons",
+        url: "#",
+        icon: <CreditCard className="size-4" />
+      },
+      {
+        title: "Members",
+        url: "/organizations/members",
+        icon: <Users className="size-4" />
+      },
+      {
+        title: "Org Settings",
+        url: "/organizations/settings",
+        icon: <Settings className="size-4" />
+      },
+      {
+        title: "API Keys",
+        url: "#",
+        icon: <Key className="size-4" />
+      },
+    ],
+    accountSettings: [
+      {
+        title: "Profile",
+        url: "#",
+        icon: <UserCircle className="size-4" />
+      },
+    ],
+  };
+
   return (
     <Sidebar 
       collapsible="icon" 

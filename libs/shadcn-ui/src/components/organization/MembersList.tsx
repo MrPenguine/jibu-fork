@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Mail, User, UserPlus, Shield, Clock, Trash2, Check, X, ChevronDown } from "lucide-react"
+import { Mail, User, UserPlus, Shield, Clock, Trash2, Check, X, ChevronDown, LogOut, UserMinus, Crown } from "lucide-react"
 import { 
   CardDescription, 
   CardTitle, 
@@ -28,6 +28,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@libs/shadcn-ui/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@libs/shadcn-ui/components/ui/select"
 
 interface MemberUser {
   id?: string
@@ -62,15 +69,21 @@ export function MembersList({ organizationId }: MembersListProps) {
   const [memberToDelete, setMemberToDelete] = React.useState<Member | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = React.useState(false)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = React.useState(false)
+  const [newOwnerId, setNewOwnerId] = React.useState<string>('')
+  const [isTransferring, setIsTransferring] = React.useState(false)
+  const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null)
   
   // Get organization ID from props or active organization
   const targetOrgId = organizationId || activeOrganization?.id
   
   // Check user permissions based on role
   const userRole = activeOrganization?.role
-  const canInviteMembers = userRole === 'owner' || userRole === 'admin'
-  const canDeleteMembers = userRole === 'owner' || userRole === 'admin'
-  const canChangeRoles = userRole === 'owner' || userRole === 'admin'
+  const isOwner = userRole === 'owner'
+  const canInviteMembers = isOwner || userRole === 'admin'
+  const canDeleteMembers = isOwner || userRole === 'admin'
+  const canChangeRoles = isOwner || userRole === 'admin'
   
   // Function to get member display name
   const getMemberName = (member: Member) => {
@@ -107,43 +120,81 @@ export function MembersList({ organizationId }: MembersListProps) {
     }
   }
 
-  // Check if user can delete a specific member
-  const canDeleteMember = (member: Member) => {
-    // Owner can delete anyone except themselves
-    if (userRole === 'owner') {
-      return member.email !== activeOrganization?.email
-    }
-    // Admin can delete everyone except owners and themselves
-    if (userRole === 'admin') {
-      return member.role !== 'owner' && member.email !== activeOrganization?.email
-    }
-    // Editors cannot delete anyone
-    return false
-  }
+  // Fetch current user's data when component mounts
+  React.useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const userData = await fetchAPI('/users/me');
+        if (userData && userData.email) {
+          setCurrentUserEmail(userData.email);
+        }
+      } catch (err) {
+        console.error('Error fetching current user data:', err);
+      }
+    };
+    
+    fetchCurrentUser();
+  }, []);
 
   // Check if user can change role of a specific member
   const canChangeRole = (member: Member) => {
-    // Owner can change role of anyone except themselves
-    if (userRole === 'owner') {
-      return member.email !== activeOrganization?.email
+    // No one can change the owner role
+    if (member.role === 'owner') {
+      return false;
     }
-    // Admin can change role of editors only
-    if (userRole === 'admin') {
-      return member.role !== 'owner' && member.role !== 'admin' && member.email !== activeOrganization?.email
+    
+    // Current user cannot change their own role
+    if (member.email === activeOrganization?.email) {
+      return false;
     }
-    // Editors cannot change roles
-    return false
+    
+    // Only owners can change roles
+    return userRole === 'owner';
   }
 
   // Get available roles for changing based on current user role
   const getAvailableRoles = (member: Member) => {
     if (userRole === 'owner') {
-      return ['owner', 'admin', 'editor']
+      // Owner can only assign admin or editor roles (can't create another owner)
+      return ['admin', 'editor'];
     }
+    
+    // Admins and others cannot change roles
+    return [];
+  }
+
+  // Check if user can delete a specific member
+  const canDeleteMember = (member: Member) => {
+    const isCurrentUser = member.email === activeOrganization?.email;
+    
+    // Current user cannot delete themselves (should use leave instead)
+    if (isCurrentUser) {
+      return false;
+    }
+    
+    // Owner cannot be removed by anyone
+    if (member.role === 'owner') {
+      return false;
+    }
+    
+    // Owner can delete anyone except owners
+    if (userRole === 'owner') {
+      return member.role !== 'owner';
+    }
+    
+    // Admin can delete editors only, not other admins or owners
     if (userRole === 'admin') {
-      return ['admin', 'editor']
+      return member.role === 'editor';
     }
-    return []
+    
+    // Editors cannot delete anyone
+    return false;
+  }
+
+  // Check if the current user can leave the organization
+  const canLeaveOrganization = () => {
+    // Owners can't leave directly (they must transfer ownership first)
+    return userRole !== 'owner';
   }
 
   // Fetch members when component mounts
@@ -215,29 +266,146 @@ export function MembersList({ organizationId }: MembersListProps) {
     }
   }
   
+  // Function to leave the organization
+  const leaveOrganization = async (member: Member) => {
+    try {
+      setIsDeleting(true);
+      
+      // Delete the membership
+      await fetchAPI(`/organizations/${targetOrgId}/members/${member.id}`, {
+        method: 'DELETE'
+      });
+      
+      toast({
+        title: "Left organization",
+        description: "You have left the organization successfully.",
+      });
+      
+      // Update localStorage to remove this org as active
+      try {
+        localStorage.removeItem('activeOrganizationId');
+      } catch (err) {
+        console.error('Error updating localStorage:', err);
+      }
+      
+      // Fetch user's remaining organizations
+      const remainingOrgs = await fetchAPI('/organizations');
+      
+      if (remainingOrgs && remainingOrgs.length > 0) {
+        // Set the first available org as the active one
+        const newActiveOrg = remainingOrgs[0];
+        
+        try {
+          // Store the new active org ID
+          localStorage.setItem('activeOrganizationId', newActiveOrg.id);
+        } catch (err) {
+          console.error('Error updating localStorage:', err);
+        }
+        
+        // Redirect to the dashboard with the new org
+        window.location.href = '/';
+      } else {
+        // If no organizations left, redirect to the organizations page
+        // where they can create a new one
+        window.location.href = '/organizations';
+      }
+    } catch (err) {
+      console.error('Error leaving organization:', err);
+      toast({
+        title: "Error",
+        description: "Failed to leave the organization. Please try again.",
+        variant: "destructive"
+      });
+      setIsDeleting(false);
+      setIsLeaveDialogOpen(false);
+    }
+  }
+  
   // Function to change member role
   const changeMemberRole = async (memberId: string, newRole: string) => {
     try {
       await fetchAPI(`/organizations/${targetOrgId}/members/${memberId}`, {
         method: 'PATCH',
         body: JSON.stringify({ role: newRole })
-      })
+      });
       
       toast({
         title: "Role updated",
         description: `Member role has been updated to ${newRole}.`,
-      })
-      refreshMembers()
+      });
+      refreshMembers();
     } catch (err) {
-      console.error('Error updating role:', err)
-      toast({
-        title: "Error",
-        description: "Failed to update role. Please try again.",
-        variant: "destructive"
-      })
+      console.error('Error updating role:', err);
+      
+      // Check for specific error messages
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update role';
+      
+      if (errorMessage.includes("Admins can only assign the editor role")) {
+        toast({
+          title: "Permission Denied",
+          description: "Admins can only assign the editor role to other members.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update role. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   }
   
+  // Function to transfer ownership to another member
+  const transferOwnership = async () => {
+    if (!newOwnerId || !targetOrgId) return;
+    
+    try {
+      setIsTransferring(true);
+      
+      await fetchAPI(`/organizations/${targetOrgId}/transfer-ownership`, {
+        method: 'POST',
+        body: JSON.stringify({ newOwnerId })
+      });
+      
+      toast({
+        title: "Ownership transferred",
+        description: "Organization ownership has been transferred successfully.",
+      });
+      
+      refreshMembers();
+      setIsTransferDialogOpen(false);
+    } catch (err) {
+      console.error('Error transferring ownership:', err);
+      toast({
+        title: "Error",
+        description: "Failed to transfer ownership. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  // Get eligible members who can become owners (active members who aren't the current owner)
+  const getEligibleNewOwners = () => {
+    return members.filter(member => 
+      member.status === 'active' && 
+      member.email !== activeOrganization?.email
+    );
+  };
+  
+  // Add isCurrentUser function
+  // Function to check if this is the current user
+  const isCurrentUser = (member: Member) => {
+    // Try to match by comparing with the user's email from /users/me API
+    // If that's not available, fall back to the activeOrganization.email
+    return (
+      (currentUserEmail && member.email === currentUserEmail) || 
+      member.email === activeOrganization?.email
+    );
+  }
+
   return (
     <div className="flex justify-center">
       <div className="w-full md:w-5/6">
@@ -249,15 +417,35 @@ export function MembersList({ organizationId }: MembersListProps) {
                 Members who have access to this organization
               </CardDescription>
             </div>
-            <Button 
-              onClick={() => setIsInviteModalOpen(true)}
-              className="ml-auto rounded-xl"
-              disabled={!canInviteMembers}
-              title={!canInviteMembers ? "Only owners and admins can invite members" : ""}
-            >
-              <UserPlus className="h-4 w-4 mr-2" />
-              Invite Members
-            </Button>
+            <div className="flex items-center gap-2">
+              {isOwner ? (
+                <Button 
+                  onClick={() => setIsTransferDialogOpen(true)}
+                  className="rounded-xl bg-purple-600 hover:bg-purple-700"
+                  title="Transfer ownership to another member"
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Transfer Ownership
+                </Button>
+              ) : (
+                <Button 
+                  onClick={() => {
+                    // Find the current user's membership
+                    const currentMember = members.find(m => isCurrentUser(m));
+                    if (currentMember) {
+                      setMemberToDelete(currentMember);
+                      setIsLeaveDialogOpen(true);
+                    }
+                  }}
+                  className="rounded-xl bg-orange-600 hover:bg-orange-700"
+                  title="Leave this organization"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Leave Organization
+                </Button>
+              )}
+              
+            </div>
           </CustomCardHeader>
           <CustomCardContent className="p-0">
             {isLoading ? (
@@ -300,19 +488,19 @@ export function MembersList({ organizationId }: MembersListProps) {
                   <div>
                     {members.map((member) => {
                       // Check if this is the current user
-                      const isCurrentUser = member.email === activeOrganization?.email;
+                      const currentUser = isCurrentUser(member);
                       
                       return (
                         <div 
                           key={member.id} 
                           className={`px-6 py-4 grid grid-cols-5 gap-4 border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
-                            isCurrentUser ? "bg-violet-50/30 dark:bg-violet-900/10" : ""
+                            currentUser ? "bg-violet-100 dark:bg-violet-900/30 relative" : ""
                           }`}
                         >
-                          <div className="text-sm flex items-center gap-2">
+                          <div className="text-sm flex items-center gap-2 font-medium">
                             {member.email}
-                            {isCurrentUser && (
-                              <span className="text-xs bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 py-0.5 px-2 rounded-full">
+                            {currentUser && (
+                              <span className="ml-1 text-xs font-bold bg-violet-200 text-violet-800 dark:bg-violet-800 dark:text-violet-200 py-0.5 px-2 rounded-full">
                                 You
                               </span>
                             )}
@@ -339,9 +527,11 @@ export function MembersList({ organizationId }: MembersListProps) {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             ) : (
-                              <>
-                                {getRoleIcon(member.role)} {member.role}
-                              </>
+                              <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${
+                                member.role === 'owner' ? 'bg-purple-50 dark:bg-purple-900/20' : ''
+                              }`}>
+                                {getRoleIcon(member.role)} <span>{member.role}</span>
+                              </div>
                             )}
                           </div>
                           <div className="text-sm">
@@ -349,23 +539,54 @@ export function MembersList({ organizationId }: MembersListProps) {
                               {member.status}
                             </span>
                           </div>
-                          {(canDeleteMembers || canChangeRoles) && (
-                            <div className="flex items-center gap-2">
-                              {canDeleteMember(member) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-100"
-                                  onClick={() => {
-                                    setMemberToDelete(member);
-                                    setIsDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {canDeleteMember(member) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-100"
+                                onClick={() => {
+                                  setMemberToDelete(member);
+                                  setIsDeleteDialogOpen(true);
+                                }}
+                                title="Remove member"
+                              >
+                                <UserMinus className="h-4 w-4" />
+                              </Button>
+                            )}
+                            
+                            {currentUser && (
+                              <>
+                                {isOwner ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-purple-500 hover:text-purple-700 hover:bg-purple-100"
+                                    onClick={() => {
+                                      setIsTransferDialogOpen(true);
+                                      setNewOwnerId('');
+                                    }}
+                                    title="Transfer ownership to another member"
+                                  >
+                                    <Crown className="h-4 w-4 mr-1" /> Transfer
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-3 text-orange-500 hover:text-orange-700 hover:bg-orange-100"
+                                    onClick={() => {
+                                      setMemberToDelete(member);
+                                      setIsLeaveDialogOpen(true);
+                                    }}
+                                    title="Leave this organization"
+                                  >
+                                    <LogOut className="h-4 w-4 mr-1" /> Leave
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -393,9 +614,9 @@ export function MembersList({ organizationId }: MembersListProps) {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="rounded-xl">
           <DialogHeader>
-            <DialogTitle>Remove member</DialogTitle>
+            <DialogTitle>Remove Member</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove {memberToDelete?.email} from this organization?
+              Are you sure you want to remove {memberToDelete?.email} from this organization? 
               This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
@@ -414,6 +635,97 @@ export function MembersList({ organizationId }: MembersListProps) {
               disabled={isDeleting}
             >
               {isDeleting ? "Removing..." : "Remove Member"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
+        <DialogContent className="rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Leave Organization</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to leave this organization? You will lose access to all resources and content.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsLeaveDialogOpen(false)}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="rounded-xl"
+              onClick={() => memberToDelete && leaveOrganization(memberToDelete)}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Leaving..." : "Leave Organization"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+        <DialogContent className="rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Transfer Ownership</DialogTitle>
+            <DialogDescription>
+              Select a member to transfer ownership to. You will be demoted to an admin role.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="space-y-1.5 mb-4">
+              <label htmlFor="new-owner" className="text-sm font-medium">
+                New Owner
+              </label>
+              <Select value={newOwnerId} onValueChange={setNewOwnerId}>
+                <SelectTrigger className="w-full rounded-xl">
+                  <SelectValue placeholder="Select a member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getEligibleNewOwners().map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{member.email}</span>
+                        <span className="text-xs text-muted-foreground">({member.role})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30 text-sm text-amber-800 dark:text-amber-300">
+              <p className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-amber-500 dark:text-amber-400">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                This action cannot be undone. The new owner will have full control over this organization.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsTransferDialogOpen(false)}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              className="rounded-xl bg-purple-600 hover:bg-purple-700"
+              onClick={transferOwnership}
+              disabled={isTransferring || !newOwnerId}
+            >
+              {isTransferring ? "Transferring..." : "Transfer Ownership"}
             </Button>
           </DialogFooter>
         </DialogContent>

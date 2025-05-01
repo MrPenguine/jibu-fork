@@ -20,4 +20,8 @@ export class RespondToInvitationDto {
 
 export class UpdateMemberRoleDto {
   role: string;
+}
+
+export class TransferOwnershipDto {
+  newOwnerId: string;
 } 
