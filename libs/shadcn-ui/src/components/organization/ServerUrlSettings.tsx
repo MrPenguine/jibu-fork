@@ -91,138 +91,134 @@ export default function ServerUrlSettings() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Server URL</h2>
-        <p className="text-muted-foreground">The URL of your Vapi server.</p>
-      </div>
-      
-      <div className="p-6 bg-card rounded-lg border space-y-6">
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="serverUrl" className="flex items-center">
-                <Link className="h-4 w-4 mr-2" />
-                Server URL
-              </Label>
-            </div>
-            <Input 
-              id="serverUrl" 
-              value={serverUrl} 
-              onChange={(e) => setServerUrl(e.target.value)} 
-              placeholder="No Server URL"
-            />
+    <div className="space-y-10">
+      <div className="space-y-10">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="serverUrl" className="flex items-center">
+              <Link className="h-4 w-4 mr-2" />
+              Server URL
+            </Label>
           </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="timeoutSeconds">
-                <Info className="h-4 w-4 mr-2" />
-                Timeout Seconds
-              </Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>This is the timeout in seconds for the request to your server. Must be between 1 and 120 seconds.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <p className="text-sm text-muted-foreground mb-2">
-              This is the timeout in seconds for the request to your server. Must be between 1 and 120 seconds.
-            </p>
-            <Input 
-              id="timeoutSeconds" 
-              value={timeoutSeconds} 
-              onChange={(e) => setTimeoutSeconds(e.target.value)} 
-              min="1"
-              max="120"
-              type="number"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label>
-                <Label htmlFor="headers">Headers</Label>
-              </Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>These are the custom headers to include in the request sent to your server. Each key-value pair represents a header name and its value.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              These are the custom headers to include in the request sent to your server. Each key-value pair represents a header name and its value.
-            </p>
-            
-            {headers.length > 0 && (
-              <div className="space-y-2 mb-4">
-                {headers.map((header) => (
-                  <div key={header.id} className="flex gap-2">
-                    <Input 
-                      value={header.name} 
-                      onChange={(e) => updateHeader(header.id, "name", e.target.value)} 
-                      placeholder="Header Name"
-                      className="flex-1"
-                    />
-                    <Input 
-                      value={header.value} 
-                      onChange={(e) => updateHeader(header.id, "value", e.target.value)} 
-                      placeholder="Header Value"
-                      className="flex-1"
-                    />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => removeHeader(header.id)}
-                    >
-                      ✕
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            <Button 
-              variant="outline" 
-              onClick={addRow}
-              className="flex items-center"
-            >
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Add Row
-            </Button>
-          </div>
+          <Input 
+            id="serverUrl" 
+            value={serverUrl} 
+            onChange={(e) => setServerUrl(e.target.value)} 
+            placeholder="No Server URL"
+            className="mt-1"
+          />
         </div>
         
-        <div className="flex justify-end gap-2">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="timeoutSeconds">
+              <Info className="h-4 w-4 mr-2" />
+              Timeout Seconds
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>This is the timeout in seconds for the request to your server. Must be between 1 and 120 seconds.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">
+            This is the timeout in seconds for the request to your server. Must be between 1 and 120 seconds.
+          </p>
+          <Input 
+            id="timeoutSeconds" 
+            value={timeoutSeconds} 
+            onChange={(e) => setTimeoutSeconds(e.target.value)} 
+            min="1"
+            max="120"
+            type="number"
+            className="mt-1"
+          />
+        </div>
+        
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Label>
+              <Label htmlFor="headers">Headers</Label>
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>These are the custom headers to include in the request sent to your server. Each key-value pair represents a header name and its value.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            These are the custom headers to include in the request sent to your server. Each key-value pair represents a header name and its value.
+          </p>
+          
+          {headers.length > 0 && (
+            <div className="space-y-3 mb-5">
+              {headers.map((header) => (
+                <div key={header.id} className="flex gap-2">
+                  <Input 
+                    value={header.name} 
+                    onChange={(e) => updateHeader(header.id, "name", e.target.value)} 
+                    placeholder="Header Name"
+                    className="flex-1"
+                  />
+                  <Input 
+                    value={header.value} 
+                    onChange={(e) => updateHeader(header.id, "value", e.target.value)} 
+                    placeholder="Header Value"
+                    className="flex-1"
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => removeHeader(header.id)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          
           <Button 
             variant="outline" 
-            onClick={clearAll}
+            onClick={addRow}
+            className="flex items-center mt-2"
           >
-            Clear
-          </Button>
-          <Button 
-            onClick={saveSettings}
-            disabled={isSaving}
-            className="gap-2"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : 'Save'}
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Add Row
           </Button>
         </div>
+      </div>
+      
+      <div className="flex justify-end gap-3 mt-8">
+        <Button 
+          variant="outline" 
+          onClick={clearAll}
+          className="rounded-xl border-0"
+        >
+          Clear
+        </Button>
+        <Button 
+          onClick={saveSettings}
+          disabled={isSaving}
+          className="gap-2 rounded-xl border-0"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : 'Save'}
+        </Button>
       </div>
     </div>
   );

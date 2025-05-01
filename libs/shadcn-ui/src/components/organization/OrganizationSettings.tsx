@@ -73,203 +73,190 @@ export default function OrganizationSettings() {
 
   if (loading || !activeOrganization) {
     return (
-      <div className="animate-pulse p-6 space-y-6">
-        <div className="h-8 bg-muted rounded w-1/3"></div>
-        <div className="space-y-4">
-          <div className="h-6 bg-muted rounded w-1/4"></div>
-          <div className="h-10 bg-muted rounded w-full"></div>
-        </div>
+      <div className="animate-pulse space-y-6">
+        <div className="h-10 bg-muted rounded w-full"></div>
+        <div className="h-10 bg-muted rounded w-full"></div>
+        <div className="h-10 bg-muted rounded w-full"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Organization Settings</h2>
-        <p className="text-muted-foreground">Your organization's server and security details.</p>
-      </div>
-      
-      <div className="p-6 bg-card rounded-lg border space-y-6">
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Organization Name</Label>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Organization Name</Label>
+          <Input 
+            id="name" 
+            value={organizationName} 
+            onChange={(e) => setOrganizationName(e.target.value)} 
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="email">Organization Email</Label>
+          <Input 
+            id="email" 
+            value={organizationEmail} 
+            onChange={(e) => setOrganizationEmail(e.target.value)} 
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="orgId" className="flex items-center">
+            Organization ID
+          </Label>
+          <div className="relative">
             <Input 
-              id="name" 
-              value={organizationName} 
-              onChange={(e) => setOrganizationName(e.target.value)} 
+              id="orgId" 
+              value={activeOrganization?.id || ""} 
+              readOnly 
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="email">Organization Email</Label>
-            <Input 
-              id="email" 
-              value={organizationEmail} 
-              onChange={(e) => setOrganizationEmail(e.target.value)} 
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="orgId" className="flex items-center">
-              Organization ID
-            </Label>
-            <div className="relative">
-              <Input 
-                id="orgId" 
-                value={activeOrganization?.id || ""} 
-                readOnly 
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="absolute right-2 top-1/2 transform -translate-y-1/2" 
-                onClick={() => copyToClipboard(activeOrganization?.id || "")}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="walletId" className="flex items-center">
-              Wallet ID
-            </Label>
-            <div className="relative">
-              <Input 
-                id="walletId" 
-                value="df107735-fc0b-430c-a308-6080ae56fcf9" 
-                readOnly 
-              />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="absolute right-2 top-1/2 transform -translate-y-1/2" 
-                onClick={() => copyToClipboard("df107735-fc0b-430c-a308-6080ae56fcf9")}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="channel">Channel</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Select your video channel provider</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Select value={channel} onValueChange={setChannel}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select channel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">daily</SelectItem>
-                <SelectItem value="zoom">zoom</SelectItem>
-                <SelectItem value="teams">teams</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="callConcurrency">Call Concurrency Limit</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Maximum number of concurrent calls</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Input 
-              id="callConcurrency" 
-              value={callConcurrencyLimit} 
-              onChange={(e) => setCallConcurrencyLimit(e.target.value)} 
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="hipaa">HIPAA Enabled</Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Enabling HIPAA will disable storage of call recordings, logs or transcripts of any future calls.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Enabling HIPAA will disable storage of call recordings, logs or transcripts of any future calls.
-                </p>
-              </div>
-              <Switch 
-                id="hipaa" 
-                checked={hipaaEnabled} 
-                onCheckedChange={setHipaaEnabled} 
-              />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="pci">PCI Enabled</Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Enabling PCI will disable storage of call recordings, logs or transcripts of any future calls.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Enabling PCI will disable storage of call recordings, logs or transcripts of any future calls.
-                </p>
-              </div>
-              <Switch 
-                id="pci" 
-                checked={pciEnabled} 
-                onCheckedChange={setPciEnabled} 
-              />
-            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute right-2 top-1/2 transform -translate-y-1/2" 
+              onClick={() => copyToClipboard(activeOrganization?.id || "")}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         
-        <div className="flex justify-end">
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving}
-            className="gap-2"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : 'Save Changes'}
-          </Button>
+        <div className="space-y-2">
+          <Label htmlFor="walletId" className="flex items-center">
+            Wallet ID
+          </Label>
+          <div className="relative">
+            <Input 
+              id="walletId" 
+              value="df107735-fc0b-430c-a308-6080ae56fcf9" 
+              readOnly 
+            />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute right-2 top-1/2 transform -translate-y-1/2" 
+              onClick={() => copyToClipboard("df107735-fc0b-430c-a308-6080ae56fcf9")}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="channel">Channel</Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Select your video channel provider</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <Select value={channel} onValueChange={setChannel}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select channel" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">daily</SelectItem>
+              <SelectItem value="zoom">zoom</SelectItem>
+              <SelectItem value="teams">teams</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="callConcurrency">Call Concurrency Limit</Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Maximum number of concurrent calls</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <Input 
+            id="callConcurrency" 
+            value={callConcurrencyLimit} 
+            onChange={(e) => setCallConcurrencyLimit(e.target.value)} 
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="hipaa">HIPAA Enabled</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Enabling HIPAA will disable storage of call recordings, logs or transcripts of any future calls.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Enabling HIPAA will disable storage of call recordings, logs or transcripts of any future calls.
+              </p>
+            </div>
+            <Switch 
+              id="hipaa" 
+              checked={hipaaEnabled} 
+              onCheckedChange={setHipaaEnabled} 
+            />
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="pci">PCI Enabled</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Enabling PCI will disable storage of call recordings, logs or transcripts of any future calls.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Enabling PCI will disable storage of call recordings, logs or transcripts of any future calls.
+              </p>
+            </div>
+            <Switch 
+              id="pci" 
+              checked={pciEnabled} 
+              onCheckedChange={setPciEnabled} 
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end mt-6">
+        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+          {isSaving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : 'Save Changes'}
+        </Button>
       </div>
     </div>
   );

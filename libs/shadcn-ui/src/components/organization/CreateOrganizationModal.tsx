@@ -74,7 +74,7 @@ export function CreateOrganizationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] rounded-xl border-0">
         <DialogHeader>
           <DialogTitle>Create New Organization</DialogTitle>
           <DialogDescription>
@@ -85,7 +85,7 @@ export function CreateOrganizationModal({
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             {error && (
-              <div className="text-sm text-red-500 bg-red-50 p-2 rounded-md">
+              <div className="text-sm text-red-500 bg-red-50 p-3 rounded-xl">
                 {error}
               </div>
             )}
@@ -98,17 +98,18 @@ export function CreateOrganizationModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isSubmitting}
+                className="rounded-xl border-0"
               />
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isSubmitting}>
+              <Button type="button" variant="outline" disabled={isSubmitting} className="rounded-xl border-0">
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} className="rounded-xl border-0">
               {isSubmitting ? (
                 <>
                   <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />

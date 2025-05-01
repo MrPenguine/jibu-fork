@@ -71,70 +71,50 @@ export default function DeleteOrganization() {
   // If user is not an owner, show permission denied
   if (activeOrganization.role !== 'owner') {
     return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight">Delete Organization</h2>
-          <p className="text-destructive-foreground/80">
-            Only organization owners can delete organizations.
-          </p>
-        </div>
-        
-        <div className="p-6 bg-card rounded-lg border space-y-4">
-          <div className="flex items-center gap-3 text-destructive">
-            <ShieldAlert className="h-8 w-8" />
-            <div>
-              <h3 className="font-semibold">Permission Denied</h3>
-              <p>Your role: {activeOrganization.role}. Required role: owner</p>
-            </div>
-          </div>
+      <div className="flex items-center gap-3 text-destructive">
+        <ShieldAlert className="h-8 w-8" />
+        <div>
+          <h3 className="font-semibold">Permission Denied</h3>
+          <p>Your role: {activeOrganization.role}. Required role: owner</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      <p className="text-muted-foreground">
+        To confirm, please type your organization name: <span className="font-semibold">{activeOrganization.name}</span>
+      </p>
+      
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Delete Organization</h2>
-        <p className="text-destructive-foreground/80">
-          Permanently remove your organization and all its contents. This action cannot be undone, so please proceed with caution.
-        </p>
+        <Label htmlFor="confirm" className="sr-only">Confirm organization name</Label>
+        <Input 
+          id="confirm" 
+          value={confirmText} 
+          onChange={(e) => setConfirmText(e.target.value)} 
+          placeholder="Enter organization name"
+        />
       </div>
       
-      <div className="p-6 bg-card rounded-lg border space-y-4">
-        <p className="text-muted-foreground">
-          To confirm, please type your organization name: <span className="font-semibold">{activeOrganization.name}</span>
-        </p>
-        
-        <div className="space-y-2">
-          <Label htmlFor="confirm" className="sr-only">Confirm organization name</Label>
-          <Input 
-            id="confirm" 
-            value={confirmText} 
-            onChange={(e) => setConfirmText(e.target.value)} 
-            placeholder="Enter organization name"
-          />
-        </div>
-        
-        <Button 
-          variant="destructive" 
-          disabled={confirmText !== activeOrganization.name || isDeleting}
-          onClick={handleDelete}
-          className="gap-2"
-        >
-          {isDeleting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Deleting...
-            </>
-          ) : (
-            <>
-              <AlertTriangle className="h-4 w-4" />
-              Delete Organization
-            </>
-          )}
-        </Button>
-      </div>
+      <Button 
+        variant="destructive" 
+        disabled={confirmText !== activeOrganization.name || isDeleting}
+        onClick={handleDelete}
+        className="gap-2"
+      >
+        {isDeleting ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Deleting...
+          </>
+        ) : (
+          <>
+            <AlertTriangle className="h-4 w-4" />
+            Delete Organization
+          </>
+        )}
+      </Button>
     </div>
   );
 } 
