@@ -52,7 +52,7 @@ const navData = {
   },
   overview: [
     {
-      title: "Overview",
+      title: "Dashboard",
       url: "/",
     }
   ],
