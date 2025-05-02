@@ -57,6 +57,10 @@ export class OrganizationService {
    * Create a new organization and make the current user the owner
    */
   async createOrganization(userId: string, name: string) {
+    if (!name || typeof name !== 'string') {
+      throw new HttpException('Organization name is required', HttpStatus.BAD_REQUEST);
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {

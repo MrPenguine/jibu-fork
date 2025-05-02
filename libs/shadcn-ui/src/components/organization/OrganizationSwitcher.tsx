@@ -371,7 +371,7 @@ export function OrganizationSwitcher() {
                         }}
                       >
                         <div className="flex flex-col w-full">
-                          <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-3">
                               <div className={`flex h-8 w-8 items-center justify-center rounded-xl border-0 
                                 ${item.type === 'direct' 
@@ -406,57 +406,57 @@ export function OrganizationSwitcher() {
                           {/* Expanded section with accept/decline buttons */}
                           {expandedInvitationId === item.id && item.invitation && (
                             <div className="ml-11 mt-2 flex items-center gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
+                            <Button
+                              size="sm"
+                              variant="outline"
                                 className="h-6 px-2 text-xs rounded-xl border-0 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
                                   const invitationId = item.invitation?.id;
                                   if (!invitationId) return;
                                   
                                   console.log(`Accepting invitation ${invitationId}`);
                                   acceptInvitation(invitationId)
-                                    .then(() => {
-                                      console.log('Invitation accepted successfully');
+                                  .then(() => {
+                                    console.log('Invitation accepted successfully');
                                       setExpandedInvitationId(null);
                                       // Refresh the organizations data
                                       refreshOrganizations();
                                       // Reload the page to ensure all contexts are updated
                                       window.location.reload();
-                                    })
+                                  })
                                     .catch((err: Error) => {
-                                      console.error('Error accepting invitation:', err);
-                                    });
-                                }}
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
+                                    console.error('Error accepting invitation:', err);
+                                  });
+                              }}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                                 className="h-6 px-2 text-xs rounded-xl border-0 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
                                   const invitationId = item.invitation?.id;
                                   if (!invitationId) return;
                                   
                                   console.log(`Rejecting invitation ${invitationId}`);
                                   rejectInvitation(invitationId)
-                                    .then(() => {
-                                      console.log('Invitation rejected successfully');
+                                  .then(() => {
+                                    console.log('Invitation rejected successfully');
                                       setExpandedInvitationId(null);
-                                    })
+                                  })
                                     .catch((err: Error) => {
-                                      console.error('Error rejecting invitation:', err);
-                                    });
-                                }}
-                              >
-                                Decline
-                              </Button>
-                            </div>
+                                    console.error('Error rejecting invitation:', err);
+                                  });
+                              }}
+                            >
+                              Decline
+                            </Button>
+                          </div>
                           )}
                         </div>
                       </DropdownMenuItem>

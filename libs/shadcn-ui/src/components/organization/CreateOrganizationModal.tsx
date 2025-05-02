@@ -47,9 +47,16 @@ export function CreateOrganizationModal({
       setIsSubmitting(true)
       setError(null)
       
+      // Create the request payload and log it to ensure it's correctly structured
+      const payload = { name: name.trim() }
+      console.log('Creating organization with payload:', payload)
+      
       await fetchAPI('/organizations', {
         method: 'POST',
-        body: JSON.stringify({ name: name.trim() })
+        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json'
+        }
       })
       
       setName('')

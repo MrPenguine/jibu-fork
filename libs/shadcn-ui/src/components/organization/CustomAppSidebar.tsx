@@ -167,7 +167,7 @@ export function CustomAppSidebar({ className, ...props }: React.ComponentProps<t
       },
       {
         title: "Files",
-        url: "#",
+        url: "/organizations/file",
         icon: <Files className="size-4" />
       },
       {

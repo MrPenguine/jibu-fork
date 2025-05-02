@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Delete, UseGuards, Request, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, UseGuards, Request, Body, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { OrganizationService } from './organization.service';
 import { CreateOrganizationDto, UpdateOrganizationDto, InviteMembersDto, RespondToInvitationDto, UpdateMemberRoleDto, TransferOwnershipDto } from './dto/organization.dto';
@@ -33,7 +33,36 @@ export class OrganizationController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async createOrganization(@Request() req: any, @Body() createOrgDto: CreateOrganizationDto) {
-    return this.organizationService.createOrganization(req.user.id, createOrgDto.name);
+    console.log('Create organization request:', {
+      userId: req.user?.id,
+      dto: createOrgDto,
+      body: req.body
+    });
+    
+    // If name is in req.body but not in createOrgDto (for compatibility), use it
+    if (!createOrgDto.name && req.body && req.body.name) {
+      createOrgDto.name = req.body.name;
+    }
+    
+    if (!createOrgDto.name) {
+      console.error('Error: name is missing from request body');
+      throw new HttpException('Organization name is required', HttpStatus.BAD_REQUEST);
+    }
+    
+    if (!req.user || !req.user.id) {
+      console.error('Error: user not authenticated or missing user ID');
+      throw new HttpException('Authentication required', HttpStatus.UNAUTHORIZED);
+    }
+    
+    try {
+      return await this.organizationService.createOrganization(req.user.id, createOrgDto.name);
+    } catch (error) {
+      console.error('Error creating organization:', error);
+      throw new HttpException(
+        error.message || 'Failed to create organization', 
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
   
   /**
