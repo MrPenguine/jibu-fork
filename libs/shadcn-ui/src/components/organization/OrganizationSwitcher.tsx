@@ -47,8 +47,8 @@ interface ExtendedOrganizationContext {
   activeOrganization: ExtendedOrganization | null;
   organizations: ExtendedOrganization[];
   loading: boolean;
-  switchOrganization: (org: ExtendedOrganization) => void;
-  refreshOrganizations: () => void;
+  switchOrganization: (org: ExtendedOrganization) => Promise<void>;
+  refreshOrganizations: () => Promise<void>;
   incomingInvitations: Invitation[];
   acceptInvitation: (invitationId: string) => Promise<void>;
   rejectInvitation: (invitationId: string) => Promise<void>;
@@ -149,13 +149,17 @@ export function OrganizationSwitcher() {
       // If found, switch to it
       if (ownedOrg) {
         console.log('Switching to owned organization:', ownedOrg);
-        switchOrganization(ownedOrg);
+        switchOrganization(ownedOrg).catch((err) => {
+          console.error('Error auto-switching to owned organization:', err);
+        });
       } else {
         // Fallback to any active organization (if there is one)
         const firstActiveOrg = activeOrganizations[0];
         if (firstActiveOrg && firstActiveOrg.id !== activeOrganization.id) {
           console.log('Switching to first active organization:', firstActiveOrg);
-          switchOrganization(firstActiveOrg);
+          switchOrganization(firstActiveOrg).catch((err) => {
+            console.error('Error auto-switching to first active organization:', err);
+          });
         }
       }
     }
@@ -324,7 +328,22 @@ export function OrganizationSwitcher() {
                 .map((org) => (
                   <DropdownMenuItem
                     key={org.id}
-                    onClick={() => switchOrganization(org)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      // Show loading state
+                      const target = e.currentTarget;
+                      target.classList.add('opacity-50', 'pointer-events-none');
+                      
+                      console.log('Switching to organization:', org.name);
+                      
+                      // Call the async function with proper error handling
+                      switchOrganization(org)
+                        .catch((error) => {
+                          console.error('Error switching organization:', error);
+                          // Remove loading indicator if there's an error
+                          target.classList.remove('opacity-50', 'pointer-events-none');
+                        });
+                    }}
                     className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <div className="flex items-center justify-between w-full">

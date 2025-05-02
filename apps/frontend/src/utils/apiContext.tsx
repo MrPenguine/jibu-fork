@@ -110,6 +110,21 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       
+      // Check if we're in the middle of an organization switch
+      const orgSwitchInProgress = typeof window !== 'undefined' && 
+        sessionStorage.getItem('orgSwitchInProgress') === 'true';
+      
+      const activeOrgIdBeforeReload = typeof window !== 'undefined' && 
+        sessionStorage.getItem('activeOrgIdBeforeReload');
+      
+      // Log the state of organization switching at the start of context refresh
+      if (orgSwitchInProgress && activeOrgIdBeforeReload) {
+        console.log('[refreshContext] Organization switch in progress detected:', activeOrgIdBeforeReload);
+      }
+      
+      // Do NOT clear the flags here - we need them to properly set the active organization
+      // They will be cleared after the organization is set properly
+      
       const supabase = createClient();
       const { data: sessionData } = await supabase.auth.getSession();
       
@@ -123,6 +138,12 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         setOrganizations([]);
         setActiveOrganization(null);
         setLoading(false);
+        
+        // Clear organization switch flags if user is logged out
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('orgSwitchInProgress');
+          sessionStorage.removeItem('activeOrgIdBeforeReload');
+        }
         return;
       }
       
@@ -160,22 +181,75 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       const orgsData = await orgsResponse.json();
       setOrganizations(orgsData);
       
-      // Set active organization
-      if (context.orgId) {
-        const activeOrg = orgsData.find((org: Organization) => org.id === context.orgId);
+      // Determine which organization should be active
+      let orgIdToUse = null;
+      
+      // 1. First priority: Organization from an in-progress switch
+      if (orgSwitchInProgress && activeOrgIdBeforeReload) {
+        console.log('[refreshContext] Using org ID from recent organization switch:', activeOrgIdBeforeReload);
+        orgIdToUse = activeOrgIdBeforeReload;
+      } 
+      // 2. Second priority: Organization from API context
+      else if (context.orgId) {
+        console.log('[refreshContext] Using org ID from API context:', context.orgId);
+        orgIdToUse = context.orgId;
+      } 
+      // 3. Third priority: Check localStorage
+      else {
+        try {
+          const storedOrgId = localStorage.getItem('activeOrganizationId');
+          if (storedOrgId) {
+            console.log('[refreshContext] Using org ID from localStorage:', storedOrgId);
+            orgIdToUse = storedOrgId;
+          }
+        } catch (error) {
+          console.error('[refreshContext] Error reading from localStorage:', error);
+        }
+      }
+      
+      // Set active organization if we found a valid ID
+      if (orgIdToUse) {
+        const activeOrg = orgsData.find((org: Organization) => org.id === orgIdToUse);
         if (activeOrg) {
+          console.log('[refreshContext] Setting active organization:', activeOrg.name, activeOrg.id);
           setActiveOrganization(activeOrg);
+          setOrgId(activeOrg.id);
+          setOrgName(activeOrg.name);
+          setOrgRole(activeOrg.role);
+          setMembershipStatus(activeOrg.status || 'active');
           
           // Update localStorage for consistency
           try {
             localStorage.setItem('activeOrganizationId', activeOrg.id);
           } catch (storageError) {
-            console.error('Error saving to localStorage:', storageError);
+            console.error('[refreshContext] Error saving to localStorage:', storageError);
+          }
+          
+          // Now that we've successfully set the organization, we can clear the switch flags
+          if (orgSwitchInProgress && activeOrgIdBeforeReload && activeOrg.id === activeOrgIdBeforeReload) {
+            console.log('[refreshContext] Organization switch completed, clearing sessionStorage flags');
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('orgSwitchInProgress');
+              sessionStorage.removeItem('activeOrgIdBeforeReload');
+            }
+          }
+        } else {
+          console.warn(`[refreshContext] Organization with ID ${orgIdToUse} not found in available organizations`);
+          if (orgSwitchInProgress && activeOrgIdBeforeReload) {
+            // Clear the switch flags if the organization wasn't found
+            console.log('[refreshContext] Clearing sessionStorage flags - org not found');
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('orgSwitchInProgress');
+              sessionStorage.removeItem('activeOrgIdBeforeReload');
+            }
           }
         }
+      } else {
+        console.log('[refreshContext] No valid organization ID found. User must select one explicitly.');
+        setActiveOrganization(null);
       }
     } catch (err) {
-      console.error('Error refreshing context:', err);
+      console.error('[refreshContext] Error refreshing context:', err);
       setError(err instanceof Error ? err.message : 'Failed to refresh context');
     } finally {
       setLoading(false);
@@ -185,6 +259,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   // Function to switch active organization
   const switchOrganization = async (org: Organization) => {
     try {
+      console.log('Switching organization in API context:', org.name);
       setActiveOrganization(org);
       setOrgId(org.id);
       setOrgName(org.name);
@@ -203,9 +278,16 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         body: JSON.stringify({ organizationId: org.id }),
       });
+      
+      // Set a flag to ensure API requests use the new organization ID immediately
+      sessionStorage.setItem('orgSwitchInProgress', 'true');
+      sessionStorage.setItem('activeOrgIdBeforeReload', org.id);
+      
+      // Don't reload - let the calling context handle that if needed
     } catch (error) {
       console.error('Error switching organization:', error);
       setError(error instanceof Error ? error.message : 'Failed to switch organization');
+      throw error;
     }
   };
 

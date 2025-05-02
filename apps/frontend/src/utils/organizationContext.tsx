@@ -131,9 +131,29 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       await fetchInvitations();
       
       if (organizationsWithStatus.length === 0) {
-        console.warn('User has no organizations');
+        console.log('User has no organizations');
+        setActiveOrganization(null);
         setLoading(false);
         return;
+      }
+      
+      // Check for an in-progress organization switch first
+      if (typeof window !== 'undefined') {
+        const switchInProgress = sessionStorage.getItem('orgSwitchInProgress') === 'true';
+        const orgIdBeforeReload = sessionStorage.getItem('activeOrgIdBeforeReload');
+        
+        if (switchInProgress && orgIdBeforeReload) {
+          console.log('Detected active organization switch from sessionStorage:', orgIdBeforeReload);
+          const activeOrgFromSwitch = organizationsWithStatus.find(
+            (org: Organization) => org.id === orgIdBeforeReload
+          );
+          
+          if (activeOrgFromSwitch) {
+            setActiveOrganization(activeOrgFromSwitch);
+            setLoading(false);
+            return;
+          }
+        }
       }
       
       // Try to get active organization ID from localStorage
@@ -151,89 +171,20 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         );
         
         if (activeOrg) {
+          console.log('Setting active organization from localStorage:', activeOrg.name);
           setActiveOrganization(activeOrg);
+          setLoading(false);
           return;
         }
       }
       
-      // If no active org in localStorage, try user data from API
-      try {
-        const userData = await fetchAPI('/users/me');
-        
-        if (userData && userData.lastOrganizationId) {
-          const activeOrgFromApi = organizationsWithStatus.find(
-            (org: Organization) => org.id === userData.lastOrganizationId
-          );
-          
-          if (activeOrgFromApi) {
-            setActiveOrganization(activeOrgFromApi);
-            
-            // Update localStorage for consistency
-            try {
-              localStorage.setItem('activeOrganizationId', activeOrgFromApi.id);
-            } catch (storageError) {
-              console.error('Error saving to localStorage:', storageError);
-            }
-            
-            return;
-          }
-        }
-        
-        // If neither localStorage nor API has a valid active org, find the first active one
-        const firstActiveOrg = organizationsWithStatus.find((org: Organization) => 
-          !org.status || org.status === 'active'
-        );
-        
-        if (firstActiveOrg) {
-          setActiveOrganization(firstActiveOrg);
-          
-          // Store the first org ID in localStorage
-          try {
-            localStorage.setItem('activeOrganizationId', firstActiveOrg.id);
-          } catch (storageError) {
-            console.error('Error saving to localStorage:', storageError);
-          }
-        } else if (organizationsWithStatus.length > 0) {
-          // If there are no active orgs but we have organizations, use the first one (likely pending)
-          setActiveOrganization(organizationsWithStatus[0]);
-          
-          try {
-            localStorage.setItem('activeOrganizationId', organizationsWithStatus[0].id);
-          } catch (storageError) {
-            console.error('Error saving to localStorage:', storageError);
-          }
-        }
-      } catch (userError) {
-        console.error('Error fetching user data:', userError);
-        
-        // Find the first active organization
-        const firstActiveOrg = organizationsWithStatus.find((org: Organization) => 
-          !org.status || org.status === 'active'
-        );
-        
-        if (firstActiveOrg) {
-          setActiveOrganization(firstActiveOrg);
-          
-          // Store in localStorage
-          try {
-            localStorage.setItem('activeOrganizationId', firstActiveOrg.id);
-          } catch (storageError) {
-            console.error('Error saving to localStorage:', storageError);
-          }
-        } else if (organizationsWithStatus.length > 0) {
-          // If no active orgs, use the first one
-          setActiveOrganization(organizationsWithStatus[0]);
-          
-          try {
-            localStorage.setItem('activeOrganizationId', organizationsWithStatus[0].id);
-          } catch (storageError) {
-            console.error('Error saving to localStorage:', storageError);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching organization data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch organization data');
+      // No active organization found - leave it null
+      // This will require the user to explicitly select an organization
+      console.log('No active organization found. User must select one explicitly.');
+      setActiveOrganization(null);
+    } catch (error) {
+      console.error('Error fetching organizations:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch organizations');
     } finally {
       setLoading(false);
     }
@@ -316,6 +267,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   // Function to switch active organization
   const switchOrganization = async (org: Organization) => {
+    console.log('Switching organization in OrganizationContext:', org.name);
     setActiveOrganization(org);
     
     // Store in localStorage
@@ -331,15 +283,28 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         body: JSON.stringify({ organizationId: org.id })
       });
+      
+      // Ensure headers are refreshed before reload
+      // Set a flag to indicate that a reload is happening from an org switch
+      sessionStorage.setItem('orgSwitchInProgress', 'true');
+      sessionStorage.setItem('activeOrgIdBeforeReload', org.id);
+      
+      // Force a soft reload to ensure the components update correctly
+      // Use the current path to avoid redirecting the user
+      const currentPath = window.location.pathname;
+      window.location.href = currentPath;
     } catch (apiError) {
       console.warn('Could not update organization on backend:', apiError);
       // Continue even if API fails
+      
+      // Still reload for UI consistency
+      // Set a flag to indicate that a reload is happening from an org switch
+      sessionStorage.setItem('orgSwitchInProgress', 'true');
+      sessionStorage.setItem('activeOrgIdBeforeReload', org.id);
+      
+      const currentPath = window.location.pathname;
+      window.location.href = currentPath;
     }
-    
-    // Force a soft reload to ensure the components update correctly
-    // Use the current path to avoid redirecting the user
-    const currentPath = window.location.pathname;
-    window.location.href = currentPath;
   };
 
   // Function to invite members to an organization
@@ -408,6 +373,43 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshOrganizations();
   }, []);
+  
+  // Check for organization switch on each page load
+  useEffect(() => {
+    const checkForOrgSwitch = async () => {
+      if (typeof window === 'undefined') return;
+      
+      const orgSwitchInProgress = sessionStorage.getItem('orgSwitchInProgress') === 'true';
+      const orgIdBeforeReload = sessionStorage.getItem('activeOrgIdBeforeReload');
+      
+      if (orgSwitchInProgress && orgIdBeforeReload && organizations.length > 0) {
+        console.log('Detected organization switch in progress. Syncing with ID:', orgIdBeforeReload);
+        
+        // Find the organization with the matching ID
+        const targetOrg = organizations.find(org => org.id === orgIdBeforeReload);
+        
+        if (targetOrg && (!activeOrganization || activeOrganization.id !== targetOrg.id)) {
+          console.log('Syncing active organization with recent switch:', targetOrg.name);
+          setActiveOrganization(targetOrg);
+          
+          // Clear the session storage flags after successfully applying the switch
+          // This prevents duplicate handling of the same organization switch
+          console.log('Clearing organization switch flags from sessionStorage');
+          sessionStorage.removeItem('orgSwitchInProgress');
+          sessionStorage.removeItem('activeOrgIdBeforeReload');
+        } else if (!targetOrg) {
+          console.warn(`Organization with ID ${orgIdBeforeReload} not found in available organizations`);
+          // Clear the flags if the organization is not found
+          sessionStorage.removeItem('orgSwitchInProgress');
+          sessionStorage.removeItem('activeOrgIdBeforeReload');
+        }
+      }
+    };
+    
+    if (!loading) {
+      checkForOrgSwitch();
+    }
+  }, [loading, organizations, activeOrganization]);
 
   return (
     <OrganizationContext.Provider

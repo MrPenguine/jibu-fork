@@ -1,4 +1,5 @@
 import { createClient } from './supabase/client';
+import { getActiveOrgId } from './fileApi';
 
 /**
  * Base URL for API requests to the backend
@@ -6,15 +7,12 @@ import { createClient } from './supabase/client';
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 /**
- * Get the active organization ID from localStorage
+ * Get the active organization ID from localStorage (DEPRECATED)
+ * Use getActiveOrgId from fileApi.ts instead
  */
 export function getActiveOrganizationId(): string | null {
-  try {
-    return localStorage.getItem('activeOrganizationId');
-  } catch (error) {
-    console.error('Error reading from localStorage:', error);
-    return null;
-  }
+  // Use the shared implementation to ensure consistency
+  return getActiveOrgId();
 }
 
 /**
@@ -35,8 +33,8 @@ export async function fetchAPI(
     throw new Error('No active session. User must be authenticated to make this request.');
   }
   
-  // Get the active organization ID from localStorage
-  const activeOrganizationId = getActiveOrganizationId();
+  // Get the active organization ID using the consistent helper function
+  const activeOrganizationId = getActiveOrgId();
   
   // Prepare request headers with auth token and org ID if available
   const headers = {

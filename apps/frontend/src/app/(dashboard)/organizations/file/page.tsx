@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { FileUploadArea } from '@libs/shadcn-ui/components/organization/FileUploadArea'
 import { FileList } from '@libs/shadcn-ui/components/organization/FileList'
 import { Button } from '@libs/shadcn-ui/components/ui/button'
@@ -9,9 +9,12 @@ import { useToast } from '@libs/shadcn-ui/components/ui/use-toast'
 import { Card } from '@libs/shadcn-ui/components/ui/card'
 import * as fileApi from '../../../../utils/fileApi'
 import { Progress } from '@libs/shadcn-ui/components/ui/progress'
+import { useOrganization } from '../../../../utils/organizationContext'
 
 export default function FilePage() {
   const { toast } = useToast()
+  const { activeOrganization } = useOrganization()
+  const refreshTimestamp = useRef(Date.now()).current
   
   // State to track if any files have been uploaded
   const [hasFiles, setHasFiles] = useState(false)
@@ -29,93 +32,142 @@ export default function FilePage() {
   // State for tracking loading states
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Add a forceRefresh state to explicitly trigger re-renders
+  const [forceRefresh, setForceRefresh] = useState(Date.now())
 
-  // Log component mounting
-  useEffect(() => {
-    console.log('File page component mounted');
-    fetchFiles();
-    
-    // Log the active organization ID
-    try {
-      const orgId = localStorage.getItem('activeOrganizationId');
-      console.log('Active organization ID:', orgId);
-    } catch (error) {
-      console.error('Error reading localStorage:', error);
+  // Define fetchFiles as useCallback to avoid recreating it on each render
+  const fetchFiles = useCallback(async (orgId?: string) => {
+    if (!orgId) {
+      console.log('No organization ID provided for fetchFiles, skipping');
+      setIsLoading(false);
+      setFiles([]);
+      setHasFiles(false);
+      setSelectedFile(null);
+      return;
     }
-  }, []);
 
-  // Function to fetch files from the API
-  const fetchFiles = async () => {
     try {
       setIsLoading(true);
-      console.log('Fetching files...');
+      console.log(`[FETCH_FILES] Fetching files for organization: ${orgId}`);
       
-      const filesList = await fileApi.listFiles();
-      console.log('Files fetched:', filesList);
+      // Force-pass the specific organization ID, bypassing any cached values
+      const filesList = await fileApi.listFiles(1, 50, orgId);
+      console.log(`[FETCH_FILES] Files fetched for org ${orgId}:`, filesList);
       
       setFiles(filesList);
       setHasFiles(filesList.length > 0);
       
       // Select the first file if available and none is currently selected
-      if (filesList.length > 0 && !selectedFile) {
-        console.log('Setting selected file to first file');
+      if (filesList.length > 0) {
+        console.log('[FETCH_FILES] Setting selected file to first file');
         setSelectedFile(filesList[0]);
+      } else {
+        console.log('[FETCH_FILES] No files found for this organization');
+        setSelectedFile(null);
       }
-      
-      setIsLoading(false);
     } catch (error) {
-      console.error('Error fetching files:', error);
+      console.error(`[FETCH_FILES] Error fetching files for org ${orgId}:`, error);
       toast({
         title: "Error",
         description: "Failed to load files. Please try again.",
         variant: "destructive"
       });
+      // Clear files on error
+      setFiles([]);
+      setHasFiles(false);
+      setSelectedFile(null);
+    } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Force a rerender whenever the organization changes
+  useEffect(() => {
+    console.log(`[COMPONENT] FilePage fully remounting for organization: ${activeOrganization?.id}`);
+    setForceRefresh(Date.now());
+  }, [activeOrganization?.id]);
+
+  // Effect to watch for organization changes - this will be triggered by forceRefresh updates now
+  useEffect(() => {
+    if (!activeOrganization?.id) {
+      console.log('[ORG_CHANGE] No active organization, clearing files');
+      setFiles([]);
+      setSelectedFile(null);
+      setHasFiles(false);
+      setIsLoading(false);
+      return;
+    }
+    
+    console.log(`[ORG_CHANGE] Active organization changed: ${activeOrganization.name} (${activeOrganization.id})`);
+    
+    // Reset states
+    setSelectedFile(null);
+    setFiles([]);
+    setHasFiles(false);
+    
+    // Fetch files for the new organization
+    fetchFiles(activeOrganization.id);
+    
+  }, [activeOrganization?.id, fetchFiles, forceRefresh]);
 
   // Function to handle file upload
   const handleFileUpload = async (file: File) => {
+    if (!activeOrganization?.id) {
+      toast({
+        title: "Error",
+        description: "Please select an organization before uploading files.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
-      console.log('Handling file upload:', file.name);
+      console.log(`[UPLOAD] Uploading file: ${file.name} to organization: ${activeOrganization.id}`);
       setIsUploading(true);
       setUploadProgress(0);
       
+      // Pass the active organization ID directly
       const uploadedFile = await fileApi.uploadFile(file, (progress: number) => {
-        console.log(`Upload progress: ${progress}%`);
+        console.log(`[UPLOAD] Upload progress: ${progress}%`);
         setUploadProgress(progress);
-      });
+      }, activeOrganization.id);
       
-      console.log('File uploaded successfully:', uploadedFile);
+      console.log('[UPLOAD] File uploaded successfully:', uploadedFile);
       
       setFiles(prevFiles => [uploadedFile, ...prevFiles]);
       setSelectedFile(uploadedFile);
       setHasFiles(true);
-      setIsUploading(false);
       
       toast({
         title: "Success",
         description: `${file.name} has been uploaded successfully.`,
       });
+      
+      // Refresh the file list to ensure consistency
+      fetchFiles(activeOrganization.id);
     } catch (error: any) {
-      console.error('Error uploading file:', error);
+      console.error('[UPLOAD] Error uploading file:', error);
       toast({
         title: "Upload Failed",
         description: `There was an error uploading your file: ${error?.message || 'Unknown error'}`,
         variant: "destructive"
       });
+    } finally {
       setIsUploading(false);
     }
   };
 
   // Function to handle file deletion
   const handleDeleteFile = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !activeOrganization?.id) return;
     
     try {
-      console.log('Deleting file:', selectedFile.id);
+      console.log(`[DELETE] Deleting file: ${selectedFile.id} from organization: ${activeOrganization.id}`);
       setIsDeleting(true);
-      await fileApi.deleteFile(selectedFile.id);
+      
+      // Explicitly pass the organization ID
+      await fileApi.deleteFile(selectedFile.id, activeOrganization.id);
       
       // Update files list
       const updatedFiles = files.filter(file => file.id !== selectedFile.id);
@@ -133,27 +185,29 @@ export default function FilePage() {
         title: "Success",
         description: "File has been deleted successfully.",
       });
-      
-      setIsDeleting(false);
     } catch (error: any) {
-      console.error('Error deleting file:', error);
+      console.error('[DELETE] Error deleting file:', error);
       toast({
         title: "Delete Failed",
         description: `There was an error deleting your file: ${error?.message || 'Unknown error'}`,
         variant: "destructive"
       });
+    } finally {
       setIsDeleting(false);
     }
   };
 
   // Function to get and copy download URL
   const copyUrlToClipboard = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !activeOrganization?.id) return;
     
     try {
-      console.log('Getting download URL for file:', selectedFile.id);
-      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id);
-      console.log('Download URL:', downloadUrl);
+      console.log(`[COPY_URL] Getting download URL for file: ${selectedFile.id} from organization: ${activeOrganization.id}`);
+      
+      // Explicitly pass the organization ID
+      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id, activeOrganization.id);
+      
+      console.log('[COPY_URL] Download URL:', downloadUrl);
       
       navigator.clipboard.writeText(downloadUrl);
       toast({
@@ -161,7 +215,7 @@ export default function FilePage() {
         description: "The file URL has been copied to your clipboard.",
       });
     } catch (error: any) {
-      console.error('Error getting download URL:', error);
+      console.error('[COPY_URL] Error getting download URL:', error);
       toast({
         title: "Error",
         description: `Failed to get download URL: ${error?.message || 'Unknown error'}`,
@@ -172,15 +226,18 @@ export default function FilePage() {
 
   // Function to handle download
   const handleDownload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !activeOrganization?.id) return;
     
     try {
-      console.log('Downloading file:', selectedFile.id);
-      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id);
-      console.log('Opening download URL:', downloadUrl);
+      console.log(`[DOWNLOAD] Downloading file: ${selectedFile.id} from organization: ${activeOrganization.id}`);
+      
+      // Explicitly pass the organization ID
+      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id, activeOrganization.id);
+      
+      console.log('[DOWNLOAD] Opening download URL:', downloadUrl);
       window.open(downloadUrl, '_blank');
     } catch (error: any) {
-      console.error('Error downloading file:', error);
+      console.error('[DOWNLOAD] Error downloading file:', error);
       toast({
         title: "Download Failed",
         description: `There was an error downloading your file: ${error?.message || 'Unknown error'}`,
@@ -188,6 +245,20 @@ export default function FilePage() {
       });
     }
   };
+
+  // If no organization is selected
+  if (!activeOrganization) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="max-w-md text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+          <h2 className="text-xl font-semibold mb-2">No Organization Selected</h2>
+          <p className="text-gray-600 mb-4">
+            Please select an organization from the organization switcher to view and manage files.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // If loading, show a loading state
   if (isLoading && !isUploading) {
@@ -223,22 +294,43 @@ export default function FilePage() {
   }
 
   return (
-    <div className="h-screen flex flex-col p-0">
+    <div className="h-screen flex flex-col p-0" key={`file-page-container-${activeOrganization?.id}-${forceRefresh}`}>
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar - Files section with upload button */}
         <div className="w-[350px] border-r border-gray-200 flex flex-col p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-semibold">Documents ({files.length})</h2>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-primary/10 hover:bg-primary/20 text-primary flex items-center gap-1.5"
-              onClick={() => document.getElementById('file-upload')?.click()}
-              disabled={isUploading}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              <span className="text-xs">Upload</span>
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-gray-50 hover:bg-gray-100 text-gray-500 flex items-center gap-1.5"
+                onClick={() => {
+                  console.log('[MANUAL_REFRESH] User triggered manual refresh');
+                  setForceRefresh(Date.now());
+                  fetchFiles(activeOrganization?.id);
+                }}
+                disabled={isLoading}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isLoading ? 'animate-spin' : undefined}>
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                  <path d="M3 3v5h5"></path>
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                  <path d="M16 21h5v-5"></path>
+                </svg>
+                <span className="text-xs sr-only">Refresh</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-primary/10 hover:bg-primary/20 text-primary flex items-center gap-1.5"
+                onClick={() => document.getElementById('file-upload')?.click()}
+                disabled={isUploading}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span className="text-xs">Upload</span>
+              </Button>
+            </div>
             <input
               id="file-upload"
               type="file"
@@ -260,6 +352,7 @@ export default function FilePage() {
           )}
           
           <FileList 
+            key={`file-list-${activeOrganization?.id || 'none'}`}
             files={files.map(file => ({
               id: file.id,
               name: file.name,
@@ -340,6 +433,13 @@ export default function FilePage() {
             <h3 className="text-xs text-gray-500 mb-2">ID</h3>
             <div className="text-sm text-gray-700 p-2 rounded bg-white border border-gray-200 break-all font-mono">
               {selectedFile?.id || 'N/A'}
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <h3 className="text-xs text-gray-500 mb-2">Organization</h3>
+            <div className="text-sm text-gray-700 p-2 rounded bg-white border border-gray-200">
+              {activeOrganization.name} ({activeOrganization.id.substring(0, 8)}...)
             </div>
           </div>
           
