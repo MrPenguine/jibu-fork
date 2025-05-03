@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request, Post, Body } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request, Post, Body, Delete } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { UserService } from './user.service';
 
@@ -58,5 +58,15 @@ export class UserController {
   @Post('last-organization')
   async updateLastOrganization(@Request() req: any, @Body() body: UpdateLastOrgDto) {
     return this.userService.updateLastOrganization(req.user.id, body.organizationId);
+  }
+
+  /**
+   * Delete the current user account
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete('me')
+  async deleteMyAccount(@Request() req: any) {
+    await this.userService.deleteUserAccount(req.user.id);
+    return { message: 'Account deleted successfully' };
   }
 } 

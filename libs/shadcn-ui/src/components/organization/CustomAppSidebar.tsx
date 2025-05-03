@@ -126,7 +126,7 @@ function CustomNavPlayground({
   );
 }
 
-export function CustomAppSidebar({ className, ...props }: React.ComponentProps<typeof Sidebar>) {
+export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps }: React.ComponentProps<typeof Sidebar> & { navUserProps?: any }) {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   
@@ -234,20 +234,13 @@ export function CustomAppSidebar({ className, ...props }: React.ComponentProps<t
         icon: <Key className="size-4" />
       },
     ],
-    accountSettings: [
-      {
-        title: "Profile",
-        url: "#",
-        icon: <UserCircle className="size-4" />
-      },
-    ],
   };
 
   return (
     <Sidebar 
       collapsible="icon" 
       className={cn("!border-0 !bg-gray-50/80 dark:!bg-gray-900/95", className)}
-      {...props}
+      {...sidebarProps}
     >
       <SidebarHeader className="border-0 flex-col !p-0">
         <div className={cn(
@@ -278,10 +271,9 @@ export function CustomAppSidebar({ className, ...props }: React.ComponentProps<t
         <CustomNavPlayground items={navData.observe} title="Observe" />
         <CustomNavPlayground items={navData.community} title="Community" />
         <CustomNavPlayground items={navData.orgSettings} title="Org Settings" />
-        <CustomNavPlayground items={navData.accountSettings} title="Account Settings" />
       </SidebarContent>
       <SidebarFooter className="border-0">
-        <NavUser user={navData.user} />
+        <NavUser user={navData.user} {...navUserProps} />
       </SidebarFooter>
       <SidebarRail className="!hidden" />
     </Sidebar>
