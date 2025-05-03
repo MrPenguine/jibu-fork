@@ -173,6 +173,19 @@ export function OrganizationSwitcher() {
     switchOrganization
   ]);
 
+  // Targeted logging to detect problematic state (org auto-selection)
+  React.useEffect(() => {
+    console.log(`[OrgSwitcher LOG] loading=${loading}, activeOrg=${activeOrganization?.id}, orgsCount=${organizations.length}`);
+    // THE CRITICAL CHECK:
+    if (!loading && !activeOrganization && organizations && organizations.length > 0) {
+      // Check if this component is *already* selecting the first org
+      // (e.g., if a <Select> component has its own internal default value logic)
+      console.error(`[OrgSwitcher DETECTED] Context loaded, no active org, but orgs exist. Potential auto-selection happening! First org is: ${organizations[0]?.id} (${organizations[0]?.name}). Check if switchOrganization is being called below this line or if UI element defaults!`);
+      // TEMPORARILY COMMENT OUT any code here that calls switchOrganization automatically
+      // e.g., // switchOrganization(organizations[0]);
+    }
+  }, [loading, activeOrganization, organizations, switchOrganization]);
+
   // Define the maximum number of invitations to show before "Show more" button
   const MAX_VISIBLE_INVITATIONS = 2;
   
