@@ -14,6 +14,8 @@ import {
   Req,
   HttpStatus,
   BadRequestException,
+  Body,
+  Headers,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -54,6 +56,56 @@ export class FileController {
 
   constructor(private readonly fileService: FileService) {}
 
+  // Helper function to get organization ID with consistent priority
+  private getOrganizationId(req: AuthenticatedRequest, queryOrgId?: string): string {
+    // 1. Force header - highest priority for switching organizations
+    let orgId = req.headers['x-force-organization-id'] as string;
+    
+    // 2. Organization ID from query param with 'orgId' key
+    if (!orgId && queryOrgId) {
+      orgId = queryOrgId;
+    }
+    
+    // 3. Organization from a query param named 'organization' (for compatibility)
+    // Skip this check as the request object doesn't have a query property
+    
+    // 4. Standard organization header
+    if (!orgId && req.headers['x-organization-id']) {
+      orgId = req.headers['x-organization-id'] as string;
+    }
+    
+    // 5. Organization from body (for POST/PUT requests)
+    if (!orgId && req.body?.organizationId) {
+      orgId = req.body.organizationId;
+    }
+    
+    // 6. Organization from JWT token (lowest priority since it might be outdated)
+    if (!orgId && req.user?.orgId) {
+      orgId = req.user.orgId;
+    }
+    
+    return orgId;
+  }
+
+  // Helper function to sanitize userId
+  private sanitizeUserId(userId: string | undefined | string[]): string | null {
+    if (!userId) return null;
+    
+    // Handle array values
+    if (Array.isArray(userId)) {
+      this.logger.warn(`Received userId as array: ${userId}, using first value`);
+      return userId[0];
+    }
+    
+    // Handle comma-separated values
+    if (typeof userId === 'string' && userId.includes(',')) {
+      this.logger.warn(`Received comma-separated userId: ${userId}, using first value`);
+      return userId.split(',')[0];
+    }
+    
+    return userId as string;
+  }
+
   @Post()
   @ApiOperation({ summary: 'Upload a file' })
   @ApiConsumes('multipart/form-data')
@@ -62,55 +114,59 @@ export class FileController {
     description: 'File uploaded successfully',
     type: FileResponseDto,
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 25 * 1024 * 1024, // 25MB limit
+      },
+    }),
+  )
   async uploadFile(
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
-          new FileTypeValidator({ fileType: /(pdf|txt|jpg|jpeg|png|doc|docx)$/i }),
-        ],
-      }),
-    )
-    file: MulterFile,
-    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: MulterFile,
+    @Body('userId') bodyUserId: string,
+    @Body('organizationId') bodyOrgId: string,
     @Query('orgId') queryOrgId: string,
-    @Query('userId') queryUserId: string,
+    @Query('organization') queryOrganization: string,
+    @Headers('x-organization-id') headerOrgId: string,
+    @Headers('x-force-organization-id') forceOrgId: string,
   ): Promise<FileResponseDto> {
-    this.logger.log(`File upload request received. File: ${file.originalname}, Size: ${file.size}`);
+    // Fix duplicate userId issue - if userId contains commas, take first value
+    const userId = this.sanitizeUserId(bodyUserId);
+
+    // Log all sources of organization ID to help debug issues
+    this.logger.log(`File upload request received from user: ${userId}`);
+    this.logger.log(`Organization IDs from various sources:`);
+    this.logger.log(`- Query param 'orgId': ${queryOrgId || 'not provided'}`);
+    this.logger.log(`- Query param 'organization': ${queryOrganization || 'not provided'}`);
+    this.logger.log(`- Body param 'organizationId': ${bodyOrgId || 'not provided'}`);
+    this.logger.log(`- Header 'x-organization-id': ${headerOrgId || 'not provided'}`);
+    this.logger.log(`- Header 'x-force-organization-id': ${forceOrgId || 'not provided'}`);
     
-    // For debugging purposes
-    this.logger.log(`Request headers: ${JSON.stringify(req.headers)}`);
-    this.logger.log(`Request body: ${JSON.stringify(req.body)}`);
-    this.logger.log(`Query params - orgId: ${queryOrgId}, userId: ${queryUserId}`);
+    // Fix duplicate organizationId issue - if bodyOrgId contains commas, take first value
+    const cleanBodyOrgId = bodyOrgId?.includes(',') ? bodyOrgId.split(',')[0] : bodyOrgId;
     
-    // Try to get user ID from multiple sources
-    let userId = req.user?.userId;  // From JWT token
-    
-    if (!userId) {
-      userId = queryUserId;  // From query param
-    }
-    
-    if (!userId && req.headers['x-user-id']) {
-      userId = req.headers['x-user-id'] as string;  // From header
-    }
-    
-    if (!userId && req.body?.userId) {
-      userId = req.body.userId;  // From form data
-    }
-    
-    // Try to get org ID from multiple sources
-    const orgId = req.user?.orgId || queryOrgId || req.headers['x-organization-id'] as string || req.body?.organizationId;
+    // Precedence: 1. force header, 2. query param, 3. body param, 4. regular header
+    const orgId = forceOrgId || queryOrgId || queryOrganization || cleanBodyOrgId || headerOrgId;
     
     if (!orgId) {
+      this.logger.error('No organization ID provided in request');
       throw new BadRequestException('Organization ID is required');
     }
     
     if (!userId) {
+      this.logger.error('No user ID provided in request');
       throw new BadRequestException('User ID is required');
     }
     
-    this.logger.log(`Processing file upload for orgId: ${orgId}, userId: ${userId}`);
+    if (!file) {
+      this.logger.error('No file uploaded');
+      throw new BadRequestException('No file uploaded');
+    }
+    
+    this.logger.log(`Using organization ID: ${orgId} for file upload`);
+    this.logger.log(`Using user ID: ${userId} for file upload`);
+    this.logger.log(`File details: name=${file.originalname}, size=${file.size}, type=${file.mimetype}`);
+    
     return this.fileService.uploadAndCreateFileMetadata(orgId, userId, file);
   }
 
@@ -126,11 +182,12 @@ export class FileController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('orgId') queryOrgId?: string,
+    @Query('organization') queryOrganization?: string,
   ): Promise<ListFilesDto> {
-    this.logger.log(`List files request received`);
+    this.logger.log(`List files request received. Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}`);
     
-    // Try to get org ID from multiple sources
-    const orgId = req.user?.orgId || queryOrgId || req.headers['x-organization-id'] as string;
+    // Get org ID with consistent priority - also consider the organization query param
+    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
     
     if (!orgId) {
       throw new BadRequestException('Organization ID is required');
@@ -158,11 +215,19 @@ export class FileController {
     @Param('id') fileId: string,
     @Req() req: AuthenticatedRequest,
     @Query('orgId') queryOrgId?: string,
+    @Query('organization') queryOrganization?: string,
+    @Query('userId') queryUserId?: string,
   ): Promise<FileResponseDto> {
-    this.logger.log(`Get file request received for fileId: ${fileId}`);
+    this.logger.log(`Get file request received for fileId: ${fileId}. Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}, userId: ${queryUserId}`);
     
-    // Try to get org ID from multiple sources
-    const orgId = req.user?.orgId || queryOrgId || req.headers['x-organization-id'] as string;
+    // Get org ID with consistent priority - also consider the organization query param
+    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
+    
+    // Sanitize user ID in case it's being passed and used later
+    const userId = this.sanitizeUserId(queryUserId || req.user?.userId);
+    if (userId) {
+      this.logger.log(`Request from user: ${userId}`);
+    }
     
     if (!orgId) {
       throw new BadRequestException('Organization ID is required');
@@ -186,11 +251,19 @@ export class FileController {
     @Param('id') fileId: string,
     @Req() req: AuthenticatedRequest,
     @Query('orgId') queryOrgId?: string,
+    @Query('organization') queryOrganization?: string,
+    @Query('userId') queryUserId?: string,
   ): Promise<{ downloadUrl: string }> {
-    this.logger.log(`Get download URL request received for fileId: ${fileId}`);
+    this.logger.log(`Get download URL request received for fileId: ${fileId}. Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}, userId: ${queryUserId}`);
     
-    // Try to get org ID from multiple sources
-    const orgId = req.user?.orgId || queryOrgId || req.headers['x-organization-id'] as string;
+    // Get org ID with consistent priority - also consider the organization query param
+    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
+    
+    // Sanitize user ID in case it's being passed and used later
+    const userId = this.sanitizeUserId(queryUserId || req.user?.userId);
+    if (userId) {
+      this.logger.log(`Download URL request from user: ${userId}`);
+    }
     
     if (!orgId) {
       throw new BadRequestException('Organization ID is required');
@@ -216,28 +289,43 @@ export class FileController {
     @Req() req: AuthenticatedRequest,
     @Query('orgId') queryOrgId?: string,
     @Query('userId') queryUserId?: string,
+    @Query('organization') queryOrganization?: string,
+    @Headers('x-user-id') headerUserId?: string,
   ): Promise<void> {
     this.logger.log(`Delete file request received for fileId: ${fileId}`);
+    this.logger.log(`Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}, userId: ${queryUserId}`);
+    this.logger.log(`Headers - x-user-id: ${headerUserId || 'not provided'}`);
     
-    // Try to get org ID from multiple sources
-    const orgId = req.user?.orgId || queryOrgId || req.headers['x-organization-id'] as string;
+    // Get org ID with consistent priority - also consider the organization query param
+    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
     
-    // Try to get user ID from multiple sources
-    let userId = req.user?.userId;  // From JWT token
+    // Try to get user ID from multiple sources with clear priority
+    // Use sanitizeUserId on each source to prevent array/comma issues
+    // 1. Query param (highest priority)
+    let userId = this.sanitizeUserId(queryUserId);
     
-    if (!userId) {
-      userId = queryUserId;  // From query param
+    // 2. Header
+    if (!userId && headerUserId) {
+      userId = this.sanitizeUserId(headerUserId);
     }
     
+    // 3. Request header
     if (!userId && req.headers['x-user-id']) {
-      userId = req.headers['x-user-id'] as string;  // From header
+      userId = this.sanitizeUserId(req.headers['x-user-id'] as string);
+    }
+    
+    // 4. JWT token (lowest priority as it might be outdated)
+    if (!userId && req.user?.userId) {
+      userId = this.sanitizeUserId(req.user.userId);
     }
     
     if (!orgId) {
+      this.logger.error('No organization ID provided for file deletion');
       throw new BadRequestException('Organization ID is required');
     }
     
     if (!userId) {
+      this.logger.error('No user ID provided for file deletion');
       throw new BadRequestException('User ID is required for file deletion');
     }
 

@@ -181,10 +181,31 @@ export function OrganizationSwitcher() {
       // Check if this component is *already* selecting the first org
       // (e.g., if a <Select> component has its own internal default value logic)
       console.error(`[OrgSwitcher DETECTED] Context loaded, no active org, but orgs exist. Potential auto-selection happening! First org is: ${organizations[0]?.id} (${organizations[0]?.name}). Check if switchOrganization is being called below this line or if UI element defaults!`);
-      // TEMPORARILY COMMENT OUT any code here that calls switchOrganization automatically
-      // e.g., // switchOrganization(organizations[0]);
+      
+      // Fix: Automatically select the first active organization
+      // Find an organization where the user is an owner
+      const ownedOrg = activeOrganizations.find(org => org.role === 'owner');
+      
+      if (ownedOrg) {
+        console.log('[OrgSwitcher AUTO-SELECT] Selecting owned organization:', ownedOrg.name);
+        switchOrganization(ownedOrg).catch((err) => {
+          console.error('Error auto-selecting owned organization:', err);
+        });
+      } else if (activeOrganizations.length > 0) {
+        // Fallback to the first active organization
+        console.log('[OrgSwitcher AUTO-SELECT] Selecting first active organization:', activeOrganizations[0].name);
+        switchOrganization(activeOrganizations[0]).catch((err) => {
+          console.error('Error auto-selecting first active organization:', err);
+        });
+      } else if (organizations.length > 0) {
+        // Last resort: use any organization available
+        console.log('[OrgSwitcher AUTO-SELECT] Selecting first available organization:', organizations[0].name);
+        switchOrganization(organizations[0]).catch((err) => {
+          console.error('Error auto-selecting first available organization:', err);
+        });
+      }
     }
-  }, [loading, activeOrganization, organizations, switchOrganization]);
+  }, [loading, activeOrganization, organizations, activeOrganizations, switchOrganization]);
 
   // Define the maximum number of invitations to show before "Show more" button
   const MAX_VISIBLE_INVITATIONS = 2;

@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { FileUploadArea } from '@libs/shadcn-ui/components/organization/FileUploadArea'
-import { FileList } from '@libs/shadcn-ui/components/organization/FileList'
+import { FileUploadArea } from '@libs/shadcn-ui/components/file/FileUploadArea'
+import { FileList } from '@libs/shadcn-ui/components/file/FileList'
 import { Button } from '@libs/shadcn-ui/components/ui/button'
 import { Upload, Download, Link, Trash, FileIcon } from 'lucide-react'
 import { useToast } from '@libs/shadcn-ui/components/ui/use-toast'
@@ -10,6 +10,16 @@ import { Card } from '@libs/shadcn-ui/components/ui/card'
 import * as fileApi from '../../../../utils/fileApi'
 import { Progress } from '@libs/shadcn-ui/components/ui/progress'
 import { useOrganization } from '../../../../utils/organizationContext'
+import { createClient } from '../../../../utils/supabase/client'
+
+/**
+ * Sanitize a user ID to ensure it's a single string value, not an array
+ */
+function sanitizeUserId(userId: string | undefined): string {
+  if (!userId) return '';
+  // If userId contains commas, it might be duplicated - take the first value
+  return userId.includes(',') ? userId.split(',')[0] : userId;
+}
 
 export default function FilePage() {
   const { toast } = useToast()
@@ -55,13 +65,26 @@ export default function FilePage() {
       const filesList = await fileApi.listFiles(1, 50, orgId);
       console.log(`[FETCH_FILES] Files fetched for org ${orgId}:`, filesList);
       
-      setFiles(filesList);
-      setHasFiles(filesList.length > 0);
+      // Add additional validation to ensure organization IDs match
+      const matchingFiles = filesList.filter(file => {
+        const fileOrgId = file.metadata?.organizationId;
+        const matches = fileOrgId === orgId;
+        if (!matches) {
+          console.warn(`[FETCH_FILES] Found file with mismatched organization ID: ${file.id}, belongs to ${fileOrgId} but current org is ${orgId}`);
+        }
+        return matches;
+      });
+      
+      console.log(`[FETCH_FILES] After filtering: ${matchingFiles.length} of ${filesList.length} files belong to org ${orgId}`);
+      
+      // Only set files that match the current organization
+      setFiles(matchingFiles);
+      setHasFiles(matchingFiles.length > 0);
       
       // Select the first file if available and none is currently selected
-      if (filesList.length > 0) {
+      if (matchingFiles.length > 0) {
         console.log('[FETCH_FILES] Setting selected file to first file');
-        setSelectedFile(filesList[0]);
+        setSelectedFile(matchingFiles[0]);
       } else {
         console.log('[FETCH_FILES] No files found for this organization');
         setSelectedFile(null);
@@ -123,7 +146,7 @@ export default function FilePage() {
     }
 
     try {
-      console.log(`[UPLOAD] Uploading file: ${file.name} to organization: ${activeOrganization.id}`);
+      console.log(`[UPLOAD] Uploading file: ${file.name} to organization: ${activeOrganization.id} (${activeOrganization.name})`);
       setIsUploading(true);
       setUploadProgress(0);
       
@@ -134,6 +157,7 @@ export default function FilePage() {
       }, activeOrganization.id);
       
       console.log('[UPLOAD] File uploaded successfully:', uploadedFile);
+      console.log('[UPLOAD] File organization ID:', uploadedFile.metadata?.organizationId);
       
       setFiles(prevFiles => [uploadedFile, ...prevFiles]);
       setSelectedFile(uploadedFile);
@@ -141,7 +165,7 @@ export default function FilePage() {
       
       toast({
         title: "Success",
-        description: `${file.name} has been uploaded successfully.`,
+        description: `${file.name} has been uploaded successfully to ${activeOrganization.name}.`,
       });
       
       // Refresh the file list to ensure consistency
@@ -166,8 +190,37 @@ export default function FilePage() {
       console.log(`[DELETE] Deleting file: ${selectedFile.id} from organization: ${activeOrganization.id}`);
       setIsDeleting(true);
       
-      // Explicitly pass the organization ID
-      await fileApi.deleteFile(selectedFile.id, activeOrganization.id);
+      // Get current user ID from Supabase session
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        const userId = data?.user?.id;
+        
+        if (!userId) {
+          console.error('[DELETE] No user ID available. User must be authenticated.');
+          toast({
+            title: "Authentication Error",
+            description: "You must be logged in to delete files.",
+            variant: "destructive"
+          });
+          setIsDeleting(false);
+          return;
+        }
+        
+        console.log(`[DELETE] Using user ID: ${userId}`);
+        
+        // Explicitly pass the organization ID and user ID
+        await fileApi.deleteFile(selectedFile.id, activeOrganization.id, sanitizeUserId(userId));
+      } catch (authError) {
+        console.error('[DELETE] Error getting user:', authError);
+        toast({
+          title: "Authentication Error",
+          description: "Failed to verify your identity. Please try logging in again.",
+          variant: "destructive"
+        });
+        setIsDeleting(false);
+        return;
+      }
       
       // Update files list
       const updatedFiles = files.filter(file => file.id !== selectedFile.id);
@@ -279,7 +332,9 @@ export default function FilePage() {
               if (file) {
                 handleFileUpload(file);
               }
-            }} 
+            }}
+            organizationName={activeOrganization?.name}
+            organizationId={activeOrganization?.id}
           />
           
           {isUploading && (
@@ -324,7 +379,7 @@ export default function FilePage() {
                 variant="outline"
                 size="sm"
                 className="bg-primary/10 hover:bg-primary/20 text-primary flex items-center gap-1.5"
-                onClick={() => document.getElementById('file-upload')?.click()}
+                onClick={() => document.getElementById(`file-upload-${activeOrganization?.id || 'default'}`)?.click()}
                 disabled={isUploading}
               >
                 <Upload className="h-3.5 w-3.5" />
@@ -332,7 +387,7 @@ export default function FilePage() {
               </Button>
             </div>
             <input
-              id="file-upload"
+              id={`file-upload-${activeOrganization?.id || 'default'}`}
               type="file"
               className="hidden"
               onChange={(e) => {
@@ -352,19 +407,18 @@ export default function FilePage() {
           )}
           
           <FileList 
-            key={`file-list-${activeOrganization?.id || 'none'}`}
             files={files.map(file => ({
               id: file.id,
               name: file.name,
-              type: file.type
-            }))} 
-            selectedFileId={selectedFile?.id} 
-            onSelectFile={(id) => {
-              const file = files.find(f => f.id === id);
-              if (file) {
-                setSelectedFile(file);
-              }
+              type: file.type,
+              organizationId: file.metadata?.organizationId || activeOrganization?.id
+            }))}
+            selectedFileId={selectedFile?.id}
+            onSelectFile={(fileId) => {
+              const file = files.find(f => f.id === fileId);
+              setSelectedFile(file || null);
             }}
+            organizationId={activeOrganization?.id}
           />
         </div>
         

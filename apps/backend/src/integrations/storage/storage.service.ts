@@ -16,11 +16,27 @@ export class StorageService implements IStorageService {
     mimeType: string,
     orgId: string,
   ): Promise<{ url: string; key: string; versionId?: string }> {
-    return this.storageService.upload(key, buffer, mimeType, orgId);
+    this.logger.log(`StorageService: Uploading file for organization ${orgId}`);
+    this.logger.log(`StorageService: Key: ${key}, Size: ${buffer.byteLength} bytes, MimeType: ${mimeType}`);
+    
+    try {
+      const result = await this.storageService.upload(key, buffer, mimeType, orgId);
+      this.logger.log(`StorageService: Upload successful for organization ${orgId}, final key: ${result.key}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`StorageService: Upload failed for organization ${orgId}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   async getFileStream(key: string, orgId: string): Promise<Readable> {
-    return this.storageService.getFileStream(key, orgId);
+    this.logger.log(`StorageService: Getting file stream for organization ${orgId}, key: ${key}`);
+    try {
+      return await this.storageService.getFileStream(key, orgId);
+    } catch (error) {
+      this.logger.error(`StorageService: Failed to get file stream for organization ${orgId}, key: ${key}`, error.stack);
+      throw error;
+    }
   }
 
   async getSignedDownloadUrl(
@@ -28,11 +44,26 @@ export class StorageService implements IStorageService {
     orgId: string,
     expiresIn?: number,
   ): Promise<string> {
-    return this.storageService.getSignedDownloadUrl(key, orgId, expiresIn);
+    this.logger.log(`StorageService: Generating signed URL for organization ${orgId}, key: ${key}`);
+    try {
+      const url = await this.storageService.getSignedDownloadUrl(key, orgId, expiresIn);
+      this.logger.log(`StorageService: Successfully generated signed URL for organization ${orgId}`);
+      return url;
+    } catch (error) {
+      this.logger.error(`StorageService: Failed to generate signed URL for organization ${orgId}`, error.stack);
+      throw error;
+    }
   }
 
   async delete(key: string, orgId: string): Promise<void> {
-    return this.storageService.delete(key, orgId);
+    this.logger.log(`StorageService: Deleting file for organization ${orgId}, key: ${key}`);
+    try {
+      await this.storageService.delete(key, orgId);
+      this.logger.log(`StorageService: Successfully deleted file for organization ${orgId}`);
+    } catch (error) {
+      this.logger.error(`StorageService: Failed to delete file for organization ${orgId}`, error.stack);
+      throw error;
+    }
   }
 
   async checkConnection(): Promise<boolean> {

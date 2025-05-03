@@ -43,7 +43,26 @@ export class FileService {
     const fileId = generateId();
     const storageKey = `${fileId}/${sanitizedName}`;
 
-    this.logger.log(`Uploading file ${sanitizedName} for org ${orgId} by user ${userId}`);
+    // Enhanced handling of userId - handle arrays, comma-separated strings, and other edge cases
+    let cleanUserId = userId;
+    
+    // Handle arrays or comma-separated values
+    if (userId?.includes(',')) {
+      cleanUserId = userId.split(',')[0];
+      this.logger.warn(`Received comma-separated userId: ${userId}, using first value: ${cleanUserId}`);
+    } else if (Array.isArray(userId)) {
+      cleanUserId = userId[0];
+      this.logger.warn(`Received array userId: ${userId}, using first value: ${cleanUserId}`);
+    }
+    
+    // Ensure userId is a proper string
+    if (!cleanUserId || typeof cleanUserId !== 'string') {
+      this.logger.error(`Invalid userId provided: ${userId}. Using default placeholder.`);
+      cleanUserId = 'unknown-user';
+    }
+
+    this.logger.log(`Uploading file ${sanitizedName} for organization ${orgId} by user ${cleanUserId}`);
+    this.logger.log(`File details: size=${file.size} bytes, type=${file.mimetype}`);
 
     try {
       // First check if organization exists
@@ -56,17 +75,17 @@ export class FileService {
         
         // Check if user exists
         const user = await this.prisma.user.findUnique({
-          where: { id: userId },
+          where: { id: cleanUserId },
         });
         
         if (!user) {
-          this.logger.warn(`User with ID ${userId} not found. Creating user first.`);
+          this.logger.warn(`User with ID ${cleanUserId} not found. Creating user first.`);
           
           // Create user if not exists (basic info)
           await this.prisma.user.create({
             data: {
-              id: userId,
-              email: `${userId}@example.com`, // Placeholder email
+              id: cleanUserId,
+              email: `${cleanUserId}@example.com`, // Placeholder email
             },
           });
         }
@@ -78,14 +97,16 @@ export class FileService {
             name: `Organization ${orgId.substring(0, 8)}`,
             memberships: {
               create: {
-                userId: userId,
+                userId: cleanUserId,
                 role: 'admin',
               },
             },
           },
         });
         
-        this.logger.log(`Created organization ${orgId} and linked to user ${userId}`);
+        this.logger.log(`Created organization ${orgId} and linked to user ${cleanUserId}`);
+      } else {
+        this.logger.log(`Using existing organization: ${organization.name} (${orgId})`);
       }
 
       // Upload to storage service
@@ -105,14 +126,14 @@ export class FileService {
           mimeType: file.mimetype,
           sizeBytes: file.size,
           organizationId: orgId,
-          userId: userId,
+          userId: cleanUserId,
         },
       });
 
-      this.logger.log(`File ${fileRecord.id} uploaded and metadata saved`);
+      this.logger.log(`File ${fileRecord.id} uploaded and metadata saved with organization ${orgId}`);
       return plainToInstance(FileResponseDto, fileRecord);
     } catch (error) {
-      this.logger.error(`File upload failed: ${error.message}`, error.stack);
+      this.logger.error(`File upload failed for organization ${orgId}: ${error.message}`, error.stack);
       throw error;
     }
   }
@@ -226,6 +247,26 @@ export class FileService {
   }
 
   async deleteFile(fileId: string, orgId: string, userId: string, isAdmin = false): Promise<void> {
+    // Enhanced handling of userId - handle arrays, comma-separated strings, and other edge cases
+    let cleanUserId = userId;
+    
+    // Handle arrays or comma-separated values
+    if (userId?.includes(',')) {
+      cleanUserId = userId.split(',')[0];
+      this.logger.warn(`Received comma-separated userId for deletion: ${userId}, using first value: ${cleanUserId}`);
+    } else if (Array.isArray(userId)) {
+      cleanUserId = userId[0];
+      this.logger.warn(`Received array userId for deletion: ${userId}, using first value: ${cleanUserId}`);
+    }
+    
+    // Ensure userId is a proper string
+    if (!cleanUserId || typeof cleanUserId !== 'string') {
+      this.logger.error(`Invalid userId provided for deletion: ${userId}. Using default placeholder.`);
+      cleanUserId = 'unknown-user';
+    }
+    
+    this.logger.log(`Delete request for file ${fileId} in organization ${orgId} by user ${cleanUserId}`);
+    
     // First get the file to check ownership
     const file = await this.prisma.file.findFirst({
       where: { id: fileId, organizationId: orgId },
@@ -236,7 +277,8 @@ export class FileService {
     }
     
     // Only allow deletion if the user is the uploader or has admin permissions
-    if (!isAdmin && file.userId !== userId) {
+    if (!isAdmin && file.userId !== cleanUserId) {
+      this.logger.warn(`Permission denied: User ${cleanUserId} attempting to delete file ${fileId} owned by ${file.userId}`);
       throw new BadRequestException('You do not have permission to delete this file');
     }
     
@@ -249,7 +291,7 @@ export class FileService {
         where: { id: fileId },
       });
       
-      this.logger.log(`File ${fileId} deleted for org ${orgId} by user ${userId}`);
+      this.logger.log(`File ${fileId} deleted successfully for org ${orgId} by user ${cleanUserId}`);
     } catch (error) {
       this.logger.error(`Failed to delete file ${fileId}: ${error.message}`, error.stack);
       throw error;

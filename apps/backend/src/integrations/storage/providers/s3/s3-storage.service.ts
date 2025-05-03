@@ -72,17 +72,24 @@ export class S3StorageService implements IStorageService {
     // Use a consistent format for the S3 key using the new path structure
     const s3Key = key.startsWith(`files/${orgId}/`) ? key : `files/${orgId}/${key}`;
     
-    this.logger.log(`Uploading file with key: ${s3Key}`);
+    this.logger.log(`Uploading file to S3 for organization ${orgId}`);
+    this.logger.log(`Original key: ${key}, S3 key with organization path: ${s3Key}`);
+    this.logger.log(`Content type: ${mimeType}, Size: ${buffer.byteLength} bytes`);
 
     try {
       // Dynamic import of PutObjectCommand to avoid build errors
       const { PutObjectCommand } = require('@aws-sdk/client-s3');
       
+      // Add organization metadata to the S3 object
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: s3Key,
         Body: buffer,
         ContentType: mimeType,
+        Metadata: {
+          'organization-id': orgId,
+          'upload-timestamp': new Date().toISOString()
+        }
       });
 
       const response = await this.s3Client.send(command);
@@ -91,6 +98,7 @@ export class S3StorageService implements IStorageService {
       const s3Url = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
 
       this.logger.log(`Successfully uploaded file to S3: ${s3Key}`);
+      this.logger.log(`Organization ID: ${orgId}, Version ID: ${response.VersionId || 'none'}`);
       
       return {
         url: s3Url,
@@ -98,7 +106,7 @@ export class S3StorageService implements IStorageService {
         versionId: response.VersionId,
       };
     } catch (error) {
-      this.logger.error(`Failed to upload file to S3: ${error.message}`, error.stack);
+      this.logger.error(`Failed to upload file to S3 for organization ${orgId}: ${error.message}`, error.stack);
       throw new Error(`S3 upload failed: ${error.message}`);
     }
   }

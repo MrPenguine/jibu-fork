@@ -137,6 +137,12 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         return;
       }
       
+      // Filter out any pending organizations to get active ones only
+      const activeOrgs = organizationsWithStatus.filter(
+        (org: Organization) => !org.status || org.status === 'active'
+      );
+      console.log(`[CONTEXT INIT] Active organizations:`, activeOrgs.map((o: Organization) => ({id: o.id, name: o.name})));
+      
       // Targeted logging for org persistence
       let activeOrgId = null;
       try {
@@ -147,6 +153,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       console.log(`[CONTEXT INIT] Read from localStorage:`, activeOrgId);
       console.log(`[CONTEXT INIT] Fetched orgs:`, organizationsWithStatus.map((o: Organization) => ({id: o.id, name: o.name})));
       
+      // Try to find the active organization from localStorage
       if (activeOrgId) {
         const activeOrg = organizationsWithStatus.find(
           (org: Organization) => org.id === activeOrgId
@@ -160,6 +167,58 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         } else {
           console.warn(`[CONTEXT INIT] Org ID ${activeOrgId} found in localStorage BUT NOT in fetched list!`);
         }
+      }
+      
+      // If no active organization is found in localStorage, try to find a suitable one
+      
+      // First try to find an organization where the user is an owner
+      const ownedOrg = activeOrgs.find((org: Organization) => org.role === 'owner');
+      
+      if (ownedOrg) {
+        console.log(`[CONTEXT INIT] No active org in localStorage, setting to an owned org: ${ownedOrg.id}`);
+        setActiveOrganization(ownedOrg);
+        
+        // Store this selection in localStorage
+        try {
+          localStorage.setItem('activeOrganizationId', ownedOrg.id);
+        } catch (storageError) {
+          console.error('Error saving to localStorage:', storageError);
+        }
+        
+        setLoading(false);
+        return;
+      }
+      
+      // If no owned org, use the first active organization
+      if (activeOrgs.length > 0) {
+        console.log(`[CONTEXT INIT] No owned org, setting to first active org: ${activeOrgs[0].id}`);
+        setActiveOrganization(activeOrgs[0]);
+        
+        // Store this selection in localStorage
+        try {
+          localStorage.setItem('activeOrganizationId', activeOrgs[0].id);
+        } catch (storageError) {
+          console.error('Error saving to localStorage:', storageError);
+        }
+        
+        setLoading(false);
+        return;
+      }
+      
+      // If we still don't have an active organization, just use the first one
+      if (organizationsWithStatus.length > 0) {
+        console.log(`[CONTEXT INIT] No active orgs, setting to first available org: ${organizationsWithStatus[0].id}`);
+        setActiveOrganization(organizationsWithStatus[0]);
+        
+        // Store this selection in localStorage
+        try {
+          localStorage.setItem('activeOrganizationId', organizationsWithStatus[0].id);
+        } catch (storageError) {
+          console.error('Error saving to localStorage:', storageError);
+        }
+        
+        setLoading(false);
+        return;
       }
       
       console.log('[CONTEXT INIT] Setting active org to NULL.');

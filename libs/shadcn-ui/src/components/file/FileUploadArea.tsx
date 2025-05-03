@@ -1,15 +1,22 @@
 "use client"
 
 import React, { useState } from 'react'
-import { File, Upload, FileUp } from 'lucide-react'
+import { File, Upload, FileUp, Building2 } from 'lucide-react'
 import { Button } from '@libs/shadcn-ui/components/ui/button'
 
 interface FileUploadAreaProps {
   onFileUpload?: (file: File) => void;
   compact?: boolean;
+  organizationName?: string;
+  organizationId?: string;
 }
 
-export function FileUploadArea({ onFileUpload, compact = false }: FileUploadAreaProps) {
+export function FileUploadArea({ 
+  onFileUpload, 
+  compact = false, 
+  organizationName, 
+  organizationId 
+}: FileUploadAreaProps) {
   const [isDragging, setIsDragging] = useState(false)
   
   const handleDragOver = (e: React.DragEvent) => {
@@ -41,9 +48,17 @@ export function FileUploadArea({ onFileUpload, compact = false }: FileUploadArea
   
   return (
     <div className="w-full">
-      <div className="flex items-center mb-3">
-        <File className="h-5 w-5 mr-2 text-primary" />
-        <h2 className="text-sm font-semibold">Files</h2>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center">
+          <File className="h-5 w-5 mr-2 text-primary" />
+          <h2 className="text-sm font-semibold">Files</h2>
+        </div>
+        {organizationName && (
+          <div className="flex items-center text-xs text-gray-500">
+            <Building2 className="h-3 w-3 mr-1" />
+            <span>Uploading to: {organizationName}</span>
+          </div>
+        )}
       </div>
       
       <div
@@ -61,6 +76,7 @@ export function FileUploadArea({ onFileUpload, compact = false }: FileUploadArea
         {!compact && (
           <p className="text-sm text-gray-600 mb-3">
             Drag and drop a file here or browse files
+            {organizationName && <span className="block text-xs mt-1">Files will be uploaded to {organizationName}</span>}
           </p>
         )}
         
@@ -69,7 +85,7 @@ export function FileUploadArea({ onFileUpload, compact = false }: FileUploadArea
             variant="default"
             size="sm"
             className="bg-primary hover:bg-primary/90 text-white px-4 py-2 h-auto rounded-xl flex items-center gap-2 shadow-sm"
-            onClick={() => document.getElementById('file-upload')?.click()}
+            onClick={() => document.getElementById(`file-upload-${organizationId || 'default'}`)?.click()}
           >
             <Upload className="h-4 w-4" />
             {compact ? 'Choose File' : 'Browse Files'}
@@ -85,7 +101,7 @@ export function FileUploadArea({ onFileUpload, compact = false }: FileUploadArea
           )}
         </div>
         <input
-          id="file-upload"
+          id={`file-upload-${organizationId || 'default'}`}
           type="file"
           className="hidden"
           onChange={handleFileChange}

@@ -48,7 +48,11 @@ export const formatFileResponse = (file: FileMetadata): FileResponse => {
     type: file.mimeType,
     url: '#', // This will be replaced with a real URL when needed
     createdAt,
-    metadata: undefined
+    metadata: {
+      organizationId: file.organizationId,
+      userId: file.userId,
+      storageProvider: file.storageProvider
+    }
   };
 };
 
@@ -108,12 +112,23 @@ export function getActiveOrgId(specificOrgId?: string): string | null {
     }
     
     // Do not return a default organization ID - force explicit organization selection
-    console.warn('[getActiveOrgId] No active organization ID found in any storage.');
+    console.warn('[getActiveOrgId] No active organization ID found in any storage, file operations will likely fail!');
+    console.warn('[getActiveOrgId] To fix this issue, please select an organization or pass an explicit organization ID.');
     return null;
   } catch (error) {
     console.error('[getActiveOrgId] Error determining active organization ID:', error);
     return null;
   }
+}
+
+/**
+ * Sanitize a user ID to ensure it's a single string value, not an array
+ * This addresses an issue where the userId is sometimes passed as an array to the backend
+ */
+function sanitizeUserId(userId: string): string {
+  if (!userId) return '';
+  // If userId contains commas, it might be duplicated - take the first value
+  return userId.includes(',') ? userId.split(',')[0] : userId;
 }
 
 /**
@@ -142,11 +157,14 @@ export async function uploadFile(
       
       // Get user ID from session
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
+      let userId = user?.id;
       
       if (!userId) {
         throw new Error('Could not retrieve user ID from session.');
       }
+      
+      // Sanitize userId to prevent duplicate/array issues
+      userId = sanitizeUserId(userId);
       
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
@@ -155,15 +173,17 @@ export async function uploadFile(
       const orgId = getActiveOrgId(specificOrgId);
       
       if (!orgId) {
+        console.error('[uploadFile] No organization ID available. Upload will fail!');
+        console.error('[uploadFile] specificOrgId provided:', specificOrgId);
+        console.error('[uploadFile] localStorage organization ID:', localStorage.getItem('activeOrganizationId'));
         throw new Error('No active organization selected. Please select an organization first.');
       }
       
+      console.log(`[uploadFile] File will be uploaded to organization ID: ${orgId}`);
+      console.log(`[uploadFile] File: ${file.name}, size: ${formatFileSize(file.size)}`);
+      
       // Important: Use the field name 'file' as expected by the FileInterceptor in NestJS
       formData.append('file', file);
-      
-      // Add metadata to the form as well
-      formData.append('userId', userId);
-      formData.append('organizationId', orgId);
       
       // Setup progress tracking if provided
       if (onProgress) {
@@ -179,10 +199,15 @@ export async function uploadFile(
       xhr.onload = function() {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            console.log('Upload complete. Status:', xhr.status);
-            console.log('Response text:', xhr.responseText.substring(0, 200) + (xhr.responseText.length > 200 ? '...' : ''));
+            console.log('[uploadFile] Upload complete. Status:', xhr.status);
+            console.log('[uploadFile] Response text:', xhr.responseText.substring(0, 200) + (xhr.responseText.length > 200 ? '...' : ''));
             
             const response = JSON.parse(xhr.responseText);
+            
+            // Verify the organization ID in the response
+            if (response.organizationId && response.organizationId !== orgId) {
+              console.warn(`[uploadFile] Organization ID mismatch! Expected: ${orgId}, Got: ${response.organizationId}`);
+            }
             
             // Create a file object from the response
             const fileObject: FileResponse = {
@@ -195,21 +220,31 @@ export async function uploadFile(
               metadata: {
                 storageProvider: response.storageProvider || 'local',
                 userId: response.userId || userId,
+                organizationId: response.organizationId || orgId,
               }
             };
             
-            console.log('Parsed file object:', fileObject);
+            console.log('[uploadFile] Parsed file object:', fileObject);
+            console.log('[uploadFile] File organization ID:', fileObject.metadata?.organizationId);
             resolve(fileObject);
           } catch (error) {
-            console.error('Error parsing upload response:', error);
-            console.error('Response text:', xhr.responseText);
+            console.error('[uploadFile] Error parsing upload response:', error);
+            console.error('[uploadFile] Response text:', xhr.responseText);
             reject(new Error('Failed to parse server response'));
           }
         } else {
-          console.error('Upload failed. Status:', xhr.status);
-          console.error('Status text:', xhr.statusText);
-          console.error('Response:', xhr.responseText);
-          reject(new Error(`Status text: "${xhr.statusText}"`));
+          console.error('[uploadFile] Upload failed. Status:', xhr.status);
+          console.error('[uploadFile] Status text:', xhr.statusText);
+          console.error('[uploadFile] Response:', xhr.responseText);
+          
+          // Try to parse error message from response if possible
+          try {
+            const errorResponse = JSON.parse(xhr.responseText);
+            const errorMessage = errorResponse.message || errorResponse.error || xhr.statusText || 'Server error';
+            reject(new Error(`Upload failed: ${errorMessage}`));
+          } catch (parseError) {
+            reject(new Error(`Upload failed: ${xhr.statusText || 'Server error'}`));
+          }
         }
       };
       
@@ -221,28 +256,31 @@ export async function uploadFile(
       
       // Send the request
       // Add userId directly in the formData as well as query param
-      const uploadUrl = `${API_BASE_URL}/files?orgId=${orgId}&userId=${userId}`;
-      console.log('Upload URL:', uploadUrl);
+      const uploadUrl = `${API_BASE_URL}/files?orgId=${orgId}&userId=${userId}&organization=${orgId}&_t=${Date.now()}`;
+      console.log('[uploadFile] Upload URL:', uploadUrl);
       
       xhr.open('POST', uploadUrl);
       
       // Add Supabase auth token
-      console.log('Setting Authorization header with token');
+      console.log('[uploadFile] Setting Authorization header with token');
       xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
       
       // Add organization ID and userId headers
-      if (orgId) {
-        xhr.setRequestHeader('X-Organization-ID', orgId);
-      }
-      
-      // Add user ID header explicitly 
+      xhr.setRequestHeader('X-Organization-ID', orgId);
+      xhr.setRequestHeader('X-Force-Organization-ID', orgId);
       xhr.setRequestHeader('X-User-ID', userId);
+      // Don't set Content-Type for FormData - browser will handle this automatically with correct boundary
       
-      // Also add userId to form data as a fallback
+      // Add additional headers to prevent caching
+      xhr.setRequestHeader('Cache-Control', 'no-cache, no-store');
+      xhr.setRequestHeader('Pragma', 'no-cache');
+      
+      // Add userId and organizationId to form data - do this only ONCE to avoid duplication
       formData.append('userId', userId);
       formData.append('organizationId', orgId);
+      formData.append('organization', orgId); // Add extra version for compatibility
       
-      console.log('Sending upload request with userId:', userId);
+      console.log('[uploadFile] Sending upload request with userId:', userId, 'and organizationId:', orgId);
       xhr.send(formData);
     } catch (error) {
       console.error('Error preparing upload:', error);
@@ -308,7 +346,12 @@ export async function listFiles(
       type: file.mimeType || 'application/octet-stream',
       url: file.url || '',
       createdAt: file.createdAt || new Date().toISOString(),
-      metadata: file.metadata || {}
+      metadata: {
+        organizationId: file.organizationId || orgId,
+        userId: file.userId,
+        storageProvider: file.storageProvider,
+        ...(file.metadata || {})
+      }
     }));
   } catch (error) {
     console.error('[listFiles] Error listing files:', error);
@@ -358,7 +401,12 @@ export async function getFile(fileId: string, specificOrgId?: string): Promise<F
       type: fileData.mimeType || 'application/octet-stream',
       url: fileData.url || '',
       createdAt: fileData.createdAt || new Date().toISOString(),
-      metadata: fileData.metadata || {}
+      metadata: {
+        organizationId: fileData.organizationId || orgId,
+        userId: fileData.userId,
+        storageProvider: fileData.storageProvider,
+        ...(fileData.metadata || {})
+      }
     };
   } catch (error) {
     console.error('[getFile] Error getting file:', error);
@@ -411,8 +459,9 @@ export async function getDownloadUrl(fileId: string, specificOrgId?: string): Pr
  * Delete a file
  * @param fileId File ID
  * @param specificOrgId Optional organization ID to override the current one
+ * @param specificUserId Optional user ID to override the current one
  */
-export async function deleteFile(fileId: string, specificOrgId?: string): Promise<void> {
+export async function deleteFile(fileId: string, specificOrgId?: string, specificUserId?: string): Promise<void> {
   try {
     // Get the organization ID using our helper function
     const orgId = getActiveOrgId(specificOrgId);
@@ -422,11 +471,29 @@ export async function deleteFile(fileId: string, specificOrgId?: string): Promis
       throw new Error("No active organization selected");
     }
     
-    // Add cache busting parameter
+    // Get the user ID from Supabase session
+    let userId = specificUserId;
+    
+    if (!userId) {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+      
+      if (!userId) {
+        console.error('[deleteFile] No user ID available. User must be authenticated.');
+        throw new Error('User must be authenticated to delete files');
+      }
+    }
+    
+    // Sanitize userId to prevent duplicate/array issues
+    userId = sanitizeUserId(userId);
+    
+    // Add cache busting parameter and userId
     const timestamp = Date.now();
-    const fetchUrl = `/files/${fileId}?orgId=${orgId}&_t=${timestamp}`;
+    const fetchUrl = `/files/${fileId}?orgId=${orgId}&userId=${userId}&_t=${timestamp}`;
     console.log('[deleteFile] Deleting file at:', fetchUrl);
     console.log('[deleteFile] Using organization ID:', orgId);
+    console.log('[deleteFile] Using user ID:', userId);
     
     // Add custom headers
     const customOptions = {
@@ -434,6 +501,7 @@ export async function deleteFile(fileId: string, specificOrgId?: string): Promis
       headers: {
         'X-Organization-ID': orgId,
         'X-Force-Organization-ID': orgId,
+        'X-User-ID': userId,
         'Cache-Control': 'no-cache, no-store',
         'Pragma': 'no-cache'
       }
