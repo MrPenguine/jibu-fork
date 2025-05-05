@@ -8,6 +8,7 @@ import { UserModule } from '../../modules/v1/user/user.module';
 import { OrganizationModule } from '../../modules/v1/organization/organization.module';
 import { DatabaseModule } from '../database/database.module';
 import { SupabaseWebhookGuard } from './guards/supabase-webhook.guard';
+import { ApiKeyModule } from '../../modules/v1/api-key/api-key.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { SupabaseWebhookGuard } from './guards/supabase-webhook.guard';
     forwardRef(() => WebhookModule),
     UserModule,
     OrganizationModule,
+    ApiKeyModule,
   ],
   controllers: [],
   providers: [JwtStrategy, UserSyncService, SupabaseWebhookGuard],

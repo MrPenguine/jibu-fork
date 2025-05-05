@@ -7,6 +7,7 @@ import { AuthModule } from '../core/auth/auth.module';
 import { DatabaseModule } from '../core/database/database.module';
 import { JwtAuthGuard } from '../core/auth/guards/jwt-auth.guard';
 import { V1Module } from '../modules/v1/v1.module';
+import { EncryptionModule } from '../core/encryption/encryption.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { V1Module } from '../modules/v1/v1.module';
       envFilePath: '.env',
     }),
     DatabaseModule,
+    EncryptionModule,
     AuthModule,
     V1Module,
   ],

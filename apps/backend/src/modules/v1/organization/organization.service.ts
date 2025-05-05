@@ -1,12 +1,19 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { ApiKeyService } from '../api-key/api-key.service';
 import { v4 as uuidv4 } from 'uuid';
 import { add } from 'date-fns';
 import { InviteMembersDto } from './dto/organization.dto';
+import { randomUUID, randomBytes } from 'crypto';
+import { VaultService } from '../../../core/encryption/vault.service';
 
 @Injectable()
 export class OrganizationService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private apiKeyService: ApiKeyService,
+    private vaultService: VaultService,
+  ) {}
 
   /**
    * Get the organizations that the user is a member of
@@ -83,6 +90,40 @@ export class OrganizationService {
       await tx.user.update({
         where: { id: userId },
         data: { lastOrgId: organization.id },
+      });
+
+      // Create default API keys for the organization within the transaction
+      const apiKeyId = randomUUID();
+      const apiKey = 'sk_' + randomBytes(32).toString('hex');
+      const prefix = apiKey.slice(0, 10);
+      
+      // Create private key
+      await this.vaultService.writeSecret('apiKeys', organization.id, apiKeyId, { apiKey }, organization.id);
+      await tx.apiKey.create({
+        data: {
+          id: apiKeyId,
+          organizationId: organization.id,
+          userId: userId,
+          name: "Default Private Key",
+          prefix,
+          scopes: [],
+        },
+      });
+
+      // Create public key
+      const publicApiKeyId = randomUUID();
+      const publicApiKey = 'sk_' + randomBytes(32).toString('hex');
+      const publicPrefix = publicApiKey.slice(0, 10);
+      await this.vaultService.writeSecret('apiKeys', organization.id, publicApiKeyId, { apiKey: publicApiKey }, organization.id);
+      await tx.apiKey.create({
+        data: {
+          id: publicApiKeyId,
+          organizationId: organization.id,
+          userId: userId,
+          name: "Default Public Key",
+          prefix: publicPrefix,
+          scopes: [],
+        },
       });
       
       return { organization, membership };

@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { ApiKeyService } from '../../modules/v1/api-key/api-key.service';
 
 @Injectable()
 export class UserSyncService {
   private readonly logger = new Logger(UserSyncService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private apiKeyService: ApiKeyService,
+  ) {}
 
   /**
    * Sync a user from Supabase to our database
@@ -79,7 +83,10 @@ export class UserSyncService {
       data: { lastOrgId: organization.id }
     });
 
-    this.logger.log(`Created new user and organization: ${user.id}, ${organization.id}`);
+    // Create default API keys for the user
+    await this.apiKeyService.ensureDefaultKeysForUser(organization.id, user.id);
+
+    this.logger.log(`Created new user, organization, and default API keys: ${user.id}, ${organization.id}`);
     return { user, organization };
   }
 

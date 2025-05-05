@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -8,57 +9,59 @@ datasource db {
 }
 
 model User {
-  id                String   @id // Supabase User ID
-  email             String   @unique
-  emailConfirmed    Boolean  @default(false)
-  firstName         String?
-  lastName          String?
-  fullName          String?  // Added from user_metadata.full_name
-  imageUrl          String?  // This will store the avatar_url/picture from Supabase
-  provider          String?  // Authentication provider (e.g., "google")
-  providerIds       String[] // Array of provider IDs
-  lastSignInAt      DateTime?
-  phoneNumber       String?  // From Supabase phone field
-  phoneConfirmed    Boolean  @default(false)
-  isAnonymous       Boolean  @default(false)
-  metadata          Json?    // For storing additional user_metadata
-  lastOrgId         String?  // Store the ID of the last organization the user accessed
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  memberships       OrganizationMembership[] // Relation field
-  files             File[]   // Reverse relation
-  lastOrg           Organization? @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
-  sentInvitations   Invitation[] // Invitations sent by this user
-  
+  id              String                   @id // Supabase User ID
+  email           String                   @unique
+  emailConfirmed  Boolean                  @default(false)
+  firstName       String?
+  lastName        String?
+  fullName        String? // Added from user_metadata.full_name
+  imageUrl        String? // This will store the avatar_url/picture from Supabase
+  provider        String? // Authentication provider (e.g., "google")
+  providerIds     String[] // Array of provider IDs
+  lastSignInAt    DateTime?
+  phoneNumber     String? // From Supabase phone field
+  phoneConfirmed  Boolean                  @default(false)
+  isAnonymous     Boolean                  @default(false)
+  metadata        Json? // For storing additional user_metadata
+  lastOrgId       String? // Store the ID of the last organization the user accessed
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  memberships     OrganizationMembership[] // Relation field
+  files           File[] // Reverse relation
+  lastOrg         Organization?            @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
+  sentInvitations Invitation[] // Invitations sent by this user
+  apiKeys         ApiKey[] // API keys created by this user
+
   @@index([lastOrgId])
 }
 
 model Organization {
-  id          String   @id @default(uuid())
-  name        String
-  email       String?
-  settings    Json?    // Store organization settings as JSON
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  memberships OrganizationMembership[] // Relation field
-  credentials Credential[] // Relation to credentials
-  files       File[]   // Reverse relation
-  usersLastOrg User[]  @relation("UserLastOrg") // Users who have this as their last organization
-  invitations Invitation[] // Invitations for this organization
+  id           String                   @id @default(uuid())
+  name         String
+  email        String?
+  settings     Json? // Store organization settings as JSON
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  memberships  OrganizationMembership[] // Relation field
+  credentials  Credential[] // Relation to credentials
+  files        File[] // Reverse relation
+  usersLastOrg User[]                   @relation("UserLastOrg") // Users who have this as their last organization
+  invitations  Invitation[] // Invitations for this organization
+  apiKeys      ApiKey[] // API keys belonging to this organization
 }
 
 model OrganizationMembership {
   id             String   @id @default(uuid())
   organizationId String
-  userId         String?  // Optional to handle invitations for non-users
-  email          String?  // Store email for pending memberships with no user
+  userId         String? // Optional to handle invitations for non-users
+  email          String? // Store email for pending memberships with no user
   role           String
   status         String   @default("pending") // Status: "pending", "active", "revoked"
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([organizationId])
@@ -73,13 +76,13 @@ model Invitation {
   token          String   @unique
   status         String   @default("pending") // Status: "pending", "accepted", "revoked", "expired"
   invitedById    String
-  message        String?  // Optional message to include with invitation
+  message        String? // Optional message to include with invitation
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   expiresAt      DateTime
 
-  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  invitedBy     User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([invitedById])
@@ -99,17 +102,17 @@ model Credential {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, provider, name])
   @@index([organizationId])
 }
 
 model File {
-  id             String   @id @default(uuid())
-  name           String
+  id              String   @id @default(uuid())
+  name            String
   storageProvider String
-  storageKey      String  @unique
+  storageKey      String   @unique
   mimeType        String
   sizeBytes       Int
   organizationId  String
@@ -117,9 +120,29 @@ model File {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model ApiKey {
+  id             String    @id @default(uuid())
+  organizationId String
+  userId         String
+  name           String
+  prefix         String
+  scopes         String[]
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+  revoked        Boolean   @default(false)
+  isDefault      Boolean   @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
   @@index([organizationId])
   @@index([userId])
 }
