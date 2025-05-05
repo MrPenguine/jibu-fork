@@ -13,5 +13,17 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  vault:
+    image: hashicorp/vault:1.15
+    restart: always
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - '8200:8200'
+    cap_add:
+      - IPC_LOCK
+    # For production, configure a persistent backend and remove dev mode
+
 volumes:
-  postgres_data: 
+  postgres_data:
