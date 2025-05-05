@@ -177,7 +177,7 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
       },
       {
         title: "Provider Keys",
-        url: "#",
+        url: "/organizations/keys",
         icon: <Key className="size-4" />
       },
     ],
@@ -230,7 +230,7 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
       },
       {
         title: "API Keys",
-        url: "#",
+        url: "/organizations/settings/api-keys",
         icon: <Key className="size-4" />
       },
     ],
