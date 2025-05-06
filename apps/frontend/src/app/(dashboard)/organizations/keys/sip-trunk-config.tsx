@@ -1,85 +1,172 @@
 "use client";
 
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Icons } from "@/components/ui/icons";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
 type SipTrunkConfigProps = {
-  name: string;
-  description: string;
   className?: string;
 };
 
-export function SipTrunkConfig({ name, description, className = "bg-card" }: SipTrunkConfigProps) {
-  // Determine text colors based on background
-  const isDarkCard = className.includes("bg-indigo-950") || className.includes("bg-blue") || className.includes("bg-slate-900");
-  
-  // No special text colors needed for pale backgrounds
-  const textColorClass = isDarkCard ? "text-white" : "";
-  const mutedTextClass = isDarkCard ? "text-indigo-200" : "text-muted-foreground";
+export function SipTrunkConfig({ className = "" }: SipTrunkConfigProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [gatewayCount, setGatewayCount] = useState(1);
 
-  return (
-    <div className={`p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow ${className}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className={`font-medium text-lg ${textColorClass}`}>{name}</h3>
-          <p className={`text-sm ${mutedTextClass}`}>{description}</p>
-        </div>
-        <button className={`h-6 w-6 rounded-full flex items-center justify-center ${mutedTextClass}`}>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="12" r="1" />
-            <circle cx="12" cy="5" r="1" />
-            <circle cx="12" cy="19" r="1" />
-          </svg>
-        </button>
+  const Gateway = ({ number }: { number: number }) => (
+    <div className="space-y-4 p-4 border rounded-lg bg-background/50">
+      <div className="flex justify-between items-center">
+        <h4 className="font-medium">Gateway #{number}</h4>
+        {number > 1 && (
+          <button className="text-destructive" onClick={() => setGatewayCount(prev => prev - 1)}>
+            <Icons.trash className="h-4 w-4" />
+          </button>
+        )}
       </div>
       
-      <div className="space-y-4 pb-2">
+      <div className="space-y-3">
         <div>
-          <label className={`text-sm font-medium block mb-1.5 ${textColorClass}`}>SIP Username</label>
-          <input 
-            type="text" 
-            placeholder="Enter SIP username" 
-            className="w-full h-9 px-3 rounded-full border bg-background text-sm" 
-          />
+          <Label>IP Address / Domain *</Label>
+          <Input placeholder="IPv4 address or domain name" />
         </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Port</Label>
+            <Input placeholder="5060" />
+          </div>
+          <div>
+            <Label>Netmask</Label>
+            <Input placeholder="32" />
+          </div>
+        </div>
+
         <div>
-          <label className={`text-sm font-medium block mb-1.5 ${textColorClass}`}>SIP Password</label>
-          <input 
-            type="password" 
-            placeholder="Enter SIP password" 
-            className="w-full h-9 px-3 rounded-full border bg-background text-sm" 
-          />
+          <Label>Outbound Protocol</Label>
+          <Select>
+            <option value="udp">UDP</option>
+            <option value="tcp">TCP</option>
+          </Select>
         </div>
-        <div>
-          <label className={`text-sm font-medium block mb-1.5 ${textColorClass}`}>SIP Domain</label>
-          <input 
-            type="text" 
-            placeholder="e.g., sip.example.com" 
-            className="w-full h-9 px-3 rounded-full border bg-background text-sm" 
-          />
+
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Switch id={`inbound-${number}`} />
+            <Label htmlFor={`inbound-${number}`}>Allow inbound calls</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch id={`outbound-${number}`} />
+            <Label htmlFor={`outbound-${number}`}>Allow outbound calls</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch id={`ping-${number}`} />
+            <Label htmlFor={`ping-${number}`}>Enable options ping</Label>
+          </div>
         </div>
-        <div>
-          <label className={`text-sm font-medium block mb-1.5 ${textColorClass}`}>SIP Port</label>
-          <input 
-            type="text" 
-            placeholder="e.g., 5060" 
-            className="w-full h-9 px-3 rounded-full border bg-background text-sm" 
-          />
-        </div>
-      </div>
-      
-      <div className="mt-4 flex justify-end">
-        <button className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground">
-          Save
-        </button>
       </div>
     </div>
+  );
+
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle>Add New SIP Trunk</CardTitle>
+        <CardDescription>Configure a new SIP trunk connection</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button className="w-full" variant={isOpen ? "secondary" : "default"}>
+              <Icons.plus className="mr-2 h-4 w-4" />
+              Configure New SIP Trunk
+            </Button>
+          </CollapsibleTrigger>
+          
+          <CollapsibleContent className="mt-4 space-y-6">
+            <div>
+              <Label>Name *</Label>
+              <Input placeholder="My SIP Trunk" />
+              <p className="text-sm text-muted-foreground mt-1">Choose a name for this trunk</p>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-2">Gateway Configuration</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure at least one SIP gateway where your trunk provider accepts connections.
+                <a href="#" className="text-primary ml-2 hover:underline">Read the docs</a>
+              </p>
+
+              <div className="space-y-4">
+                {Array.from({ length: gatewayCount }).map((_, i) => (
+                  <Gateway key={i} number={i + 1} />
+                ))}
+              </div>
+
+              <Button 
+                variant="outline" 
+                className="mt-4 w-full"
+                onClick={() => setGatewayCount(prev => prev + 1)}
+              >
+                Add Another Gateway
+              </Button>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-2">Authentication (Optional)</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label>Username</Label>
+                  <Input placeholder="Authentication username" />
+                </div>
+                <div>
+                  <Label>Password</Label>
+                  <Input type="password" placeholder="Authentication password" />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="sip-registration" />
+                  <Label htmlFor="sip-registration">Use SIP Registration</Label>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-medium mb-2">Advanced Settings (Optional)</h3>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Switch id="meeting-join" />
+                  <Label htmlFor="meeting-join">Enable Meeting joins for outbound calls</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch id="cluster-sip" />
+                  <Label htmlFor="cluster-sip">Use Cluster SIP</Label>
+                </div>
+                <div>
+                  <Label>Tech Prefix</Label>
+                  <Input placeholder="Tech prefix for outbound calls" />
+                </div>
+                <div>
+                  <Label>SIP Diversion Header</Label>
+                  <Input placeholder="SIP diversion header" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button variant="outline" onClick={() => setIsOpen(false)}>
+                Cancel
+              </Button>
+              <Button>
+                Save SIP Trunk
+              </Button>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </CardContent>
+    </Card>
   );
 } 
