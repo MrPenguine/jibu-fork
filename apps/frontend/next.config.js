@@ -12,6 +12,24 @@ const nextConfig = {
     // See: https://github.com/gregberge/svgr
     svgr: false,
   },
+  // Server components external packages
+  serverComponentsExternalPackages: ['ioredis'],
+  
+  // Add Node.js polyfills for client-side
+  webpack: (config, { isServer }) => {
+    // Add polyfills for Node.js modules
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        net: false,
+        dns: false,
+        tls: false,
+        fs: false,
+        path: false,
+      };
+    }
+    return config;
+  },
 };
 
 const plugins = [

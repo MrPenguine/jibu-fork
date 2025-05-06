@@ -1,6 +1,10 @@
 // This file exist only to make the shadcn-ui cli happy ¯\_(ツ)_/¯
 {
     "compilerOptions": {
+        "target": "ES2022",
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "declaration": true,
         "baseUrl": ".",
         "paths": {
             "@libs/shadcn-ui": [

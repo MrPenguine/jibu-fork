@@ -1,0 +1,27 @@
+{
+  "name": "queue-definitions",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/queue-definitions/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/queue-definitions",
+        "tsConfig": "libs/queue-definitions/tsconfig.json",
+        "packageJson": "libs/queue-definitions/package.json",
+        "main": "libs/queue-definitions/src/index.ts",
+        "assets": ["libs/queue-definitions/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/queue-definitions/**/*.ts"]
+      }
+    }
+  },
+  "tags": []
+} 

@@ -1,11 +1,28 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import vault from 'node-vault';
+// Fix import to avoid esModuleInterop error
+const vaultFactory = require('node-vault');
+
+// Define interfaces for TypeScript
+interface VaultClient {
+  approleLogin: (options: any) => Promise<any>;
+  health: () => Promise<any>;
+  write: (path: string, data: any) => Promise<any>;
+  read: (path: string) => Promise<any>;
+  list: (path: string) => Promise<any>;
+  delete: (path: string) => Promise<any>;
+}
+
+interface VaultOptions {
+  apiVersion: string;
+  endpoint: string;
+  token?: string;
+}
 
 @Injectable()
 export class VaultService implements OnModuleInit {
     private readonly logger = new Logger(VaultService.name);
-    private client: vault.client;
+    private client: VaultClient;
 
     constructor(private configService: ConfigService) {}
 
@@ -20,7 +37,7 @@ export class VaultService implements OnModuleInit {
             return;
         }
 
-        const options: vault.VaultOptions = {
+        const options: VaultOptions = {
             apiVersion: 'v1',
             endpoint: vaultAddr,
         };
@@ -31,7 +48,7 @@ export class VaultService implements OnModuleInit {
         }
 
         try {
-            this.client = vault(options);
+            this.client = vaultFactory(options);
             if (vaultRoleId && vaultSecretId) {
                 await this.client.approleLogin({
                     role_id: vaultRoleId,
@@ -51,7 +68,7 @@ export class VaultService implements OnModuleInit {
         }
     }
 
-    private ensureClient(): vault.client {
+    private ensureClient(): VaultClient {
         if (!this.client) {
             this.logger.error('Vault client is not initialized or failed to initialize.');
             throw new Error('Vault client is not available.');

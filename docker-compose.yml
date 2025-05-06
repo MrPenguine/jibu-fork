@@ -25,5 +25,31 @@ services:
       - IPC_LOCK
     # For production, configure a persistent backend and remove dev mode
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: always
+    ports:
+      - 6333:6333
+      - 6334:6334
+    expose:
+      - 6333
+      - 6334
+      - 6335
+    volumes:
+      - qdrant_storage:/qdrant/storage
+      - ./apps/qdrant_config.yaml:/qdrant/config/production.yaml
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 volumes:
   postgres_data:
+  qdrant_storage:
+  redis_data:

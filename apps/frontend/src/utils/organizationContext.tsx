@@ -311,11 +311,13 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     console.log('Switching organization in OrganizationContext:', org.name);
     setActiveOrganization(org);
     
-    // Store in localStorage
+    // Store in localStorage and sessionStorage for redundancy
     try {
       localStorage.setItem('activeOrganizationId', org.id);
+      sessionStorage.setItem('activeOrganizationId', org.id);
+      console.log(`[organizationContext] Organization ID stored in both storages: ${org.id}`);
     } catch (storageError) {
-      console.error('Error saving to localStorage:', storageError);
+      console.error('Error saving to storage:', storageError);
     }
     
     // Try to update on the backend
@@ -328,7 +330,6 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       console.warn('Could not update organization on backend:', apiError);
       // Continue even if API fails
     }
-    // No reload or sessionStorage logic needed
   };
 
   // Function to invite members to an organization

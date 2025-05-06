@@ -147,7 +147,7 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
     build: [
       {
         title: "Assistants",
-        url: "#",
+        url: "/assistants",
         icon: <MessageSquare className="size-4" />
       },
       {
@@ -230,7 +230,7 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
       },
       {
         title: "API Keys",
-        url: "/organizations/settings/api-keys",
+        url: "/api-keys",
         icon: <Key className="size-4" />
       },
     ],

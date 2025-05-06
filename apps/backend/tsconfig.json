@@ -1,13 +1,16 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
-  ],
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "esModuleInterop": true
-  }
+    "declaration": false,
+    "outDir": "../../dist/apps/backend",
+    "paths": {
+      "@jibu/queue-definitions": ["libs/queue-definitions/src"]
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }
