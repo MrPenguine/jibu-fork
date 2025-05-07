@@ -36,7 +36,22 @@ import { VectorDbModule } from '../vector-db/vector-db.module';
     }),
     BullModule.registerQueue(
       { name: QUEUE_NAMES.DEFAULT },
-      { name: QUEUE_NAMES.INDEXING },
+      { 
+        name: QUEUE_NAMES.INDEXING,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+        limiter: {
+          max: 5, // Maximum number of jobs processed in the duration
+          duration: 1000, // Duration in milliseconds for rate limiting
+        }
+      },
     ),
     DatabaseModule,
     FileModule,

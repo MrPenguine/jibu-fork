@@ -5,12 +5,6 @@
   "projectType": "application",
   "tags": [],
   "targets": {
-    "serve": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "node apps/worker/queue-runner.js"
-      }
-    },
     "build": {
       "executor": "nx:run-commands",
       "options": {

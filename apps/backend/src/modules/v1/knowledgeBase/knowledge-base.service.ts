@@ -5,38 +5,15 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
 import { UpdateKnowledgeBaseDto } from './dto/update-knowledge-base.dto';
 import { JOB_NAMES } from '@jibu/queue-definitions';
-import * as Redis from 'ioredis';
 
 @Injectable()
 export class KnowledgeBaseService {
   private readonly logger = new Logger(KnowledgeBaseService.name);
-  private readonly redis: Redis.Redis;
 
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('indexing') private readonly indexingQueue: Queue,
-  ) {
-    // Initialize Redis client using environment variables for Docker compatibility
-    const redisHost = process.env.REDIS_HOST || 'localhost';
-    const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
-    const redisPassword = process.env.REDIS_PASSWORD || '';
-    
-    this.logger.log(`Initializing Redis connection to ${redisHost}:${redisPort} for direct queue integration`);
-    
-    this.redis = new Redis.default({
-      host: redisHost,
-      port: redisPort,
-      password: redisPassword || undefined,
-    });
-    
-    this.redis.on('connect', () => {
-      this.logger.log('Redis client successfully connected for direct queue integration');
-    });
-    
-    this.redis.on('error', (err) => {
-      this.logger.error(`Redis connection error: ${err.message}`, err.stack);
-    });
-  }
+  ) {}
 
   /**
    * Create a new knowledge base

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as crypto from 'crypto';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Simple embedding service using hash-based vectors
@@ -8,30 +8,79 @@ import * as crypto from 'crypto';
 @Injectable()
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
-  private readonly vectorDimension: number = 512;
   
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     this.logger.log('Initializing embedding service');
   }
   
   /**
-   * Generate embeddings for a batch of texts
+   * Create embeddings for an array of texts
    */
   async embedTexts(texts: string[]): Promise<number[][]> {
     this.logger.log(`Generating embeddings for ${texts.length} texts`);
     const startTime = Date.now();
     
     try {
-      // Process texts and generate embeddings
-      const embeddings = texts.map(text => this.generateDeterministicEmbedding(text));
+      // Generate random embeddings of the configured dimension for the MVP
+      const dimension = parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10);
       
-      const duration = Date.now() - startTime;
-      this.logger.log(`Generated ${embeddings.length} embeddings in ${duration}ms`);
+      // Create embeddings
+      const embeddings = texts.map(text => {
+        // For actual embeddings, we would call a real embedding API or model here
+        // For now, generate random vectors of the configured dimension
+        // Use deterministic approach based on the hash of the text
+        const vector = new Array(dimension).fill(0);
+        
+        // Only generate actual embeddings for valid text content
+        if (text && !text.startsWith('%PDF') && !/^\uFFFD/.test(text)) {
+          // Simple hash function to get deterministic vectors based on text
+          let hash = 0;
+          for (let i = 0; i < text.length; i++) {
+            hash = ((hash << 5) - hash) + text.charCodeAt(i);
+            hash |= 0; // Convert to 32bit integer
+          }
+          
+          // Seed random with hash
+          const random = seedRandom(hash);
+          
+          // Fill vector with deterministic random values between -1 and 1
+          for (let i = 0; i < dimension; i++) {
+            vector[i] = random() * 2 - 1;
+          }
+          
+          // Normalize the vector to have a magnitude of 1
+          const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+          if (magnitude > 0) {
+            for (let i = 0; i < dimension; i++) {
+              vector[i] /= magnitude;
+            }
+          }
+        } else {
+          // For binary or invalid content, use a small non-zero vector instead of zeros
+          // This helps avoid issues with Qdrant rejecting malformed vectors
+          for (let i = 0; i < dimension; i++) {
+            vector[i] = 0.00001 * (i % 2 === 0 ? 1 : -1);
+          }
+          
+          // Normalize this tiny vector too
+          const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+          if (magnitude > 0) {
+            for (let i = 0; i < dimension; i++) {
+              vector[i] /= magnitude;
+            }
+          }
+        }
+        
+        return vector;
+      });
+      
+      const elapsed = Date.now() - startTime;
+      this.logger.log(`Generated ${embeddings.length} embeddings in ${elapsed}ms`);
       
       return embeddings;
     } catch (error) {
-      this.logger.error(`Error generating embeddings: ${error.message}`, error.stack);
-      throw new Error(`Embedding generation failed: ${error.message}`);
+      this.logger.error(`Error generating embeddings: ${error.message}`);
+      throw error;
     }
   }
   
@@ -39,32 +88,40 @@ export class EmbeddingService {
    * Generate a single embedding for a text
    */
   async embedText(text: string): Promise<number[]> {
-    return this.generateDeterministicEmbedding(text);
-  }
-  
-  /**
-   * Generate a deterministic embedding vector based on text content
-   * This uses a hashing approach to create consistent vectors for the same input
-   */
-  private generateDeterministicEmbedding(text: string): number[] {
-    // Create a deterministic seed from the text
-    const hash = crypto.createHash('sha256').update(text).digest('hex');
+    const dimension = parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10);
     
-    // Use the hash to seed a simple PRNG
-    const vector: number[] = new Array(this.vectorDimension).fill(0);
-    
-    // Fill the vector with deterministic values based on the hash
-    for (let i = 0; i < this.vectorDimension; i++) {
-      // Use different parts of the hash as seeds for different dimensions
-      const byte1 = parseInt(hash.substring((i * 2) % 64, (i * 2 + 2) % 64), 16);
-      const byte2 = parseInt(hash.substring((i * 3) % 64, (i * 3 + 2) % 64), 16);
-      
-      // Generate a value between -1 and 1 using the hash bytes
-      vector[i] = (byte1 / 255) * 2 - 1 + ((byte2 / 255) * 0.1); // Add some variation
+    // Create a simple embedding based on text
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = ((hash << 5) - hash) + text.charCodeAt(i);
+      hash |= 0;
     }
     
-    // Normalize the vector to unit length for cosine similarity
+    const random = seedRandom(hash);
+    const vector = new Array(dimension).fill(0);
+    
+    for (let i = 0; i < dimension; i++) {
+      vector[i] = random() * 2 - 1;
+    }
+    
+    // Normalize
     const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
-    return vector.map(val => val / magnitude);
+    if (magnitude > 0) {
+      for (let i = 0; i < dimension; i++) {
+        vector[i] /= magnitude;
+      }
+    }
+    
+    return vector;
   }
+}
+
+/**
+ * Simple seedable random number generator
+ */
+function seedRandom(seed: number) {
+  return function() {
+    const x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+  };
 } 

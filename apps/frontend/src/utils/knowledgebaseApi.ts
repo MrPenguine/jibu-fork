@@ -21,7 +21,7 @@ export interface KnowledgeBaseSource {
   sourcePointer: string;
   knowledgeBaseId: string;
   sourceType: string;
-  indexingStatus: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'; 
+  indexingStatus: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'INDEXED' | 'FAILED'; 
   createdAt: string;
   updatedAt: string;
 }

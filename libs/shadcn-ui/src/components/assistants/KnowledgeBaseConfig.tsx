@@ -570,7 +570,9 @@ export function KnowledgeBaseConfig({
     
     // Count sources by status
     const statusCounts = knowledgeBaseSources.reduce((counts, source) => {
-      counts[source.indexingStatus] = (counts[source.indexingStatus] || 0) + 1;
+      // Normalize status - treat INDEXED the same as COMPLETED for backward compatibility
+      const normalizedStatus = source.indexingStatus === 'INDEXED' ? 'COMPLETED' : source.indexingStatus;
+      counts[normalizedStatus] = (counts[normalizedStatus] || 0) + 1;
       return counts;
     }, {} as Record<string, number>);
     
@@ -605,19 +607,20 @@ export function KnowledgeBaseConfig({
   
   // Add a function to get status indicator for individual files
   const getSourceStatusIndicator = (source: KnowledgeBaseSource) => {
-    const status = source.indexingStatus || 'UNKNOWN';
+    // Explicitly type as string to avoid TypeScript issues with literal types
+    const status: string = source.indexingStatus || 'UNKNOWN';
     
-    switch (status) {
-      case 'COMPLETED':
-        return <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Indexed</Badge>;
-      case 'PROCESSING':
-        return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Processing</Badge>;
-      case 'PENDING':
-        return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Pending</Badge>;
-      case 'FAILED':
-        return <Badge className="ml-2 bg-red-100 text-red-800 text-xs">Failed</Badge>;
-      default:
-        return <Badge className="ml-2 bg-gray-100 text-gray-800 text-xs">Unknown</Badge>;
+    // Use string comparison to avoid TypeScript issues
+    if (status === 'COMPLETED' || status === 'INDEXED') {
+      return <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Indexed</Badge>;
+    } else if (status === 'PROCESSING') {
+      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Processing</Badge>;
+    } else if (status === 'PENDING') {
+      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Pending</Badge>;
+    } else if (status === 'FAILED') {
+      return <Badge className="ml-2 bg-red-100 text-red-800 text-xs">Failed</Badge>;
+    } else {
+      return <Badge className="ml-2 bg-gray-100 text-gray-800 text-xs">Unknown</Badge>;
     }
   };
 
@@ -719,10 +722,8 @@ export function KnowledgeBaseConfig({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="ml-1 p-0 h-6 w-6"
+                  <div 
+                    className="ml-1 p-0 h-6 w-6 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
                     onClick={async () => {
                       if (!activeKnowledgeBase) return;
                       setIsLoadingSources(true);
@@ -746,10 +747,10 @@ export function KnowledgeBaseConfig({
                         setIsLoadingSources(false);
                       }
                     }}
-                    disabled={isLoadingSources}
+                    aria-disabled={isLoadingSources}
                   >
                     <RefreshCw className={cn("h-3 w-3", isLoadingSources && "animate-spin")} />
-                  </Button>
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Refresh indexing status</p>
@@ -792,10 +793,8 @@ export function KnowledgeBaseConfig({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="ml-2 p-0 h-6 w-6"
+                        <div 
+                          className="ml-2 p-0 h-6 w-6 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
                           onClick={async (e) => {
                             // Prevent accordion from toggling when clicking the refresh button
                             e.stopPropagation();
@@ -813,10 +812,10 @@ export function KnowledgeBaseConfig({
                               setIsLoadingSources(false);
                             }
                           }}
-                          disabled={isLoadingSources}
+                          aria-disabled={isLoadingSources}
                         >
                           <RefreshCw className={cn("h-3 w-3", isLoadingSources && "animate-spin")} />
-                        </Button>
+                        </div>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Refresh list of files</p>
@@ -828,19 +827,17 @@ export function KnowledgeBaseConfig({
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="ml-1 p-0 h-6 w-6"
+                          <div 
+                            className="ml-1 p-0 h-6 w-6 inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
                             onClick={(e) => {
                               // Prevent accordion from toggling
                               e.stopPropagation();
                               requestReindexAll();
                             }}
-                            disabled={isLoadingSources}
+                            aria-disabled={isLoadingSources}
                           >
                             <RefreshCw className="h-3 w-3 text-blue-600" />
-                          </Button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Reindex all files</p>
