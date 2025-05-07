@@ -2,6 +2,7 @@
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { composePlugins, withNx } = require('@nx/next');
+const path = require('path');
 
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
@@ -28,6 +29,24 @@ const nextConfig = {
         path: false,
       };
     }
+    
+    // Fix path resolution for libs
+    const workspace = path.resolve(__dirname, '../..');
+    
+    // Add aliases for path mapping
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.join(__dirname, 'src'),
+      'libs': path.join(workspace, 'libs'),
+      '@libs': path.join(workspace, 'libs'),
+      
+      // Add specific aliases for shadcn-ui components
+      '@libs/shadcn-ui/lib/utils': path.join(workspace, 'libs/shadcn-ui/src/lib/utils'),
+      '@libs/shadcn-ui/lib': path.join(workspace, 'libs/shadcn-ui/src/lib'),
+      '@libs/shadcn-ui/hooks': path.join(workspace, 'libs/shadcn-ui/src/hooks'),
+      '@libs/shadcn-ui/components': path.join(workspace, 'libs/shadcn-ui/src/components')
+    };
+    
     return config;
   },
 };

@@ -701,32 +701,113 @@ const phoneNumberProviders = {
 
 const sipTrunkProviders = {
   "SIP Trunk": {
-    name: "Add New SIP Trunk",
-    description: "Configure a new SIP trunk connection",
     fields: [
       {
-        name: "username",
-        label: "SIP Username",
-        placeholder: "Enter SIP username",
+        name: "name",
+        label: "Name",
+        placeholder: "My SIP Trunk",
         type: "text",
+        required: true,
       },
       {
-        name: "password",
-        label: "SIP Password",
-        placeholder: "Enter SIP password",
-        type: "text",
+        name: "gateways",
+        label: "Gateways",
+        type: "gateway",
+        fields: [
+          {
+            name: "ip_address",
+            label: "IP Address / Domain",
+            placeholder: "IPv4 address or domain name",
+            type: "text",
+            required: true,
+          },
+          {
+            name: "port",
+            label: "Port",
+            placeholder: "5060",
+            type: "text",
+          },
+          {
+            name: "netmask",
+            label: "Netmask",
+            placeholder: "32",
+            type: "text",
+          },
+          {
+            name: "outbound_protocol",
+            label: "Outbound Protocol",
+            type: "select",
+            options: ["UDP", "TCP"],
+          },
+          {
+            name: "allow_inbound",
+            label: "Allow inbound calls",
+            type: "boolean",
+          },
+          {
+            name: "allow_outbound",
+            label: "Allow outbound calls",
+            type: "boolean",
+          },
+          {
+            name: "enable_ping",
+            label: "Enable options ping",
+            type: "boolean",
+          },
+        ],
       },
       {
-        name: "domain",
-        label: "SIP Domain",
-        placeholder: "e.g., sip.example.com",
+        name: "auth_username",
+        label: "Username",
+        placeholder: "Authentication username",
         type: "text",
+        section: "Authentication",
+        optional: true,
       },
       {
-        name: "port",
-        label: "SIP Port",
-        placeholder: "e.g., 5060",
+        name: "auth_password",
+        label: "Password",
+        placeholder: "Authentication password",
+        type: "password",
+        section: "Authentication",
+        optional: true,
+      },
+      {
+        name: "use_registration",
+        label: "Use SIP Registration",
+        type: "boolean",
+        section: "Authentication",
+        optional: true,
+      },
+      {
+        name: "enable_meeting_joins",
+        label: "Enable Meeting joins for outbound calls",
+        type: "boolean",
+        section: "Advanced",
+        optional: true,
+      },
+      {
+        name: "use_cluster_sip",
+        label: "Use Cluster SIP",
+        type: "boolean",
+        section: "Advanced",
+        optional: true,
+      },
+      {
+        name: "tech_prefix",
+        label: "Tech Prefix",
+        placeholder: "Tech prefix for outbound calls",
         type: "text",
+        section: "Advanced",
+        optional: true,
+      },
+      {
+        name: "diversion_header",
+        label: "SIP Diversion Header",
+        placeholder: "SIP diversion header",
+        type: "text",
+        section: "Advanced",
+        optional: true,
       },
     ],
   },
@@ -1341,15 +1422,8 @@ export default function Providers() {
               <h2 className="text-2xl font-bold tracking-tight">SIP Trunk Credentials</h2>
             </div>
             <div className="flex-1 overflow-y-auto pb-24">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto pt-8">
-                {Object.entries(sipTrunkProviders).map(([key, provider]) => (
-                  <SipTrunkConfig
-                    key={provider.name}
-                    name={provider.name}
-                    description={provider.description}
-                    className={cardClass}
-                  />
-                ))}
+              <div className="max-w-4xl mx-auto pt-8">
+                <SipTrunkConfig className={cardClass} />
               </div>
             </div>
           </div>
