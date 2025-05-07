@@ -337,25 +337,17 @@ export class KnowledgeBaseService {
 
       this.logger.log(`Created source: ${source.id}`);
 
-      // Add file to the indexing queue using direct Redis publish
+      // Add file to the indexing queue using Bull queue
       try {
-        this.logger.log(`Publishing source ${source.id} to Redis indexing channel`);
+        this.logger.log(`Adding source ${source.id} to Bull indexing queue`);
         
-        // Create a payload matching the format worker.js expects
-        const payload = JSON.stringify({
-          sourceId: source.id,
-          knowledgeBaseId,
-          organizationId: orgId,
+        // Add to the Bull queue using the proper job name from queue definitions
+        await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+          knowledgeBaseSourceId: source.id,
+          organizationId: orgId
         });
         
-        // Publish to the Redis channel that the worker listens on
-        const result = await this.redis.publish('kb:indexing:requests', payload);
-        
-        if (result > 0) {
-          this.logger.log(`Successfully published indexing request for source ${source.id} (${result} subscribers)`);
-        } else {
-          this.logger.warn(`Published indexing request, but no subscribers were listening (${result} subscribers)`);
-        }
+        this.logger.log(`Successfully added indexing job for source ${source.id} to Bull queue`);
 
         // Update the source to show it's been queued
         // @ts-ignore - PrismaClient models are not properly typed
@@ -466,16 +458,21 @@ export class KnowledgeBaseService {
       throw new NotFoundException(`Source with ID ${sourceId} not found`);
     }
     
-    // Publish to Redis channel instead of using Bull
-    const payload = JSON.stringify({
-      sourceId: sourceId,
-      knowledgeBaseId: knowledgeBaseId,
-      organizationId: orgId,
+    // Add to the Bull queue using the proper job name from queue definitions
+    await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+      knowledgeBaseSourceId: sourceId,
+      organizationId: orgId
     });
     
-    await this.redis.publish('kb:indexing:requests', payload);
+    this.logger.log(`Added indexing job for source ${sourceId} to queue`);
     
-    this.logger.log(`Published indexing request for source ${sourceId}`);
+    // Update the source to show it's been queued
+    // @ts-ignore - PrismaClient models are not properly typed
+    await this.prisma.knowledgeBaseSource.update({
+      where: { id: sourceId },
+      data: { indexingStatus: 'PROCESSING' },
+    });
+    
     return { success: true };
   }
 
@@ -491,5 +488,156 @@ export class KnowledgeBaseService {
         createdAt: 'desc',
       },
     });
+  }
+
+  /**
+   * Get all chunks for a knowledge base
+   */
+  async getKnowledgeBaseChunks(knowledgeBaseId: string, orgId: string) {
+    // Verify KB exists
+    await this.findKnowledgeBaseById(knowledgeBaseId, orgId);
+    
+    this.logger.log(`Getting chunks for knowledge base: ${knowledgeBaseId}`);
+    
+    // @ts-ignore - PrismaClient models are not properly typed in the service
+    return this.prisma.chunkMetadata.findMany({
+      where: {
+        knowledgeBaseId,
+      },
+      orderBy: [
+        { sourceId: 'asc' },
+        { chunkIndex: 'asc' }
+      ],
+      include: {
+        source: {
+          select: {
+            id: true,
+            file: {
+              select: {
+                id: true,
+                name: true,
+                mimeType: true
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Get chunks for a specific source in a knowledge base
+   */
+  async getSourceChunks(knowledgeBaseId: string, sourceId: string, orgId: string) {
+    // Verify KB exists
+    await this.findKnowledgeBaseById(knowledgeBaseId, orgId);
+    
+    // Verify source exists and belongs to this KB
+    // @ts-ignore - PrismaClient models are not properly typed in the service
+    const source = await this.prisma.knowledgeBaseSource.findFirst({
+      where: {
+        id: sourceId,
+        knowledgeBaseId,
+        organizationId: orgId
+      }
+    });
+    
+    if (!source) {
+      throw new NotFoundException(`Source ${sourceId} not found in knowledge base ${knowledgeBaseId}`);
+    }
+    
+    this.logger.log(`Getting chunks for source: ${sourceId} in knowledge base: ${knowledgeBaseId}`);
+    
+    // @ts-ignore - PrismaClient models are not properly typed in the service
+    return this.prisma.chunkMetadata.findMany({
+      where: {
+        sourceId,
+        knowledgeBaseId
+      },
+      orderBy: {
+        chunkIndex: 'asc'
+      }
+    });
+  }
+
+  /**
+   * Get statistics about chunks in a knowledge base
+   */
+  async getKnowledgeBaseChunkStats(knowledgeBaseId: string, orgId: string) {
+    // Verify KB exists
+    await this.findKnowledgeBaseById(knowledgeBaseId, orgId);
+    
+    this.logger.log(`Getting chunk statistics for knowledge base: ${knowledgeBaseId}`);
+    
+    // Get all sources for this knowledge base
+    // @ts-ignore - PrismaClient models are not properly typed in the service
+    const sources = await this.prisma.knowledgeBaseSource.findMany({
+      where: {
+        knowledgeBaseId,
+        // @ts-ignore - New field not yet in TypeScript definitions
+        hasIndexedContent: true
+      },
+      include: {
+        file: {
+          select: {
+            name: true,
+            mimeType: true,
+            sizeBytes: true
+          }
+        }
+      }
+    });
+    
+    // Get chunk count for this knowledge base
+    // @ts-ignore - PrismaClient models are not properly typed in the service
+    const chunkCount = await this.prisma.chunkMetadata.count({
+      where: {
+        knowledgeBaseId
+      }
+    });
+    
+    // Get total text length
+    // @ts-ignore - PrismaClient models are not properly typed in the service
+    const aggregations = await this.prisma.chunkMetadata.aggregate({
+      where: {
+        knowledgeBaseId
+      },
+      _sum: {
+        textLength: true
+      }
+    });
+    
+    const totalTextLength = aggregations._sum.textLength || 0;
+    
+    // Get count per source
+    const sourceStats = await Promise.all(sources.map(async (source) => {
+      // @ts-ignore - PrismaClient models are not properly typed in the service
+      const sourceChunkCount = await this.prisma.chunkMetadata.count({
+        where: {
+          sourceId: source.id
+        }
+      });
+      
+      // Use type assertion to access file property
+      const sourceFile = (source as any).file;
+      
+      return {
+        sourceId: source.id,
+        fileName: sourceFile?.name || 'Unknown',
+        mimeType: sourceFile?.mimeType || 'Unknown',
+        fileSizeBytes: sourceFile?.sizeBytes || 0,
+        chunkCount: sourceChunkCount,
+        indexingStatus: source.indexingStatus
+      };
+    }));
+    
+    return {
+      knowledgeBaseId,
+      totalSources: sources.length,
+      totalChunks: chunkCount,
+      totalTextLength,
+      averageChunkLength: chunkCount > 0 ? Math.round(totalTextLength / chunkCount) : 0,
+      sources: sourceStats
+    };
   }
 } 

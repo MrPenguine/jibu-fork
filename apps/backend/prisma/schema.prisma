@@ -36,21 +36,21 @@ model User {
 }
 
 model Organization {
-  id           String                   @id @default(uuid())
-  name         String
-  email        String?
-  settings     Json? // Store organization settings as JSON
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
-  memberships  OrganizationMembership[] // Relation field
-  credentials  Credential[] // Relation to credentials
-  files        File[] // Reverse relation
-  usersLastOrg User[]                   @relation("UserLastOrg") // Users who have this as their last organization
-  invitations  Invitation[] // Invitations for this organization
-  apiKeys      ApiKey[] // API keys belonging to this organization
-  knowledgeBases KnowledgeBase[] // Knowledge bases belonging to this organization
+  id                   String                   @id @default(uuid())
+  name                 String
+  email                String?
+  settings             Json? // Store organization settings as JSON
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  memberships          OrganizationMembership[] // Relation field
+  credentials          Credential[] // Relation to credentials
+  files                File[] // Reverse relation
+  usersLastOrg         User[]                   @relation("UserLastOrg") // Users who have this as their last organization
+  invitations          Invitation[] // Invitations for this organization
+  apiKeys              ApiKey[] // API keys belonging to this organization
+  knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this organization
   knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this organization
-  assistants   Assistant[] // Assistants belonging to this organization
+  assistants           Assistant[] // Assistants belonging to this organization
 }
 
 model OrganizationMembership {
@@ -123,8 +123,8 @@ model File {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   knowledgeBaseSources KnowledgeBaseSource[] // Relationship to knowledge base sources
 
   @@index([organizationId])
@@ -157,6 +157,7 @@ model KnowledgeBase {
   organizationId String
   organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sources        KnowledgeBaseSource[]
+  chunks         ChunkMetadata[] // Relation to chunks
   assistants     Assistant[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
@@ -165,17 +166,19 @@ model KnowledgeBase {
 }
 
 model KnowledgeBaseSource {
-  id              String        @id @default(uuid())
-  knowledgeBaseId String
-  organizationId  String
-  sourceType      String        @default("file")
-  sourcePointer   String // Stores File ID for sourceType='file'
-  indexingStatus  String        @default("PENDING")
-  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
-  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  file            File          @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                String          @id @default(uuid())
+  knowledgeBaseId   String
+  organizationId    String
+  sourceType        String          @default("file")
+  sourcePointer     String // Stores File ID for sourceType='file'
+  indexingStatus    String          @default("PENDING")
+  hasIndexedContent Boolean         @default(false)
+  knowledgeBase     KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  file              File            @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
+  chunks            ChunkMetadata[] // Relation to chunks
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   @@index([knowledgeBaseId])
   @@index([organizationId])
@@ -207,4 +210,23 @@ model Assistant {
 
   @@index([organizationId])
   @@index([knowledgeBaseId])
+}
+
+model ChunkMetadata {
+  id              String   @id @default(uuid())
+  knowledgeBaseId String
+  sourceId        String
+  chunkIndex      Int
+  vectorId        String
+  textPreview     String
+  textLength      Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  knowledgeBase KnowledgeBase       @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  source        KnowledgeBaseSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId])
+  @@index([sourceId])
+  @@index([vectorId])
 }

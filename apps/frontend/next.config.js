@@ -41,10 +41,17 @@ const nextConfig = {
       '@libs': path.join(workspace, 'libs'),
       
       // Add specific aliases for shadcn-ui components
-      '@libs/shadcn-ui/lib/utils': path.join(workspace, 'libs/shadcn-ui/src/lib/utils'),
+      '@libs/shadcn-ui/lib/utils': path.join(workspace, 'libs/shadcn-ui/src/lib/utils.ts'),
       '@libs/shadcn-ui/lib': path.join(workspace, 'libs/shadcn-ui/src/lib'),
       '@libs/shadcn-ui/hooks': path.join(workspace, 'libs/shadcn-ui/src/hooks'),
-      '@libs/shadcn-ui/components': path.join(workspace, 'libs/shadcn-ui/src/components')
+      '@libs/shadcn-ui/hooks/use-mobile': path.join(workspace, 'libs/shadcn-ui/src/hooks/use-mobile.ts'),
+      '@libs/shadcn-ui/components': path.join(workspace, 'libs/shadcn-ui/src/components'),
+      '@libs/shadcn-ui/components/ui': path.join(workspace, 'libs/shadcn-ui/src/components/ui'),
+      
+      // Add paths for worker, backend, and shared libs
+      '@jibu/queue-definitions': path.join(workspace, 'libs/queue-definitions/src'),
+      '@backend': path.join(workspace, 'apps/backend/src'),
+      '@worker': path.join(workspace, 'apps/worker/src')
     };
     
     return config;

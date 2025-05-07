@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "baseUrl": "../../",
+    "paths": {
+      "@jibu/queue-definitions": ["libs/queue-definitions/src/index.ts"],
+      "@backend/*": ["apps/backend/src/*"],
+      "@worker/*": ["apps/worker/src/*"]
+    }
+  }
+} 

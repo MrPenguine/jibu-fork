@@ -170,6 +170,77 @@ export class KnowledgeBaseController {
     return this.knowledgeBaseService.findKnowledgeBaseById(id, req.user.orgId);
   }
 
+  @Get(':id/chunks')
+  @ApiOperation({ summary: 'Get all chunks for a knowledge base' })
+  @ApiResponse({ status: 200, description: 'Returns the chunks metadata for the knowledge base' })
+  @ApiResponse({ status: 404, description: 'Knowledge base not found' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  async getKnowledgeBaseChunks(
+    @Req() req,
+    @Param('id') id: string,
+  ) {
+    try {
+      const orgId = req.headers['x-organization-id'] || 
+                   req.headers['organization-id'] || 
+                   req.headers['x-force-organization-id'] || 
+                   req.user.orgId;
+      
+      this.logger.log(`[getKnowledgeBaseChunks] Getting chunks for knowledge base: ${id} in org: ${orgId}`);
+      return this.knowledgeBaseService.getKnowledgeBaseChunks(id, orgId);
+    } catch (error) {
+      this.logger.error(`[getKnowledgeBaseChunks] Error getting chunks: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+  
+  @Get(':id/chunks/stats')
+  @ApiOperation({ summary: 'Get chunk statistics for a knowledge base' })
+  @ApiResponse({ status: 200, description: 'Returns statistics about the chunks in the knowledge base' })
+  @ApiResponse({ status: 404, description: 'Knowledge base not found' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  async getKnowledgeBaseChunkStats(
+    @Req() req,
+    @Param('id') id: string,
+  ) {
+    try {
+      const orgId = req.headers['x-organization-id'] || 
+                   req.headers['organization-id'] || 
+                   req.headers['x-force-organization-id'] || 
+                   req.user.orgId;
+      
+      this.logger.log(`[getKnowledgeBaseChunkStats] Getting chunk stats for knowledge base: ${id} in org: ${orgId}`);
+      return this.knowledgeBaseService.getKnowledgeBaseChunkStats(id, orgId);
+    } catch (error) {
+      this.logger.error(`[getKnowledgeBaseChunkStats] Error getting chunk stats: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+  
+  @Get(':id/sources/:sourceId/chunks')
+  @ApiOperation({ summary: 'Get chunks for a specific source in a knowledge base' })
+  @ApiResponse({ status: 200, description: 'Returns the chunks metadata for the specified source' })
+  @ApiResponse({ status: 404, description: 'Knowledge base or source not found' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  @ApiParam({ name: 'sourceId', description: 'Knowledge Base Source ID' })
+  async getSourceChunks(
+    @Req() req,
+    @Param('id') id: string,
+    @Param('sourceId') sourceId: string,
+  ) {
+    try {
+      const orgId = req.headers['x-organization-id'] || 
+                   req.headers['organization-id'] || 
+                   req.headers['x-force-organization-id'] || 
+                   req.user.orgId;
+      
+      this.logger.log(`[getSourceChunks] Getting chunks for source: ${sourceId} in knowledge base: ${id}, org: ${orgId}`);
+      return this.knowledgeBaseService.getSourceChunks(id, sourceId, orgId);
+    } catch (error) {
+      this.logger.error(`[getSourceChunks] Error getting source chunks: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a knowledge base' })
   @ApiResponse({ status: 200, description: 'The knowledge base has been updated' })

@@ -16,7 +16,18 @@
     "baseUrl": ".",
     "paths": {
       "@libs/shadcn-ui": ["libs/shadcn-ui/src/index.ts"],
-      "@libs/shadcn-ui/*": ["libs/shadcn-ui/src/*"]
+      "@libs/shadcn-ui/components/*": ["libs/shadcn-ui/src/components/*"],
+      "@libs/shadcn-ui/lib/*": ["libs/shadcn-ui/src/lib/*"],
+      "@libs/shadcn-ui/hooks/*": ["libs/shadcn-ui/src/hooks/*"],
+      "libs/shadcn-ui/src/*": ["libs/shadcn-ui/src/*"],
+      
+      "@jibu/core/chunking": ["libs/core/chunking/src/index.ts"],
+      "@jibu/core/embedding": ["libs/core/embedding/src/index.ts"],
+      "@jibu/core/vector-db": ["libs/core/vector-db/src/index.ts"],
+      "@jibu/queue-definitions": ["libs/queue-definitions/src/index.ts"],
+      "@backend/*": ["apps/backend/src/*"],
+      "@worker/*": ["apps/worker/src/*"],
+      "@frontend/*": ["apps/frontend/src/*"]
     }
   },
   "exclude": ["node_modules", "tmp"]

@@ -4,6 +4,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QUEUE_NAMES } from '@jibu/queue-definitions';
 import { QueueProcessor } from './queue.processor';
 import { IndexingProcessor } from './indexing.processor';
+import { PrismaService } from '../../../backend/src/core/database/prisma.service';
+import { FileService } from '../../../backend/src/modules/v1/file/file.service';
+import { DatabaseModule } from '../../../backend/src/core/database/database.module';
+import { FileModule } from '../../../backend/src/modules/v1/file/file.module';
+import { ChunkingModule } from '../chunking/chunking.module';
+import { EmbeddingModule } from '../embedding/embedding.module';
+import { VectorDbModule } from '../vector-db/vector-db.module';
 
 @Module({
   imports: [
@@ -31,8 +38,16 @@ import { IndexingProcessor } from './indexing.processor';
       { name: QUEUE_NAMES.DEFAULT },
       { name: QUEUE_NAMES.INDEXING },
     ),
+    DatabaseModule,
+    FileModule,
+    ChunkingModule,
+    EmbeddingModule,
+    VectorDbModule,
   ],
-  providers: [QueueProcessor, IndexingProcessor],
+  providers: [
+    QueueProcessor, 
+    IndexingProcessor,
+  ],
   exports: [BullModule],
 })
 export class QueueModule {} 
