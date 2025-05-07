@@ -22,7 +22,7 @@ start "Cloudflared Tunnel" powershell -NoExit -Command "cloudflared tunnel --url
 REM Start Worker Application
 echo.
 echo [3/3] Starting Worker Application...
-start "Worker Application" powershell -NoExit -Command "node apps/worker/queue-runner.js"
+start "Worker Application" powershell -NoExit -Command "npx run worker:worker"
 
 echo.
 echo Docker, Cloudflared, and Worker started successfully!
