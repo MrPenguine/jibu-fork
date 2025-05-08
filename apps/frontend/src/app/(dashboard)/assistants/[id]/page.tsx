@@ -30,7 +30,7 @@ const apiProviders = [
 export default function AssistantDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { activeOrganization } = useOrganization();
+  const { activeOrganization, loading: orgLoading } = useOrganization();
   
   // Safely extract the ID using React.use() as recommended
   const id = typeof params?.id === 'string' ? params.id : 
@@ -50,6 +50,7 @@ export default function AssistantDetailPage() {
   const [model, setModel] = useState<string>('');
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(2048);
+  const [modelPreference, setModelPreference] = useState<'latency' | 'balance' | 'capability'>('latency');
   
   // State for UI
   const [selectedProvider, setSelectedProvider] = useState<ProviderType>('web');
@@ -91,28 +92,30 @@ export default function AssistantDetailPage() {
         
         // Set model config if available
         if (assistantData.model) {
-          if (typeof assistantData.model === 'string') {
-            setModel(assistantData.model);
-          } else if (typeof assistantData.model === 'object' && assistantData.model.name) {
-            setModel(assistantData.model.name);
+          if (assistantData.model.model) {
+            setModel(assistantData.model.model);
           }
           
-          // Set temperature and maxTokens if available
-          if (typeof assistantData.model === 'object') {
-            if (assistantData.model.temperature !== undefined) {
-              setTemperature(assistantData.model.temperature);
-            }
-            if (assistantData.model.maxTokens !== undefined) {
-              setMaxTokens(assistantData.model.maxTokens);
-            }
+          if (assistantData.model.provider) {
+            setProvider(assistantData.model.provider);
+          }
+          
+          if (assistantData.model.temperature !== undefined) {
+            setTemperature(assistantData.model.temperature);
+          }
+          
+          if (assistantData.model.maxTokens !== undefined) {
+            setMaxTokens(assistantData.model.maxTokens);
+          }
+          
+          if (assistantData.model.preference) {
+            setModelPreference(assistantData.model.preference);
           }
         }
         
-        // Set provider if available, default to the first provider otherwise
-        setProvider((assistantData as any).provider || (apiProviders.length > 0 ? apiProviders[0].value : ''));
-        
-        // Set knowledge base ID if available
-        setKnowledgeBaseId(assistantData.knowledgeBaseId || null);
+        if (assistantData.knowledgeBaseId) {
+          setKnowledgeBaseId(assistantData.knowledgeBaseId);
+        }
         
         // Set last saved time from updatedAt
         if (assistantData.updatedAt) {
@@ -159,10 +162,30 @@ export default function AssistantDetailPage() {
       return (data: any) => {
         if (timeout) clearTimeout(timeout);
         
+        // Log what's being saved for debugging
+        console.log("[debouncedSave] Saving data:", data);
+        
         timeout = setTimeout(async () => {
           setSaving(true);
           try {
-            const updated = await updateAssistant(id, data);
+            // If we're updating any model-related properties, ensure we're providing the complete model object
+            let updatedData = { ...data };
+            
+            // If we're updating a model property, make sure we merge it with the current model state
+            if (data.model) {
+              updatedData.model = {
+                provider: data.model.provider || provider,
+                model: data.model.model || model,
+                temperature: data.model.temperature !== undefined ? data.model.temperature : temperature,
+                maxTokens: data.model.maxTokens !== undefined ? data.model.maxTokens : maxTokens,
+                preference: data.model.preference || modelPreference
+              };
+              console.log("[debouncedSave] Complete model data being sent:", updatedData.model);
+            }
+            
+            const updated = await updateAssistant(id, updatedData);
+            console.log("[debouncedSave] Response:", updated);
+            setAssistant(updated); // Update the assistant state to match what was saved
             setLastSaved(new Date(updated.updatedAt));
             setIsDirty(false);
           } catch (error) {
@@ -174,7 +197,7 @@ export default function AssistantDetailPage() {
         }, 1000); // 1 second debounce
       };
     })(),
-    [id]
+    [id, provider, model, temperature, maxTokens, modelPreference]
   );
 
   // Handle field changes with autosave
@@ -191,42 +214,113 @@ export default function AssistantDetailPage() {
   };
 
   const handleModelChange = (value: string) => {
+    console.log(`[AssistantDetailPage] Setting model to: ${value}`);
     setModel(value);
     setIsDirty(true);
-    debouncedSave({ config: { name: value } });
+    
+    // Save immediately when model changes
+    debouncedSave({ 
+      model: { 
+        provider,
+        model: value,
+        temperature,
+        maxTokens,
+        preference: modelPreference
+      } 
+    });
+    
+    // Also trigger immediate direct save
+    if (id !== 'new') {
+      handleSave();
+    }
   };
 
   const handleProviderChange = (value: string) => {
+    console.log(`[AssistantDetailPage] Setting provider to: ${value}`);
     setProvider(value);
-    // Provider doesn't need to be saved to the API in this implementation
+    setIsDirty(true);
+    
+    // Save immediately when provider changes
+    debouncedSave({ 
+      model: { 
+        provider: value,
+        model,
+        temperature,
+        maxTokens,
+        preference: modelPreference
+      } 
+    });
+    
+    // Also trigger immediate direct save
+    if (id !== 'new') {
+      handleSave();
+    }
   };
 
   const handleTemperatureChange = (value: number) => {
     setTemperature(value);
     setIsDirty(true);
-    debouncedSave({ config: { ...assistant?.model, temperature: value } });
+    debouncedSave({ 
+      model: { 
+        provider,
+        model,
+        temperature: value,
+        maxTokens,
+        preference: modelPreference
+      } 
+    });
   };
 
   const handleMaxTokensChange = (value: number) => {
     setMaxTokens(value);
     setIsDirty(true);
-    debouncedSave({ config: { ...assistant?.model, maxTokens: value } });
+    debouncedSave({ 
+      model: { 
+        provider,
+        model,
+        temperature,
+        maxTokens: value,
+        preference: modelPreference
+      } 
+    });
+  };
+
+  // Add a new handler for model preference
+  const handleModelPreferenceChange = (value: 'latency' | 'balance' | 'capability') => {
+    setModelPreference(value);
+    setIsDirty(true);
+    debouncedSave({ 
+      model: { 
+        provider,
+        model,
+        temperature,
+        maxTokens,
+        preference: value
+      } 
+    });
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const modelConfig = {
+        provider,
+        model,
+        temperature,
+        maxTokens,
+        preference: modelPreference
+      };
+      
+      console.log("[handleSave] Saving assistant with model config:", modelConfig);
+      
       const updated = await updateAssistant(id, {
         name,
         description: firstMessage, // maps to firstMessage in backend
         systemPrompt: systemPrompt, // maps to voicemailMessage in backend
         knowledgeBaseId: knowledgeBaseId, // add knowledge base ID
-        config: typeof model === 'string' ? { 
-          name: model,
-          temperature,
-          maxTokens
-        } : model // Save model configuration with temperature and maxTokens
+        model: modelConfig
       });
+      
       setLastSaved(new Date(updated.updatedAt));
       setIsDirty(false);
       
@@ -397,6 +491,7 @@ export default function AssistantDetailPage() {
                   model={model}
                   temperature={temperature}
                   maxTokens={maxTokens}
+                  modelPreference={modelPreference}
                   assistantId={id !== 'new' ? id : undefined}
                   knowledgeBaseId={knowledgeBaseId || undefined}
                   organizationId={activeOrganization?.id}
@@ -406,6 +501,7 @@ export default function AssistantDetailPage() {
                   onModelChange={handleModelChange}
                   onTemperatureChange={handleTemperatureChange}
                   onMaxTokensChange={handleMaxTokensChange}
+                  onModelPreferenceChange={handleModelPreferenceChange}
                   onKnowledgeBaseChange={setKnowledgeBaseId}
                 />
               </TabsContent>

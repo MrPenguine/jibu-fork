@@ -8,10 +8,17 @@ export interface Assistant {
   organizationId: string;
   createdAt: string;
   updatedAt: string;
-  knowledgeBaseId?: string;
+  knowledgeBaseId?: string | null;
   firstMessage?: string;
   voicemailMessage?: string; // System prompt
-  model?: any;
+  model?: {
+    provider?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    preference?: 'latency' | 'balance' | 'capability';
+    [key: string]: any;
+  };
   hipaaEnabled?: boolean;
   backgroundDenoisingEnabled?: boolean;
   endCallPhrases?: string[];
@@ -25,6 +32,13 @@ interface CreateAssistantParams {
   description?: string; // Maps to firstMessage
   systemPrompt?: string; // Maps to voicemailMessage
   knowledgeBaseId?: string;
+  model?: {
+    provider?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    preference?: 'latency' | 'balance' | 'capability';
+  };
 }
 
 interface UpdateAssistantParams {
@@ -33,7 +47,13 @@ interface UpdateAssistantParams {
   systemPrompt?: string; // Maps to voicemailMessage
   knowledgeBaseId?: string | null;
   hipaaEnabled?: boolean;
-  config?: any;
+  model?: {
+    provider?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    preference?: 'latency' | 'balance' | 'capability';
+  };
 }
 
 /**
@@ -174,15 +194,29 @@ export const createAssistant = async (params: CreateAssistantParams): Promise<As
     }
     
     try {
+      console.log('[createAssistant] Creating assistant with params:', JSON.stringify(params, null, 2));
+      
+      // Create request payload, converting any old format data to new format
+      const payload = {
+        ...params,
+        organizationId,
+        // If templateId is provided but not model, include it as model config
+        ...(params.templateId && !params.model && {
+          model: {
+            model: params.templateId
+          }
+        })
+      };
+      
+      console.log('[createAssistant] Sending payload:', JSON.stringify(payload, null, 2));
+      
       // Create assistant with organization ID
       const assistant = await fetchAPI('/assistants', {
         method: 'POST',
-        body: JSON.stringify({
-          ...params,
-          organizationId
-        })
+        body: JSON.stringify(payload)
       });
       
+      console.log('[createAssistant] Response:', assistant);
       return transformAssistant(assistant);
     } catch (error: any) {
       // If the endpoint doesn't exist, create mock data
@@ -194,7 +228,7 @@ export const createAssistant = async (params: CreateAssistantParams): Promise<As
           firstMessage: params.description || "[placeholder, replace with actual first message]::Thank you for calling Wellness Partners. This is Riley, your scheduling assistant. How may I help you today?",
           voicemailMessage: params.systemPrompt || "{# Appointment Scheduling Agent Prompt\n\n## Identity & Purpose\n\nYou are Riley, an appointment scheduling voice assistant for Wellness Partners, a multi-specialty health clinic. Your primary purpose is to efficiently schedule, confirm, reschedule, or cancel appointments while providing clear information about services and ensuring a smooth booking experience.",
           knowledgeBaseId: params.knowledgeBaseId,
-          model: params.templateId ? { template: params.templateId } : undefined,
+          model: params.model ? { ...params.model } : undefined,
           organizationId,
           hipaaEnabled: false,
           backgroundDenoisingEnabled: false,
@@ -228,11 +262,48 @@ export const updateAssistant = async (
 ): Promise<Assistant> => {
   try {
     try {
+      // Convert any legacy config format to the proper model format
+      let updatedParams = { ...params };
+      
+      // If there's an old format "config" in the params, map it to the new model format
+      if ('config' in (params as any) && (params as any).config) {
+        console.log('[updateAssistant] Converting legacy config format to model format:', (params as any).config);
+        updatedParams.model = {
+          ...(typeof (params as any).config === 'object' ? (params as any).config : {}),
+          ...(updatedParams.model || {})
+        };
+        // Use delete on the updatedParams which is a copy
+        delete (updatedParams as any).config;
+      }
+      
+      // Ensure model is properly structured if it exists
+      if (updatedParams.model) {
+        // Make sure model fields use proper keys
+        const { provider, model, temperature, maxTokens, preference } = updatedParams.model;
+        updatedParams.model = {
+          provider,
+          model,
+          temperature,
+          maxTokens,
+          preference
+        };
+        
+        // Filter out undefined values
+        Object.keys(updatedParams.model).forEach(key => {
+          if (updatedParams.model && updatedParams.model[key as keyof typeof updatedParams.model] === undefined) {
+            delete updatedParams.model[key as keyof typeof updatedParams.model];
+          }
+        });
+      }
+      
+      console.log('[updateAssistant] Sending update with params:', JSON.stringify(updatedParams, null, 2));
+      
       const assistant = await fetchAPI(`/assistants/${assistantId}`, {
         method: 'PATCH',
-        body: JSON.stringify(params)
+        body: JSON.stringify(updatedParams)
       });
       
+      console.log('[updateAssistant] Response:', assistant);
       return transformAssistant(assistant);
     } catch (error: any) {
       // If the endpoint doesn't exist, update mock data
@@ -245,7 +316,7 @@ export const updateAssistant = async (
             // Map fields to match schema
             ...(params.description && { firstMessage: params.description }),
             ...(params.systemPrompt && { voicemailMessage: params.systemPrompt }),
-            ...(params.config && { model: params.config }),
+            ...(params.model && { model: params.model }),
             updatedAt: new Date().toISOString()
           };
           
@@ -372,6 +443,127 @@ export const removeKnowledgeBaseFromAssistant = async (
 };
 
 /**
+ * Interface for model data
+ */
+export interface ModelInfo {
+  id: string;
+  name: string;
+  contextLength: number;
+  description: string;
+  speedTier?: string;
+}
+
+/**
+ * Interface for categorized models
+ */
+export interface CategorizedModels {
+  openai?: ModelInfo[];
+  google?: ModelInfo[];
+  anthropic?: ModelInfo[];
+  mistralai?: ModelInfo[];
+  groq?: ModelInfo[];
+  meta?: ModelInfo[];
+  cohere?: ModelInfo[];
+  other?: ModelInfo[];
+}
+
+// Cache variables
+let modelCache: CategorizedModels | null = null;
+let modelCacheTimestamp: number = 0;
+const MODEL_CACHE_TTL = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+/**
+ * Fetch available models from OpenRouter API
+ */
+export const getAvailableModels = async (): Promise<CategorizedModels> => {
+  const now = Date.now();
+  
+  // Return cached data if still valid
+  if (modelCache && (now - modelCacheTimestamp < MODEL_CACHE_TTL)) {
+    console.log('[getAvailableModels] Returning models from memory cache');
+    return modelCache;
+  }
+  
+  try {
+    console.log('[getAvailableModels] Fetching models from backend API');
+    
+    // Set a timeout for the fetch request
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout after 5s')), 5000);
+    });
+    
+    // Make the actual fetch request through our API utility
+    const fetchPromise = fetchAPI('/assistants/models');
+    
+    // Race the fetch against the timeout
+    const models = await Promise.race([fetchPromise, timeoutPromise]) as CategorizedModels;
+    
+    console.log('[getAvailableModels] Successfully fetched models');
+    
+    // Save to cache
+    modelCache = models;
+    modelCacheTimestamp = now;
+    
+    return models;
+  } catch (error: any) {
+    console.error('[getAvailableModels] Error fetching models:', error);
+    
+    // If we have a stale cache, use it despite being expired
+    if (modelCache) {
+      console.log('[getAvailableModels] Using stale cache as fallback');
+      return modelCache;
+    }
+    
+    // If the endpoint doesn't exist, return mock data
+    if (shouldUseMockData(error)) {
+      console.log('[getAvailableModels] Using mock data for models');
+      const mockData = {
+        openai: [
+          { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', contextLength: 128000, description: 'Fastest OpenAI model with good capabilities', speedTier: 'fastest' },
+          { id: 'openai/gpt-3.5-turbo', name: 'OpenAI: GPT-3.5 Turbo', contextLength: 16000, description: 'Fast, efficient model for most tasks', speedTier: 'balanced' },
+          { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o', contextLength: 128000, description: 'Strong reasoning capabilities with good speed', speedTier: 'balanced' }
+        ],
+        google: [
+          { id: 'google/gemini-flash-1.5', name: 'Google: Gemini Flash 1.5', contextLength: 32000, description: 'Google\'s fastest model for real-time interactions', speedTier: 'fastest' },
+          { id: 'google/gemini-pro-1.5', name: 'Google: Gemini Pro 1.5', contextLength: 128000, description: 'Balanced model with strong reasoning', speedTier: 'balanced' }
+        ],
+        anthropic: [
+          { id: 'anthropic/claude-3-haiku', name: 'Anthropic: Claude 3 Haiku', contextLength: 200000, description: 'Anthropic\'s fastest model for real-time interactions', speedTier: 'fastest' },
+          { id: 'anthropic/claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', contextLength: 200000, description: 'Great balance of speed and capability', speedTier: 'balanced' }
+        ],
+        mistralai: [
+          { id: 'mistralai/mistral-small', name: 'Mistral AI: Mistral Small', contextLength: 32000, description: 'Mistral\'s efficient model for real-time applications', speedTier: 'fastest' },
+          { id: 'mistralai/mistral-large', name: 'Mistral AI: Mistral Large', contextLength: 32000, description: 'Mistral\'s most capable model', speedTier: 'balanced' }
+        ],
+        groq: [
+          { id: 'groq/llama3-8b-8192', name: 'Groq: Llama-3 8B', contextLength: 8192, description: 'Ultra-fast inference with Llama 3 on Groq LPUs', speedTier: 'fastest' },
+          { id: 'groq/llama3-70b-8192', name: 'Groq: Llama-3 70B', contextLength: 8192, description: 'High capability with impressive speed on Groq', speedTier: 'balanced' }
+        ],
+        meta: [
+          { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Meta: Llama 3.1 8B', contextLength: 8192, description: 'Fast and efficient open model', speedTier: 'fastest' }
+        ],
+        cohere: [
+          { id: 'cohere/command-r', name: 'Cohere: Command R', contextLength: 128000, description: 'Balanced model for reasoning tasks', speedTier: 'balanced' }
+        ]
+      };
+      
+      // Save mock data to cache
+      modelCache = mockData;
+      modelCacheTimestamp = now;
+      
+      return mockData;
+    }
+    
+    // Return a friendlier error message with guidance
+    const errorMessage = error.message || 'Unknown error';
+    console.error(`[getAvailableModels] Error details: ${errorMessage}`);
+    
+    // Throw a more informative error
+    throw new Error(`Could not load available models. Please check your internet connection and try again. (${errorMessage})`);
+  }
+};
+
+/**
  * Custom hook to get assistants with organization context
  */
 export const useAssistants = () => {
@@ -401,6 +593,8 @@ export const useAssistants = () => {
       // The organizationId is already handled in the createAssistant function
       return createAssistant(params);
     },
+    
+    getAvailableModels: () => getAvailableModels(),
     
     getAssistant: (assistantId: string) => getAssistant(assistantId),
     updateAssistant: (assistantId: string, params: UpdateAssistantParams) => updateAssistant(assistantId, params),

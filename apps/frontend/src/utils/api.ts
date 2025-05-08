@@ -44,24 +44,50 @@ export async function fetchAPI(
     ...options.headers,
   };
   
-  // Make the request
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  // Calculate the full URL
+  const url = `${API_BASE_URL}${endpoint}`;
   
-  if (!response.ok) {
-    let errorMessage = `API error: ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.message || errorMessage;
-    } catch (e) {
-      // Ignore JSON parsing errors
+  try {
+    // Make the request with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+    
+    // Clear the timeout
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      let errorMessage = `API error: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // Ignore JSON parsing errors
+      }
+      throw new Error(errorMessage);
     }
+    
+    // Check if response is empty
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  } catch (error: any) {
+    // Format error message based on error type
+    let errorMessage = 'Unknown error occurred';
+    
+    if (error.name === 'AbortError') {
+      errorMessage = 'Request timed out after 10 seconds';
+    } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+      errorMessage = 'Network error: Unable to connect to the server. Please check your connection.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    console.error(`API Error (${endpoint}):`, errorMessage);
     throw new Error(errorMessage);
   }
-  
-  // Check if response is empty
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
 } 

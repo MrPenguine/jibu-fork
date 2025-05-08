@@ -1,7 +1,18 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateAssistantDto } from './dto/create-assistant.dto';
-import { UpdateAssistantDto } from './dto/update-assistant.dto';
+import { UpdateAssistantDto, ModelConfigDto } from './dto/update-assistant.dto';
+
+// Interface for model configuration
+interface ModelConfig {
+  provider?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  preference?: 'latency' | 'balance' | 'capability';
+  template?: string;
+  [key: string]: any; // Allow other properties
+}
 
 @Injectable()
 export class AssistantService {
@@ -26,7 +37,7 @@ export class AssistantService {
    * Create a new assistant
    */
   async create(createAssistantDto: CreateAssistantDto, userId: string) {
-    const { organizationId, name, description, systemPrompt, templateId, knowledgeBaseId, config } = createAssistantDto;
+    const { organizationId, name, description, systemPrompt, templateId, knowledgeBaseId, model } = createAssistantDto;
 
     // Validate that the user has access to this organization
     const hasAccess = await this.validateUserOrgAccess(userId, organizationId);
@@ -38,6 +49,35 @@ export class AssistantService {
     const defaultFirstMessage = "[placeholder, replace with actual first message]::Thank you for calling Wellness Partners. This is Riley, your scheduling assistant. How may I help you today?";
     const defaultSystemPrompt = "{# Appointment Scheduling Agent Prompt\n\n## Identity & Purpose\n\nYou are Riley, an appointment scheduling voice assistant for Wellness Partners, a multi-specialty health clinic. Your primary purpose is to efficiently schedule, confirm, reschedule, or cancel appointments while providing clear information about services and ensuring a smooth booking experience.";
 
+    // Prepare model configuration
+    let modelConfig: ModelConfig | null = null;
+    
+    // If model configuration is provided, use it
+    if (model) {
+      modelConfig = {
+        provider: model.provider,
+        model: model.model,
+        temperature: model.temperature,
+        maxTokens: model.maxTokens,
+        preference: model.preference
+      };
+      
+      // Remove any undefined values
+      Object.keys(modelConfig).forEach(key => {
+        if (modelConfig && modelConfig[key as keyof ModelConfig] === undefined) {
+          delete modelConfig[key as keyof ModelConfig];
+        }
+      });
+    }
+    
+    // Add templateId as a backward compatibility if needed
+    if (templateId && (!modelConfig || !modelConfig.model)) {
+      if (!modelConfig) modelConfig = {};
+      modelConfig.model = templateId;
+    }
+
+    console.log('Creating assistant with model config:', modelConfig);
+    
     // Create the assistant with fields that match the schema
     return this.prisma.assistant.create({
       data: {
@@ -45,7 +85,7 @@ export class AssistantService {
         organizationId,
         // Optional fields
         ...(knowledgeBaseId && { knowledgeBaseId }),
-        ...(templateId && { model: { template: templateId } }),
+        ...(modelConfig && { model: modelConfig }),
         firstMessage: description || defaultFirstMessage,
         voicemailMessage: systemPrompt || defaultSystemPrompt,
         // Set default values
@@ -105,6 +145,8 @@ export class AssistantService {
    * Update an assistant
    */
   async update(id: string, updateAssistantDto: UpdateAssistantDto, userId: string) {
+    console.log(`Updating assistant ${id} with data:`, JSON.stringify(updateAssistantDto, null, 2));
+    
     // Get the assistant
     const assistant = await this.prisma.assistant.findUnique({
       where: { id },
@@ -121,7 +163,7 @@ export class AssistantService {
     }
 
     // Map update DTO to Assistant schema fields
-    const { name, description, systemPrompt, knowledgeBaseId, hipaaEnabled, config } = updateAssistantDto;
+    const { name, description, systemPrompt, knowledgeBaseId, hipaaEnabled, model } = updateAssistantDto;
     const updateData: any = {};
     
     if (name !== undefined) updateData.name = name;
@@ -129,13 +171,39 @@ export class AssistantService {
     if (systemPrompt !== undefined) updateData.voicemailMessage = systemPrompt;
     if (knowledgeBaseId !== undefined) updateData.knowledgeBaseId = knowledgeBaseId;
     if (hipaaEnabled !== undefined) updateData.hipaaEnabled = hipaaEnabled;
-    if (config !== undefined) updateData.model = config;
+    
+    // Handle model configuration
+    if (model !== undefined) {
+      console.log('Received model configuration:', model);
+      
+      // Create a new model configuration instead of merging with existing
+      updateData.model = {
+        provider: model.provider,
+        model: model.model,
+        temperature: model.temperature,
+        maxTokens: model.maxTokens,
+        preference: model.preference
+      };
+      
+      // Remove any undefined values
+      Object.keys(updateData.model).forEach(key => {
+        if (updateData.model[key] === undefined) {
+          delete updateData.model[key];
+        }
+      });
+      
+      console.log('New model configuration:', updateData.model);
+    }
 
     // Update the assistant
-    return this.prisma.assistant.update({
+    const result = await this.prisma.assistant.update({
       where: { id },
       data: updateData,
     });
+    
+    console.log(`Assistant ${id} updated successfully. New data:`, JSON.stringify(result, null, 2));
+    
+    return result;
   }
 
   /**

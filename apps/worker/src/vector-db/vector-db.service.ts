@@ -65,7 +65,7 @@ export class VectorDbService {
       this.logger.log(`Collection ${name} created successfully`);
     } catch (error) {
       if (error.response && error.response.status === 409) {
-        this.logger.log(`Collection ${name} already exists`);
+      this.logger.log(`Collection ${name} already exists`);
       } else {
         this.logger.error(`Failed to create collection ${name}: ${error.message}`);
         throw error;
@@ -92,16 +92,16 @@ export class VectorDbService {
         // Use vectorSize parameter if provided, otherwise use the configured value from .env
         const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10);
         
-        await this.createCollection(name, {
-          vectors: {
+      await this.createCollection(name, {
+        vectors: {
             size: dimension,
-            distance: 'Cosine',
-          },
-          optimizers_config: {
-            default_segment_number: 2,
-          },
-          replication_factor: 1,
-        });
+          distance: 'Cosine',
+        },
+        optimizers_config: {
+          default_segment_number: 2,
+        },
+        replication_factor: 1,
+      });
       } else {
         this.logger.error(`Error checking collection ${name}: ${error.message}`);
         throw error;
@@ -120,8 +120,8 @@ export class VectorDbService {
     }
   ): Promise<void> {
     try {
-      await this.ensureCollection(collection);
-      
+    await this.ensureCollection(collection);
+    
       // Format points for Qdrant API
       const qdrantPoints = data.points.map(point => {
         // Ensure point ID is a valid UUID without hyphens (Qdrant format)
@@ -239,7 +239,7 @@ export class VectorDbService {
    * Delete vectors from a collection by a filter
    */
   async delete(
-    collection: string,
+    collection: string, 
     filter: {
       filter?: {
         must?: Array<{
@@ -255,12 +255,12 @@ export class VectorDbService {
     try {
       // First check if collection exists to avoid unnecessary API calls
       const exists = await this.collectionExists(collection);
-      
+    
       if (!exists) {
         this.logger.warn(`Collection ${collection} doesn't exist, skipping delete operation`);
-        return;
-      }
-      
+      return;
+    }
+    
       const url = `${this.qdrantUrl}/collections/${collection}/points/delete`;
       
       // If no filter, clear the collection points
@@ -380,8 +380,8 @@ export class VectorDbService {
       
       if (error.response) {
         this.logger.error(`Qdrant API error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
-      }
-      
+    }
+    
       return false;
     }
   }

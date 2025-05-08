@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean, IsObject } from 'class-validator';
+import { ModelConfigDto } from './update-assistant.dto';
 
 export class CreateAssistantDto {
   @ApiProperty({ description: 'The name of the assistant', example: 'Customer Support Assistant' })
@@ -32,14 +33,8 @@ export class CreateAssistantDto {
   @IsOptional()
   knowledgeBaseId?: string;
   
-  @ApiProperty({ description: 'Assistant configuration including model and settings', required: false })
+  @ApiProperty({ description: 'Assistant model configuration', required: false, type: ModelConfigDto })
   @IsObject()
   @IsOptional()
-  config?: {
-    provider?: string;
-    model?: string;
-    systemPrompt?: string;
-    temperature?: number;
-    maxTokens?: number;
-  };
+  model?: ModelConfigDto;
 } 
