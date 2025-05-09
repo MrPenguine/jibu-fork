@@ -22,7 +22,7 @@ start "Cloudflared Tunnel" powershell -NoExit -Command "cloudflared tunnel --url
 REM Start Worker Application
 echo.
 echo [3/3] Starting Worker Application...
-start "Worker Application" powershell -NoExit -Command "npx nx run worker:worker"
+start "Worker Application" powershell -NoExit -Command "call setup-worker.bat"
 
 echo.
 echo Docker, Cloudflared, and Worker started successfully!

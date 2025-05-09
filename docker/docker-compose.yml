@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: langflow-postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=langflow
+    ports:
+      - '5433:5432'  # Changed to port 5433 to avoid conflict
+    volumes:
+      - langflow-postgres:/var/lib/postgresql/data
+
+  langflow:
+    image: langflowai/langflow:latest
+    container_name: langflow
+    restart: always
+    ports:
+      - '5070:7860'  # Changed to port 5070 to avoid conflict
+    depends_on:
+      - postgres
+    environment:
+      - LANGFLOW_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/langflow
+      - LANGFLOW_SUPERUSER=langflow
+      - LANGFLOW_SUPERUSER_PASSWORD=langflow
+    volumes:
+      - langflow-data:/var/lib/langflow
+
+volumes:
+  langflow-postgres:
+  langflow-data:

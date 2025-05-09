@@ -426,24 +426,31 @@ export class IndexingProcessor {
       // 1. Get the knowledge base ID for this source
       let knowledgeBaseId = '';
       
-      try {
-        // Try to get KB ID from database if the source still exists
-        // @ts-ignore - PrismaClient models are not properly typed
-        const source = await this.prisma.knowledgeBaseSource.findUnique({
-          where: { id: job.data.knowledgeBaseSourceId }
-        });
-        
-        if (source) {
-          knowledgeBaseId = source.knowledgeBaseId;
+      // First check if knowledgeBaseId is provided in job data (new format)
+      if (job.data.knowledgeBaseId) {
+        this.logger.debug(`Using knowledgeBaseId from job data: ${job.data.knowledgeBaseId}`);
+        knowledgeBaseId = job.data.knowledgeBaseId;
+      } else {
+        // Fallback to getting it from the database (old format)
+        this.logger.debug(`No knowledgeBaseId in job data, trying to get it from database`);
+        try {
+          // Try to get KB ID from database if the source still exists
+          // @ts-ignore - PrismaClient models are not properly typed
+          const source = await this.prisma.knowledgeBaseSource.findUnique({
+            where: { id: job.data.knowledgeBaseSourceId }
+          });
+          
+          if (source) {
+            knowledgeBaseId = source.knowledgeBaseId;
+            this.logger.debug(`Found knowledgeBaseId from database: ${knowledgeBaseId}`);
+          }
+        } catch (error) {
+          // If source doesn't exist, might be because it was already deleted
+          this.logger.warn(`Source ${job.data.knowledgeBaseSourceId} not found, proceeding with deindexing anyway`);
         }
-      } catch (error) {
-        // If source doesn't exist, might be because it was already deleted
-        this.logger.warn(`Source ${job.data.knowledgeBaseSourceId} not found, proceeding with deindexing anyway`);
       }
       
-      // We don't have knowledgeBaseId in DeindexSourceJobData, but we can extract it from the source info we just got
       // If we couldn't get the knowledgeBaseId, we'll have to error out
-      
       if (!knowledgeBaseId) {
         throw new Error('Knowledge base ID not found for source');
       }

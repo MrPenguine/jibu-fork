@@ -40,4 +40,5 @@ export interface DeindexSourceJobData {
   organizationId: string;
   sourceType: string;
   sourcePointer: string;
+  knowledgeBaseId: string;
 } 

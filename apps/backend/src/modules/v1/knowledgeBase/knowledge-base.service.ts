@@ -209,6 +209,7 @@ export class KnowledgeBaseService {
           organizationId: orgId,
           sourceType: source.sourceType,
           sourcePointer: source.sourcePointer,
+          knowledgeBaseId: knowledgeBaseId,
         });
       } catch (error) {
         this.logger.error(`Failed to add de-indexing job for source ${source.id}`, error);
@@ -366,15 +367,21 @@ export class KnowledgeBaseService {
     
     // Add de-indexing job
     try {
-      await this.indexingQueue.add(JOB_NAMES.DEINDEX_SOURCE, {
+      const jobData = {
         knowledgeBaseSourceId: sourceId,
         organizationId: orgId,
         sourceType: source.sourceType,
         sourcePointer: source.sourcePointer,
-      });
-      this.logger.log(`Added de-indexing job for source ${sourceId}`);
+        knowledgeBaseId: source.knowledgeBaseId,
+      };
+      
+      this.logger.log(`Adding de-indexing job with data: ${JSON.stringify(jobData)}`);
+      
+      const job = await this.indexingQueue.add(JOB_NAMES.DEINDEX_SOURCE, jobData);
+      
+      this.logger.log(`Added de-indexing job for source ${sourceId}, job ID: ${job.id}`);
     } catch (error) {
-      this.logger.error(`Failed to add de-indexing job for source ${sourceId}`, error);
+      this.logger.error(`Failed to add de-indexing job for source ${sourceId}: ${error.message}`, error.stack);
       // Don't rethrow - we still want to delete the source
     }
     
