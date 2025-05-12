@@ -1,14 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@libs/shadcn-ui/components/ui/button";
+import { AssistantChat } from "./AssistantChat";
 
 interface AssistantHeaderProps {
   assistantName: string;
   assistantId?: string;
+  knowledgeBaseId?: string;
   selectedProvider: string;
   autosaveStatus?: React.ReactNode;
 }
 
-export function AssistantHeader({ assistantName, assistantId, selectedProvider, autosaveStatus }: AssistantHeaderProps) {
+export function AssistantHeader({ assistantName, assistantId, knowledgeBaseId, selectedProvider, autosaveStatus }: AssistantHeaderProps) {
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
   return (
     <div className="flex items-center justify-between px-4 py-2 bg-white">
       <div className="flex items-center">
@@ -48,7 +52,12 @@ export function AssistantHeader({ assistantName, assistantId, selectedProvider, 
         </Button>
         
         {/* Chat button */}
-        <Button variant="outline" size="sm" className="border border-gray-600 rounded-full bg-transparent">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="border border-gray-600 rounded-full bg-transparent"
+          onClick={() => setIsChatOpen(true)}
+        >
           Chat
           <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -78,6 +87,17 @@ export function AssistantHeader({ assistantName, assistantId, selectedProvider, 
           </svg>
         </Button>
       </div>
+
+      {/* Chat component */}
+      {assistantId && (
+        <AssistantChat
+          assistantId={assistantId}
+          assistantName={assistantName}
+          knowledgeBaseId={knowledgeBaseId}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+        />
+      )}
     </div>
   );
-} 
+}
