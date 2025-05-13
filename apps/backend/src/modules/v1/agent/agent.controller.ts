@@ -158,6 +158,74 @@ export class AgentController {
     };
   }
 
+  /**
+   * Helper method to clean and parse message content
+   * This handles complex JSON structures that might be embedded in the content
+   */
+  private cleanMessageContent(content: string): string {
+    try {
+      // If it's not a string that looks like JSON, return as is
+      if (typeof content !== 'string' || (!content.includes('{') && !content.includes('['))) {
+        return content;
+      }
+
+      // Try to extract JSON from the content
+      let jsonContent: any;
+      try {
+        // First try to parse the entire content as JSON
+        jsonContent = JSON.parse(content);
+      } catch (e) {
+        // If that fails, try to find JSON within the string
+        const jsonMatch = content.match(/\{.*\}|\[.*\]/s);
+        if (jsonMatch) {
+          try {
+            jsonContent = JSON.parse(jsonMatch[0]);
+          } catch (innerError) {
+            // If parsing fails, return original content
+            return content;
+          }
+        } else {
+          // No JSON found, return original content
+          return content;
+        }
+      }
+
+      // Now extract the actual message from the JSON structure
+      if (jsonContent) {
+        // Handle session_id structure with outputs
+        if (jsonContent.session_id && jsonContent.outputs && Array.isArray(jsonContent.outputs)) {
+          const firstOutput = jsonContent.outputs[0];
+          if (firstOutput?.outputs?.[0]?.results?.message?.text) {
+            return firstOutput.outputs[0].results.message.text;
+          }
+          if (firstOutput?.outputs?.[0]?.artifacts?.message) {
+            return firstOutput.outputs[0].artifacts.message;
+          }
+          if (firstOutput?.inputs?.input_value) {
+            return firstOutput.inputs.input_value;
+          }
+        }
+
+        // Handle direct message property
+        if (jsonContent.message && typeof jsonContent.message === 'string') {
+          return jsonContent.message;
+        }
+
+        // Handle text property
+        if (jsonContent.text && typeof jsonContent.text === 'string') {
+          return jsonContent.text;
+        }
+      }
+
+      // If we couldn't extract a clean message, return the original content
+      return content;
+    } catch (error) {
+      this.logger.error(`Error cleaning message content: ${error.message}`);
+      // Return original content if cleaning fails
+      return content;
+    }
+  }
+
   // Helper method to save messages to the database
   private async saveMessageToDatabase(chatId: string, content: string, role: 'user' | 'assistant', organizationId: string): Promise<void> {
     try {
@@ -168,6 +236,10 @@ export class AgentController {
       }
       
       this.logger.log(`Saving ${role} message to database for chat ${chatId}`);
+      
+      // Clean the message content before saving
+      const cleanedContent = this.cleanMessageContent(content);
+      this.logger.log(`Original content length: ${content.length}, Cleaned content length: ${cleanedContent.length}`);
       
       // Get the next sequence ID
       let sequenceId = 0;
@@ -186,7 +258,7 @@ export class AgentController {
       
       // Create the message DTO
       const messageDto: CreateMessageDto = {
-        content,
+        content: cleanedContent,
         role,
         sequenceId,
         type: 'text'

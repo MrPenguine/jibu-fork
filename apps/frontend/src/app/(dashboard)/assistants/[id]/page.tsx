@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@libs/shadcn-ui/compon
 import { ModelConfig } from "@libs/shadcn-ui/components/assistants/ModelConfig"
 import { LatencyCard } from "libs/shadcn-ui/src/components/assistants/LatencyCard"
 import { CostCard } from "libs/shadcn-ui/src/components/assistants/CostCard"
-import { AssistantHeader } from "libs/shadcn-ui/src/components/assistants/AssistantHeader"
+import { AssistantHeader } from "@libs/shadcn-ui/components/assistants"
 import { 
   DropdownMenu,
   DropdownMenuContent,
