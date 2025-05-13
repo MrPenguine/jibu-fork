@@ -127,6 +127,7 @@
     "object-inspect": "^1.13.4",
     "openai": "^4.97.0",
     "passport-jwt": "^4.0.1",
+    "pdf-parse": "^1.1.1",
     "raw-body": "3.0.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",

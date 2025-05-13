@@ -16,6 +16,8 @@ import {
 import { randomUUID } from 'crypto';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+// Don't directly import pdf-parse to allow for dynamic loading
+// We'll check if it's available and install it if needed
 
 @Injectable()
 @Processor(QUEUE_NAMES.INDEXING)
@@ -93,22 +95,104 @@ export class IndexingProcessor {
           textContent = Buffer.from(fileContent).toString('utf-8');
           this.logger.debug(`Extracted ${textContent.length} characters of text content from file`);
         } else if (mimeType.includes('pdf')) {
-          // For PDF files, handle as binary content first
-          textContent = Buffer.from(fileContent).toString('utf-8');
-          
-          // Remove common PDF binary markers and artifacts
-          textContent = textContent
-            .replace(/%PDF-\d+\.\d+/g, ' PDF document ')
-            .replace(/endobj/g, ' ')
-            .replace(/endstream/g, ' ')
-            .replace(/<<\/.*?>>/g, ' ')
-            .replace(/\/Filter.*?\/FlateDecode/g, ' ')
-            .replace(/xref\s*\d+\s\d+/g, ' ')
-            .replace(/trailer\s*<</g, ' ');
+          // For PDF files, use the pdf-parse library for proper extraction
+          try {
+            const pdfParse = require('pdf-parse');
+            this.logger.debug('Using pdf-parse library for PDF extraction');
             
-          this.logger.debug(`Extracted and cleaned ${textContent.length} characters from PDF file`);
+            // Check for PDF header to confirm it's a valid PDF
+            const fileContentBuffer = Buffer.from(fileContent);
+            const header = fileContentBuffer.slice(0, 5).toString();
+            
+            if (header.startsWith('%PDF-')) {
+              this.logger.debug('Valid PDF header detected');
+              
+              // Use pdf-parse for proper PDF extraction
+              const pdfData = await pdfParse(fileContentBuffer);
+              textContent = pdfData.text || '';
+              
+              // Log PDF information for debugging
+              if (pdfData.info) {
+                this.logger.debug(`PDF Info: Pages=${pdfData.numpages}, Version=${pdfData.info.PDFFormatVersion || 'unknown'}`);
+                
+                // Check if the PDF is possibly a scanned document
+                const producer = (pdfData.info.Producer || '').toLowerCase();
+                const creator = (pdfData.info.Creator || '').toLowerCase();
+                const isLikelyScanned = 
+                  producer.includes('scan') || 
+                  creator.includes('scan') || 
+                  producer.includes('image') || 
+                  creator.includes('image') ||
+                  producer.includes('ocr') || 
+                  creator.includes('ocr');
+                  
+                if (isLikelyScanned) {
+                  this.logger.warn('PDF metadata suggests this may be a scanned document');
+                }
+              }
+              
+              // Check if the PDF extraction was reasonably successful
+              if (!textContent || textContent.trim().length === 0) {
+                this.logger.warn('PDF parsing yielded empty text, PDF may require OCR');
+                textContent = "This PDF requires OCR processing. Please convert it to a text-searchable PDF.";
+                
+                // Update source status to indicate warning
+                await this.prisma.knowledgeBaseSource.update({
+                  where: { id: source.id },
+                  data: { 
+                    indexingStatus: 'WARNING'
+                  }
+                });
+              } else {
+                // Additional check for PDFs with very little text (likely scanned)
+                const charCount = textContent.length;
+                const wordCount = textContent.split(/\s+/).length;
+                
+                // Calculate average characters per page (rough heuristic)
+                const pageCount = pdfData.numpages || 1;
+                const charsPerPage = charCount / pageCount;
+                
+                if (charsPerPage < 100) {
+                  this.logger.warn(`Suspiciously low character count per page (${charsPerPage.toFixed(1)}), PDF may be scanned`);
+                  
+                  // Add warning note to the text content
+                  textContent = "Note: This PDF appears to contain very little text and may be a scanned document. OCR processing is recommended.\n\n" + textContent;
+                } else {
+                  this.logger.debug(`Successfully extracted ${textContent.length} characters (${wordCount} words) from ${pageCount} page PDF`);
+                }
+                
+                // Log sample of extracted text for debugging
+                if (textContent.length > 0) {
+                  const sampleText = textContent.substring(0, Math.min(500, textContent.length));
+                  this.logger.debug(`PDF text sample: "${sampleText}${textContent.length > 500 ? '...' : ''}"`);
+                }
+              }
+            } else {
+              this.logger.error('Invalid PDF header, file may be corrupted');
+              textContent = "PDF extraction failed - file appears to be corrupted or not a valid PDF.";
+              
+              await this.prisma.knowledgeBaseSource.update({
+                where: { id: source.id },
+                data: { 
+                  indexingStatus: 'ERROR'
+                }
+              });
+            }
+          } catch (pdfError) {
+            this.logger.error(`PDF processing failed: ${pdfError.message}`);
+            textContent = "PDF processing failed. This document may not be properly indexed.";
+            
+            // Update source with the specific error information
+            await this.prisma.knowledgeBaseSource.update({
+              where: { id: source.id },
+              data: { 
+                indexingStatus: 'ERROR'
+              }
+            });
+          }
         } else {
-          // For other file types, attempt basic extraction
+          // For other file types, attempt basic extraction with warning
+          this.logger.warn(`Unsupported file type: ${mimeType}, attempting basic text extraction`);
           textContent = Buffer.from(fileContent).toString('utf-8');
           this.logger.debug(`Basic extraction of ${textContent.length} characters from file of type ${mimeType}`);
         }
@@ -120,8 +204,8 @@ export class IndexingProcessor {
       // Sanitize text to ensure it's valid UTF-8
       textContent = this.sanitizeText(textContent);
       
-      // 4. Split text into chunks
-      const chunks = await this.chunkingService.splitTextIntoChunks(textContent);
+      // 4. Split text into chunks - pass the mime type for specialized handling
+      const chunks = await this.chunkingService.splitTextIntoChunks(textContent, mimeType);
       this.logger.debug(`Split text into ${chunks.length} chunks`);
       
       // Log sample chunk data
@@ -586,20 +670,22 @@ export class IndexingProcessor {
 
   /**
    * Sanitize text for safe processing and storage
+   * This is a gentler sanitization when using proper PDF extraction
    */
   private sanitizeText(text: string): string {
     if (!text) return '';
     
     try {
-      // Remove control characters and non-printable characters
+      // Basic sanitization focused on maintaining text quality while removing problematic characters
       let sanitized = text
-        .replace(/[\x00-\x09\x0B-\x1F\x7F-\x9F]/g, ' ')
-        // Remove escape sequences and control codes
-        .replace(/\\[xXuU][0-9a-fA-F]{1,6}/g, ' ')
-        // Replace null bytes specifically
-        .replace(/\0/g, ' ')
-        // Replace sequences of spaces with a single space
-        .replace(/\s+/g, ' ');
+        // Remove null bytes and control characters
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        // Replace carriage returns with newlines for consistency
+        .replace(/\r\n?/g, '\n')
+        // Replace repeated whitespace with a single space (preserve some formatting)
+        .replace(/[ \t]+/g, ' ')
+        // Remove any remaining replacement characters ()
+        .replace(/\uFFFD/g, ' ');
       
       // Limit length to avoid extremely long strings
       if (sanitized.length > 1000000) {
