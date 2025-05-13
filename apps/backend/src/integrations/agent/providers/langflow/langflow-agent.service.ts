@@ -11,7 +11,12 @@ export class LangflowAgentService implements IAgentService {
   private readonly langflowFlowId: string;
 
   constructor(private configService: ConfigService) {
-    this.langflowUrl = this.configService.get<string>('LANGFLOW_API_URL', 'http://localhost:7860');
+    let url = this.configService.get<string>('LANGFLOW_API_URL', 'http://localhost:7860');
+    // Ensure URL has a protocol
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `http://${url}`;
+    }
+    this.langflowUrl = url;
     this.langflowFlowId = this.configService.get<string>('LANGFLOW_FLOW_ID', 'a59a91f2-08a8-431d-bd4f-8da5eec9792d');
     this.logger.log(`Initialized LangflowAgentService with URL: ${this.langflowUrl}`);
   }

@@ -1,5 +1,5 @@
 export * from './AssistantHeader';
-export * from './AssistantChat';
+export * from '../chat/AssistantChat';
 export * from './KnowledgeBaseConfig';
 export * from './ModelConfig';
 export * from './CreateAssistantModal';

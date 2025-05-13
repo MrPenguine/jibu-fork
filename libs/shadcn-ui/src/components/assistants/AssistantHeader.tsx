@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "@libs/shadcn-ui/components/ui/button";
-import { AssistantChat } from "./AssistantChat";
+import { AssistantChat } from "../chat/AssistantChat";
+import { ChatList } from "../chat/ChatList";
 
 interface AssistantHeaderProps {
   assistantName: string;
@@ -12,6 +13,33 @@ interface AssistantHeaderProps {
 
 export function AssistantHeader({ assistantName, assistantId, knowledgeBaseId, selectedProvider, autosaveStatus }: AssistantHeaderProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatListOpen, setIsChatListOpen] = useState(false);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+
+  const handleChatClick = () => {
+    setIsChatListOpen(true);
+  };
+
+  const handleChatSelect = (chatId: string) => {
+    setSelectedChatId(chatId);
+    setIsChatListOpen(false);
+    setIsChatOpen(true);
+  };
+
+  const handleNewChat = () => {
+    setSelectedChatId(null); // Clear selected chat to create a new one
+    setIsChatListOpen(false);
+    setIsChatOpen(true);
+  };
+
+  const handleChatClose = () => {
+    setIsChatOpen(false);
+    setSelectedChatId(null);
+  };
+
+  const handleChatListClose = () => {
+    setIsChatListOpen(false);
+  };
 
   return (
     <div className="flex items-center justify-between px-4 py-2 bg-white">
@@ -56,7 +84,7 @@ export function AssistantHeader({ assistantName, assistantId, knowledgeBaseId, s
           variant="outline" 
           size="sm" 
           className="border border-gray-600 rounded-full bg-transparent"
-          onClick={() => setIsChatOpen(true)}
+          onClick={handleChatClick}
         >
           Chat
           <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -88,14 +116,27 @@ export function AssistantHeader({ assistantName, assistantId, knowledgeBaseId, s
         </Button>
       </div>
 
+      {/* Chat List component */}
+      {assistantId && isChatListOpen && (
+        <div className="fixed bottom-5 right-5 w-96 h-[70vh] z-50">
+          <ChatList
+            assistantId={assistantId}
+            onSelectChat={handleChatSelect}
+            onNewChat={handleNewChat}
+            onClose={handleChatListClose}
+          />
+        </div>
+      )}
+
       {/* Chat component */}
-      {assistantId && (
+      {assistantId && isChatOpen && (
         <AssistantChat
           assistantId={assistantId}
           assistantName={assistantName}
           knowledgeBaseId={knowledgeBaseId}
+          chatId={selectedChatId}
           isOpen={isChatOpen}
-          onClose={() => setIsChatOpen(false)}
+          onClose={handleChatClose}
         />
       )}
     </div>

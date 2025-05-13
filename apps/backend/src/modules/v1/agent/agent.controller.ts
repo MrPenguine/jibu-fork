@@ -9,6 +9,8 @@ import { AgentService } from '../../../integrations/agent/agent.service';
 import { AgentRequest, AgentResponse } from '../../../integrations/agent/interfaces/agent.interface';
 import { StreamableFile } from '@nestjs/common';
 import { PassThrough } from 'stream';
+import { ChatsService } from '../chats/chats.service';
+import { CreateMessageDto } from '../chats/dto/create-message.dto';
 
 // Define a custom interface for our streaming response
 interface StreamResponse {
@@ -23,15 +25,39 @@ interface StreamResponse {
 export class AgentController {
   private readonly logger = new Logger(AgentController.name);
 
-  constructor(private readonly agentService: AgentService) {}
+  constructor(
+    private readonly agentService: AgentService,
+    private readonly chatsService: ChatsService
+  ) {}
 
   @Post('query')
-  @UseGuards(JwtAuthGuard)
+  @Public() // Make this endpoint public
   @ApiOperation({ summary: 'Process a query through the agent' })
   @ApiResponse({ status: 200, description: 'Query processed successfully' })
-  async processQuery(@Body() request: AgentRequest): Promise<AgentResponse> {
+  async processQuery(@Body() request: AgentRequest, @Req() req: Request): Promise<AgentResponse> {
     this.logger.log(`Processing agent query: ${request.input}`);
-    return this.agentService.processRequest(request);
+    
+    const response = await this.agentService.processRequest(request);
+    
+    // Save the messages to the database if we have a valid chat ID
+    if (request.sessionId && !request.sessionId.startsWith('chat-')) {
+      try {
+        const organizationId = req.headers['x-organization-id'] as string;
+        
+        // Save user message
+        await this.saveMessageToDatabase(request.sessionId, request.input, 'user', organizationId);
+        
+        // Save assistant response
+        if (response && response.output) {
+          await this.saveMessageToDatabase(request.sessionId, response.output, 'assistant', organizationId);
+        }
+      } catch (error) {
+        this.logger.error(`Error saving messages to database: ${error.message}`);
+        // Continue with the response even if saving fails
+      }
+    }
+    
+    return response;
   }
 
   @Post('stream')
@@ -40,6 +66,17 @@ export class AgentController {
   async streamQuery(@Req() req: Request, @Body() request: AgentRequest): Promise<StreamableFile> {
     this.logger.log(`Processing streaming agent query: ${request.input}`);
     this.logger.log(`Request details: ${JSON.stringify(request)}`);
+    
+    // Save the user message to the database if we have a valid chat ID
+    if (request.sessionId && !request.sessionId.startsWith('chat-')) {
+      try {
+        const organizationId = req.headers['x-organization-id'] as string;
+        await this.saveMessageToDatabase(request.sessionId, request.input, 'user', organizationId);
+      } catch (error) {
+        this.logger.error(`Error saving user message to database: ${error.message}`);
+        // Continue with the streaming response even if saving fails
+      }
+    }
     
     // Create a PassThrough stream to pipe the response
     const stream = new PassThrough();
@@ -50,12 +87,31 @@ export class AgentController {
         // Get the streaming response from the agent service
         const agentStream = this.agentService.processStreamingRequest(request);
         
+        // Track the complete assistant response for saving to the database
+        let completeAssistantResponse = '';
+        
         // Write each chunk to the stream
         for await (const chunk of agentStream) {
           this.logger.log(`Received chunk: ${JSON.stringify(chunk)}`);
+          
+          // Extract the assistant's response from the chunk
+          if (chunk.output && typeof chunk.output === 'string') {
+            completeAssistantResponse = chunk.output;
+          }
+          
           // Format the chunk as SSE
           const sseData = `data: ${JSON.stringify(chunk)}\n\n`;
           stream.write(sseData);
+        }
+        
+        // Save the complete assistant response to the database
+        if (request.sessionId && !request.sessionId.startsWith('chat-') && completeAssistantResponse) {
+          try {
+            const organizationId = req.headers['x-organization-id'] as string;
+            await this.saveMessageToDatabase(request.sessionId, completeAssistantResponse, 'assistant', organizationId);
+          } catch (error) {
+            this.logger.error(`Error saving assistant response to database: ${error.message}`);
+          }
         }
         
         // End the stream when done
@@ -89,14 +145,59 @@ export class AgentController {
   }
 
   @Post('health')
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @ApiOperation({ summary: 'Check the health of the agent service' })
   @ApiResponse({ status: 200, description: 'Health check successful' })
   async healthCheck(): Promise<{ status: string; connected: boolean }> {
+    this.logger.log('Health check requested');
     const connected = await this.agentService.checkConnection();
+    this.logger.log(`Health check result: ${connected ? 'connected' : 'disconnected'}`);
     return {
       status: connected ? 'ok' : 'error',
       connected,
     };
+  }
+
+  // Helper method to save messages to the database
+  private async saveMessageToDatabase(chatId: string, content: string, role: 'user' | 'assistant', organizationId: string): Promise<void> {
+    try {
+      // Skip if we don't have a valid chat ID or organization ID
+      if (!chatId || !organizationId) {
+        this.logger.warn(`Cannot save message: Missing chatId (${chatId}) or organizationId (${organizationId})`);
+        return;
+      }
+      
+      this.logger.log(`Saving ${role} message to database for chat ${chatId}`);
+      
+      // Get the next sequence ID
+      let sequenceId = 0;
+      try {
+        const messages = await this.chatsService.getChatMessages(chatId, organizationId);
+        if (Array.isArray(messages) && messages.length > 0) {
+          // Find the highest sequence ID and add 1
+          sequenceId = Math.max(...messages.map(m => m.sequenceId)) + 1;
+          this.logger.log(`Determined sequence ID from existing messages: ${sequenceId}`);
+        }
+      } catch (error) {
+        // If we can't get existing messages, use a timestamp-based ID
+        sequenceId = Math.floor(Date.now() / 1000) % 10000; // Convert to seconds and keep only last 4 digits
+        this.logger.log(`Using fallback sequence ID: ${sequenceId}`);
+      }
+      
+      // Create the message DTO
+      const messageDto: CreateMessageDto = {
+        content,
+        role,
+        sequenceId,
+        type: 'text'
+      };
+      
+      // Save the message
+      await this.chatsService.createMessage(chatId, messageDto, organizationId);
+      this.logger.log(`Successfully saved ${role} message to database for chat ${chatId}`);
+    } catch (error) {
+      this.logger.error(`Error saving message to database: ${error.message}`);
+      throw error;
+    }
   }
 }

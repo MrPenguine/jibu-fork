@@ -51,6 +51,7 @@ model Organization {
   knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this organization
   knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this organization
   assistants           Assistant[] // Assistants belonging to this organization
+  chats                Chat[] // All chats in this organization
 }
 
 model OrganizationMembership {
@@ -207,6 +208,7 @@ model Assistant {
   hipaaEnabled               Boolean        @default(false)
   createdAt                  DateTime       @default(now())
   updatedAt                  DateTime       @updatedAt
+  chats                      Chat[]
 
   @@index([organizationId])
   @@index([knowledgeBaseId])
@@ -229,4 +231,45 @@ model ChunkMetadata {
   @@index([knowledgeBaseId])
   @@index([sourceId])
   @@index([vectorId])
+}
+
+model Chat {
+  id             String   @id @default(uuid())
+  name           String?  // Optional name for the chat
+  organizationId String
+  assistantId    String
+  sessionId      String   // Required: For calls: phone number, For chats: user identifier or anonymous session
+  sessionType    String   @default("chat") // "chat" or "call"
+  metadata       Json?    // Additional metadata for the chat/call session
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assistant    Assistant    @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  messages     Message[]
+
+  @@index([organizationId])
+  @@index([assistantId])
+  @@index([sessionId])
+  @@index([sessionType])
+  @@unique([assistantId, sessionId]) // Ensure we have a unique chat per assistant and sessionId
+}
+
+model Message {
+  id           String   @id @default(uuid())
+  chatId       String
+  content      String   // The actual message content
+  role         String   // 'user', 'assistant', 'system'
+  type         String   @default("text") // 'text', 'audio', 'transcript', etc.
+  sequenceId   Int      // Order of messages in the conversation
+  redisStatus  String?  @default("pending") // 'pending', 'synced', 'failed'
+  metadata     Json?    // Additional metadata about the message (e.g., audio duration, sentiment, etc.)
+  createdAt    DateTime @default(now())
+  
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([role])
+  @@index([type])
+  @@index([chatId, sequenceId]) // For efficient retrieval of messages in order
 }

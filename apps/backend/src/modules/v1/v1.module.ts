@@ -5,6 +5,8 @@ import { UserModule } from './user/user.module';
 import { AssistantModule } from './assistants/assistant.module';
 import { KnowledgeBaseModule } from './knowledgeBase/knowledge-base.module';
 import { AgentModule } from './agent/agent.module';
+import { ChatsModule } from './chats/chats.module';
+import { ConsoleModule } from './console/console.module';
 
 @Module({
   imports: [
@@ -14,6 +16,8 @@ import { AgentModule } from './agent/agent.module';
     AssistantModule,
     KnowledgeBaseModule,
     AgentModule,
+    ChatsModule,
+    ConsoleModule,
   ],
   exports: [
     FileModule,
@@ -22,6 +26,8 @@ import { AgentModule } from './agent/agent.module';
     AssistantModule,
     KnowledgeBaseModule,
     AgentModule,
+    ChatsModule,
+    ConsoleModule,
   ],
 })
 export class V1Module {} 
