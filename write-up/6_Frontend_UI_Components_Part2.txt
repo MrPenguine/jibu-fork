@@ -1,0 +1,819 @@
+==============================================================
+JIBU CONSOLE - FRONTEND UI COMPONENTS (PART 2)
+==============================================================
+
+TABLE OF CONTENTS
+------------------
+1. Domain-Specific Components
+   1.1. Chat Components
+   1.2. Assistant Components
+2. Navigation Components
+   2.1. Sidebar Navigation
+   2.2. Breadcrumbs
+
+==============================================================
+1. DOMAIN-SPECIFIC COMPONENTS
+==============================================================
+
+1.1. Chat Components
+------------------
+
+The Chat components provide specialized UI elements for the chat functionality in Jibu Console.
+
+File: libs/shadcn-ui/src/components/chat/chat-interface.tsx
+
+The Chat Interface component provides a complete chat interface with message history, input area, and various controls. It integrates with the Chat API to send and receive messages.
+
+Key Features:
+- Message display with user and assistant messages
+- Message input with support for text and attachments
+- Real-time message streaming
+- Message history loading and pagination
+- Markdown rendering for message content
+- Code syntax highlighting
+- File attachment handling
+
+Implementation (Simplified):
+
+```typescript
+import React, { useEffect, useRef, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+import { Form, FormControl, FormField, FormItem } from '../ui/form';
+import { Card, CardContent } from '../ui/card';
+import { Avatar } from '../ui/avatar';
+import { ScrollArea } from '../ui/scroll-area';
+import { Spinner } from '../ui/spinner';
+import { FileUpload } from '../file/file-upload';
+
+import { ChatMessage, ChatMessageRole, SendMessageDto } from '../../types/chat';
+import { useApi } from '../../hooks/use-api';
+
+const formSchema = z.object({
+  message: z.string().min(1, 'Message cannot be empty'),
+});
+
+export interface ChatInterfaceProps {
+  chatId: string;
+  assistantName: string;
+  assistantAvatar?: string;
+  onChatEnd?: () => void;
+}
+
+export function ChatInterface({
+  chatId,
+  assistantName,
+  assistantAvatar,
+  onChatEnd,
+}: ChatInterfaceProps) {
+  const { chatApi } = useApi();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamedMessage, setStreamedMessage] = useState<string>('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      message: '',
+    },
+  });
+
+  // Load initial messages
+  useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        setIsLoading(true);
+        const chatMessages = await chatApi.getMessages(chatId);
+        setMessages(chatMessages);
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadMessages();
+  }, [chatId, chatApi]);
+
+  // Set up message streaming
+  useEffect(() => {
+    const setupMessageStream = () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+
+      const eventSource = chatApi.streamMessages(chatId);
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'message') {
+          const message = data.message as ChatMessage;
+          
+          if (message.role === ChatMessageRole.ASSISTANT) {
+            setIsStreaming(true);
+            setStreamedMessage(message.content);
+          } else {
+            setMessages((prev) => {
+              // Check if message already exists
+              if (prev.some((m) => m.id === message.id)) {
+                return prev;
+              }
+              return [...prev, message];
+            });
+          }
+        } else if (data.type === 'done') {
+          setIsStreaming(false);
+          setStreamedMessage('');
+          
+          // Refresh messages to get the final version
+          chatApi.getMessages(chatId).then((chatMessages) => {
+            setMessages(chatMessages);
+          });
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error('EventSource error:', error);
+        eventSource.close();
+      };
+
+      return () => {
+        eventSource.close();
+      };
+    };
+
+    setupMessageStream();
+
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, [chatId, chatApi]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, streamedMessage]);
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      const messageDto: SendMessageDto = {
+        content: values.message,
+        role: ChatMessageRole.USER,
+      };
+
+      // Add user message to UI immediately
+      const tempUserMessage: ChatMessage = {
+        id: `temp-${Date.now()}`,
+        chatId,
+        content: values.message,
+        role: ChatMessageRole.USER,
+        createdAt: new Date().toISOString(),
+      };
+      
+      setMessages((prev) => [...prev, tempUserMessage]);
+      
+      // Reset form
+      form.reset();
+      
+      // Send message to API
+      await chatApi.sendMessage(chatId, messageDto);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  };
+
+  const handleFileUpload = async (files: File[]) => {
+    try {
+      // Upload files and get URLs
+      const fileUrls = await Promise.all(
+        files.map(async (file) => {
+          const uploadedFile = await chatApi.uploadAttachment(chatId, file);
+          return uploadedFile.url;
+        })
+      );
+
+      // Create message with file attachments
+      const fileLinks = fileUrls
+        .map((url, index) => `[${files[index].name}](${url})`)
+        .join('\n');
+      
+      const messageDto: SendMessageDto = {
+        content: `Attached files:\n${fileLinks}`,
+        role: ChatMessageRole.USER,
+        metadata: {
+          attachments: fileUrls.map((url, index) => ({
+            name: files[index].name,
+            url,
+            type: files[index].type,
+          })),
+        },
+      };
+
+      // Send message with attachments
+      await chatApi.sendMessage(chatId, messageDto);
+    } catch (error) {
+      console.error('Failed to upload files:', error);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <ScrollArea className="flex-1 p-4">
+        {isLoading ? (
+          <div className="flex justify-center items-center h-full">
+            <Spinner />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                assistantName={assistantName}
+                assistantAvatar={assistantAvatar}
+              />
+            ))}
+            
+            {isStreaming && (
+              <ChatMessage
+                message={{
+                  id: 'streaming',
+                  chatId,
+                  content: streamedMessage,
+                  role: ChatMessageRole.ASSISTANT,
+                  createdAt: new Date().toISOString(),
+                }}
+                assistantName={assistantName}
+                assistantAvatar={assistantAvatar}
+                isStreaming
+              />
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </ScrollArea>
+      
+      <div className="p-4 border-t">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
+            <FormField
+              control={form.control}
+              name="message"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Type your message..."
+                      className="min-h-[80px]"
+                      {...field}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          form.handleSubmit(onSubmit)();
+                        }
+                      }}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            
+            <div className="flex justify-between items-center">
+              <FileUpload onUpload={handleFileUpload} />
+              
+              <div className="flex space-x-2">
+                {onChatEnd && (
+                  <Button variant="outline" onClick={onChatEnd}>
+                    End Chat
+                  </Button>
+                )}
+                
+                <Button type="submit" disabled={isLoading || form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? (
+                    <>
+                      <Spinner className="mr-2" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Form>
+      </div>
+    </div>
+  );
+}
+
+interface ChatMessageProps {
+  message: ChatMessage;
+  assistantName: string;
+  assistantAvatar?: string;
+  isStreaming?: boolean;
+}
+
+function ChatMessage({ message, assistantName, assistantAvatar, isStreaming }: ChatMessageProps) {
+  const isUser = message.role === ChatMessageRole.USER;
+  
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`flex ${isUser ? 'flex-row-reverse' : 'flex-row'} max-w-[80%]`}>
+        <Avatar
+          className="h-8 w-8 mt-1"
+          src={isUser ? undefined : assistantAvatar}
+          fallback={isUser ? 'U' : assistantName[0]}
+        />
+        
+        <div className={`mx-2 ${isUser ? 'text-right' : 'text-left'}`}>
+          <div className="text-xs text-muted-foreground mb-1">
+            {isUser ? 'You' : assistantName}
+          </div>
+          
+          <Card>
+            <CardContent className="p-3">
+              <div className={isStreaming ? 'animate-pulse' : ''}>
+                <ReactMarkdown
+                  components={{
+                    code({ node, inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || '');
+                      return !inline && match ? (
+                        <SyntaxHighlighter
+                          style={vscDarkPlus}
+                          language={match[1]}
+                          PreTag="div"
+                          {...props}
+                        >
+                          {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                      ) : (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      );
+                    },
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <div className="text-xs text-muted-foreground mt-1">
+            {new Date(message.createdAt).toLocaleTimeString()}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+1.2. Assistant Components
+-----------------------
+
+The Assistant components provide specialized UI elements for managing assistants in Jibu Console.
+
+File: libs/shadcn-ui/src/components/assistants/assistant-card.tsx
+
+The Assistant Card component displays information about an assistant and provides actions for managing it.
+
+Key Features:
+- Display assistant information
+- Actions for editing, deploying, and deleting assistants
+- Status indicators for deployment status
+- Integration with the Assistants API
+
+Implementation (Simplified):
+
+```typescript
+import React from 'react';
+import { MoreHorizontal, Edit, Trash, Play, ExternalLink } from 'lucide-react';
+
+import { Button } from '../ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { Badge } from '../ui/badge';
+
+import { Assistant } from '../../types/assistant';
+
+export interface AssistantCardProps {
+  assistant: Assistant;
+  onEdit?: (assistant: Assistant) => void;
+  onDelete?: (assistant: Assistant) => void;
+  onDeploy?: (assistant: Assistant) => void;
+  onChat?: (assistant: Assistant) => void;
+}
+
+export function AssistantCard({
+  assistant,
+  onEdit,
+  onDelete,
+  onDeploy,
+  onChat,
+}: AssistantCardProps) {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'deployed':
+        return 'bg-green-500';
+      case 'deploying':
+        return 'bg-yellow-500';
+      case 'failed':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  return (
+    <Card className="w-full">
+      <CardHeader className="flex flex-row items-start justify-between space-y-0">
+        <div>
+          <CardTitle>{assistant.name}</CardTitle>
+          <CardDescription>{assistant.description}</CardDescription>
+        </div>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">Actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+          
+          <DropdownMenuContent align="end">
+            {onEdit && (
+              <DropdownMenuItem onClick={() => onEdit(assistant)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+            )}
+            
+            {onDeploy && (
+              <DropdownMenuItem onClick={() => onDeploy(assistant)}>
+                <Play className="mr-2 h-4 w-4" />
+                Deploy
+              </DropdownMenuItem>
+            )}
+            
+            {onDelete && (
+              <DropdownMenuItem
+                onClick={() => onDelete(assistant)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </CardHeader>
+      
+      <CardContent>
+        <div className="flex flex-col space-y-2">
+          <div className="flex items-center">
+            <span className="text-sm font-medium">Status:</span>
+            <div className="flex items-center ml-2">
+              <span
+                className={`h-2 w-2 rounded-full ${getStatusColor(assistant.deploymentStatus)} mr-1`}
+              />
+              <span className="text-sm capitalize">{assistant.deploymentStatus}</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <span className="text-sm font-medium">Agent:</span>
+            <span className="text-sm ml-2">{assistant.agentId}</span>
+          </div>
+          
+          {assistant.knowledgeBaseIds.length > 0 && (
+            <div className="flex items-center">
+              <span className="text-sm font-medium">Knowledge Bases:</span>
+              <div className="flex flex-wrap ml-2">
+                {assistant.knowledgeBaseIds.map((id) => (
+                  <Badge key={id} variant="outline" className="mr-1 mb-1">
+                    {id.substring(0, 8)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {assistant.isPublic && (
+            <Badge variant="secondary">Public</Badge>
+          )}
+        </div>
+      </CardContent>
+      
+      <CardFooter className="flex justify-between">
+        {onChat && (
+          <Button onClick={() => onChat(assistant)}>
+            Chat
+          </Button>
+        )}
+        
+        {assistant.deploymentStatus === 'deployed' && assistant.deploymentId && (
+          <Button variant="outline" asChild>
+            <a
+              href={`/assistants/${assistant.id}/preview`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Preview
+            </a>
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+```
+
+==============================================================
+2. NAVIGATION COMPONENTS
+==============================================================
+
+2.1. Sidebar Navigation
+---------------------
+
+The Sidebar Navigation component provides a navigation sidebar for the application.
+
+File: libs/shadcn-ui/src/components/nav/sidebar-nav.tsx
+
+The Sidebar Navigation component displays a list of navigation items with icons and labels. It supports nested navigation items, active state highlighting, and collapsible sections.
+
+Key Features:
+- Responsive sidebar navigation
+- Support for nested navigation items
+- Active state highlighting
+- Collapsible sections
+- Integration with Next.js router
+
+Implementation (Simplified):
+
+```typescript
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+
+import { cn } from '../../lib/utils';
+import { ScrollArea } from '../ui/scroll-area';
+import { Button } from '../ui/button';
+
+export interface NavItem {
+  title: string;
+  href?: string;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  external?: boolean;
+  label?: string;
+  children?: NavItem[];
+}
+
+export interface SidebarNavProps {
+  items: NavItem[];
+  className?: string;
+  collapsible?: boolean;
+}
+
+export function SidebarNav({ items, className, collapsible = true }: SidebarNavProps) {
+  return (
+    <nav className={cn('flex flex-col space-y-1', className)}>
+      <ScrollArea className="h-full">
+        {items.map((item, index) => (
+          <NavItemComponent key={index} item={item} collapsible={collapsible} />
+        ))}
+      </ScrollArea>
+    </nav>
+  );
+}
+
+interface NavItemComponentProps {
+  item: NavItem;
+  collapsible?: boolean;
+  depth?: number;
+}
+
+function NavItemComponent({ item, collapsible = true, depth = 0 }: NavItemComponentProps) {
+  const pathname = usePathname();
+  const [expanded, setExpanded] = useState(false);
+  const isActive = item.href ? pathname === item.href : false;
+  const hasChildren = item.children && item.children.length > 0;
+  
+  const toggleExpanded = () => {
+    if (collapsible && hasChildren) {
+      setExpanded(!expanded);
+    }
+  };
+
+  return (
+    <div>
+      <div
+        className={cn(
+          'flex items-center py-2 px-3 rounded-md text-sm font-medium',
+          isActive
+            ? 'bg-accent text-accent-foreground'
+            : 'hover:bg-accent/50 hover:text-accent-foreground',
+          item.disabled && 'opacity-50 pointer-events-none',
+          depth > 0 && 'ml-4',
+        )}
+      >
+        {item.href ? (
+          <Link
+            href={item.href}
+            className={cn('flex items-center flex-1', item.disabled && 'cursor-not-allowed')}
+            target={item.external ? '_blank' : undefined}
+            rel={item.external ? 'noopener noreferrer' : undefined}
+            onClick={(e) => {
+              if (hasChildren && collapsible) {
+                e.preventDefault();
+                toggleExpanded();
+              }
+            }}
+          >
+            {item.icon && <span className="mr-2">{item.icon}</span>}
+            <span className="flex-1">{item.title}</span>
+            {item.label && (
+              <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                {item.label}
+              </span>
+            )}
+            {hasChildren && collapsible && (
+              <Button variant="ghost" size="icon" className="ml-auto h-4 w-4">
+                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+            )}
+          </Link>
+        ) : (
+          <button
+            className="flex items-center flex-1"
+            onClick={toggleExpanded}
+            disabled={item.disabled}
+          >
+            {item.icon && <span className="mr-2">{item.icon}</span>}
+            <span className="flex-1">{item.title}</span>
+            {item.label && (
+              <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                {item.label}
+              </span>
+            )}
+            {hasChildren && collapsible && (
+              <span className="ml-auto">
+                {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </span>
+            )}
+          </button>
+        )}
+      </div>
+      
+      {hasChildren && expanded && (
+        <div className="mt-1">
+          {item.children!.map((child, index) => (
+            <NavItemComponent key={index} item={child} collapsible={collapsible} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+2.2. Breadcrumbs
+--------------
+
+The Breadcrumbs component provides a breadcrumb navigation trail for the application.
+
+File: libs/shadcn-ui/src/components/nav/breadcrumbs.tsx
+
+The Breadcrumbs component displays a hierarchical navigation path, showing the current location in the application and providing links to parent pages.
+
+Key Features:
+- Hierarchical navigation display
+- Integration with Next.js router
+- Customizable separators and styling
+- Support for dynamic breadcrumb generation
+
+Implementation (Simplified):
+
+```typescript
+import React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ChevronRight, Home } from 'lucide-react';
+
+import { cn } from '../../lib/utils';
+
+export interface BreadcrumbItem {
+  title: string;
+  href?: string;
+  icon?: React.ReactNode;
+}
+
+export interface BreadcrumbsProps {
+  items?: BreadcrumbItem[];
+  homeHref?: string;
+  className?: string;
+  separator?: React.ReactNode;
+}
+
+export function Breadcrumbs({
+  items,
+  homeHref = '/',
+  className,
+  separator = <ChevronRight className="h-4 w-4" />,
+}: BreadcrumbsProps) {
+  const pathname = usePathname();
+  
+  // Generate breadcrumbs from pathname if items not provided
+  const breadcrumbItems = items || generateBreadcrumbsFromPath(pathname, homeHref);
+
+  return (
+    <nav aria-label="Breadcrumbs" className={cn('flex items-center text-sm', className)}>
+      <ol className="flex items-center space-x-2">
+        <li>
+          <Link
+            href={homeHref}
+            className="flex items-center text-muted-foreground hover:text-foreground"
+          >
+            <Home className="h-4 w-4" />
+            <span className="sr-only">Home</span>
+          </Link>
+        </li>
+        
+        {breadcrumbItems.map((item, index) => (
+          <React.Fragment key={index}>
+            <li className="flex items-center text-muted-foreground">
+              {separator}
+            </li>
+            
+            <li>
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  className={cn(
+                    'flex items-center hover:text-foreground',
+                    index === breadcrumbItems.length - 1
+                      ? 'text-foreground font-medium'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {item.icon && <span className="mr-1">{item.icon}</span>}
+                  <span>{item.title}</span>
+                </Link>
+              ) : (
+                <span
+                  className={cn(
+                    'flex items-center',
+                    index === breadcrumbItems.length - 1
+                      ? 'text-foreground font-medium'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {item.icon && <span className="mr-1">{item.icon}</span>}
+                  <span>{item.title}</span>
+                </span>
+              )}
+            </li>
+          </React.Fragment>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+// Helper function to generate breadcrumbs from path
+function generateBreadcrumbsFromPath(pathname: string, homeHref: string): BreadcrumbItem[] {
+  const paths = pathname.split('/').filter(Boolean);
+  
+  return paths.map((path, index) => {
+    const href = `/${paths.slice(0, index + 1).join('/')}`;
+    const title = path.charAt(0).toUpperCase() + path.slice(1).replace(/-/g, ' ');
+    
+    return {
+      title,
+      href: index === paths.length - 1 ? undefined : href,
+    };
+  });
+}
+```
+
+These domain-specific and navigation components are essential parts of the Jibu Console frontend, providing specialized functionality for the application's core features. They build upon the core UI components to create a cohesive and user-friendly interface.

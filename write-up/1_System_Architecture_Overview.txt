@@ -1,0 +1,167 @@
+==============================================================
+JIBU CONSOLE - SYSTEM ARCHITECTURE OVERVIEW
+==============================================================
+
+TABLE OF CONTENTS
+------------------
+1. Introduction
+2. System Architecture
+   2.1. Backend Architecture
+   2.2. Frontend Architecture
+   2.3. Libraries and Components
+3. Technology Stack
+4. Deployment Architecture
+5. Data Flow
+6. Integration Points
+7. Security Architecture
+
+==============================================================
+1. INTRODUCTION
+==============================================================
+
+The Jibu Console is a comprehensive platform designed to facilitate the creation, management, and deployment of AI assistants. It provides a robust ecosystem for building conversational agents with natural language processing capabilities, knowledge base integration, and multi-modal interactions.
+
+The system is architected as a modern web application with a clear separation between the backend services and the frontend user interface. It follows a microservices-inspired architecture where different functional components are organized into modules with clear boundaries and interfaces.
+
+==============================================================
+2. SYSTEM ARCHITECTURE
+==============================================================
+
+2.1. Backend Architecture
+-------------------------
+
+The backend of Jibu Console is built using NestJS, a progressive Node.js framework for building efficient and scalable server-side applications. The architecture follows a modular approach with clear separation of concerns:
+
+- Core Layer: Contains fundamental services, configurations, and utilities used throughout the application.
+- Modules Layer: Implements the business logic organized by domain.
+- Integration Layer: Manages connections with external services and APIs.
+- Webhook Layer: Handles incoming webhook events from integrated services.
+
+The backend follows the Controller-Service-Repository pattern:
+- Controllers: Handle HTTP requests and define API endpoints
+- Services: Implement business logic
+- Repositories: Handle data access and persistence
+
+Key modules in the backend include:
+- Agent Module: Manages AI agent configurations and executions
+- Assistant Module: Handles assistant creation, configuration, and deployment
+- Chat Module: Manages chat sessions and message history
+- Knowledge Base Module: Handles document storage, indexing, and retrieval
+- Organization Module: Manages multi-tenancy and organization settings
+- User Module: Handles user authentication, authorization, and profile management
+
+2.2. Frontend Architecture
+-------------------------
+
+The frontend is built using Next.js, a React framework that enables server-side rendering and static site generation. The architecture follows a component-based approach with:
+
+- Pages: Define the routes and layout of the application
+- Components: Reusable UI elements organized by domain and functionality
+- Hooks: Custom React hooks for state management and business logic
+- Utils: Utility functions and API clients
+- Contexts: React contexts for global state management
+
+The frontend implements a modern UI/UX design with responsive layouts and accessibility features. It uses the ShadCN UI component library for consistent styling and interaction patterns.
+
+2.3. Libraries and Components
+----------------------------
+
+The system makes extensive use of shared libraries to promote code reuse and maintainability:
+
+- ShadCN UI: A comprehensive UI component library built on top of Radix UI
+- API Clients: Type-safe clients for interacting with the backend APIs
+- Authentication: Shared authentication and authorization utilities
+- Form Handling: Form validation and submission utilities
+- State Management: Global and local state management solutions
+
+==============================================================
+3. TECHNOLOGY STACK
+==============================================================
+
+The Jibu Console leverages a modern technology stack:
+
+Backend:
+- Node.js and NestJS for the application framework
+- TypeScript for type-safe development
+- PostgreSQL for relational data storage
+- Redis for caching and pub/sub messaging
+- Langflow for workflow orchestration
+- Docker for containerization
+- Supabase for authentication and storage
+
+Frontend:
+- Next.js for the React framework
+- TypeScript for type-safe development
+- TailwindCSS for styling
+- ShadCN UI for component library
+- React Query for data fetching and caching
+- Zod for schema validation
+- React Hook Form for form management
+
+==============================================================
+4. DEPLOYMENT ARCHITECTURE
+==============================================================
+
+The Jibu Console is designed for flexible deployment options:
+
+- Docker Compose: For local development and testing
+- Kubernetes: For production deployments with scalability and high availability
+- Cloud Services: Compatible with major cloud providers (AWS, Azure, GCP)
+
+The system uses environment-based configuration to adapt to different deployment environments. Infrastructure as Code (IaC) principles are followed for reproducible deployments.
+
+==============================================================
+5. DATA FLOW
+==============================================================
+
+The data flow in the Jibu Console follows these general patterns:
+
+1. User Interaction Flow:
+   - User interacts with the frontend UI
+   - Frontend sends API requests to the backend
+   - Backend processes the request and interacts with databases or external services
+   - Backend returns response to the frontend
+   - Frontend updates the UI based on the response
+
+2. Agent Execution Flow:
+   - User or system triggers an agent execution
+   - Backend routes the request to the appropriate agent provider
+   - Agent provider processes the request using configured models and tools
+   - Results are returned to the backend
+   - Backend stores the results and notifies the frontend
+   - Frontend updates the UI with the results
+
+3. Chat History Flow:
+   - Chat messages are stored in Redis for fast access
+   - Messages are organized by chat ID and session ID
+   - Local caching mechanism improves performance
+   - Messages can be retrieved by chat ID or by assistant and session IDs
+
+==============================================================
+6. INTEGRATION POINTS
+==============================================================
+
+The Jibu Console integrates with various external systems:
+
+- Language Models: Integration with OpenAI, Anthropic, and other LLM providers
+- Langflow: For visual workflow creation and execution
+- Vector Databases: For knowledge base embeddings and semantic search
+- Storage Services: For file storage and management
+- Authentication Providers: For user authentication and identity management
+- Webhook Consumers: For event-driven integrations with external systems
+
+==============================================================
+7. SECURITY ARCHITECTURE
+==============================================================
+
+The security architecture of Jibu Console includes:
+
+- Authentication: JWT-based authentication with Supabase integration
+- Authorization: Role-based access control (RBAC) for fine-grained permissions
+- API Security: Rate limiting, input validation, and CORS protection
+- Data Protection: Encryption at rest and in transit
+- Secrets Management: Secure handling of API keys and credentials
+- Audit Logging: Comprehensive logging of security events
+- Compliance: Design patterns for GDPR, CCPA, and other regulatory requirements
+
+The system implements the principle of least privilege, ensuring that users and services have only the permissions necessary for their intended functions.

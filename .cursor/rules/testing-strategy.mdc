@@ -1,39 +1,112 @@
 ---
-description: 
+description: Testing strategy for the Jibu Console project
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ## Testing Strategy
 
-**Frameworks:**
-*   **Unit & Integration Tests:** Jest (configured via `jest.config.js` files in relevant apps/libs). Utilize `@nestjs/testing` for backend testing utilities.
-*   **End-to-End (E2E) Tests:** Playwright or Cypress (Planned - specific choice TBD).
+### Testing Frameworks
 
-**Types of Tests & Scope:**
-*   **Unit Tests:**
-    *   Focus: Individual functions, classes, NestJS services, utility functions, React components (isolated logic), shared library functions.
-    *   Mocking: External dependencies (DB calls, external APIs, other services) should be mocked using Jest mocks (`jest.fn()`, `jest.spyOn`).
-*   **Integration Tests:**
-    *   Focus: Interaction between multiple units within an application boundary.
-        *   Backend: Test NestJS modules, controller endpoints (using `supertest` via `@nestjs/testing`), service interactions, database interactions (potentially against a test database).
-        *   Frontend: Test component interactions, state management logic, page-level integration.
-*   **E2E Tests:**
-    *   Focus: Full user flows through the application (Frontend UI -> Backend API -> Database/External Services).
-    *   Tooling: Playwright/Cypress will interact with the browser like a real user.
+* **Unit & Integration Tests:** Jest (configured via `jest.config.js` files in relevant apps/libs)
+  * Backend: `@nestjs/testing` for NestJS testing utilities
+  * Frontend: React Testing Library for component testing
+* **End-to-End (E2E) Tests:** Cypress for frontend user flow testing
 
-**Location:**
-*   Tests should reside alongside the code they test (e.g., `*.spec.ts` or `*.test.ts` files). E2E tests might live in a separate `e2e` directory within apps or at the root.
+### Package Management
 
-**CI/CD:**
-*   All test suites (unit, integration, E2E) should be run automatically as part of the CI/CD pipeline (GitHub Actions) on pushes and pull requests.
+* **Always use pnpm** for installing test dependencies and running test scripts
+* **Always recheck the codebase** before writing tests to ensure consistency with existing test patterns
 
-**Coverage:**
-*   Aim for reasonable code coverage, focusing on critical business logic and complex functions. Specific percentage targets TBD.
+### Types of Tests & Scope
 
-**Specific Considerations:**
-*   **NestJS Testing:** Leverage `@nestjs/testing`'s `Test.createTestingModule` for setting up test environments with mocked providers.
-*   **Prisma:** Mock Prisma client calls in unit tests. For integration tests, consider strategies like test database setup/teardown or Prisma mocking libraries.
-*   **External APIs:** Mock external API calls during testing using libraries like `nock` or Jest mocks.
-*   **Queues (BullMQ):** Test that jobs are correctly added to the queue. Test worker processors in isolation, mocking dependencies.
+#### Unit Tests
 
-*   **Frontend:** Use React Testing Library (often included with Next.js/Jest setup) for component testing.
+* **Focus:** Individual functions, classes, services, utilities, and components
+* **Backend Unit Tests:**
+  * Test individual NestJS services in isolation
+  * Test utility functions and helpers
+  * Mock external dependencies (Prisma, Redis, external APIs)
+* **Frontend Unit Tests:**
+  * Test React components in isolation
+  * Test custom hooks
+  * Test utility functions
+
+#### Integration Tests
+
+* **Backend Integration Tests:**
+  * Test NestJS modules as a whole
+  * Test controller endpoints using `supertest` via `@nestjs/testing`
+  * Test service interactions
+  * Test database interactions with Prisma (against test database)
+  * Test Redis integration with test Redis instance
+* **Frontend Integration Tests:**
+  * Test component interactions
+  * Test state management with React Query
+  * Test page-level integration
+
+#### End-to-End (E2E) Tests
+
+* **Focus:** Full user flows through the application
+* **Implementation:** Cypress tests that simulate real user interactions
+* **Coverage:** Critical user journeys and business workflows
+
+### Test Organization
+
+* Tests should reside alongside the code they test
+* Use consistent naming patterns: `*.spec.ts` or `*.test.ts`
+* E2E tests should be in a dedicated `e2e` directory within the appropriate app
+
+### Testing Best Practices
+
+#### General Practices
+
+* Write tests before or alongside feature development (TDD when possible)
+* Keep tests simple, focused, and fast
+* Use descriptive test names that explain the expected behavior
+* Follow the AAA pattern: Arrange, Act, Assert
+
+#### Backend Testing
+
+* **NestJS Testing:**
+  * Use `Test.createTestingModule` to set up test environments
+  * Mock providers and dependencies appropriately
+  * Test controllers with `supertest` for HTTP endpoint testing
+* **Prisma Testing:**
+  * Mock Prisma client calls in unit tests
+  * Use test database for integration tests with proper setup/teardown
+  * Consider using Prisma's transaction API for test isolation
+* **Redis Testing:**
+  * Mock Redis for unit tests
+  * Use test Redis instance for integration tests
+  * Test both key patterns for chat history:
+    * `chat:history:{chatId}`
+    * `chat:{assistantId}:{sessionId}`
+
+#### Frontend Testing
+
+* **Component Testing:**
+  * Use React Testing Library for component testing
+  * Focus on user interactions rather than implementation details
+  * Test accessibility concerns
+* **API Client Testing:**
+  * Mock API responses for predictable testing
+  * Test error handling and loading states
+
+### CI/CD Integration
+
+* All tests should run automatically in CI/CD pipeline
+* Fast tests (unit) should run on every commit
+* Slower tests (integration, E2E) can run on PRs and main branch
+* Test failures should block deployments
+
+### Test Data Management
+
+* Use factories or fixtures for consistent test data
+* Reset test state between test runs
+* Avoid dependencies between tests
+
+### Performance Testing
+
+* Implement performance testing for critical API endpoints
+* Test Redis caching effectiveness
+* Monitor frontend rendering performance

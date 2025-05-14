@@ -1,49 +1,110 @@
 ---
-description: 
+description: Coding style guidelines and conventions for the Jibu Console project
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ## Coding Style & Conventions
 
-**Formatting:**
-*   **Tool:** Prettier
-*   **Configuration:** Uses `.prettierrc` and `.prettierignore` at the root. Adhere strictly to Prettier formatting.
+### General Principles
 
-**Linting:**
-*   **Tool:** ESLint
-*   **Configuration:** Uses `eslint.config.mjs` (likely flat config). Follow defined rules to maintain code quality and prevent errors.
+* **Always recheck the codebase** before making changes to ensure consistency with existing patterns
+* **Always use pnpm** instead of npm for package management
+* **Follow the principle of least surprise** - code should be predictable and intuitive
+* **Prioritize readability over cleverness** - clear code is better than clever code
+* **Maintain consistent patterns** across similar components and modules
 
-**Naming Conventions:**
-*   **Variables, Functions, Methods:** `camelCase`
-*   **Classes, Interfaces, Types, Enums, React Components:** `PascalCase`
-*   **Constants (if truly constant):** `UPPER_SNAKE_CASE`
-*   **Files:** `kebab-case` or `camelCase` for components/classes (follow existing patterns within `apps`/`libs`). Config files often match tool names (`tailwind.config.js`).
-*   **API Endpoints:** RESTful principles, `kebab-case` path segments (e.g., `/api/v1/knowledge-bases/{id}`).
+### Formatting & Linting
 
-**Code Structure:**
-*   **Monorepo:** Adhere to the Nx structure (`apps/`, `libs/`). Place shared code in `libs`.
-*   **NestJS (Backend):** Use modules (`*.module.ts`), controllers (`*.controller.ts`), services (`*.service.ts`), providers, guards (`*.guard.ts`), strategies (`*.strategy.ts`). Group by feature domain. Use Dependency Injection.
-*   **Next.js (Frontend):** Organize components, hooks, utils, styles logically within the `src` directory (e.g., `/components`, `/hooks`, `/lib`, `/styles`). Follow conventions for App Router or Pages Router as established.
-*   **shadcn/ui:** Components are likely generated into `libs/shadcn-ui/src/components` or similar, based on `components.json`.
+* **Tool:** Prettier for formatting, ESLint for linting
+* **Configuration:** Adhere strictly to the project's `.prettierrc` and `eslint.config.mjs` settings
+* **Pre-commit Hooks:** All code should pass linting and formatting checks before commit
 
-**TypeScript:**
-*   **Typing:** Strive for strong typing. Use interfaces (`interface`) or types (`type`) appropriately. Avoid `any` where possible.
-*   **Modules:** Use ES modules (`import`/`export`).
+### Naming Conventions
 
-**Comments:**
-*   Use JSDoc/TSDoc for explaining complex functions, classes, and types.
-*   Add inline comments for non-obvious logic.
+* **Variables, Functions, Methods:** `camelCase`
+* **Classes, Interfaces, Types, Enums, React Components:** `PascalCase`
+* **Constants:** `UPPER_SNAKE_CASE` for true constants
+* **Files:**
+  * Backend: `kebab-case.type.ts` (e.g., `chat.service.ts`, `user.controller.ts`)
+  * Frontend: `PascalCase.tsx` for components, `camelCase.ts` for utilities
+  * Config files: Match tool names (e.g., `tailwind.config.js`)
+* **API Endpoints:** RESTful principles with `kebab-case` path segments (e.g., `/api/v1/knowledge-bases/{id}`)
+* **Database Entities:** Singular nouns in `PascalCase` (e.g., `User`, `Assistant`, `Chat`)
 
-**API Design (Backend):**
-*   Use NestJS decorators for routing (`@Get`, `@Post`, etc.), request/response handling (`@Body`, `@Param`, `@Query`), and validation (`ValidationPipe` with DTOs using `class-validator`).
-*   Use `@nestjs/swagger` for OpenAPI documentation.
-*   Return meaningful HTTP status codes.
+### Code Structure
 
-**Validation:**
-*   Use `class-validator` decorators in DTOs for backend request validation.
-*   Use Zod for shared types/validation logic and potentially frontend form validation schema (with React Hook Form).
+#### Monorepo Structure
 
-**Error Handling:**
-*   Use NestJS exception filters for consistent backend error responses.
+* **Nx Workspace:** Follow the Nx workspace structure with `apps/` and `libs/` directories
+* **Package Management:** Use pnpm for all package management operations
+* **Shared Code:** Place shared code in `libs/` for better reusability
 
-*   Handle frontend errors gracefully, providing user feedback.
+#### Backend (NestJS)
+
+* **Module Organization:** Feature-based modules (e.g., `ChatsModule`, `AssistantModule`)
+* **Controller-Service-Repository Pattern:**
+  * Controllers handle HTTP requests
+  * Services contain business logic
+  * Repository pattern implemented via Prisma Client
+* **File Types:**
+  * `*.module.ts` - NestJS modules
+  * `*.controller.ts` - HTTP request handlers
+  * `*.service.ts` - Business logic
+  * `*.dto.ts` - Data Transfer Objects for request/response validation
+  * `*.entity.ts` - Database models (represented in Prisma schema)
+  * `*.interface.ts` - TypeScript interfaces
+  * `*.guard.ts` - Authentication/authorization guards
+  * `*.middleware.ts` - HTTP middleware
+
+#### Database & ORM
+
+* **ORM:** Prisma for database interactions
+* **Schema:** Define database schema in `prisma/schema.prisma`
+* **Migrations:** Use Prisma migrations for database schema changes
+* **Queries:** Use Prisma Client for type-safe database queries
+
+#### Frontend (Next.js)
+
+* **Component Organization:**
+  * `components/ui/` - Generic UI components
+  * `components/domain/` - Domain-specific components
+  * `hooks/` - Custom React hooks
+  * `lib/` - Utility functions and API clients
+  * `contexts/` - React context providers
+  * `types/` - TypeScript type definitions
+
+* **Component Structure:**
+  * Each component should have a single responsibility
+  * Use composition over inheritance
+  * Extract reusable logic into custom hooks
+
+### TypeScript Best Practices
+
+* **Strong Typing:** Use explicit types and avoid `any` where possible
+* **Interface vs Type:** Use interfaces for object shapes that might be extended, types for unions/intersections
+* **Generics:** Use generics to create reusable, type-safe components and functions
+* **Type Guards:** Use type guards to narrow types in conditional blocks
+
+### State Management
+
+* **Backend:** Use dependency injection for service state
+* **Frontend:**
+  * React Query for server state
+  * React Context for global UI state
+  * Component state for local UI state
+
+### API Design
+
+* **RESTful Principles:** Follow standard HTTP methods (GET, POST, PUT, DELETE)
+* **Versioning:** Include version in URL path (e.g., `/api/v1/chats`)
+* **Request Validation:** Use DTOs with class-validator decorators
+* **Response Format:** Consistent JSON structure with appropriate HTTP status codes
+* **Error Handling:** Standardized error responses
+
+### Redis Integration
+
+* **Chat History:** Store chat messages in Redis using dual key patterns:
+  * `chat:history:{chatId}` - Direct access by chat ID
+  * `chat:{assistantId}:{sessionId}` - Backward compatibility
+* **Caching:** Implement local caching with appropriate TTL values
+* **Pub/Sub:** Use Redis for real-time message delivery

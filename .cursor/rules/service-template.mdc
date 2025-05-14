@@ -1,14 +1,14 @@
 ---
-description: 
+description: Service implementation template for the Jibu Console project
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ## Service Implementation Template
 
 This template should be used to document the implementation details of a service before coding. 
-Replace [ServiceName] with the actual service name (e.g., SupabaseAuth, AzureStt).
+Replace [ServiceName] with the actual service name (e.g., ChatsService, AssistantService).
 
-```
+```markdown
 # [ServiceName] Service Implementation
 
 ## Purpose & Functionality
@@ -19,56 +19,142 @@ Replace [ServiceName] with the actual service name (e.g., SupabaseAuth, AzureStt
 - **External Services:** [List any external APIs or services]
 - **Internal Dependencies:** [List dependent internal modules/services]
 - **Required Credentials:** [List required API keys or credentials]
+- **Package Dependencies:** [List npm packages required, remember to use pnpm for installation]
 
 ## Data Models
-- [List and describe relevant database models]
-- [Include relationships between models]
+
+### Prisma Models
+```prisma
+// Reference or include relevant Prisma schema definitions
+model ModelName {
+  id          String   @id @default(uuid())
+  // Other fields
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+```
+
+### Relationships
+- [Describe relationships between models]
 
 ## Implementation Details
 
 ### Core Components
-- [List main classes/interfaces/functions to implement]
-- [Describe file structure]
+- **Service Class:** `[ServiceName]Service` - Main service implementation
+- **Controller:** `[ServiceName]Controller` - API endpoints
+- **DTOs:** 
+  - `Create[Entity]Dto` - Data transfer object for creation
+  - `Update[Entity]Dto` - Data transfer object for updates
+  - `[Entity]ResponseDto` - Response data structure
+- **Interfaces:** `I[ServiceName]Service` - Service interface
+
+### File Structure
+```
+src/modules/[module-name]/
+├── dto/
+│   ├── create-[entity].dto.ts
+│   ├── update-[entity].dto.ts
+│   └── [entity]-response.dto.ts
+├── interfaces/
+│   └── [service-name].interface.ts
+├── [service-name].controller.ts
+├── [service-name].service.ts
+├── [service-name].module.ts
+└── [service-name].spec.ts
+```
 
 ### Main Flows
-1. [Detailed description of first process flow]
-   - [Inputs]
-   - [Step 1]
-   - [Step 2]
-   - [...]
-   - [Outputs]
 
-2. [Detailed description of second process flow]
-   - [...]
+1. **Create [Entity]**
+   - **Inputs:** `Create[Entity]Dto`
+   - **Process:**
+     1. Validate input data
+     2. Check for existing records if needed
+     3. Create record in database using Prisma
+     4. Handle any additional processing (e.g., Redis caching)
+   - **Outputs:** Created entity or error
+
+2. **Retrieve [Entity]**
+   - **Inputs:** Entity ID or query parameters
+   - **Process:**
+     1. Check cache (Redis) if applicable
+     2. Query database using Prisma if not in cache
+     3. Transform data if needed
+   - **Outputs:** Entity data or error
+
+3. **Update [Entity]**
+   - **Inputs:** Entity ID, `Update[Entity]Dto`
+   - **Process:**
+     1. Validate input data
+     2. Check if entity exists
+     3. Update record in database using Prisma
+     4. Update cache if applicable
+   - **Outputs:** Updated entity or error
+
+4. **Delete [Entity]**
+   - **Inputs:** Entity ID
+   - **Process:**
+     1. Check if entity exists
+     2. Delete record in database using Prisma
+     3. Remove from cache if applicable
+   - **Outputs:** Success confirmation or error
 
 ### Error Handling
-- [Common error cases and how to handle them]
-- [Retry strategies]
-- [Fallback mechanisms]
+- Use NestJS exception filters for consistent error responses
+- Implement proper error logging
+- Consider retry mechanisms for transient failures
+- Use transactions for operations that modify multiple records
+
+### Caching Strategy
+- **Redis Implementation:**
+  - Key pattern: `[entity]:[id]` or appropriate pattern
+  - TTL: [Specify appropriate TTL]
+  - Invalidation strategy: [When to invalidate cache]
 
 ### Security Considerations
-- [Security measures]
-- [Credential handling]
-- [Data protection]
+- Implement proper authorization checks
+- Validate user permissions for each operation
+- Sanitize inputs to prevent injection attacks
+- Protect sensitive data in logs and responses
 
 ## API Interface
+
 ```typescript
 // Interface definition
-interface I[ServiceName]Service {
+export interface I[ServiceName]Service {
   // Method signatures with documentation
-  methodName(param1: Type, param2: Type): ReturnType;
+  create(createDto: Create[Entity]Dto, organizationId: string): Promise<[Entity]>;
+  findAll(organizationId: string, filters?: [Entity]Filters): Promise<[Entity][]>;
+  findOne(id: string, organizationId: string): Promise<[Entity]>;
+  update(id: string, updateDto: Update[Entity]Dto, organizationId: string): Promise<[Entity]>;
+  remove(id: string, organizationId: string): Promise<void>;
 }
 ```
 
 ## Integration Test Plan
-- [Test scenarios]
-- [Mock requirements]
-- [Validation criteria]
+
+### Unit Tests
+- Test service methods in isolation with mocked Prisma client
+- Test validation logic in DTOs
+- Test error handling scenarios
+
+### Integration Tests
+- Test API endpoints using NestJS testing module
+- Test database interactions with test database
+- Test caching behavior with test Redis instance
+
+### E2E Tests
+- Test complete user flows through the API
 
 ## Future Enhancements
 - [Planned features for future iterations]
 - [Potential optimizations]
+- [Scalability considerations]
 ```
 
-To use this template, create a new file in the `.cursor/rules/` directory with the name of your service, e.g., `.cursor/rules/supabase-auth.mdc`. Then fill in the template with the specific implementation details of that service.
+To use this template, create a new file in the `.cursor/rules/` directory with the name of your service, e.g., `.cursor/rules/chats-service.mdc`. Then fill in the template with the specific implementation details of that service.
 
+**Important Reminders:**
+- Always use pnpm instead of npm for package management
+- Always recheck the codebase before implementing a new service to ensure consistency with existing patterns
+- Follow the established NestJS module structure
