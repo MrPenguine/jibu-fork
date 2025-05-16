@@ -1,5 +1,6 @@
 export enum AgentProvider {
   LANGFLOW = 'langflow',
+  LANGCHAIN = 'langchain',
 }
 
 export interface LangflowPayload {

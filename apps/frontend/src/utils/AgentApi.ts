@@ -219,12 +219,21 @@ export async function sendStreamingAgentRequest(
                   throw new Error(eventData.message || 'Unknown error');
                 }
                 
-                // Call the onToken callback
-                if (options.onToken) {
-                  options.onToken(eventData.output || '', eventData);
+                // Only process output if it's not empty (skip empty final responses)
+                if (eventData.output) {
+                  // Call the onToken callback
+                  if (options.onToken) {
+                    options.onToken(eventData.output, eventData);
+                  }
+                  
+                  // Update the full response with non-empty content
+                  fullResponse = eventData.output;
                 }
                 
-                fullResponse = eventData.output || '';
+                // If this is the final response with metadata, call onComplete
+                if (eventData.metadata?.type === 'final' && options.onComplete) {
+                  options.onComplete(fullResponse);
+                }
               } catch (error) {
                 console.error('Error parsing SSE message:', error);
                 if (options.onError) {
@@ -235,10 +244,8 @@ export async function sendStreamingAgentRequest(
           }
         }
         
-        // Call the onComplete callback
-        if (options.onComplete) {
-          options.onComplete(fullResponse);
-        }
+        // onComplete is already called when we receive the final metadata
+        // No need to call it again here
       } catch (error) {
         console.error('Error reading stream:', error);
         if (options.onError) {
