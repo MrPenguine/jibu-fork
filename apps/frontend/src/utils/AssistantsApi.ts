@@ -443,6 +443,16 @@ export const removeKnowledgeBaseFromAssistant = async (
 };
 
 /**
+ * Interface for pricing information
+ */
+export interface ModelPricing {
+  inputPrice?: number;
+  outputPrice?: number;
+  imagePrice?: number;
+  unit?: string;
+}
+
+/**
  * Interface for model data
  */
 export interface ModelInfo {
@@ -451,6 +461,7 @@ export interface ModelInfo {
   contextLength: number;
   description: string;
   speedTier?: string;
+  pricing?: ModelPricing;
 }
 
 /**
@@ -464,6 +475,7 @@ export interface CategorizedModels {
   groq?: ModelInfo[];
   meta?: ModelInfo[];
   cohere?: ModelInfo[];
+  xai?: ModelInfo[];
   other?: ModelInfo[];
 }
 
@@ -473,7 +485,7 @@ let modelCacheTimestamp: number = 0;
 const MODEL_CACHE_TTL = 10 * 60 * 1000; // 10 minutes in milliseconds
 
 /**
- * Fetch available models from OpenRouter API
+ * Fetch available models - now manually listing Grok and Gemini models
  */
 export const getAvailableModels = async (): Promise<CategorizedModels> => {
   const now = Date.now();
@@ -484,83 +496,107 @@ export const getAvailableModels = async (): Promise<CategorizedModels> => {
     return modelCache;
   }
   
-  try {
-    console.log('[getAvailableModels] Fetching models from backend API');
+  // Instead of fetching from API, we now manually define the models
+  console.log('[getAvailableModels] Using manually defined models');
+  
+  // Define the models with their pricing and token information
+  const models: CategorizedModels = {
+    // XAI (Grok) models
+    xai: [
+      { 
+        id: 'x-ai/grok-3-latest', 
+        name: 'Grok 3', 
+        contextLength: 131072, 
+        description: 'Text Input: $3.00, Text Completion: $15.00', 
+        speedTier: 'balanced',
+        pricing: {
+          inputPrice: 3.00,
+          outputPrice: 15.00,
+          unit: 'per million tokens'
+        }
+      },
+      { 
+        id: 'x-ai/grok-3-fast-latest', 
+        name: 'Grok 3 Fast', 
+        contextLength: 131072, 
+        description: 'Text Input: $5.00, Text Completion: $25.00', 
+        speedTier: 'fastest',
+        pricing: {
+          inputPrice: 5.00,
+          outputPrice: 25.00,
+          unit: 'per million tokens'
+        }
+      },
+      { 
+        id: 'x-ai/grok-3-mini-latest', 
+        name: 'Grok 3 Mini', 
+        contextLength: 131072, 
+        description: 'Text Input: $0.30, Text Completion: $0.50', 
+        speedTier: 'balanced',
+        pricing: {
+          inputPrice: 0.30,
+          outputPrice: 0.50,
+          unit: 'per million tokens'
+        }
+      },
+      { 
+        id: 'x-ai/grok-3-mini-fast-latest', 
+        name: 'Grok 3 Mini Fast', 
+        contextLength: 131072, 
+        description: 'Text Input: $0.60, Text Completion: $4.00', 
+        speedTier: 'fastest',
+        pricing: {
+          inputPrice: 0.60,
+          outputPrice: 4.00,
+          unit: 'per million tokens'
+        }
+      },
+      { 
+        id: 'x-ai/grok-2-vision-latest', 
+        name: 'Grok 2 Vision', 
+        contextLength: 8192, 
+        description: 'Text Input: $2.00, Image Input: $2.00, Text Completion: $10.00', 
+        speedTier: 'balanced',
+        pricing: {
+          inputPrice: 2.00,
+          imagePrice: 2.00,
+          outputPrice: 10.00,
+          unit: 'per million tokens'
+        }
+      }
+    ],
     
-    // Set a timeout for the fetch request
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout after 5s')), 5000);
-    });
-    
-    // Make the actual fetch request through our API utility
-    const fetchPromise = fetchAPI('/assistants/models');
-    
-    // Race the fetch against the timeout
-    const models = await Promise.race([fetchPromise, timeoutPromise]) as CategorizedModels;
-    
-    console.log('[getAvailableModels] Successfully fetched models');
-    
-    // Save to cache
-    modelCache = models;
-    modelCacheTimestamp = now;
-    
-    return models;
-  } catch (error: any) {
-    console.error('[getAvailableModels] Error fetching models:', error);
-    
-    // If we have a stale cache, use it despite being expired
-    if (modelCache) {
-      console.log('[getAvailableModels] Using stale cache as fallback');
-      return modelCache;
-    }
-    
-    // If the endpoint doesn't exist, return mock data
-    if (shouldUseMockData(error)) {
-      console.log('[getAvailableModels] Using mock data for models');
-      const mockData = {
-        openai: [
-          { id: 'openai/gpt-4o-mini', name: 'OpenAI: GPT-4o Mini', contextLength: 128000, description: 'Fastest OpenAI model with good capabilities', speedTier: 'fastest' },
-          { id: 'openai/gpt-3.5-turbo', name: 'OpenAI: GPT-3.5 Turbo', contextLength: 16000, description: 'Fast, efficient model for most tasks', speedTier: 'balanced' },
-          { id: 'openai/gpt-4o', name: 'OpenAI: GPT-4o', contextLength: 128000, description: 'Strong reasoning capabilities with good speed', speedTier: 'balanced' }
-        ],
-        google: [
-          { id: 'google/gemini-flash-1.5', name: 'Google: Gemini Flash 1.5', contextLength: 32000, description: 'Google\'s fastest model for real-time interactions', speedTier: 'fastest' },
-          { id: 'google/gemini-pro-1.5', name: 'Google: Gemini Pro 1.5', contextLength: 128000, description: 'Balanced model with strong reasoning', speedTier: 'balanced' }
-        ],
-        anthropic: [
-          { id: 'anthropic/claude-3-haiku', name: 'Anthropic: Claude 3 Haiku', contextLength: 200000, description: 'Anthropic\'s fastest model for real-time interactions', speedTier: 'fastest' },
-          { id: 'anthropic/claude-3.5-sonnet', name: 'Anthropic: Claude 3.5 Sonnet', contextLength: 200000, description: 'Great balance of speed and capability', speedTier: 'balanced' }
-        ],
-        mistralai: [
-          { id: 'mistralai/mistral-small', name: 'Mistral AI: Mistral Small', contextLength: 32000, description: 'Mistral\'s efficient model for real-time applications', speedTier: 'fastest' },
-          { id: 'mistralai/mistral-large', name: 'Mistral AI: Mistral Large', contextLength: 32000, description: 'Mistral\'s most capable model', speedTier: 'balanced' }
-        ],
-        groq: [
-          { id: 'groq/llama3-8b-8192', name: 'Groq: Llama-3 8B', contextLength: 8192, description: 'Ultra-fast inference with Llama 3 on Groq LPUs', speedTier: 'fastest' },
-          { id: 'groq/llama3-70b-8192', name: 'Groq: Llama-3 70B', contextLength: 8192, description: 'High capability with impressive speed on Groq', speedTier: 'balanced' }
-        ],
-        meta: [
-          { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Meta: Llama 3.1 8B', contextLength: 8192, description: 'Fast and efficient open model', speedTier: 'fastest' }
-        ],
-        cohere: [
-          { id: 'cohere/command-r', name: 'Cohere: Command R', contextLength: 128000, description: 'Balanced model for reasoning tasks', speedTier: 'balanced' }
-        ]
-      };
-      
-      // Save mock data to cache
-      modelCache = mockData;
-      modelCacheTimestamp = now;
-      
-      return mockData;
-    }
-    
-    // Return a friendlier error message with guidance
-    const errorMessage = error.message || 'Unknown error';
-    console.error(`[getAvailableModels] Error details: ${errorMessage}`);
-    
-    // Throw a more informative error
-    throw new Error(`Could not load available models. Please check your internet connection and try again. (${errorMessage})`);
-  }
+    // Google (Gemini) models - text only models - using exact IDs from the UI
+    google: [
+      { 
+        id: 'gemini-1.5-pro', 
+        name: 'Gemini 1.5 Pro', 
+        contextLength: 2097152, 
+        description: 'Complex reasoning tasks requiring more intelligence. Input: 2M tokens, Output: 8K tokens', 
+        speedTier: 'capable'
+      },
+      { 
+        id: 'gemini-2.0-flash', 
+        name: 'Gemini 2.0 Flash', 
+        contextLength: 1048576, 
+        description: 'Next generation features, speed. Input: 1M tokens, Output: 8K tokens', 
+        speedTier: 'fastest'
+      },
+      { 
+        id: 'gemini-2.0-flash-lite', 
+        name: 'Gemini 2.0 Flash Lite', 
+        contextLength: 1048576, 
+        description: 'Cost efficiency and low latency. Input: 1M tokens, Output: 8K tokens', 
+        speedTier: 'fastest'
+      }
+    ]
+  };
+  
+  // Save to cache
+  modelCache = models;
+  modelCacheTimestamp = now;
+  
+  return models;
 };
 
 /**

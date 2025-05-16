@@ -54,7 +54,16 @@ export class GeminiLlmService implements ILlmService {
         }
       });
       
-      const result = await model.generateContent(prompt);
+      // Format the prompt according to the latest API pattern
+      const contents = [{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }];
+      
+      const result = await model.generateContent({
+        contents,
+        systemInstruction: config?.systemPrompt || undefined
+      });
       const response = result.response;
       const text = response.text();
       

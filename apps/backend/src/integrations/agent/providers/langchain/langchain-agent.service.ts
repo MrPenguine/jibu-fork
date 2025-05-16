@@ -198,8 +198,15 @@ export class LangchainAgentService implements IAgentService {
         };
       } else if (this.googleApiKey) {
         // Use Gemini
-        modelName = 'gemini-1.5-pro';
+        // Extract the model name from the model config, removing any provider prefix
+        const originalModelName = modelConfig.model || 'gemini-1.5-pro';
+        modelName = originalModelName.replace(/^.*?\//g, '');
         modelUsed = `google/${modelName}`;
+        
+        // Add detailed logging to help debug model ID issues
+        this.logger.log(`Original model from config: ${originalModelName}`);
+        this.logger.log(`Using Gemini model ID: ${modelName}`);
+        this.logger.log(`Full model identifier: ${modelUsed}`);
         
         // Create the model with the assistant's configuration
         const genAI = new GoogleGenerativeAI(this.googleApiKey);
@@ -409,25 +416,20 @@ export class LangchainAgentService implements IAgentService {
         };
       } else if (this.googleApiKey) {
         // Use Gemini
-        modelName = 'gemini-1.5-pro';
+        // Extract the model name from the model config, removing any provider prefix
+        const originalModelName = modelConfig.model || 'gemini-1.5-pro';
+        modelName = originalModelName.replace(/^.*?\//g, '');
         modelUsed = `google/${modelName}`;
+        
+        // Add detailed logging to help debug model ID issues
+        this.logger.log(`Original model from config: ${originalModelName}`);
+        this.logger.log(`Using Gemini model ID: ${modelName}`);
+        this.logger.log(`Full model identifier: ${modelUsed}`);
         
         // Create the model with the assistant's configuration
         const genAI = new GoogleGenerativeAI(this.googleApiKey);
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            temperature: modelConfig.temperature || 0.7,
-            maxOutputTokens: modelConfig.maxTokens || 2048,
-          }
-        });
         
-        // Prepare messages for the model
-        let prompt = '';
-        
-        // Add system prompt
-        // Make sure we're using the voicemailMessage which contains the actual system instructions
-        // NOT the firstMessage which contains the greeting
+        // Prepare system instructions
         let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
@@ -436,27 +438,58 @@ export class LangchainAgentService implements IAgentService {
           this.logger.warn('Found greeting text in system prompt, removing it');
           systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
         }
-        prompt += `${systemPrompt}\n\n`;
         
-        // Add context if available
+        // Prepare chat history in the format expected by the Gemini API
+        const chatHistory = [];
+        
+        // Add context as system message if available
         if (context) {
-          prompt += `Context information:\n${context}\n\n`;
+          chatHistory.push({
+            role: 'user',
+            parts: [{ text: 'Here is some relevant context information:' }]
+          });
+          chatHistory.push({
+            role: 'model',
+            parts: [{ text: context }]
+          });
         }
         
         // Add chat history
         for (const message of rawMessages) {
-          if (message.role === 'user') {
-            prompt += `User: ${message.content}\n`;
-          } else {
-            prompt += `Assistant: ${message.content}\n`;
-          }
+          chatHistory.push({
+            role: message.role === 'user' ? 'user' : 'model',
+            parts: [{ text: message.content }]
+          });
         }
         
-        // Add current query
-        prompt += `User: ${input}\nAssistant:`;
+        // Create the model with the assistant's configuration
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            temperature: modelConfig.temperature || 0.7,
+            maxOutputTokens: modelConfig.maxTokens || 2048,
+          }
+        });
+        
+        // Convert chat history to the format expected by the Gemini API
+        const contents = [];
+        
+        // Add chat history
+        for (const message of chatHistory) {
+          contents.push(message);
+        }
+        
+        // Add the current user message
+        contents.push({
+          role: 'user',
+          parts: [{ text: input }]
+        });
         
         // Stream the response
-        const streamResult = await model.generateContentStream(prompt);
+        const streamResult = await model.generateContentStream({
+          contents,
+          systemInstruction: systemPrompt
+        });
         
         let buffer = '';
         for await (const chunk of streamResult.stream) {

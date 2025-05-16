@@ -18,56 +18,32 @@ import {
 import { KnowledgeBaseConfig } from "./KnowledgeBaseConfig"
 import { getAvailableModels, CategorizedModels, ModelInfo } from "../../../../../apps/frontend/src/utils/AssistantsApi"
 
-// List of deprecated or older models to filter out
-const DEPRECATED_MODELS = [
-  'openai/gpt-3.5-turbo-0613',
-  'openai/gpt-4-0314',
-  'openai/gpt-4-1106-preview',
-  'mistralai/mistral-tiny',
-  'mistralai/mistral-7b-instruct-v0.1',
-  'anthropic/claude-1',
-  'anthropic/claude-2',
-  'anthropic/claude-instant-1'
-];
-
 // Minimum context length for filtering
 const MIN_CONTEXT_LENGTH = 8192;
 
 // Known fast models for streaming
 const KNOWN_FAST_MODELS = [
-  'groq/llama3-8b-8192',
-  'groq/llama3-70b-8192',
-  'groq/mixtral-8x7b-32768',
-  'anthropic/claude-3-haiku',
-  'google/gemini-flash-1.5',
-  'google/gemini-2.0-flash-lite-001',
-  'google/gemini-2.0-flash-001',
-  'mistralai/mistral-small',
-  'mistralai/ministral-8b',
-  'openai/gpt-4o-mini'
+  // Grok models
+  'x-ai/grok-3-fast-latest',
+  'x-ai/grok-3-mini-fast-latest',
+  // Google models - only include models available in your account
+  'google/gemini-2.0-flash',
+  'google/gemini-2.0-flash-lite'
 ];
 
 // Known balanced models (good performance/speed trade-off)
 const KNOWN_BALANCED_MODELS = [
-  'anthropic/claude-3.5-sonnet',
-  'openai/gpt-4o',
-  'openai/gpt-3.5-turbo',
-  'mistralai/mistral-large',
-  'mistralai/mixtral-8x22b-instruct',
-  'meta-llama/llama-3.1-8b-instruct',
-  'meta-llama/llama-3.1-70b-instruct',
-  'meta-llama/llama-3.3-70b-instruct',
-  'cohere/command-r',
-  'cohere/command-r-plus'
+  // Grok models
+  'x-ai/grok-3-latest',
+  'x-ai/grok-3-mini-latest',
+  'x-ai/grok-2-vision-latest',
+  // Google models - only include models available in your account
+  'google/gemini-1.5-pro'
 ];
 
 // Known capable models (highest quality, may be slower)
-const KNOWN_CAPABLE_MODELS = [
-  'anthropic/claude-3-opus',
-  'openai/gpt-4-turbo',
-  'openai/gpt-4',
-  'google/gemini-1.5-pro',
-  'google/gemini-1.5-ultra'
+const KNOWN_CAPABLE_MODELS: string[] = [
+  // Currently none - we're focusing on Grok and Gemini
 ];
 
 // Types for model filtering preferences
@@ -86,11 +62,8 @@ const filterAndSortModels = (
     }
   });
   
-  // Filter out deprecated models and those with insufficient context length
+  // Filter models based on minimum context length
   const filteredModels = allModels.filter(model => {
-    // Filter out deprecated models
-    if (DEPRECATED_MODELS.includes(model.id)) return false;
-    
     // Filter by minimum context length
     if (model.contextLength < MIN_CONTEXT_LENGTH) return false;
     
@@ -125,10 +98,15 @@ const filterAndSortModels = (
       return scoreB - scoreA; // Higher score first
     }
     
-    // Sort by provider priority (Groq first for speed)
+    // Sort by provider priority (XAI/Grok first, then Groq for speed)
     const providerA = a.id.split('/')[0];
     const providerB = b.id.split('/')[0];
     
+    // Prioritize XAI (Grok) models
+    if (providerA === 'x-ai' && providerB !== 'x-ai') return -1;
+    if (providerA !== 'x-ai' && providerB === 'x-ai') return 1;
+    
+    // Then prioritize Groq for speed
     if (providerA === 'groq' && providerB !== 'groq') return -1;
     if (providerA !== 'groq' && providerB === 'groq') return 1;
     

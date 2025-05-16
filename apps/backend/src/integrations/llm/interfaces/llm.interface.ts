@@ -4,6 +4,7 @@ export interface LlmAgentConfig {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  systemPrompt?: string;
 }
 
 export interface LlmResponse {
