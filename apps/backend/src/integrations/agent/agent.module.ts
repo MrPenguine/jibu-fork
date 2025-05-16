@@ -1,18 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AgentService } from './agent.service';
-import { AgentServiceFactory } from './agent.factory';
-import { LangflowAgentService } from './providers/langflow/langflow-agent.service';
 import { LangchainAgentService } from './providers/langchain/langchain-agent.service';
 import { IAgentService } from './interfaces/agent.interface';
 import { LangchainModule } from './providers/langchain/langchain.module';
+import { DatabaseModule } from '../../core/database/database.module';
 
 @Module({
-  imports: [ConfigModule, LangchainModule],
+  imports: [ConfigModule, LangchainModule, DatabaseModule],
   providers: [
-    AgentService,
-    AgentServiceFactory,
-    LangflowAgentService,
+    LangchainAgentService,
+    {
+      provide: AgentService,
+      useClass: LangchainAgentService
+    },
     {
       provide: IAgentService,
       useExisting: AgentService

@@ -1,8 +1,10 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IAgentService, AgentRequest, AgentResponse } from '../../interfaces/agent.interface';
 import { PrismaService } from '../../../../core/database/prisma.service';
-import { ILlmService } from '../../../llm/interfaces/llm.interface';
+import { XaiProvider } from './providers/xai-provider';
+import { GeminiProvider } from './providers/gemini-provider';
+import { MistralProvider } from './providers/mistral-provider';
 import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence, RunnablePassthrough } from '@langchain/core/runnables';
@@ -17,15 +19,21 @@ export class LangchainAgentService implements IAgentService {
   private readonly logger = new Logger(LangchainAgentService.name);
   private readonly googleApiKey: string;
   private readonly xaiApiKey: string;
+  private readonly mistralApiKey: string;
   private readonly openaiClient: OpenAI;
+  
+  // Provider instances
+  private readonly xaiProvider: XaiProvider;
+  private readonly geminiProvider: GeminiProvider;
+  private readonly mistralProvider: MistralProvider;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-    @Inject(ILlmService) private readonly llmService: ILlmService,
   ) {
     this.googleApiKey = this.configService.get<string>('GOOGLE_API_KEY');
     this.xaiApiKey = this.configService.get<string>('XAI_API_KEY');
+    this.mistralApiKey = this.configService.get<string>('MISTRAL_API_KEY');
     
     // Initialize OpenAI client for Grok
     this.openaiClient = new OpenAI({
@@ -33,15 +41,99 @@ export class LangchainAgentService implements IAgentService {
       baseURL: 'https://api.x.ai/v1',
     });
     
-    if (!this.googleApiKey && !this.xaiApiKey) {
-      this.logger.warn('Neither GOOGLE_API_KEY nor XAI_API_KEY is configured. Langchain agent service will not work properly.');
-    } else if (!this.googleApiKey) {
-      this.logger.log('GOOGLE_API_KEY is not configured. Using XAI (Grok) as the default provider.');
-    } else if (!this.xaiApiKey) {
-      this.logger.warn('XAI_API_KEY is not configured. Using Google (Gemini) as the default provider.');
+    // Initialize provider instances
+    this.xaiProvider = new XaiProvider(this.xaiApiKey);
+    this.geminiProvider = new GeminiProvider(this.googleApiKey);
+    this.mistralProvider = new MistralProvider(this.mistralApiKey);
+    
+    if (!this.googleApiKey && !this.xaiApiKey && !this.mistralApiKey) {
+      this.logger.warn('No API keys configured. Langchain agent service will not work properly.');
     } else {
-      this.logger.log('Both GOOGLE_API_KEY and XAI_API_KEY are configured. Prioritizing XAI (Grok) as the default provider.');
+      const providers = [];
+      if (this.xaiApiKey) providers.push('XAI (Grok)');
+      if (this.googleApiKey) providers.push('Google (Gemini)');
+      if (this.mistralApiKey) providers.push('Mistral AI');
+      this.logger.log(`Available providers: ${providers.join(', ')}`);
     }
+  }
+  
+  /**
+   * Determines the appropriate provider based on model configuration and available API keys
+   */
+  private determineProvider(modelConfig: any): { provider: string, modelName: string, modelUsed: string } {
+    const configProvider = (modelConfig?.provider || '').toLowerCase();
+    const configModel = (modelConfig?.model || '').toLowerCase();
+    
+    let provider = '';
+    let modelName = '';
+    
+    // Determine provider based on configuration
+    if (configProvider.includes('x-ai') || configProvider.includes('xai') || configProvider.includes('grok')) {
+      if (this.xaiApiKey) {
+        provider = 'xai';
+        // Extract model name, removing any provider prefix
+        modelName = configModel.replace(/^.*?\//, '');
+        // Ensure it's a valid Grok model
+        if (!modelName.includes('grok')) {
+          modelName = 'grok-3-latest';
+        }
+      }
+    } else if (configProvider.includes('google') || configProvider.includes('gemini')) {
+      if (this.googleApiKey) {
+        provider = 'google';
+        // Extract model name, removing any provider prefix
+        modelName = configModel.replace(/^.*?\//, '');
+        // Ensure it's a valid Gemini model
+        if (!modelName.includes('gemini')) {
+          modelName = 'gemini-1.5-pro';
+        }
+      }
+    } else if (configProvider.includes('mistral')) {
+      if (this.mistralApiKey) {
+        provider = 'mistral';
+        // Extract model name, removing any provider prefix
+        modelName = configModel.replace(/^.*?\//, '');
+        // Ensure it's a valid Mistral model
+        if (!modelName.includes('mistral')) {
+          modelName = 'mistral-large-latest';
+        }
+      }
+    } else if (configModel.includes('grok') && this.xaiApiKey) {
+      provider = 'xai';
+      modelName = configModel.replace(/^.*?\//, '');
+    } else if (configModel.includes('gemini') && this.googleApiKey) {
+      provider = 'google';
+      modelName = configModel.replace(/^.*?\//, '');
+    } else if (configModel.includes('mistral') && this.mistralApiKey) {
+      provider = 'mistral';
+      modelName = configModel.replace(/^.*?\//, '');
+    } else {
+      // Use first available provider
+      if (this.xaiApiKey) {
+        provider = 'xai';
+        modelName = 'grok-3-latest';
+      } else if (this.googleApiKey) {
+        provider = 'google';
+        modelName = 'gemini-1.5-pro';
+      } else if (this.mistralApiKey) {
+        provider = 'mistral';
+        modelName = 'mistral-large-latest';
+      }
+    }
+    
+    // Construct full model identifier for logging
+    let modelUsed = '';
+    if (provider === 'xai') {
+      modelUsed = `x-ai/${modelName}`;
+    } else if (provider === 'google') {
+      modelUsed = `google/${modelName}`;
+    } else if (provider === 'mistral') {
+      modelUsed = `mistral/${modelName}`;
+    }
+    
+    this.logger.log(`Using provider: ${provider}, model: ${modelName}, full identifier: ${modelUsed}`);
+    
+    return { provider, modelName, modelUsed };
   }
   
   async checkConnection(): Promise<boolean> {
@@ -98,11 +190,13 @@ export class LangchainAgentService implements IAgentService {
         throw new Error(`Assistant with ID ${assistantId} not found`);
       }
       
-      // Extract model configuration from assistant
+      // Extract model configuration from assistant and determine provider
       const modelConfig = assistant.model as any || {};
-      const provider = modelConfig.provider || (this.xaiApiKey ? 'xai' : 'google');
-      let modelName = '';
-      let modelUsed = '';
+      const { provider, modelName, modelUsed } = this.determineProvider(modelConfig);
+      
+      if (!provider) {
+        throw new Error('No valid API key configured for any provider');
+      }
       
       // Get chat history
       const rawMessages = await this.getChatHistory(sessionId);
@@ -117,14 +211,9 @@ export class LangchainAgentService implements IAgentService {
         }
       }
       
-      // Determine which provider to use based on available API keys
-      // Prioritize using Grok if XAI_API_KEY is available
-      if (this.xaiApiKey) {
+      // Process request based on provider
+      if (provider === 'xai') {
         // Use Grok
-        // Remove any provider prefix from the model name (e.g., 'x-ai/grok-2-1212' -> 'grok-2-1212')
-        modelName = (modelConfig.model || 'grok-3-latest').replace(/^.*?\//g, '');
-        modelUsed = modelName; // Don't prefix with provider for Grok API
-        
         // Prepare messages for Grok
         const messages = [];
         
@@ -196,18 +285,8 @@ export class LangchainAgentService implements IAgentService {
             modelUsed
           }
         };
-      } else if (this.googleApiKey) {
+      } else if (provider === 'google') {
         // Use Gemini
-        // Extract the model name from the model config, removing any provider prefix
-        const originalModelName = modelConfig.model || 'gemini-1.5-pro';
-        modelName = originalModelName.replace(/^.*?\//g, '');
-        modelUsed = `google/${modelName}`;
-        
-        // Add detailed logging to help debug model ID issues
-        this.logger.log(`Original model from config: ${originalModelName}`);
-        this.logger.log(`Using Gemini model ID: ${modelName}`);
-        this.logger.log(`Full model identifier: ${modelUsed}`);
-        
         // Create the model with the assistant's configuration
         const genAI = new GoogleGenerativeAI(this.googleApiKey);
         const model = genAI.getGenerativeModel({
@@ -241,19 +320,107 @@ export class LangchainAgentService implements IAgentService {
         
         // Add chat history
         for (const message of rawMessages) {
-          if (message.role === 'user') {
-            prompt += `User: ${message.content}\n`;
+          // Skip assistant messages that contain the standard greeting
+          const isGreetingMessage = message.role === 'assistant' && 
+            message.content.includes('Thank you for calling Wellness Partners') && 
+            message.content.includes('How may I help you today');
+            
+          if (!isGreetingMessage) {
+            prompt += `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content}\n\n`;
           } else {
-            prompt += `Assistant: ${message.content}\n`;
+            this.logger.log('Skipping greeting message in chat history');
           }
         }
         
         // Add current query
-        prompt += `User: ${input}\nAssistant:`;
+        prompt += `User: ${input}\n\nAssistant: `;
         
-        // Generate response using the direct API
+        // Generate response
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
+        
+        return {
+          output: responseText,
+          sessionId,
+          metadata: { 
+            assistantId,
+            knowledgeBaseId,
+            modelUsed
+          }
+        };
+      } else if (provider === 'mistral') {
+        // Use Mistral
+        // Prepare messages for Mistral
+        const messages = [];
+        
+        // Add system prompt
+        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        
+        // Remove any greeting text that might have been included in the system prompt
+        if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
+          this.logger.warn('Found greeting text in system prompt, removing it');
+          systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
+        }
+        
+        messages.push({
+          role: 'system',
+          content: systemPrompt
+        });
+        
+        // Add context if available
+        if (context) {
+          messages.push({
+            role: 'system',
+            content: `Context information:\n${context}`
+          });
+        }
+        
+        // Add chat history
+        for (const message of rawMessages) {
+          // Skip assistant messages that contain the standard greeting
+          const isGreetingMessage = message.role === 'assistant' && 
+            message.content.includes('Thank you for calling Wellness Partners') && 
+            message.content.includes('How may I help you today');
+            
+          if (!isGreetingMessage) {
+            messages.push({
+              role: message.role,
+              content: message.content
+            });
+          } else {
+            this.logger.log('Skipping greeting message in chat history');
+          }
+        }
+        
+        // Add current query
+        messages.push({
+          role: 'user',
+          content: input
+        });
+        
+        // Generate response using Mistral API
+        const apiUrl = 'https://api.mistral.ai/v1/chat/completions';
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.mistralApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages,
+            temperature: modelConfig.temperature || 0.7,
+            max_tokens: modelConfig.maxTokens || 2048
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Mistral API error: ${response.status} ${errorText}`);
+        }
+        
+        const responseData = await response.json();
+        const responseText = responseData.choices[0].message.content;
         
         return {
           output: responseText,
@@ -291,12 +458,13 @@ export class LangchainAgentService implements IAgentService {
         throw new Error(`Assistant with ID ${assistantId} not found`);
       }
       
-      // Extract model configuration from assistant
+      // Extract model configuration from assistant and determine provider
       const modelConfig = assistant.model as any || {};
-      // Prioritize using Grok if XAI_API_KEY is available, otherwise use the provider from the config
-      const provider = this.xaiApiKey ? 'xai' : (modelConfig.provider || 'google');
-      let modelName = '';
-      let modelUsed = '';
+      const { provider, modelName, modelUsed } = this.determineProvider(modelConfig);
+      
+      if (!provider) {
+        throw new Error('No valid API key configured for any provider');
+      }
       
       // Get chat history
       const rawMessages = await this.getChatHistory(sessionId);
@@ -311,24 +479,16 @@ export class LangchainAgentService implements IAgentService {
         }
       }
       
-      // Determine which provider to use based on available API keys
-      // Prioritize using Grok if XAI_API_KEY is available
-      if (this.xaiApiKey) {
+      // Process streaming request based on provider
+      if (provider === 'xai') {
         // Use Grok
-        // Remove any provider prefix from the model name (e.g., 'x-ai/grok-2-1212' -> 'grok-2-1212')
-        modelName = (modelConfig.model || 'grok-3-latest').replace(/^.*?\//g, '');
-        modelUsed = modelName; // Don't prefix with provider for Grok API
-        
         // Prepare messages for Grok
         const messages = [];
         
         // Add system prompt
-        // Make sure we're using the voicemailMessage which contains the actual system instructions
-        // NOT the firstMessage which contains the greeting
         let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
-        // This prevents the greeting from appearing in every response
         if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
           this.logger.warn('Found greeting text in system prompt, removing it');
           systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
@@ -346,11 +506,9 @@ export class LangchainAgentService implements IAgentService {
           });
         }
         
-        // Add chat history, but filter out any greeting messages that match the assistant's firstMessage
-        // This prevents the greeting from being passed to the LLM and causing repetition
+        // Add chat history, but filter out any greeting messages
         for (const message of rawMessages) {
           // Skip assistant messages that contain the standard greeting
-          // This prevents the greeting from being included in the conversation history
           const isGreetingMessage = message.role === 'assistant' && 
             message.content.includes('Thank you for calling Wellness Partners') && 
             message.content.includes('How may I help you today');
@@ -402,8 +560,6 @@ export class LangchainAgentService implements IAgentService {
         }
         
         // Send a final metadata marker to signal completion
-        // We send an empty string as output to avoid duplicating content
-        // The client will still have the complete response from previous chunks
         yield {
           output: '', // Empty string to avoid duplicating content
           sessionId,
@@ -414,26 +570,12 @@ export class LangchainAgentService implements IAgentService {
             modelUsed
           }
         };
-      } else if (this.googleApiKey) {
+      } else if (provider === 'google') {
         // Use Gemini
-        // Extract the model name from the model config, removing any provider prefix
-        const originalModelName = modelConfig.model || 'gemini-1.5-pro';
-        modelName = originalModelName.replace(/^.*?\//g, '');
-        modelUsed = `google/${modelName}`;
-        
-        // Add detailed logging to help debug model ID issues
-        this.logger.log(`Original model from config: ${originalModelName}`);
-        this.logger.log(`Using Gemini model ID: ${modelName}`);
-        this.logger.log(`Full model identifier: ${modelUsed}`);
-        
-        // Create the model with the assistant's configuration
-        const genAI = new GoogleGenerativeAI(this.googleApiKey);
-        
         // Prepare system instructions
         let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
-        // This prevents the greeting from appearing in every response
         if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
           this.logger.warn('Found greeting text in system prompt, removing it');
           systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
@@ -463,6 +605,7 @@ export class LangchainAgentService implements IAgentService {
         }
         
         // Create the model with the assistant's configuration
+        const genAI = new GoogleGenerativeAI(this.googleApiKey);
         const model = genAI.getGenerativeModel({
           model: modelName,
           generationConfig: {
@@ -510,7 +653,130 @@ export class LangchainAgentService implements IAgentService {
         
         // Final chunk with complete response
         yield {
-          output: buffer,
+          output: '',
+          sessionId,
+          metadata: { 
+            type: 'final',
+            assistantId,
+            knowledgeBaseId,
+            modelUsed
+          }
+        };
+      } else if (provider === 'mistral') {
+        // Use Mistral
+        // Prepare messages for Mistral
+        const messages = [];
+        
+        // Add system prompt
+        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        
+        // Remove any greeting text that might have been included in the system prompt
+        if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
+          this.logger.warn('Found greeting text in system prompt, removing it');
+          systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
+        }
+        
+        messages.push({
+          role: 'system',
+          content: systemPrompt
+        });
+        
+        // Add context if available
+        if (context) {
+          messages.push({
+            role: 'system',
+            content: `Context information:\n${context}`
+          });
+        }
+        
+        // Add chat history
+        for (const message of rawMessages) {
+          // Skip assistant messages that contain the standard greeting
+          const isGreetingMessage = message.role === 'assistant' && 
+            message.content.includes('Thank you for calling Wellness Partners') && 
+            message.content.includes('How may I help you today');
+            
+          if (!isGreetingMessage) {
+            messages.push({
+              role: message.role,
+              content: message.content
+            });
+          } else {
+            this.logger.log('Skipping greeting message in chat history');
+          }
+        }
+        
+        // Add current query
+        messages.push({
+          role: 'user',
+          content: input
+        });
+        
+        // Generate streaming response using Mistral API
+        const apiUrl = 'https://api.mistral.ai/v1/chat/completions';
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.mistralApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages,
+            stream: true,
+            temperature: modelConfig.temperature || 0.7,
+            max_tokens: modelConfig.maxTokens || 2048
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Mistral API error: ${response.status} ${errorText}`);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n').filter(line => line.trim() !== '');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              
+              try {
+                const parsed = JSON.parse(data);
+                const content = parsed.choices[0]?.delta?.content || '';
+                
+                if (content) {
+                  buffer += content;
+                  yield {
+                    output: content,
+                    sessionId,
+                    metadata: { 
+                      type: 'chunk',
+                      assistantId,
+                      knowledgeBaseId,
+                      modelUsed
+                    }
+                  };
+                }
+              } catch (e) {
+                this.logger.error(`Error parsing Mistral stream chunk: ${e.message}`);
+              }
+            }
+          }
+        }
+        
+        // Send a final metadata marker to signal completion
+        yield {
+          output: '',
           sessionId,
           metadata: { 
             type: 'final',
@@ -539,9 +805,9 @@ export class LangchainAgentService implements IAgentService {
         orderBy: { sequenceId: 'asc' }
       });
       
-      return messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
+      return messages.map(message => ({
+        role: message.role,
+        content: message.content
       }));
     } catch (error) {
       this.logger.error(`Error getting chat history: ${error.message}`);
@@ -555,75 +821,20 @@ export class LangchainAgentService implements IAgentService {
     }
     
     try {
-      // Format the collection name according to the convention: kb_{knowledgeBaseId}
-      const collectionName = `kb_${knowledgeBaseId}`;
-      this.logger.log(`Searching knowledge base ${knowledgeBaseId} for: ${query}`);
-      
-      // First, get the knowledge base to check if it exists
-      const knowledgeBase = await this.prisma.knowledgeBase.findUnique({
+      // Use the knowledgeBase model to search
+      const kb = await this.prisma.knowledgeBase.findUnique({
         where: { id: knowledgeBaseId }
       });
       
-      if (!knowledgeBase) {
-        this.logger.warn(`Knowledge base ${knowledgeBaseId} not found`);
+      if (!kb) {
+        this.logger.warn(`Knowledge base with ID ${knowledgeBaseId} not found`);
         return [];
       }
       
-      // For now, we'll retrieve the chunks directly from the database
-      // In a production implementation, you would:
-      // 1. Generate embeddings for the query using the same model as the knowledge base
-      // 2. Perform a vector search in the vector database (e.g., Qdrant)
-      // 3. Return the most semantically similar chunks
-      
-      // Get the most recent chunks for this knowledge base
-      const chunks = await this.prisma.chunkMetadata.findMany({
-        where: {
-          knowledgeBaseId: knowledgeBaseId
-        },
-        take: 5,
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-      
-      // Get the source information for these chunks
-      const sourceIds = [...new Set(chunks.map(chunk => chunk.sourceId))];
-      const sources = await this.prisma.knowledgeBaseSource.findMany({
-        where: {
-          id: { in: sourceIds }
-        }
-      });
-      
-      // Create a map of source information for quick lookup
-      const sourceMap = sources.reduce((map, source) => {
-        map[source.id] = {
-          id: source.id,
-          name: source.sourcePointer || 'Unknown', // Use sourcePointer as name
-          type: source.sourceType || 'Unknown'
-        };
-        return map;
-      }, {} as Record<string, { id: string; name: string; type: string }>);
-      
-      // Transform chunks to search results format
-      const searchResults = chunks.map(chunk => {
-        const source = sourceMap[chunk.sourceId];
-        return {
-          id: chunk.id,
-          score: 0.9, // Placeholder score - in a real implementation, this would be the cosine similarity
-          payload: {
-            text: chunk.textPreview,
-            metadata: {
-              sourceId: chunk.sourceId,
-              sourceName: source?.name || 'Unknown',
-              sourceType: source?.type || 'Unknown',
-              chunkIndex: chunk.chunkIndex
-            }
-          }
-        };
-      });
-      
-      this.logger.log(`Found ${searchResults.length} results from knowledge base`);
-      return searchResults;
+      // In a real implementation, this would perform a vector search
+      // For now, just return an empty array as a placeholder
+      this.logger.log(`Searching knowledge base ${knowledgeBaseId} for query: ${query}`);
+      return [];
     } catch (error) {
       this.logger.error(`Error searching knowledge base: ${error.message}`);
       return [];

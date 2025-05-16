@@ -589,6 +589,45 @@ export const getAvailableModels = async (): Promise<CategorizedModels> => {
         description: 'Cost efficiency and low latency. Input: 1M tokens, Output: 8K tokens', 
         speedTier: 'fastest'
       }
+    ],
+    
+    // Mistral models
+    mistralai: [
+      { 
+        id: 'mistral-large-latest', 
+        name: 'Mistral Large', 
+        contextLength: 131072, 
+        description: 'Top-tier reasoning model for high-complexity tasks. Input: 128K tokens, Output: 8K tokens', 
+        speedTier: 'capable'
+      },
+      { 
+        id: 'mistral-medium-latest', 
+        name: 'Mistral Medium 3', 
+        contextLength: 131072, 
+        description: 'Frontier-class multimodal model. Input: 128K tokens, Output: 8K tokens', 
+        speedTier: 'capable'
+      },
+      { 
+        id: 'mistral-small-latest', 
+        name: 'Mistral Small', 
+        contextLength: 131072, 
+        description: 'Leader in small models with image understanding capabilities. Input: 128K tokens, Output: 8K tokens', 
+        speedTier: 'fastest'
+      },
+      { 
+        id: 'codestral-latest', 
+        name: 'Codestral', 
+        contextLength: 262144, 
+        description: 'Cutting-edge language model for coding. Input: 256K tokens, Output: 8K tokens', 
+        speedTier: 'fastest'
+      },
+      { 
+        id: 'ministral-3b-latest', 
+        name: 'Ministral 3B', 
+        contextLength: 131072, 
+        description: 'World\'s best edge model. Input: 128K tokens, Output: 8K tokens', 
+        speedTier: 'fastest'
+      }
     ]
   };
   

@@ -1,23 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IAgentService, AgentRequest, AgentResponse } from './interfaces/agent.interface';
-import { AgentServiceFactory } from './agent.factory';
+import { LangchainAgentService } from './providers/langchain/langchain-agent.service';
 
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  private agentService: IAgentService;
 
-  constructor(private agentServiceFactory: AgentServiceFactory) {
-    this.agentService = this.agentServiceFactory.getAgentService();
-  }
+  constructor(private langchainAgentService: LangchainAgentService) {}
 
   async checkConnection(): Promise<boolean> {
-    return this.agentService.checkConnection();
+    return this.langchainAgentService.checkConnection();
   }
 
   async processRequest(request: AgentRequest): Promise<AgentResponse> {
     try {
-      return await this.agentService.processRequest(request);
+      return await this.langchainAgentService.processRequest(request);
     } catch (error) {
       this.logger.error(`Error processing agent request: ${error.message}`);
       throw error;
@@ -26,7 +23,7 @@ export class AgentService {
 
   async *processStreamingRequest(request: AgentRequest): AsyncIterable<AgentResponse> {
     try {
-      for await (const chunk of this.agentService.processStreamingRequest(request)) {
+      for await (const chunk of this.langchainAgentService.processStreamingRequest(request)) {
         yield chunk;
       }
     } catch (error) {

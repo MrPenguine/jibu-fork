@@ -28,7 +28,11 @@ const KNOWN_FAST_MODELS = [
   'x-ai/grok-3-mini-fast-latest',
   // Google models - only include models available in your account
   'google/gemini-2.0-flash',
-  'google/gemini-2.0-flash-lite'
+  'google/gemini-2.0-flash-lite',
+  // Mistral models
+  'mistralai/mistral-small-latest',
+  'mistralai/codestral-latest',
+  'mistralai/ministral-3b-latest'
 ];
 
 // Known balanced models (good performance/speed trade-off)
@@ -38,7 +42,10 @@ const KNOWN_BALANCED_MODELS = [
   'x-ai/grok-3-mini-latest',
   'x-ai/grok-2-vision-latest',
   // Google models - only include models available in your account
-  'google/gemini-1.5-pro'
+  'google/gemini-1.5-pro',
+  // Mistral models
+  'mistralai/mistral-large-latest',
+  'mistralai/mistral-medium-latest'
 ];
 
 // Known capable models (highest quality, may be slower)
@@ -46,13 +53,13 @@ const KNOWN_CAPABLE_MODELS: string[] = [
   // Currently none - we're focusing on Grok and Gemini
 ];
 
-// Types for model filtering preferences
-type ModelPreference = 'latency' | 'balance' | 'capability';
+// List of supported providers - only include the main ones we want to show
+const SUPPORTED_PROVIDERS = ['google', 'x-ai', 'mistralai'];
 
 // Function to filter and sort models
 const filterAndSortModels = (
-  models: CategorizedModels, 
-  preference: ModelPreference = 'latency'
+  models: CategorizedModels,
+  selectedProvider?: string
 ): ModelInfo[] => {
   // Collect all models into a single array
   const allModels: ModelInfo[] = [];
@@ -62,42 +69,38 @@ const filterAndSortModels = (
     }
   });
   
-  // Filter models based on minimum context length
+  // Filter models based on provider
   const filteredModels = allModels.filter(model => {
-    // Filter by minimum context length
-    if (model.contextLength < MIN_CONTEXT_LENGTH) return false;
+    // Filter by provider if specified
+    if (selectedProvider) {
+      // Handle Google models (gemini-*)
+      if (selectedProvider === 'google' && model.id.startsWith('gemini-')) {
+        return true;
+      }
+      
+      // Handle X AI models (x-ai/*)
+      if (selectedProvider === 'x-ai' && model.id.startsWith('x-ai/')) {
+        return true;
+      }
+      
+      // Handle Mistral models (mistral-*) - without provider prefix
+      if (selectedProvider === 'mistralai' && (
+        model.id.startsWith('mistral-') || 
+        model.id === 'codestral-latest' || 
+        model.id === 'ministral-3b-latest'
+      )) {
+        return true;
+      }
+      
+      // No match for this provider
+      return false;
+    }
     
     return true;
   });
   
-  // Sort models based on preference and other factors
+  // Sort models by name and capability
   filteredModels.sort((a, b) => {
-    let scoreA = 0;
-    let scoreB = 0;
-    
-    // Prioritize based on preference
-    if (preference === 'latency') {
-      if (KNOWN_FAST_MODELS.includes(a.id)) scoreA += 100;
-      if (KNOWN_FAST_MODELS.includes(b.id)) scoreB += 100;
-      if (KNOWN_BALANCED_MODELS.includes(a.id)) scoreA += 50;
-      if (KNOWN_BALANCED_MODELS.includes(b.id)) scoreB += 50;
-    } else if (preference === 'balance') {
-      if (KNOWN_BALANCED_MODELS.includes(a.id)) scoreA += 100;
-      if (KNOWN_BALANCED_MODELS.includes(b.id)) scoreB += 100;
-      if (KNOWN_FAST_MODELS.includes(a.id)) scoreA += 50;
-      if (KNOWN_FAST_MODELS.includes(b.id)) scoreB += 50;
-    } else { // 'capability' preference
-      if (KNOWN_CAPABLE_MODELS.includes(a.id)) scoreA += 100;
-      if (KNOWN_CAPABLE_MODELS.includes(b.id)) scoreB += 100;
-      if (KNOWN_BALANCED_MODELS.includes(a.id)) scoreA += 80;
-      if (KNOWN_BALANCED_MODELS.includes(b.id)) scoreB += 80;
-    }
-    
-    // If scores differ, use them for sorting
-    if (scoreA !== scoreB) {
-      return scoreB - scoreA; // Higher score first
-    }
-    
     // Sort by provider priority (XAI/Grok first, then Groq for speed)
     const providerA = a.id.split('/')[0];
     const providerB = b.id.split('/')[0];
@@ -132,7 +135,6 @@ interface ModelConfigProps {
   model: string
   temperature: number
   maxTokens: number
-  modelPreference?: 'latency' | 'balance' | 'capability'
   assistantId?: string
   knowledgeBaseId?: string
   organizationId?: string
@@ -142,7 +144,6 @@ interface ModelConfigProps {
   onModelChange: (value: string) => void
   onTemperatureChange: (value: number) => void
   onMaxTokensChange: (value: number) => void
-  onModelPreferenceChange?: (value: 'latency' | 'balance' | 'capability') => void
   onKnowledgeBaseChange?: (knowledgeBaseId: string | null) => void
 }
 
@@ -153,7 +154,6 @@ export function ModelConfig({
   model,
   temperature,
   maxTokens,
-  modelPreference: initialModelPreference,
   assistantId,
   knowledgeBaseId,
   organizationId,
@@ -163,7 +163,6 @@ export function ModelConfig({
   onModelChange,
   onTemperatureChange,
   onMaxTokensChange,
-  onModelPreferenceChange,
   onKnowledgeBaseChange
 }: ModelConfigProps) {
   // State for models
@@ -171,7 +170,6 @@ export function ModelConfig({
   const [filteredModels, setFilteredModels] = useState<ModelInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [modelPreference, setModelPreference] = useState<ModelPreference>(initialModelPreference || 'latency')
   
   // Add information about the current connection
   const connectedKbInfo = knowledgeBaseId ? 
@@ -223,7 +221,7 @@ export function ModelConfig({
           setModels(data)
           
           // Apply filtering and sorting
-          const processed = filterAndSortModels(data, modelPreference)
+          const processed = filterAndSortModels(data, provider)
           console.log('[ModelConfig] Processed models count:', processed.length)
           setFilteredModels(processed)
           
@@ -258,7 +256,7 @@ export function ModelConfig({
           }]
         }
         setModels(fallbackData)
-        const processed = filterAndSortModels(fallbackData, modelPreference)
+        const processed = filterAndSortModels(fallbackData, provider)
         setFilteredModels(processed)
         
         // Auto-select the fallback model if needed
@@ -289,31 +287,17 @@ export function ModelConfig({
     
     fetchModels()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelPreference, onModelChange, onProviderChange])
+  }, [onModelChange, onProviderChange])
   
-  // Update filtered models when preference changes
+  // Update filtered models when provider changes
   useEffect(() => {
     if (models) {
-      const processed = filterAndSortModels(models, modelPreference)
+      const processed = filterAndSortModels(models, provider)
       setFilteredModels(processed)
     }
-  }, [modelPreference, models])
+  }, [models, provider])
 
-  // Use effect to notify parent when model preference changes
-  useEffect(() => {
-    if (initialModelPreference !== modelPreference && onModelPreferenceChange) {
-      onModelPreferenceChange(modelPreference);
-    }
-  }, [modelPreference, initialModelPreference, onModelPreferenceChange]);
-
-  // Update preference handler
-  const handlePreferenceChange = (value: ModelPreference) => {
-    setModelPreference(value);
-    // Notify parent of the change - this triggers the save operation
-    if (onModelPreferenceChange) {
-      onModelPreferenceChange(value);
-    }
-  };
+  // No longer using model preference handlers
   
   // Format provider name for display
   const formatProviderName = (providerKey: string) => {
@@ -325,6 +309,7 @@ export function ModelConfig({
       case 'groq': return 'Groq'
       case 'meta': return 'Meta AI'
       case 'cohere': return 'Cohere'
+      case 'x-ai': return 'X AI' // Added X AI (Grok)
       case 'other': return 'Other Providers'
       default: return providerKey.charAt(0).toUpperCase() + providerKey.slice(1)
     }
@@ -337,28 +322,26 @@ export function ModelConfig({
   // Get current provider name for display
   const currentProviderName = provider ? formatProviderName(provider) : "Select provider"
   
-  // Format model preference for display
-  const getPreferenceLabel = (pref: ModelPreference): string => {
-    switch(pref) {
-      case 'latency': return 'Fastest Available'
-      case 'balance': return 'Good Balance'
-      case 'capability': return 'Most Capable'
-      default: return 'Fastest Available'
-    }
-  }
+  // No longer using preference label function
   
   // Handler for model selection to ensure proper state updates
   const handleModelSelection = (modelInfo: ModelInfo) => {
-    const modelProvider = modelInfo.id.split('/')[0];
+    // Determine the provider based on the model ID
+    let modelProvider = '';
+    
+    if (modelInfo.id.startsWith('gemini-')) {
+      modelProvider = 'google';
+    } else if (modelInfo.id.startsWith('x-ai/')) {
+      modelProvider = 'x-ai';
+    } else if (modelInfo.id.startsWith('mistral-') || 
+               modelInfo.id === 'codestral-latest' || 
+               modelInfo.id === 'ministral-3b-latest') {
+      modelProvider = 'mistralai';
+    }
     
     console.log(`[ModelConfig] User selected model: ${modelInfo.id}, provider: ${modelProvider}`);
     
-    // For better user experience, immediately update what the user sees
-    // These state changes will apply on next render
-    // This helps give immediate visual feedback
-    
     // Update provider first, then model
-    // We need to keep this order consistent to avoid state synchronization issues
     onProviderChange(modelProvider);
     onModelChange(modelInfo.id);
   };
@@ -454,10 +437,10 @@ export function ModelConfig({
         
         {/* Right Settings Panel */}
         <div className="w-1/3 pl-6 space-y-6">
-          {/* Model Preference */}
+          {/* Provider Selection */}
           <div>
             <div className="flex items-center mb-2">
-              <label className="block text-xs font-bold uppercase">Model Preference</label>
+              <label className="block text-xs font-bold uppercase">Provider</label>
               <div className="ml-2 text-muted-foreground">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 15V17M12 7V13M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -467,33 +450,55 @@ export function ModelConfig({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="w-full bg-white rounded-full border justify-between">
-                  {getPreferenceLabel(modelPreference)}
+                  {currentProviderName}
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
                     <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
                   </svg>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" sideOffset={4} className="w-full border-0">
-                <DropdownMenuRadioGroup value={modelPreference} onValueChange={(value) => handlePreferenceChange(value as ModelPreference)}>
-                  <DropdownMenuRadioItem value="latency" className="py-2">
-                    <div className="flex flex-col">
-                      <span className="font-medium">Fastest Available</span>
-                      <span className="text-xs text-muted-foreground">Optimized for low latency and real-time interactions</span>
-                    </div>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="balance" className="py-2">
-                    <div className="flex flex-col">
-                      <span className="font-medium">Good Balance</span>
-                      <span className="text-xs text-muted-foreground">Balance between speed and capabilities</span>
-                    </div>
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="capability" className="py-2">
-                    <div className="flex flex-col">
-                      <span className="font-medium">Most Capable</span>
-                      <span className="text-xs text-muted-foreground">Highest quality outputs, may be slower</span>
-                    </div>
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
+                {loading ? (
+                  <DropdownMenuItem disabled>Loading providers...</DropdownMenuItem>
+                ) : error ? (
+                  <DropdownMenuItem disabled>Error loading providers</DropdownMenuItem>
+                ) : (
+                  SUPPORTED_PROVIDERS.map(providerKey => {
+                    let modelCount = 0;
+                    
+                    // Count models for this provider
+                    if (models) {
+                      if (providerKey === 'google') {
+                        // Count Google/Gemini models
+                        modelCount = Object.values(models).flat().filter(model => 
+                          model.id.startsWith('gemini-')
+                        ).length;
+                      } else if (providerKey === 'x-ai' && models['xai']) {
+                        // Count X AI models
+                        modelCount = models['xai'].length;
+                      } else if (providerKey === 'mistralai' && models['mistralai']) {
+                        // Count Mistral models
+                        modelCount = models['mistralai'].length;
+                      }
+                    }
+                    
+                    // Only show providers with available models
+                    if (modelCount > 0) {
+                      return (
+                        <DropdownMenuItem 
+                          key={providerKey} 
+                          onClick={() => onProviderChange(providerKey)}
+                          className="py-2"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">{formatProviderName(providerKey)}</span>
+                            <span className="text-xs text-muted-foreground">{modelCount} models available</span>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    }
+                    return null;
+                  })
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -526,7 +531,21 @@ export function ModelConfig({
                   <DropdownMenuItem disabled>No models available</DropdownMenuItem>
                 ) : (
                   filteredModels.map((modelInfo: ModelInfo) => {
-                    const provider = modelInfo.id.split('/')[0];
+                    // Get provider name for display
+                    let displayProvider = '';
+                    if (modelInfo.id.startsWith('gemini-')) {
+                      displayProvider = 'Google';
+                    } else if (modelInfo.id.startsWith('x-ai/')) {
+                      displayProvider = 'X AI';
+                    } else if (modelInfo.id.startsWith('mistral-') || 
+                               modelInfo.id === 'codestral-latest' || 
+                               modelInfo.id === 'ministral-3b-latest') {
+                      displayProvider = 'Mistral AI';
+                    } else {
+                      const provider = modelInfo.id.split('/')[0];
+                      displayProvider = formatProviderName(provider);
+                    }
+                    
                     const speedTier = getModelSpeedTier(modelInfo.id);
                     
                     return (
@@ -537,7 +556,7 @@ export function ModelConfig({
                       >
                         <div className="font-medium">{modelInfo.name}</div>
                         <div className="text-xs text-muted-foreground mt-1 w-full flex justify-between">
-                          <span>{formatProviderName(provider)}</span>
+                          <span>{displayProvider}</span>
                           <span>{speedTier}</span>
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 w-full">
