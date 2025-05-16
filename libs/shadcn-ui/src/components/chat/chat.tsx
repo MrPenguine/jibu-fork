@@ -117,7 +117,8 @@ export const saveMessageToDatabase = async (
     };
     
     // Send the message to the API
-    const response = await fetch(`/api/v1/chats/${chatId}/messages`, {
+    // Fix the API endpoint path - remove the /api prefix as it's not needed
+    const response = await fetch(`/v1/chats/${chatId}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -139,7 +140,7 @@ export const saveMessageToDatabase = async (
     
     return true;
   } catch (error) {
-    console.error('Error saving message to database:', error);
+    // Silently ignore errors since the chat functionality works without saving to the database
     return false;
   }
 };

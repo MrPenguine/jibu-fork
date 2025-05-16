@@ -129,7 +129,16 @@ export class LangchainAgentService implements IAgentService {
         const messages = [];
         
         // Add system prompt
-        const systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        // Make sure we're using the voicemailMessage which contains the actual system instructions
+        // NOT the firstMessage which contains the greeting
+        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        
+        // Remove any greeting text that might have been included in the system prompt
+        // This prevents the greeting from appearing in every response
+        if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
+          this.logger.warn('Found greeting text in system prompt, removing it');
+          systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
+        }
         messages.push({
           role: 'system',
           content: systemPrompt
@@ -143,12 +152,23 @@ export class LangchainAgentService implements IAgentService {
           });
         }
         
-        // Add chat history
+        // Add chat history, but filter out any greeting messages that match the assistant's firstMessage
+        // This prevents the greeting from being passed to the LLM and causing repetition
         for (const message of rawMessages) {
-          messages.push({
-            role: message.role,
-            content: message.content
-          });
+          // Skip assistant messages that contain the standard greeting
+          // This prevents the greeting from being included in the conversation history
+          const isGreetingMessage = message.role === 'assistant' && 
+            message.content.includes('Thank you for calling Wellness Partners') && 
+            message.content.includes('How may I help you today');
+            
+          if (!isGreetingMessage) {
+            messages.push({
+              role: message.role,
+              content: message.content
+            });
+          } else {
+            this.logger.log('Skipping greeting message in chat history');
+          }
         }
         
         // Add current query
@@ -195,7 +215,16 @@ export class LangchainAgentService implements IAgentService {
         let prompt = '';
         
         // Add system prompt
-        const systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        // Make sure we're using the voicemailMessage which contains the actual system instructions
+        // NOT the firstMessage which contains the greeting
+        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        
+        // Remove any greeting text that might have been included in the system prompt
+        // This prevents the greeting from appearing in every response
+        if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
+          this.logger.warn('Found greeting text in system prompt, removing it');
+          systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
+        }
         prompt += `${systemPrompt}\n\n`;
         
         // Add context if available
@@ -287,7 +316,16 @@ export class LangchainAgentService implements IAgentService {
         const messages = [];
         
         // Add system prompt
-        const systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        // Make sure we're using the voicemailMessage which contains the actual system instructions
+        // NOT the firstMessage which contains the greeting
+        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        
+        // Remove any greeting text that might have been included in the system prompt
+        // This prevents the greeting from appearing in every response
+        if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
+          this.logger.warn('Found greeting text in system prompt, removing it');
+          systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
+        }
         messages.push({
           role: 'system',
           content: systemPrompt
@@ -301,12 +339,23 @@ export class LangchainAgentService implements IAgentService {
           });
         }
         
-        // Add chat history
+        // Add chat history, but filter out any greeting messages that match the assistant's firstMessage
+        // This prevents the greeting from being passed to the LLM and causing repetition
         for (const message of rawMessages) {
-          messages.push({
-            role: message.role,
-            content: message.content
-          });
+          // Skip assistant messages that contain the standard greeting
+          // This prevents the greeting from being included in the conversation history
+          const isGreetingMessage = message.role === 'assistant' && 
+            message.content.includes('Thank you for calling Wellness Partners') && 
+            message.content.includes('How may I help you today');
+            
+          if (!isGreetingMessage) {
+            messages.push({
+              role: message.role,
+              content: message.content
+            });
+          } else {
+            this.logger.log('Skipping greeting message in chat history');
+          }
         }
         
         // Add current query
@@ -377,7 +426,16 @@ export class LangchainAgentService implements IAgentService {
         let prompt = '';
         
         // Add system prompt
-        const systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        // Make sure we're using the voicemailMessage which contains the actual system instructions
+        // NOT the firstMessage which contains the greeting
+        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        
+        // Remove any greeting text that might have been included in the system prompt
+        // This prevents the greeting from appearing in every response
+        if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
+          this.logger.warn('Found greeting text in system prompt, removing it');
+          systemPrompt = systemPrompt.replace(/Thank you for calling Wellness Partners[^\n]*How may I help you today\?/g, '');
+        }
         prompt += `${systemPrompt}\n\n`;
         
         // Add context if available

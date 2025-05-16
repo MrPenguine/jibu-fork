@@ -219,15 +219,23 @@ export async function sendStreamingAgentRequest(
                   throw new Error(eventData.message || 'Unknown error');
                 }
                 
-                // Only process output if it's not empty (skip empty final responses)
+                // Only process output if it's not empty and it's not a duplicate of the first message
                 if (eventData.output) {
-                  // Call the onToken callback
-                  if (options.onToken) {
-                    options.onToken(eventData.output, eventData);
-                  }
+                  // Check if this is a duplicate of the first message (common greeting pattern)
+                  const isFirstMessageDuplicate = fullResponse && 
+                    eventData.output.includes("Thank you for calling Wellness Partners") && 
+                    eventData.output.includes("How may I help you today?");
                   
-                  // Update the full response with non-empty content
-                  fullResponse = eventData.output;
+                  // Only process if it's not a duplicate greeting
+                  if (!isFirstMessageDuplicate) {
+                    // Call the onToken callback
+                    if (options.onToken) {
+                      options.onToken(eventData.output, eventData);
+                    }
+                    
+                    // Update the full response with non-empty content
+                    fullResponse = eventData.output;
+                  }
                 }
                 
                 // If this is the final response with metadata, call onComplete

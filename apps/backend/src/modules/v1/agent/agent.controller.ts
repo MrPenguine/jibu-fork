@@ -96,7 +96,13 @@ export class AgentController {
           
           // Extract the assistant's response from the chunk
           if (chunk.output && typeof chunk.output === 'string') {
-            completeAssistantResponse = chunk.output;
+            // For content chunks, accumulate the content
+            if (chunk.metadata?.type === 'chunk') {
+              completeAssistantResponse += chunk.output;
+            } else if (chunk.metadata?.type === 'final' && chunk.output) {
+              // For final chunks with content, use that as the complete response
+              completeAssistantResponse = chunk.output;
+            }
           }
           
           // Format the chunk as SSE
