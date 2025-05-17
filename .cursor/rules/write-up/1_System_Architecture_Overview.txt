@@ -1,9 +1,6 @@
-==============================================================
-JIBU CONSOLE - SYSTEM ARCHITECTURE OVERVIEW
-==============================================================
+# JIBU CONSOLE - SYSTEM ARCHITECTURE OVERVIEW
 
-TABLE OF CONTENTS
-------------------
+## TABLE OF CONTENTS
 1. Introduction
 2. System Architecture
    2.1. Backend Architecture
@@ -15,27 +12,35 @@ TABLE OF CONTENTS
 6. Integration Points
 7. Security Architecture
 
-==============================================================
-1. INTRODUCTION
-==============================================================
+## 1. INTRODUCTION
 
 The Jibu Console is a comprehensive platform designed to facilitate the creation, management, and deployment of AI assistants. It provides a robust ecosystem for building conversational agents with natural language processing capabilities, knowledge base integration, and multi-modal interactions.
 
 The system is architected as a modern web application with a clear separation between the backend services and the frontend user interface. It follows a microservices-inspired architecture where different functional components are organized into modules with clear boundaries and interfaces.
 
-==============================================================
-2. SYSTEM ARCHITECTURE
-==============================================================
+## 2. SYSTEM ARCHITECTURE
 
-2.1. Backend Architecture
--------------------------
+### 2.1. Backend Architecture
 
 The backend of Jibu Console is built using NestJS, a progressive Node.js framework for building efficient and scalable server-side applications. The architecture follows a modular approach with clear separation of concerns:
 
 - Core Layer: Contains fundamental services, configurations, and utilities used throughout the application.
+  - Redis Service: Manages chat history and caching
+  - Database Service: Handles database connections using Prisma ORM
+  - Queue Service: Manages background jobs and task processing
+  - Authentication Service: Handles user authentication and authorization
+  - Config Service: Manages application configuration
+
 - Modules Layer: Implements the business logic organized by domain.
+  - Each module follows a consistent structure with controllers, services, and DTOs
+  - Modules are designed to be independent and reusable
+
 - Integration Layer: Manages connections with external services and APIs.
+  - Agent Providers: Integrates with various LLM providers
+  - Storage Providers: Manages file storage and retrieval
+
 - Webhook Layer: Handles incoming webhook events from integrated services.
+  - Provides endpoints for external systems to communicate with Jibu Console
 
 The backend follows the Controller-Service-Repository pattern:
 - Controllers: Handle HTTP requests and define API endpoints
@@ -45,38 +50,65 @@ The backend follows the Controller-Service-Repository pattern:
 Key modules in the backend include:
 - Agent Module: Manages AI agent configurations and executions
 - Assistant Module: Handles assistant creation, configuration, and deployment
-- Chat Module: Manages chat sessions and message history
+- Chat Module: Manages chat sessions and message history with Redis-based caching
 - Knowledge Base Module: Handles document storage, indexing, and retrieval
 - Organization Module: Manages multi-tenancy and organization settings
 - User Module: Handles user authentication, authorization, and profile management
 
-2.2. Frontend Architecture
--------------------------
+### 2.2. Frontend Architecture
 
 The frontend is built using Next.js, a React framework that enables server-side rendering and static site generation. The architecture follows a component-based approach with:
 
 - Pages: Define the routes and layout of the application
+  - Dashboard pages for managing assistants, knowledge bases, and settings
+  - Chat interfaces for interacting with assistants
+  - Admin interfaces for system configuration
+
 - Components: Reusable UI elements organized by domain and functionality
+  - Atomic design pattern with atoms, molecules, organisms, and templates
+  - Domain-specific components for assistants, chats, and knowledge bases
+
 - Hooks: Custom React hooks for state management and business logic
+  - API hooks for data fetching and mutations
+  - Authentication hooks for user session management
+  - Form hooks for handling form state and validation
+
 - Utils: Utility functions and API clients
+  - Type-safe API clients for backend communication
+  - Helper functions for common operations
+
 - Contexts: React contexts for global state management
+  - Authentication context for user session
+  - Theme context for UI customization
+  - Organization context for multi-tenancy
 
 The frontend implements a modern UI/UX design with responsive layouts and accessibility features. It uses the ShadCN UI component library for consistent styling and interaction patterns.
 
-2.3. Libraries and Components
-----------------------------
+### 2.3. Libraries and Components
 
 The system makes extensive use of shared libraries to promote code reuse and maintainability:
 
 - ShadCN UI: A comprehensive UI component library built on top of Radix UI
-- API Clients: Type-safe clients for interacting with the backend APIs
-- Authentication: Shared authentication and authorization utilities
-- Form Handling: Form validation and submission utilities
-- State Management: Global and local state management solutions
+  - Consistent design language across the application
+  - Accessible components following WAI-ARIA standards
 
-==============================================================
-3. TECHNOLOGY STACK
-==============================================================
+- API Clients: Type-safe clients for interacting with the backend APIs
+  - Generated from OpenAPI specifications
+  - Includes request and response validation
+
+- Authentication: Shared authentication and authorization utilities
+  - JWT token management
+  - Role-based access control
+
+- Form Handling: Form validation and submission utilities
+  - Zod schema validation
+  - React Hook Form integration
+
+- State Management: Global and local state management solutions
+  - React Query for server state
+  - Context API for application state
+
+## 3. TECHNOLOGY STACK
 
 The Jibu Console leverages a modern technology stack:
 
@@ -84,10 +116,11 @@ Backend:
 - Node.js and NestJS for the application framework
 - TypeScript for type-safe development
 - PostgreSQL for relational data storage
-- Redis for caching and pub/sub messaging
-- Langflow for workflow orchestration
+- Prisma as the ORM for database access
+- Redis for caching, pub/sub messaging, and chat history storage
 - Docker for containerization
 - Supabase for authentication and storage
+- Bull for queue management and background processing
 
 Frontend:
 - Next.js for the React framework
@@ -98,21 +131,28 @@ Frontend:
 - Zod for schema validation
 - React Hook Form for form management
 
-==============================================================
-4. DEPLOYMENT ARCHITECTURE
-==============================================================
+## 4. DEPLOYMENT ARCHITECTURE
 
 The Jibu Console is designed for flexible deployment options:
 
 - Docker Compose: For local development and testing
+  - Multi-container setup with backend, frontend, database, and Redis
+  - Volume mounts for persistent data and hot reloading
+
 - Kubernetes: For production deployments with scalability and high availability
+  - Horizontal pod autoscaling for handling variable loads
+  - Persistent volumes for database and file storage
+  - Ingress controllers for routing and load balancing
+
 - Cloud Services: Compatible with major cloud providers (AWS, Azure, GCP)
+  - Containerized deployment on ECS, AKS, or GKE
+  - Managed database services for PostgreSQL
+  - Managed Redis services for caching and pub/sub
+  - Object storage for file management
 
 The system uses environment-based configuration to adapt to different deployment environments. Infrastructure as Code (IaC) principles are followed for reproducible deployments.
 
-==============================================================
-5. DATA FLOW
-==============================================================
+## 5. DATA FLOW
 
 The data flow in the Jibu Console follows these general patterns:
 
@@ -132,36 +172,85 @@ The data flow in the Jibu Console follows these general patterns:
    - Frontend updates the UI with the results
 
 3. Chat History Flow:
-   - Chat messages are stored in Redis for fast access
-   - Messages are organized by chat ID and session ID
-   - Local caching mechanism improves performance
-   - Messages can be retrieved by chat ID or by assistant and session IDs
+   - Chat messages are stored in Redis using dual key patterns:
+     - `chat:history:{chatId}` - Direct access by chat ID
+     - `chat:{assistantId}:{sessionId}` - Access by assistant and session IDs
+   - Local caching mechanism with 5-second TTL improves performance
+   - Messages are retrieved efficiently through Redis
+   - PostgreSQL database serves as the persistent storage for messages
+   - Redis is automatically updated when new messages are added
 
-==============================================================
-6. INTEGRATION POINTS
-==============================================================
+## 6. INTEGRATION POINTS
 
 The Jibu Console integrates with various external systems:
 
 - Language Models: Integration with OpenAI, Anthropic, and other LLM providers
-- Langflow: For visual workflow creation and execution
-- Vector Databases: For knowledge base embeddings and semantic search
-- Storage Services: For file storage and management
-- Authentication Providers: For user authentication and identity management
-- Webhook Consumers: For event-driven integrations with external systems
+  - API-based integration with configurable parameters
+  - Support for streaming responses
+  - Model-specific optimizations
 
-==============================================================
-7. SECURITY ARCHITECTURE
-==============================================================
+- Vector Databases: For knowledge base embeddings and semantic search
+  - Support for multiple vector database providers
+  - Efficient indexing and retrieval of document embeddings
+  - Hybrid search capabilities combining semantic and keyword search
+
+- Storage Services: For file storage and management
+  - Support for local and cloud storage providers
+  - Secure file upload and download
+  - Content type validation and virus scanning
+
+- Authentication Providers: For user authentication and identity management
+  - OAuth 2.0 integration
+  - SAML for enterprise SSO
+  - Multi-factor authentication support
+
+- Webhook Consumers: For event-driven integrations with external systems
+  - Configurable webhook endpoints
+  - Event filtering and transformation
+  - Retry mechanisms and dead letter queues
+
+- Voice Services: For speech-to-text and text-to-speech capabilities
+  - Real-time transcription
+  - Natural-sounding voice synthesis
+  - Multi-language support
+
+## 7. SECURITY ARCHITECTURE
 
 The security architecture of Jibu Console includes:
 
 - Authentication: JWT-based authentication with Supabase integration
+  - Short-lived access tokens
+  - Refresh token rotation
+  - Session management and revocation
+
 - Authorization: Role-based access control (RBAC) for fine-grained permissions
+  - Organization-level roles
+  - Resource-specific permissions
+  - Permission inheritance and delegation
+
 - API Security: Rate limiting, input validation, and CORS protection
+  - Request throttling to prevent abuse
+  - Comprehensive input validation using Zod schemas
+  - Strict CORS policy for frontend-backend communication
+
 - Data Protection: Encryption at rest and in transit
+  - TLS for all communications
+  - Database encryption for sensitive data
+  - Secure storage of API keys and credentials
+
 - Secrets Management: Secure handling of API keys and credentials
+  - Environment-based secrets management
+  - Encryption of sensitive configuration values
+  - Rotation policies for credentials
+
 - Audit Logging: Comprehensive logging of security events
+  - Detailed audit trails for security-relevant actions
+  - Tamper-evident logging
+  - Log aggregation and analysis
+
 - Compliance: Design patterns for GDPR, CCPA, and other regulatory requirements
+  - Data minimization principles
+  - User consent management
+  - Data export and deletion capabilities
 
 The system implements the principle of least privilege, ensuring that users and services have only the permissions necessary for their intended functions.

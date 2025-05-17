@@ -35,22 +35,31 @@ export function extractMessageFromResponse(response: any): string {
       // Try to parse as JSON first
       const parsed = JSON.parse(response);
       
-      // Check for Langflow specific format
+      // Check for nested output formats
       if (parsed.outputs && Array.isArray(parsed.outputs) && parsed.outputs.length > 0) {
         const firstOutput = parsed.outputs[0];
         
-        // Check various nested paths where the message could be
-        if (firstOutput.outputs && firstOutput.outputs[0]?.results?.message?.text) {
-          return firstOutput.outputs[0].results.message.text;
-        }
+        // Use a recursive path traversal to find text content
+        const findTextContent = (obj: any, maxDepth = 3, currentDepth = 0): string | null => {
+          if (currentDepth > maxDepth || !obj || typeof obj !== 'object') return null;
+          
+          // Check common text content fields
+          if (obj.text && typeof obj.text === 'string') return obj.text;
+          if (obj.content && typeof obj.content === 'string') return obj.content;
+          if (obj.message && typeof obj.message === 'string') return obj.message;
+          if (obj.answer && typeof obj.answer === 'string') return obj.answer;
+          
+          // Recursively check nested objects and arrays
+          for (const key in obj) {
+            const result = findTextContent(obj[key], maxDepth, currentDepth + 1);
+            if (result) return result;
+          }
+          
+          return null;
+        };
         
-        if (firstOutput.outputs && firstOutput.outputs[0]?.outputs?.message?.message) {
-          return firstOutput.outputs[0].outputs.message.message;
-        }
-        
-        if (firstOutput.outputs && firstOutput.outputs[0]?.messages?.[0]?.message) {
-          return firstOutput.outputs[0].messages[0].message;
-        }
+        const textContent = findTextContent(firstOutput);
+        if (textContent) return textContent;
       }
       
       // Check for direct message property

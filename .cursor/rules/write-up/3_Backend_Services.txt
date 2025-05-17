@@ -1,0 +1,456 @@
+# JIBU CONSOLE - BACKEND SERVICES
+
+## TABLE OF CONTENTS
+1. Introduction to Services
+2. Service Implementation Pattern
+3. Core Services
+   3.1. API Key Service
+   3.2. Assistant Service
+   3.3. Chats Service
+   3.4. Console Service
+   3.5. Credential Service
+   3.6. File Service
+   3.7. Knowledge Base Service
+   3.8. Organization Service
+   3.9. User Service
+4. Integration Services
+   4.1. Agent Provider Integration
+   4.2. Redis Integration
+   4.3. Queue Integration
+
+## 1. INTRODUCTION TO SERVICES
+
+Services in the Jibu Console backend are responsible for implementing the business logic of the application. They act as an intermediary between controllers and data access layers, encapsulating complex operations and ensuring data consistency. Services are implemented using NestJS's dependency injection system, making them highly testable and maintainable.
+
+The primary responsibilities of services include:
+- Implementing business logic and domain rules
+- Coordinating between multiple repositories or other services
+- Handling domain-specific validation
+- Managing transactions and ensuring data consistency
+- Implementing caching strategies where appropriate
+- Integrating with external systems and APIs
+
+## 2. SERVICE IMPLEMENTATION PATTERN
+
+Services in Jibu Console follow a consistent implementation pattern:
+
+1. Class Declaration with @Injectable Decorator:
+```typescript
+@Injectable()
+export class ResourceService {
+  constructor(
+    @InjectRepository(ResourceEntity)
+    private readonly resourceRepository: Repository<ResourceEntity>,
+    private readonly otherService: OtherService,
+    private readonly configService: ConfigService,
+  ) {}
+}
+```
+
+2. CRUD Operations:
+```typescript
+async create(createResourceDto: CreateResourceDto): Promise<Resource> {
+  const resource = this.resourceRepository.create(createResourceDto);
+  return this.resourceRepository.save(resource);
+}
+
+async findAll(options: PaginationQueryDto): Promise<PaginatedResponse<Resource>> {
+  const [items, totalItems] = await this.resourceRepository.findAndCount({
+    skip: (options.page - 1) * options.limit,
+    take: options.limit,
+    where: options.filter,
+    order: options.sort,
+  });
+
+  return {
+    items,
+    meta: {
+      totalItems,
+      itemCount: items.length,
+      itemsPerPage: options.limit,
+      totalPages: Math.ceil(totalItems / options.limit),
+      currentPage: options.page,
+    },
+  };
+}
+
+async findOne(id: string): Promise<Resource> {
+  const resource = await this.resourceRepository.findOne({ where: { id } });
+  if (!resource) {
+    throw new ResourceNotFoundException('Resource', id);
+  }
+  return resource;
+}
+
+async update(id: string, updateResourceDto: UpdateResourceDto): Promise<Resource> {
+  const resource = await this.findOne(id);
+  const updatedResource = this.resourceRepository.merge(resource, updateResourceDto);
+  return this.resourceRepository.save(updatedResource);
+}
+
+async remove(id: string): Promise<void> {
+  const resource = await this.findOne(id);
+  await this.resourceRepository.remove(resource);
+}
+```
+
+3. Business Logic Methods:
+```typescript
+async processResource(id: string, data: ProcessDataDto): Promise<ProcessResult> {
+  const resource = await this.findOne(id);
+  
+  // Business logic implementation
+  const result = await this.performComplexOperation(resource, data);
+  
+  // Update resource state
+  resource.status = 'processed';
+  await this.resourceRepository.save(resource);
+  
+  return result;
+}
+
+private async performComplexOperation(resource: Resource, data: ProcessDataDto): Promise<ProcessResult> {
+  // Complex business logic implementation
+}
+```
+
+4. Integration with Other Services:
+```typescript
+async integrateWithExternalSystem(id: string): Promise<IntegrationResult> {
+  const resource = await this.findOne(id);
+  
+  // Call external service
+  const externalData = await this.otherService.fetchExternalData(resource.externalId);
+  
+  // Process and integrate data
+  const integrationResult = this.processExternalData(resource, externalData);
+  
+  // Update resource with integration results
+  resource.integrationStatus = 'completed';
+  resource.lastIntegrationDate = new Date();
+  await this.resourceRepository.save(resource);
+  
+  return integrationResult;
+}
+```
+
+5. Caching Strategies:
+```typescript
+@Cacheable('resource', { ttl: 60 })
+async findOne(id: string): Promise<Resource> {
+  const resource = await this.resourceRepository.findOne({ where: { id } });
+  if (!resource) {
+    throw new ResourceNotFoundException('Resource', id);
+  }
+  return resource;
+}
+
+@CacheEvict('resource')
+async update(id: string, updateResourceDto: UpdateResourceDto): Promise<Resource> {
+  const resource = await this.findOne(id);
+  const updatedResource = this.resourceRepository.merge(resource, updateResourceDto);
+  return this.resourceRepository.save(updatedResource);
+}
+```
+
+## 3. CORE SERVICES
+
+### 3.1. API Key Service
+
+The API Key Service manages the creation, retrieval, updating, and deletion of API keys. API keys are used for authenticating API requests from external systems.
+
+File: apps/backend/src/modules/v1/api-key/api-key.service.ts
+
+Key Methods:
+- createApiKey(createApiKeyDto): Creates a new API key
+- findAll(options): Retrieves all API keys with pagination and filtering
+- findOne(id): Retrieves a single API key by ID
+- update(id, updateApiKeyDto): Updates an API key's metadata
+- remove(id): Deletes an API key
+- validateApiKey(key): Validates an API key and returns the associated user and organization
+- rotateApiKey(id): Generates a new API key value while preserving metadata
+
+Implementation Details:
+- Uses TypeORM for data access
+- Implements secure generation and storage of API keys
+- Supports filtering by organization ID
+- Implements caching for frequently accessed API keys
+- Handles API key rotation with proper invalidation of old keys
+- Integrates with the user and organization services for validation
+
+### 3.2. Assistant Service
+
+The Assistant Service manages the creation, retrieval, updating, and deletion of assistants. Assistants are AI-powered entities that can interact with users through chat interfaces.
+
+File: apps/backend/src/modules/v1/assistant/assistant.service.ts
+
+Key Methods:
+- createAssistant(createAssistantDto): Creates a new assistant
+- findAll(options): Retrieves all assistants with pagination and filtering
+- findOne(id): Retrieves a single assistant by ID
+- update(id, updateAssistantDto): Updates an assistant
+- remove(id): Deletes an assistant
+- deployAssistant(id): Deploys an assistant for use
+- undeployAssistant(id): Undeploys an assistant
+- getAssistantConfig(id): Gets the configuration for an assistant
+
+Implementation Details:
+- Uses TypeORM for data access
+- Integrates with the Agent Service for AI capabilities
+- Supports knowledge base integration for domain-specific knowledge
+- Implements versioning for assistant configurations
+- Provides deployment and undeployment capabilities
+- Handles assistant configuration validation and normalization
+
+### 3.3. Chats Service
+
+The Chats Service manages chat sessions and message history. It provides functionality for creating chat sessions, sending and receiving messages, and retrieving chat history.
+
+File: apps/backend/src/modules/v1/chats/chats.service.ts
+
+Key Methods:
+- createChat(createChatDto): Creates a new chat session
+- findAll(options): Retrieves all chats with pagination and filtering
+- findOne(id): Retrieves a single chat by ID
+- update(id, updateChatDto): Updates a chat session
+- remove(id): Deletes a chat session
+- sendMessage(id, messageDto): Sends a message in a chat session
+- getChatHistory(id): Retrieves the message history for a chat session
+
+Implementation Details:
+- Uses TypeORM for data access
+- Implements a Redis-based chat history system with dual key patterns:
+  1. `chat:history:{chatId}` - Direct access by chat ID
+  2. `chat:{assistantId}:{sessionId}` - For backward compatibility
+- Includes a local caching mechanism with 5-second TTL for performance
+- Integrates with the Assistant Service for AI-powered responses
+- Supports file attachments and rich message formats
+- Implements real-time message streaming using Server-Sent Events (SSE)
+
+### 3.4. Console Service
+
+The Console Service manages console-specific operations, such as retrieving system statistics and performing administrative tasks.
+
+File: apps/backend/src/modules/v1/console/console.service.ts
+
+Key Methods:
+- getSystemStats(): Retrieves system statistics
+- checkSystemHealth(): Checks system health
+- resetSystem(): Resets system to default state (admin only)
+- getSystemLogs(options): Retrieves system logs with filtering and pagination
+- getUsageMetrics(organizationId): Retrieves usage metrics for an organization
+
+Implementation Details:
+- Integrates with various services to collect system-wide statistics
+- Implements health checks for all system components
+- Provides administrative functions for system management
+- Collects and aggregates usage metrics
+- Implements logging and monitoring capabilities
+
+### 3.5. Credential Service
+
+The Credential Service manages the creation, retrieval, updating, and deletion of credentials. Credentials are used for authenticating with external services, such as LLM providers.
+
+File: apps/backend/src/modules/v1/credential/credential.service.ts
+
+Key Methods:
+- createCredential(createCredentialDto): Creates a new credential
+- findAll(options): Retrieves all credentials with pagination and filtering
+- findOne(id): Retrieves a single credential by ID
+- update(id, updateCredentialDto): Updates a credential
+- remove(id): Deletes a credential
+- getCredentialTypes(): Gets available credential types
+- validateCredential(id): Validates a credential with its provider
+
+Implementation Details:
+- Uses TypeORM for data access
+- Implements secure storage of sensitive credential information
+- Supports filtering by organization ID and credential type
+- Provides credential validation with external providers
+- Handles credential rotation and updates
+
+### 3.6. File Service
+
+The File Service manages file uploads, storage, and retrieval. It provides functionality for uploading files, retrieving file metadata, and downloading files.
+
+File: apps/backend/src/modules/v1/file/file.service.ts
+
+Key Methods:
+- uploadFile(file, uploadFileDto): Uploads a file
+- findAll(options): Retrieves all files with pagination and filtering
+- findOne(id): Retrieves a single file by ID
+- remove(id): Deletes a file
+- getFileMetadata(id): Gets metadata for a file
+- getFileContent(id): Gets the content of a file
+- getFileUrl(id): Gets a URL for accessing a file
+
+Implementation Details:
+- Uses TypeORM for metadata storage
+- Integrates with object storage services for file content
+- Supports various file types and formats
+- Implements file validation and virus scanning
+- Provides secure file access controls
+- Handles file versioning and deduplication
+
+### 3.7. Knowledge Base Service
+
+The Knowledge Base Service manages knowledge bases and their documents. It provides functionality for creating knowledge bases, uploading documents, and querying knowledge bases for relevant information.
+
+File: apps/backend/src/modules/v1/knowledge-base/knowledge-base.service.ts
+
+Key Methods:
+- createKnowledgeBase(createKnowledgeBaseDto): Creates a new knowledge base
+- findAll(options): Retrieves all knowledge bases with pagination and filtering
+- findOne(id): Retrieves a single knowledge base by ID
+- update(id, updateKnowledgeBaseDto): Updates a knowledge base
+- remove(id): Deletes a knowledge base
+- uploadDocument(id, file, uploadDocumentDto): Uploads a document to a knowledge base
+- removeDocument(id, documentId): Removes a document from a knowledge base
+- queryKnowledgeBase(id, query): Queries a knowledge base for relevant information
+
+Implementation Details:
+- Uses TypeORM for metadata storage
+- Integrates with vector databases for document embedding storage
+- Supports various document types and formats
+- Implements document chunking and embedding generation
+- Provides semantic search capabilities
+- Handles document processing and indexing
+
+### 3.8. Organization Service
+
+The Organization Service manages organizations and their members. It provides functionality for creating organizations, managing members, and retrieving organization information.
+
+File: apps/backend/src/modules/v1/organization/organization.service.ts
+
+Key Methods:
+- createOrganization(createOrganizationDto): Creates a new organization
+- findAll(options): Retrieves all organizations with pagination and filtering
+- findOne(id): Retrieves a single organization by ID
+- update(id, updateOrganizationDto): Updates an organization
+- remove(id): Deletes an organization
+- addMember(id, userId, role): Adds a member to an organization
+- removeMember(id, userId): Removes a member from an organization
+- getOrganizationMembers(id): Gets members of an organization
+
+Implementation Details:
+- Uses TypeORM for data access
+- Implements role-based access control for organization members
+- Supports organization-level resource management
+- Provides organization-level settings and configurations
+- Handles organization lifecycle management
+
+### 3.9. User Service
+
+The User Service manages users and their authentication. It provides functionality for user registration, authentication, and profile management.
+
+File: apps/backend/src/modules/v1/user/user.service.ts
+
+Key Methods:
+- register(registerDto): Registers a new user
+- login(loginDto): Authenticates a user and returns a token
+- findAll(options): Retrieves all users with pagination and filtering
+- findOne(id): Retrieves a single user by ID
+- update(id, updateUserDto): Updates a user
+- remove(id): Deletes a user
+- getUserProfile(id): Gets the profile for a user
+- updateUserProfile(id, updateProfileDto): Updates the profile for a user
+
+Implementation Details:
+- Uses TypeORM for data access
+- Integrates with authentication providers for secure authentication
+- Implements password hashing and validation
+- Supports user profile management
+- Provides user preferences and settings
+- Handles user lifecycle management
+
+## 4. INTEGRATION SERVICES
+
+### 4.1. Agent Provider Integration
+
+The Agent Provider Integration services provide integration with various LLM providers for AI capabilities. These services implement a common interface for interacting with different LLM providers, allowing for easy switching between providers.
+
+Key Agent Provider Integrations:
+- OpenAI Integration
+- Anthropic Integration
+- Azure OpenAI Integration
+- Custom LLM Integration
+
+Implementation Details:
+- Implements a common interface for all agent providers
+- Handles authentication and API key management
+- Provides message formatting and parsing
+- Implements streaming responses for real-time interactions
+- Handles error handling and retry mechanisms
+- Supports function calling and tool usage
+
+### 4.2. Redis Integration
+
+The Redis integration provides services for caching, pub/sub messaging, and data storage using Redis. This includes the RedisService and various Redis-based implementations.
+
+File: apps/backend/src/core/redis/redis.service.ts
+
+Key Methods:
+- get(key): Gets a value from Redis
+- set(key, value, expirySeconds): Sets a value in Redis with optional expiration
+- del(key): Deletes a key from Redis
+- exists(key): Checks if a key exists in Redis
+- hset(key, field, value): Sets a hash field in Redis
+- hget(key, field): Gets a hash field from Redis
+- hgetall(key): Gets all fields and values from a hash in Redis
+- lrange(key, start, stop): Gets elements from a list in Redis
+- rpush(key, value): Adds a value to the end of a list in Redis
+
+Key Features:
+- Caching with configurable TTL
+- Pub/sub messaging for real-time communication
+- Data storage for transient data
+- Rate limiting and throttling
+- Session management
+
+Implementation Details:
+- Uses the ioredis client for Node.js
+- Implements connection pooling for efficient resource usage
+- Provides serialization and deserialization of complex objects
+- Handles connection errors and retries
+- Implements cache eviction strategies
+- Comprehensive error handling and logging
+
+The Redis integration is used throughout the application for various purposes, including:
+- Chat history storage and retrieval through dual key patterns
+- Caching of frequently accessed data with configurable TTL
+- Real-time message streaming for chat applications
+- Rate limiting for API endpoints to prevent abuse
+- Session management for authentication and user state
+- Distributed locking for concurrent operations
+
+The Redis-based chat history system is a key component of the Jibu Console, providing efficient storage and retrieval of chat messages for assistants. It implements a dual key pattern for flexible access patterns and includes a local caching mechanism for improved performance.
+
+### 4.3. Queue Integration
+
+The Queue Integration provides services for background job processing and task scheduling using Bull. This includes the QueueService and various queue-based implementations.
+
+File: apps/backend/src/core/queue/queue.service.ts
+
+Key Features:
+- Background job processing
+- Task scheduling
+- Delayed job execution
+- Job prioritization
+- Concurrency control
+- Job retries and error handling
+
+Implementation Details:
+- Uses Bull for job queue management
+- Integrates with Redis for job storage
+- Provides job creation and management
+- Implements job processors for different job types
+- Handles job failures and retries
+- Supports job monitoring and management
+
+The Queue Integration is used for various background tasks, including:
+- Document processing and embedding generation
+- Scheduled report generation
+- Email sending and notification delivery
+- Data import and export operations
+- System maintenance tasks
+- Long-running operations that would block the main thread

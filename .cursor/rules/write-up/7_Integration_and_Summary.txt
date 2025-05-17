@@ -1,23 +1,17 @@
-==============================================================
-JIBU CONSOLE - INTEGRATION AND SUMMARY
-==============================================================
+# JIBU CONSOLE - INTEGRATION AND SUMMARY
 
-TABLE OF CONTENTS
-------------------
+## TABLE OF CONTENTS
 1. System Integration Overview
 2. Key Features and Capabilities
 3. Development Workflow and Best Practices
 4. Deployment and Operations
 5. Future Enhancements
 
-==============================================================
-1. SYSTEM INTEGRATION OVERVIEW
-==============================================================
+## 1. SYSTEM INTEGRATION OVERVIEW
 
 The Jibu Console is a comprehensive platform that integrates various components to provide a seamless experience for creating, managing, and deploying AI assistants. This section provides an overview of how the different components of the system integrate with each other.
 
-Backend-Frontend Integration:
-----------------------------
+### Backend-Frontend Integration
 The backend and frontend components of Jibu Console communicate through a RESTful API. The frontend uses type-safe API clients to interact with the backend, ensuring consistent data exchange and error handling. The API clients are generated from the backend API definitions, providing a seamless integration between the two components.
 
 Key integration points include:
@@ -27,8 +21,7 @@ Key integration points include:
 - Real-time communication using Server-Sent Events (SSE) for chat functionality
 - File upload and download between frontend and backend
 
-External Service Integration:
----------------------------
+### External Service Integration
 Jibu Console integrates with various external services to provide its functionality:
 
 1. Language Model Providers:
@@ -48,12 +41,13 @@ Jibu Console integrates with various external services to provide its functional
    - Integration with Supabase for authentication and user management
    - Support for different authentication providers through a common interface
 
-5. Langflow Integration:
-   - Integration with Langflow for visual workflow creation and execution
-   - Custom components for Langflow to extend its functionality
+5. Queue Management:
+   - Integration with Bull for background job processing
+   - Task prioritization and scheduling
+   - Retry mechanisms for failed jobs
+   - Monitoring and management of queue health
 
-Data Flow Integration:
---------------------
+### Data Flow Integration
 The data flow in Jibu Console follows these general patterns:
 
 1. User Interaction Flow:
@@ -72,10 +66,14 @@ The data flow in Jibu Console follows these general patterns:
    - Frontend updates the UI with the results
 
 3. Chat History Flow:
-   - Chat messages are stored in Redis for fast access
-   - Messages are organized by chat ID and session ID
-   - Local caching mechanism improves performance
-   - Messages can be retrieved by chat ID or by assistant and session IDs
+   - Chat messages are stored in Redis using dual key patterns:
+     - `chat:history:{chatId}` - Direct access by chat ID
+     - `chat:{assistantId}:{sessionId}` - Access by assistant and session IDs
+   - Local caching mechanism with 5-second TTL improves performance
+   - Messages are retrieved efficiently through Redis
+   - PostgreSQL database serves as the persistent storage for messages
+   - Redis is automatically updated when new messages are added
+   - Optimized for high-throughput chat applications
 
 4. Knowledge Base Flow:
    - Documents are uploaded to the backend
@@ -84,69 +82,59 @@ The data flow in Jibu Console follows these general patterns:
    - Knowledge base can be queried for relevant information
    - Query results are returned to the frontend
 
-==============================================================
-2. KEY FEATURES AND CAPABILITIES
-==============================================================
+## 2. KEY FEATURES AND CAPABILITIES
 
 The Jibu Console provides a comprehensive set of features and capabilities for creating, managing, and deploying AI assistants. This section highlights the key features and capabilities of the system.
 
-AI Assistant Management:
-----------------------
+### AI Assistant Management
 - Create and configure AI assistants with different capabilities
 - Integrate assistants with knowledge bases for domain-specific knowledge
 - Deploy assistants for use in various channels (web, API, iframe)
 - Monitor assistant performance and usage
 
-Knowledge Base Management:
-------------------------
+### Knowledge Base Management
 - Create and manage knowledge bases with different document types
 - Upload and process documents for use in knowledge bases
 - Query knowledge bases for relevant information
 - Integrate knowledge bases with assistants
 
-Chat Interface:
--------------
+### Chat Interface
 - Real-time chat interface for interacting with assistants
 - Support for text, markdown, code, and file attachments
-- Message history and context management
+- Message history and context management using Redis
 - Streaming responses for better user experience
+- Efficient caching for improved performance
+- Support for multiple concurrent chat sessions
 
-Multi-tenancy and Organization Management:
-----------------------------------------
+### Multi-tenancy and Organization Management
 - Support for multiple organizations and users
 - Role-based access control for different user types
 - Resource isolation between organizations
 - Customization options for each organization
 
-API and Integration:
-------------------
+### API and Integration
 - Comprehensive API for integrating with external systems
 - API key management for secure access
 - Webhook support for event-driven integrations
 - SDK and client libraries for different platforms
 
-Security and Compliance:
-----------------------
+### Security and Compliance
 - Authentication and authorization for secure access
 - Data encryption for sensitive information
 - Audit logging for compliance and security
 - Privacy controls for user data
 
-Customization and Extensibility:
-------------------------------
+### Customization and Extensibility
 - Customizable assistant appearance and behavior
 - Extensible architecture for adding new capabilities
 - Plugin system for extending functionality
 - Integration with third-party services
 
-==============================================================
-3. DEVELOPMENT WORKFLOW AND BEST PRACTICES
-==============================================================
+## 3. DEVELOPMENT WORKFLOW AND BEST PRACTICES
 
 This section outlines the development workflow and best practices for working with the Jibu Console codebase.
 
-Development Environment Setup:
-----------------------------
+### Development Environment Setup
 1. Clone the repository:
    ```bash
    git clone https://github.com/jibu-ai/jibu-console.git
@@ -167,8 +155,12 @@ Development Environment Setup:
    pnpm dev
    ```
 
-Code Structure and Organization:
-------------------------------
+5. Start Redis locally for development:
+   ```bash
+   docker-compose -f docker/docker-compose.yml up redis -d
+   ```
+
+### Code Structure and Organization
 The Jibu Console codebase follows a monorepo structure using pnpm workspaces:
 
 - `apps/backend`: NestJS backend application
@@ -177,8 +169,7 @@ The Jibu Console codebase follows a monorepo structure using pnpm workspaces:
 - `libs/api-client`: Shared API client library
 - `libs/types`: Shared TypeScript types and interfaces
 
-Development Workflow:
--------------------
+### Development Workflow
 1. Create a new feature branch from the main branch
 2. Implement the feature or fix the bug
 3. Write tests for the changes
@@ -187,8 +178,7 @@ Development Workflow:
 6. Address review comments
 7. Merge the pull request
 
-Best Practices:
--------------
+### Best Practices
 1. Code Quality:
    - Follow the established coding style and conventions
    - Use TypeScript for type safety
@@ -225,14 +215,11 @@ Best Practices:
    - Document architecture decisions
    - Provide comprehensive user documentation
 
-==============================================================
-4. DEPLOYMENT AND OPERATIONS
-==============================================================
+## 4. DEPLOYMENT AND OPERATIONS
 
 This section covers the deployment and operations aspects of the Jibu Console.
 
-Deployment Options:
------------------
+### Deployment Options
 The Jibu Console can be deployed in various environments:
 
 1. Docker Compose:
@@ -268,6 +255,13 @@ Deployment Process:
    docker-compose up -d
    ```
 
+4. Verify Redis is running properly:
+   ```bash
+   docker-compose exec redis redis-cli ping
+   ```
+   
+   This should return `PONG` if Redis is running correctly.
+
 4. Deploy to Kubernetes:
    ```bash
    kubectl apply -f kubernetes/
@@ -282,8 +276,7 @@ Infrastructure Requirements:
 - Object storage (e.g., S3, GCS)
 - Langflow instance
 
-Monitoring and Logging:
----------------------
+### Monitoring and Logging
 - Application logs using structured logging
 - Metrics collection using Prometheus
 - Monitoring dashboards using Grafana
@@ -303,14 +296,11 @@ Security Considerations:
 - Implement proper access controls
 - Regular security audits and updates
 
-==============================================================
-5. FUTURE ENHANCEMENTS
-==============================================================
+## 5. FUTURE ENHANCEMENTS
 
 This section outlines potential future enhancements for the Jibu Console.
 
-Technical Enhancements:
----------------------
+### Technical Enhancements
 1. Performance Optimizations:
    - Optimize database queries for better performance
    - Implement more efficient caching strategies
@@ -326,8 +316,7 @@ Technical Enhancements:
    - Improve test coverage and testing infrastructure
    - Streamline deployment and CI/CD processes
 
-Feature Enhancements:
--------------------
+### Feature Enhancements
 1. Advanced AI Capabilities:
    - Support for more LLM providers and models
    - Enhanced function calling and tool usage
@@ -353,8 +342,7 @@ Feature Enhancements:
    - User interaction insights
    - Usage and cost optimization recommendations
 
-User Experience Enhancements:
----------------------------
+### User Experience Enhancements
 1. UI/UX Improvements:
    - Enhanced accessibility features
    - More customization options for assistants

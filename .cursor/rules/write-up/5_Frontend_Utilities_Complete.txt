@@ -1,0 +1,1276 @@
+# JIBU CONSOLE - FRONTEND UTILITIES
+
+## TABLE OF CONTENTS
+1. Introduction to Frontend Utilities
+2. API Utilities
+   2.1. Base API Client
+   2.2. Agent API Client
+   2.3. Assistants API Client
+   2.4. Chat API Client
+   2.5. Knowledge Base API Client
+   2.6. File API Client
+3. Context Providers
+   3.1. API Context Provider
+   3.2. Organization Context Provider
+
+## 1. INTRODUCTION TO FRONTEND UTILITIES
+
+The frontend utilities in Jibu Console provide a set of tools and abstractions that simplify common tasks, promote code reuse, and ensure consistency across the application. These utilities include API clients for interacting with the backend, context providers for state management, authentication utilities, and various helper functions.
+
+The frontend utilities are organized into several categories:
+
+1. API Utilities: Clients for interacting with the backend APIs
+2. Context Providers: React contexts for global state management
+3. Authentication Utilities: Utilities for handling user authentication
+4. Helper Functions: General-purpose utility functions
+
+This document focuses on the API utilities, which provide type-safe clients for interacting with the backend APIs, and context providers for state management.
+
+## 2. API UTILITIES
+
+### 2.1. Base API Client
+
+The base API client provides a foundation for all other API clients in the application. It handles common functionality such as making HTTP requests, handling authentication, and caching responses.
+
+File: apps/frontend/src/utils/api.ts
+
+The base API client provides methods for making HTTP requests to the backend API, including GET, POST, PUT, and DELETE operations. It also handles authentication by including the appropriate headers in each request.
+
+Key Features:
+- Type-safe request and response handling
+- Authentication token management
+- Request caching with configurable TTL (Time To Live)
+- Error handling and response normalization
+- Support for pagination and filtering
+
+Implementation (Simplified):
+
+```typescript
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  search?: string;
+  [key: string]: any;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface RequestOptions {
+  headers?: Record<string, string>;
+  cache?: boolean;
+  cacheTTL?: number;
+}
+
+export class ApiClient {
+  private baseUrl: string;
+  private headers: Record<string, string>;
+  private cache: Map<string, { data: any; timestamp: number }> = new Map();
+  private cacheTTL: number = 5000; // 5 seconds
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+    this.headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+  }
+
+  setAuthToken(token: string): void {
+    this.headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  getHeaders(): Record<string, string> {
+    return { ...this.headers };
+  }
+
+  private getCacheKey(endpoint: string, params?: Record<string, any>): string {
+    return `${endpoint}${params ? `?${new URLSearchParams(params as any).toString()}` : ''}`;
+  }
+
+  private isCacheValid(cacheKey: string): boolean {
+    const cachedData = this.cache.get(cacheKey);
+    if (!cachedData) return false;
+
+    const now = Date.now();
+    return now - cachedData.timestamp < this.cacheTTL;
+  }
+
+  async get<T>(
+    endpoint: string,
+    params?: Record<string, any>,
+    options?: RequestOptions
+  ): Promise<T> {
+    const cacheKey = this.getCacheKey(endpoint, params);
+
+    if (options?.cache && this.isCacheValid(cacheKey)) {
+      return this.cache.get(cacheKey)!.data;
+    }
+
+    const url = new URL(`${this.baseUrl}${endpoint}`);
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { ...this.headers, ...options?.headers },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (options?.cache) {
+      this.cache.set(cacheKey, {
+        data,
+        timestamp: Date.now(),
+      });
+    }
+
+    return data;
+  }
+
+  async post<T>(
+    endpoint: string,
+    body: any,
+    options?: RequestOptions
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers = { ...this.headers, ...options?.headers };
+    const isFormData = body instanceof FormData;
+
+    // Remove Content-Type header if FormData is used (browser will set it with boundary)
+    if (isFormData && headers['Content-Type'] === 'application/json') {
+      delete headers['Content-Type'];
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: isFormData ? body : JSON.stringify(body),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async put<T>(
+    endpoint: string,
+    body: any,
+    options?: RequestOptions
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: { ...this.headers, ...options?.headers },
+      body: JSON.stringify(body),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async delete<T>(
+    endpoint: string,
+    options?: RequestOptions
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: { ...this.headers, ...options?.headers },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    return await response.json();
+  }
+}
+```
+
+### 2.2. Agent API Client
+
+The Agent API client provides methods for interacting with the agent-related endpoints of the backend API.
+
+File: apps/frontend/src/utils/agentApi.ts
+
+The Agent API client extends the base API client and provides methods for creating, retrieving, updating, and deleting agents, as well as executing agents.
+
+Key Methods:
+- getAgents: Retrieves a list of agents with pagination and filtering
+- getAgent: Retrieves a single agent by ID
+- createAgent: Creates a new agent
+- updateAgent: Updates an existing agent
+- deleteAgent: Deletes an agent
+- executeAgent: Executes an agent with a given input
+
+Implementation (Simplified):
+
+```typescript
+import { ApiClient, PaginatedResponse, PaginationParams } from './api';
+
+export interface Agent {
+  id: string;
+  name: string;
+  description?: string;
+  organizationId: string;
+  configuration: AgentConfiguration;
+  status: AgentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentConfiguration {
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  tools: AgentTool[];
+  systemPrompt?: string;
+}
+
+export interface AgentTool {
+  type: string;
+  configuration: Record<string, any>;
+}
+
+export enum AgentStatus {
+  DRAFT = 'draft',
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+}
+
+export interface CreateAgentDto {
+  name: string;
+  description?: string;
+  organizationId: string;
+  configuration: AgentConfiguration;
+}
+
+export interface UpdateAgentDto {
+  name?: string;
+  description?: string;
+  configuration?: Partial<AgentConfiguration>;
+  status?: AgentStatus;
+}
+
+export interface ExecuteAgentDto {
+  input: string;
+  sessionId?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface AgentExecutionResult {
+  output: string;
+  sessionId: string;
+  metadata?: Record<string, any>;
+}
+
+export class AgentApi {
+  private apiClient: ApiClient;
+  private baseEndpoint = '/api/v1/agents';
+
+  constructor(apiClient: ApiClient) {
+    this.apiClient = apiClient;
+  }
+
+  async getAgents(params?: PaginationParams): Promise<PaginatedResponse<Agent>> {
+    return this.apiClient.get<PaginatedResponse<Agent>>(
+      this.baseEndpoint,
+      params,
+      { cache: true }
+    );
+  }
+
+  async getAgent(id: string): Promise<Agent> {
+    return this.apiClient.get<Agent>(`${this.baseEndpoint}/${id}`, undefined, {
+      cache: true,
+    });
+  }
+
+  async createAgent(createAgentDto: CreateAgentDto): Promise<Agent> {
+    return this.apiClient.post<Agent>(this.baseEndpoint, createAgentDto);
+  }
+
+  async updateAgent(id: string, updateAgentDto: UpdateAgentDto): Promise<Agent> {
+    return this.apiClient.put<Agent>(`${this.baseEndpoint}/${id}`, updateAgentDto);
+  }
+
+  async deleteAgent(id: string): Promise<void> {
+    return this.apiClient.delete<void>(`${this.baseEndpoint}/${id}`);
+  }
+
+  async executeAgent(id: string, executeAgentDto: ExecuteAgentDto): Promise<AgentExecutionResult> {
+    return this.apiClient.post<AgentExecutionResult>(
+      `${this.baseEndpoint}/${id}/execute`,
+      executeAgentDto
+    );
+  }
+}
+```
+
+### 2.3. Assistants API Client
+
+The Assistants API client provides methods for interacting with the assistant-related endpoints of the backend API.
+
+File: apps/frontend/src/utils/assistantsApi.ts
+
+The Assistants API client extends the base API client and provides methods for creating, retrieving, updating, and deleting assistants, as well as deploying assistants.
+
+Key Methods:
+- getAssistants: Retrieves a list of assistants with pagination and filtering
+- getAssistant: Retrieves a single assistant by ID
+- createAssistant: Creates a new assistant
+- updateAssistant: Updates an existing assistant
+- deleteAssistant: Deletes an assistant
+- deployAssistant: Deploys an assistant
+- undeployAssistant: Undeploys an assistant
+
+Implementation (Simplified):
+
+```typescript
+import { ApiClient, PaginatedResponse, PaginationParams } from './api';
+
+export interface Assistant {
+  id: string;
+  name: string;
+  description?: string;
+  organizationId: string;
+  configuration: AssistantConfiguration;
+  behavior?: AssistantBehavior;
+  status: AssistantStatus;
+  deploymentStatus: DeploymentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssistantConfiguration {
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  tools: AssistantTool[];
+  systemPrompt?: string;
+}
+
+export interface AssistantTool {
+  type: string;
+  configuration: Record<string, any>;
+}
+
+export interface AssistantBehavior {
+  greeting?: string;
+  instructions?: string;
+  responseFormat?: string;
+  responseLength?: 'short' | 'medium' | 'long';
+}
+
+export enum AssistantStatus {
+  DRAFT = 'draft',
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+}
+
+export enum DeploymentStatus {
+  NOT_DEPLOYED = 'not_deployed',
+  DEPLOYING = 'deploying',
+  DEPLOYED = 'deployed',
+  FAILED = 'failed',
+}
+
+export interface CreateAssistantDto {
+  name: string;
+  description?: string;
+  organizationId: string;
+  configuration: AssistantConfiguration;
+  behavior?: AssistantBehavior;
+}
+
+export interface UpdateAssistantDto {
+  name?: string;
+  description?: string;
+  configuration?: Partial<AssistantConfiguration>;
+  behavior?: Partial<AssistantBehavior>;
+  status?: AssistantStatus;
+}
+
+export class AssistantsApi {
+  private apiClient: ApiClient;
+  private baseEndpoint = '/api/v1/assistants';
+
+  constructor(apiClient: ApiClient) {
+    this.apiClient = apiClient;
+  }
+
+  async getAssistants(params?: PaginationParams): Promise<PaginatedResponse<Assistant>> {
+    return this.apiClient.get<PaginatedResponse<Assistant>>(
+      this.baseEndpoint,
+      params,
+      { cache: true }
+    );
+  }
+
+  async getAssistant(id: string): Promise<Assistant> {
+    return this.apiClient.get<Assistant>(`${this.baseEndpoint}/${id}`, undefined, {
+      cache: true,
+    });
+  }
+
+  async createAssistant(createAssistantDto: CreateAssistantDto): Promise<Assistant> {
+    return this.apiClient.post<Assistant>(this.baseEndpoint, createAssistantDto);
+  }
+
+  async updateAssistant(id: string, updateAssistantDto: UpdateAssistantDto): Promise<Assistant> {
+    return this.apiClient.put<Assistant>(`${this.baseEndpoint}/${id}`, updateAssistantDto);
+  }
+
+  async deleteAssistant(id: string): Promise<void> {
+    return this.apiClient.delete<void>(`${this.baseEndpoint}/${id}`);
+  }
+
+  async deployAssistant(id: string): Promise<Assistant> {
+    return this.apiClient.post<Assistant>(`${this.baseEndpoint}/${id}/deploy`, {});
+  }
+
+  async undeployAssistant(id: string): Promise<Assistant> {
+    return this.apiClient.post<Assistant>(`${this.baseEndpoint}/${id}/undeploy`, {});
+  }
+}
+```
+
+### 2.4. Chat API Client
+
+The Chat API client provides methods for interacting with the chat-related endpoints of the backend API.
+
+File: apps/frontend/src/utils/chatApi.ts
+
+The Chat API client extends the base API client and provides methods for creating, retrieving, updating, and deleting chats, as well as sending messages and streaming chat responses. It integrates with the Redis-based chat history system to efficiently retrieve and manage chat messages.
+
+Key Methods:
+- getChats: Retrieves a list of chats with pagination and filtering
+- getChat: Retrieves a single chat by ID
+- createChat: Creates a new chat
+- updateChat: Updates an existing chat
+- deleteChat: Deletes a chat
+- getChatMessages: Retrieves messages for a chat
+- sendMessage: Sends a message to a chat
+- streamChatResponse: Streams a chat response using Server-Sent Events (SSE)
+
+Implementation (Simplified):
+
+```typescript
+import { ApiClient, PaginatedResponse, PaginationParams } from './api';
+
+export interface Chat {
+  id: string;
+  title: string;
+  assistantId: string;
+  userId: string;
+  organizationId: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface CreateChatDto {
+  title: string;
+  assistantId: string;
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateChatDto {
+  title?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface SendMessageDto {
+  content: string;
+  metadata?: Record<string, any>;
+}
+
+export class ChatApi {
+  private apiClient: ApiClient;
+  private baseEndpoint = '/api/v1/chats';
+
+  constructor(apiClient: ApiClient) {
+    this.apiClient = apiClient;
+  }
+
+  async getChats(params?: PaginationParams): Promise<PaginatedResponse<Chat>> {
+    return this.apiClient.get<PaginatedResponse<Chat>>(
+      this.baseEndpoint,
+      params,
+      { cache: true }
+    );
+  }
+
+  async getChat(id: string): Promise<Chat> {
+    return this.apiClient.get<Chat>(`${this.baseEndpoint}/${id}`, undefined, {
+      cache: true,
+    });
+  }
+
+  async createChat(createChatDto: CreateChatDto): Promise<Chat> {
+    return this.apiClient.post<Chat>(this.baseEndpoint, createChatDto);
+  }
+
+  async updateChat(id: string, updateChatDto: UpdateChatDto): Promise<Chat> {
+    return this.apiClient.put<Chat>(`${this.baseEndpoint}/${id}`, updateChatDto);
+  }
+
+  async deleteChat(id: string): Promise<void> {
+    return this.apiClient.delete<void>(`${this.baseEndpoint}/${id}`);
+  }
+
+  async getChatMessages(id: string, params?: PaginationParams): Promise<PaginatedResponse<ChatMessage>> {
+    return this.apiClient.get<PaginatedResponse<ChatMessage>>(
+      `${this.baseEndpoint}/${id}/messages`,
+      params,
+      { cache: true }
+    );
+  }
+
+  async sendMessage(id: string, sendMessageDto: SendMessageDto): Promise<ChatMessage> {
+    return this.apiClient.post<ChatMessage>(
+      `${this.baseEndpoint}/${id}/messages`,
+      sendMessageDto
+    );
+  }
+
+  streamChatResponse(id: string, sendMessageDto: SendMessageDto): EventSource {
+    const baseUrl = this.apiClient.getBaseUrl();
+    const headers = this.apiClient.getHeaders();
+    const params = new URLSearchParams();
+    
+    // Add authorization header as a URL parameter for EventSource
+    if (headers['Authorization']) {
+      params.append('authorization', headers['Authorization']);
+    }
+    
+    const url = `${baseUrl}${this.baseEndpoint}/${id}/stream?${params.toString()}`;
+    
+    return new EventSource(url);
+  }
+}
+```
+
+### 2.5. Knowledge Base API Client
+
+The Knowledge Base API client provides methods for interacting with the knowledge base-related endpoints of the backend API.
+
+File: apps/frontend/src/utils/knowledgeBaseApi.ts
+
+The Knowledge Base API client extends the base API client and provides methods for creating, retrieving, updating, and deleting knowledge bases, as well as adding and removing documents.
+
+Key Methods:
+- getKnowledgeBases: Retrieves a list of knowledge bases with pagination and filtering
+- getKnowledgeBase: Retrieves a single knowledge base by ID
+- createKnowledgeBase: Creates a new knowledge base
+- updateKnowledgeBase: Updates an existing knowledge base
+- deleteKnowledgeBase: Deletes a knowledge base
+- addDocuments: Adds documents to a knowledge base
+- listDocuments: Lists documents in a knowledge base
+- removeDocument: Removes a document from a knowledge base
+- queryKnowledgeBase: Queries a knowledge base for relevant information
+
+Implementation (Simplified):
+
+```typescript
+import { ApiClient, PaginatedResponse, PaginationParams } from './api';
+
+export interface KnowledgeBase {
+  id: string;
+  name: string;
+  description?: string;
+  organizationId: string;
+  vectorStoreType: string;
+  documentCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Document {
+  id: string;
+  knowledgeBaseId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  status: DocumentStatus;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export enum DocumentStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
+export interface CreateKnowledgeBaseDto {
+  name: string;
+  description?: string;
+  organizationId: string;
+  vectorStoreType?: string;
+}
+
+export interface UpdateKnowledgeBaseDto {
+  name?: string;
+  description?: string;
+}
+
+export interface QueryKnowledgeBaseDto {
+  query: string;
+  limit?: number;
+  threshold?: number;
+}
+
+export interface QueryResult {
+  content: string;
+  metadata: Record<string, any>;
+  score: number;
+}
+
+export class KnowledgeBaseApi {
+  private apiClient: ApiClient;
+  private baseEndpoint = '/api/v1/knowledge-bases';
+
+  constructor(apiClient: ApiClient) {
+    this.apiClient = apiClient;
+  }
+
+  async getKnowledgeBases(params?: PaginationParams): Promise<PaginatedResponse<KnowledgeBase>> {
+    return this.apiClient.get<PaginatedResponse<KnowledgeBase>>(
+      this.baseEndpoint,
+      params,
+      { cache: true }
+    );
+  }
+
+  async getKnowledgeBase(id: string): Promise<KnowledgeBase> {
+    return this.apiClient.get<KnowledgeBase>(`${this.baseEndpoint}/${id}`, undefined, {
+      cache: true,
+    });
+  }
+
+  async createKnowledgeBase(createKnowledgeBaseDto: CreateKnowledgeBaseDto): Promise<KnowledgeBase> {
+    return this.apiClient.post<KnowledgeBase>(this.baseEndpoint, createKnowledgeBaseDto);
+  }
+
+  async updateKnowledgeBase(id: string, updateKnowledgeBaseDto: UpdateKnowledgeBaseDto): Promise<KnowledgeBase> {
+    return this.apiClient.put<KnowledgeBase>(`${this.baseEndpoint}/${id}`, updateKnowledgeBaseDto);
+  }
+
+  async deleteKnowledgeBase(id: string): Promise<void> {
+    return this.apiClient.delete<void>(`${this.baseEndpoint}/${id}`);
+  }
+
+  async addDocuments(id: string, files: File[]): Promise<Document[]> {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    
+    return this.apiClient.post<Document[]>(
+      `${this.baseEndpoint}/${id}/documents`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  }
+
+  async listDocuments(id: string, params?: PaginationParams): Promise<PaginatedResponse<Document>> {
+    return this.apiClient.get<PaginatedResponse<Document>>(
+      `${this.baseEndpoint}/${id}/documents`,
+      params,
+      { cache: true }
+    );
+  }
+
+  async removeDocument(knowledgeBaseId: string, documentId: string): Promise<void> {
+    return this.apiClient.delete<void>(`${this.baseEndpoint}/${knowledgeBaseId}/documents/${documentId}`);
+  }
+
+  async queryKnowledgeBase(id: string, queryDto: QueryKnowledgeBaseDto): Promise<QueryResult[]> {
+    return this.apiClient.post<QueryResult[]>(
+      `${this.baseEndpoint}/${id}/query`,
+      queryDto
+    );
+  }
+}
+```
+
+### 2.6. File API Client
+
+The File API client provides methods for interacting with the file-related endpoints of the backend API.
+
+File: apps/frontend/src/utils/fileApi.ts
+
+The File API client extends the base API client and provides methods for uploading, retrieving, and deleting files.
+
+Key Methods:
+- getFiles: Retrieves a list of files with pagination and filtering
+- getFile: Retrieves a single file by ID
+- uploadFile: Uploads a new file
+- deleteFile: Deletes a file
+- downloadFile: Downloads a file
+- getSupportedFileTypes: Gets supported file types
+
+Implementation (Simplified):
+
+```typescript
+import { ApiClient, PaginatedResponse, PaginationParams } from './api';
+
+export interface File {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  url: string;
+  organizationId: string;
+  userId: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UploadFileDto {
+  file: Blob;
+  fileName?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface SupportedFileType {
+  extension: string;
+  mimeType: string;
+  maxSize: number;
+}
+
+export class FileApi {
+  private apiClient: ApiClient;
+  private baseEndpoint = '/api/v1/files';
+
+  constructor(apiClient: ApiClient) {
+    this.apiClient = apiClient;
+  }
+
+  async getFiles(params?: PaginationParams): Promise<PaginatedResponse<File>> {
+    return this.apiClient.get<PaginatedResponse<File>>(
+      this.baseEndpoint,
+      params,
+      { cache: true }
+    );
+  }
+
+  async getFile(id: string): Promise<File> {
+    return this.apiClient.get<File>(`${this.baseEndpoint}/${id}`, undefined, {
+      cache: true,
+    });
+  }
+
+  async uploadFile(uploadFileDto: UploadFileDto): Promise<File> {
+    const formData = new FormData();
+    formData.append('file', uploadFileDto.file);
+    
+    if (uploadFileDto.fileName) {
+      formData.append('fileName', uploadFileDto.fileName);
+    }
+    
+    if (uploadFileDto.metadata) {
+      formData.append('metadata', JSON.stringify(uploadFileDto.metadata));
+    }
+    
+    return this.apiClient.post<File>(
+      this.baseEndpoint,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  }
+
+  async deleteFile(id: string): Promise<void> {
+    return this.apiClient.delete<void>(`${this.baseEndpoint}/${id}`);
+  }
+
+  async downloadFile(id: string): Promise<Blob> {
+    const response = await fetch(`${this.apiClient.getBaseUrl()}${this.baseEndpoint}/${id}/download`, {
+      method: 'GET',
+      headers: this.apiClient.getHeaders(),
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to download file');
+    }
+    
+    return response.blob();
+  }
+
+  async getSupportedFileTypes(): Promise<SupportedFileType[]> {
+    return this.apiClient.get<SupportedFileType[]>(
+      `${this.baseEndpoint}/supported-types`,
+      undefined,
+      { cache: true }
+    );
+  }
+}
+```
+
+## 3. CONTEXT PROVIDERS
+
+The context providers in Jibu Console provide React contexts for global state management. They encapsulate state and provide it to components throughout the application.
+
+### 3.1. API Context Provider
+
+The API Context Provider provides access to the API clients throughout the application.
+
+File: apps/frontend/src/contexts/ApiContext.tsx
+
+The API Context Provider initializes the API clients and provides them to components through a React context. It also handles authentication and API token management.
+
+Key Features:
+- Provides access to all API clients
+- Handles authentication token management
+- Initializes API clients with the correct base URL
+- Provides loading and error states
+
+Implementation (Simplified):
+
+```typescript
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { ApiClient } from '../utils/api';
+import { AgentApi } from '../utils/AgentApi';
+import { AssistantsApi } from '../utils/AssistantsApi';
+import { ChatApi } from '../utils/chatApi';
+import { KnowledgeBaseApi } from '../utils/knowledgeBaseApi';
+import { FileApi } from '../utils/fileApi';
+import { useSupabase } from './SupabaseContext';
+
+interface ApiContextType {
+  apiClient: ApiClient | null;
+  agentApi: AgentApi | null;
+  assistantsApi: AssistantsApi | null;
+  chatApi: ChatApi | null;
+  knowledgeBaseApi: KnowledgeBaseApi | null;
+  fileApi: FileApi | null;
+  isInitialized: boolean;
+  error: Error | null;
+}
+
+const ApiContext = createContext<ApiContextType>({
+  apiClient: null,
+  agentApi: null,
+  assistantsApi: null,
+  chatApi: null,
+  knowledgeBaseApi: null,
+  fileApi: null,
+  isInitialized: false,
+  error: null,
+});
+
+export const useApi = () => useContext(ApiContext);
+
+export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { supabase, session } = useSupabase();
+  const [apiClient, setApiClient] = useState<ApiClient | null>(null);
+  const [agentApi, setAgentApi] = useState<AgentApi | null>(null);
+  const [assistantsApi, setAssistantsApi] = useState<AssistantsApi | null>(null);
+  const [chatApi, setChatApi] = useState<ChatApi | null>(null);
+  const [knowledgeBaseApi, setKnowledgeBaseApi] = useState<KnowledgeBaseApi | null>(null);
+  const [fileApi, setFileApi] = useState<FileApi | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const initializeApi = async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const client = new ApiClient(baseUrl);
+        
+        // Set auth token if user is authenticated
+        if (session?.access_token) {
+          client.setAuthToken(session.access_token);
+        }
+        
+        setApiClient(client);
+        setAgentApi(new AgentApi(client));
+        setAssistantsApi(new AssistantsApi(client));
+        setChatApi(new ChatApi(client));
+        setKnowledgeBaseApi(new KnowledgeBaseApi(client));
+        setFileApi(new FileApi(client));
+        setIsInitialized(true);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to initialize API'));
+      }
+    };
+
+    initializeApi();
+  }, [session]);
+
+  return (
+    <ApiContext.Provider
+      value={{
+        apiClient,
+        agentApi,
+        assistantsApi,
+        chatApi,
+        knowledgeBaseApi,
+        fileApi,
+        isInitialized,
+        error,
+      }}
+    >
+      {children}
+    </ApiContext.Provider>
+  );
+};
+```
+
+### 3.2. Organization Context Provider
+
+The Organization Context Provider provides access to organization data throughout the application.
+
+File: apps/frontend/src/contexts/OrganizationContext.tsx
+
+The Organization Context Provider manages the current organization and provides methods for switching between organizations.
+
+Key Features:
+- Provides access to the current organization
+- Provides a list of available organizations
+- Handles organization switching
+- Persists the selected organization in local storage
+
+Implementation (Simplified):
+
+```typescript
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useApi } from './ApiContext';
+import { useSupabase } from './SupabaseContext';
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface OrganizationContextType {
+  currentOrganization: Organization | null;
+  organizations: Organization[];
+  isLoading: boolean;
+  error: Error | null;
+  switchOrganization: (organizationId: string) => Promise<void>;
+}
+
+const OrganizationContext = createContext<OrganizationContextType>({
+  currentOrganization: null,
+  organizations: [],
+  isLoading: true,
+  error: null,
+  switchOrganization: async () => {},
+});
+
+export const useOrganization = () => useContext(OrganizationContext);
+
+export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { apiClient, isInitialized } = useApi();
+  const { session } = useSupabase();
+  const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const loadOrganizations = async () => {
+      if (!isInitialized || !apiClient || !session) {
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        
+        // Fetch organizations
+        const response = await apiClient.get<{ items: Organization[] }>('/api/v1/organizations');
+        const orgs = response.items || [];
+        setOrganizations(orgs);
+        
+        // Get stored organization ID from local storage
+        const storedOrgId = localStorage.getItem('currentOrganizationId');
+        
+        // Set current organization
+        if (storedOrgId && orgs.some(org => org.id === storedOrgId)) {
+          setCurrentOrganization(orgs.find(org => org.id === storedOrgId) || null);
+        } else if (orgs.length > 0) {
+          setCurrentOrganization(orgs[0]);
+          localStorage.setItem('currentOrganizationId', orgs[0].id);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to load organizations'));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadOrganizations();
+  }, [isInitialized, apiClient, session]);
+
+  const switchOrganization = async (organizationId: string) => {
+    const org = organizations.find(o => o.id === organizationId);
+    
+    if (org) {
+      setCurrentOrganization(org);
+      localStorage.setItem('currentOrganizationId', org.id);
+    } else {
+      throw new Error('Organization not found');
+    }
+  };
+
+  return (
+    <OrganizationContext.Provider
+      value={{
+        currentOrganization,
+        organizations,
+        isLoading,
+        error,
+        switchOrganization,
+      }}
+    >
+      {children}
+    </OrganizationContext.Provider>
+  );
+};
+```
+
+### 3.3. Chat Context Provider
+
+The Chat Context Provider provides access to chat data and functionality throughout the application.
+
+File: apps/frontend/src/contexts/ChatContext.tsx
+
+The Chat Context Provider manages the current chat, chat messages, and provides methods for sending messages and handling chat responses. It integrates with the Redis-based chat history system to efficiently retrieve and manage chat messages.
+
+Key Features:
+- Provides access to the current chat and its messages
+- Handles sending messages and receiving responses
+- Manages loading and error states
+- Provides real-time updates using Server-Sent Events (SSE)
+
+Implementation (Simplified):
+
+```typescript
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useApi } from './ApiContext';
+import { Chat, ChatMessage, SendMessageDto } from '../utils/chatApi';
+
+interface ChatContextType {
+  currentChat: Chat | null;
+  messages: ChatMessage[];
+  isLoading: boolean;
+  isSending: boolean;
+  error: Error | null;
+  setCurrentChat: (chat: Chat | null) => void;
+  sendMessage: (content: string, metadata?: Record<string, any>) => Promise<void>;
+  clearMessages: () => void;
+}
+
+const ChatContext = createContext<ChatContextType>({
+  currentChat: null,
+  messages: [],
+  isLoading: false,
+  isSending: false,
+  error: null,
+  setCurrentChat: () => {},
+  sendMessage: async () => {},
+  clearMessages: () => {},
+});
+
+export const useChat = () => useContext(ChatContext);
+
+export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { chatApi, isInitialized } = useApi();
+  const [currentChat, setCurrentChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [eventSource, setEventSource] = useState<EventSource | null>(null);
+
+  // Load messages when current chat changes
+  useEffect(() => {
+    if (!isInitialized || !chatApi || !currentChat) {
+      setMessages([]);
+      return;
+    }
+
+    const loadMessages = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await chatApi.getChatMessages(currentChat.id);
+        setMessages(response.items);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error('Failed to load messages'));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadMessages();
+
+    // Clean up event source when chat changes
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+        setEventSource(null);
+      }
+    };
+  }, [isInitialized, chatApi, currentChat]);
+
+  const sendMessage = async (content: string, metadata?: Record<string, any>) => {
+    if (!chatApi || !currentChat) {
+      throw new Error('Chat API or current chat not initialized');
+    }
+
+    try {
+      setIsSending(true);
+      setError(null);
+      
+      // Send user message
+      const userMessage = await chatApi.sendMessage(currentChat.id, { content, metadata });
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Close previous event source if exists
+      if (eventSource) {
+        eventSource.close();
+      }
+      
+      // Stream assistant response
+      const sse = chatApi.streamChatResponse(currentChat.id, { content, metadata });
+      setEventSource(sse);
+      
+      // Handle streaming response
+      let assistantMessageId = '';
+      let assistantMessageContent = '';
+      
+      sse.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'message_start') {
+            assistantMessageId = data.messageId;
+            assistantMessageContent = '';
+            
+            // Add initial empty message
+            const assistantMessage: ChatMessage = {
+              id: assistantMessageId,
+              chatId: currentChat.id,
+              role: 'assistant',
+              content: '',
+              createdAt: new Date().toISOString(),
+            };
+            
+            setMessages(prev => [...prev, assistantMessage]);
+          } else if (data.type === 'message_chunk') {
+            assistantMessageContent += data.chunk;
+            
+            // Update message with new content
+            setMessages(prev => {
+              const updated = [...prev];
+              const index = updated.findIndex(m => m.id === assistantMessageId);
+              
+              if (index !== -1) {
+                updated[index] = {
+                  ...updated[index],
+                  content: assistantMessageContent,
+                };
+              }
+              
+              return updated;
+            });
+          } else if (data.type === 'message_end') {
+            // Message is complete, close event source
+            sse.close();
+            setEventSource(null);
+          }
+        } catch (err) {
+          console.error('Error parsing SSE message:', err);
+        }
+      };
+      
+      sse.onerror = (err) => {
+        console.error('SSE error:', err);
+        sse.close();
+        setEventSource(null);
+        setError(new Error('Error receiving chat response'));
+      };
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to send message'));
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const clearMessages = () => {
+    setMessages([]);
+  };
+
+  return (
+    <ChatContext.Provider
+      value={{
+        currentChat,
+        messages,
+        isLoading,
+        isSending,
+        error,
+        setCurrentChat,
+        sendMessage,
+        clearMessages,
+      }}
+    >
+      {children}
+    </ChatContext.Provider>
+  );
+};
+```

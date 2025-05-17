@@ -1,9 +1,6 @@
-==============================================================
-JIBU CONSOLE - BACKEND CONTROLLERS
-==============================================================
+# JIBU CONSOLE - BACKEND CONTROLLERS
 
-TABLE OF CONTENTS
-------------------
+## TABLE OF CONTENTS
 1. Introduction to Controllers
 2. Controller Implementation Pattern
 3. Module Controllers
@@ -22,9 +19,7 @@ TABLE OF CONTENTS
 6. Error Handling
 7. Authentication and Authorization
 
-==============================================================
-1. INTRODUCTION TO CONTROLLERS
-==============================================================
+## 1. INTRODUCTION TO CONTROLLERS
 
 Controllers in the Jibu Console backend are responsible for handling HTTP requests and defining API endpoints. They act as the entry point for client requests and delegate the business logic to services. Controllers are implemented using NestJS decorators and follow RESTful API design principles.
 
@@ -36,9 +31,7 @@ The primary responsibilities of controllers include:
 - Handling request-specific error handling
 - Implementing authentication and authorization checks
 
-==============================================================
-2. CONTROLLER IMPLEMENTATION PATTERN
-==============================================================
+## 2. CONTROLLER IMPLEMENTATION PATTERN
 
 Controllers in Jibu Console follow a consistent implementation pattern:
 
@@ -109,12 +102,9 @@ findOne(@Param('id') id: string): Promise<Resource> {
 }
 ```
 
-==============================================================
-3. MODULE CONTROLLERS
-==============================================================
+## 3. MODULE CONTROLLERS
 
-3.1. Agent Controller
---------------------
+### 3.1. Agent Controller
 
 The Agent Controller manages the API endpoints for creating, retrieving, updating, and deleting AI agents. It also provides endpoints for executing agents and retrieving agent execution results.
 
@@ -135,8 +125,7 @@ Implementation Details:
 - Validates input using CreateAgentDto and UpdateAgentDto
 - Implements role-based access control
 
-3.2. API Key Controller
----------------------
+### 3.2. API Key Controller
 
 The API Key Controller manages the API endpoints for creating, retrieving, updating, and deleting API keys. API keys are used for authenticating API requests from external systems.
 
@@ -157,8 +146,7 @@ Implementation Details:
 - Implements role-based access control
 - Handles secure storage and display of API keys
 
-3.3. Assistant Controller
------------------------
+### 3.3. Assistant Controller
 
 The Assistant Controller manages the API endpoints for creating, retrieving, updating, and deleting assistants. Assistants combine agents with knowledge bases and other settings to create user-facing AI assistants.
 
@@ -181,8 +169,7 @@ Implementation Details:
 - Implements role-based access control
 - Handles assistant deployment and status checking
 
-3.4. Chats Controller
--------------------
+### 3.4. Chats Controller
 
 The Chats Controller manages the API endpoints for creating, retrieving, updating, and deleting chat sessions. It also provides endpoints for sending messages and retrieving chat history.
 
@@ -206,8 +193,7 @@ Implementation Details:
 - Implements role-based access control
 - Handles real-time message streaming using Server-Sent Events (SSE)
 
-3.5. Console Controller
----------------------
+### 3.5. Console Controller-
 
 The Console Controller manages the API endpoints for console-specific operations, such as retrieving system statistics and performing administrative tasks.
 
@@ -224,8 +210,7 @@ Implementation Details:
 - Provides system health and statistics information
 - Handles system reset operations
 
-3.6. Credential Controller
-------------------------
+### 3.6. Credential Controller-
 
 The Credential Controller manages the API endpoints for creating, retrieving, updating, and deleting credentials. Credentials are used for authenticating with external services, such as LLM providers.
 
@@ -247,8 +232,7 @@ Implementation Details:
 - Implements role-based access control
 - Handles secure storage and display of sensitive credential information
 
-3.7. File Controller
-------------------
+### 3.7. File Controller-
 
 The File Controller manages the API endpoints for uploading, retrieving, and deleting files. Files can be used in knowledge bases, chat messages, and other parts of the system.
 
@@ -270,8 +254,7 @@ Implementation Details:
 - Implements role-based access control
 - Handles file storage and retrieval
 
-3.8. Knowledge Base Controller
-----------------------------
+### 3.8. Knowledge Base Controller--
 
 The Knowledge Base Controller manages the API endpoints for creating, retrieving, updating, and deleting knowledge bases. Knowledge bases are collections of documents that can be used to provide context to assistants.
 
@@ -296,8 +279,7 @@ Implementation Details:
 - Implements role-based access control
 - Handles document upload, indexing, and retrieval
 
-3.9. Organization Controller
---------------------------
+### 3.9. Organization Controller-
 
 The Organization Controller manages the API endpoints for creating, retrieving, updating, and deleting organizations. Organizations are used for multi-tenancy and resource isolation.
 
@@ -320,8 +302,7 @@ Implementation Details:
 - Implements role-based access control
 - Handles organization membership management
 
-3.10. User Controller
-------------------
+### 3.10. User Controller
 
 The User Controller manages the API endpoints for user authentication, registration, and profile management.
 
@@ -346,9 +327,7 @@ Implementation Details:
 - Integrates with Supabase for authentication
 - Handles user profile management
 
-==============================================================
-4. REQUEST VALIDATION
-==============================================================
+## 4. REQUEST VALIDATION
 
 Controllers in Jibu Console use Data Transfer Objects (DTOs) and validation pipes to ensure that incoming requests contain valid data. This validation is implemented using class-validator and class-transformer libraries.
 
@@ -389,9 +368,7 @@ create(@Body() createUserDto: CreateUserDto): Promise<User> {
 }
 ```
 
-==============================================================
-5. RESPONSE FORMATTING
-==============================================================
+## 5. RESPONSE FORMATTING
 
 Controllers in Jibu Console use interceptors and serialization to format responses consistently. This includes:
 
@@ -427,9 +404,7 @@ findAll(@Query() query: PaginationQueryDto): Promise<PaginatedResponse<User>> {
 }
 ```
 
-==============================================================
-6. ERROR HANDLING
-==============================================================
+## 6. ERROR HANDLING
 
 Controllers in Jibu Console implement error handling using NestJS exception filters and custom exceptions. This ensures that errors are caught and formatted consistently.
 
@@ -471,9 +446,7 @@ export class UserController {
 }
 ```
 
-==============================================================
-7. AUTHENTICATION AND AUTHORIZATION
-==============================================================
+## 7. AUTHENTICATION AND AUTHORIZATION
 
 Controllers in Jibu Console implement authentication and authorization using guards and decorators. This ensures that only authorized users can access protected endpoints.
 

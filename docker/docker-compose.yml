@@ -1,11 +1,11 @@
 services:
-  langflow:
-    image: langflowai/langflow:latest
+  # Redis service for caching and chat history
+  redis:
+    image: redis:alpine
     ports:
-      - "7860:7860"
-    environment:
-      # This variable defines where the logs, file storage, monitor data and secret keys are stored.
-      - LANGFLOW_CONFIG_DIR=/app/langflow_data
+      - "6379:6379"
     volumes:
-      - ./langflow-data:/app/langflow_data
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
 
