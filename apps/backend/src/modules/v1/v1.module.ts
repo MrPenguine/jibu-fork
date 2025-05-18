@@ -7,6 +7,7 @@ import { KnowledgeBaseModule } from './knowledgeBase/knowledge-base.module';
 import { AgentModule } from './agent/agent.module';
 import { ChatsModule } from './chats/chats.module';
 import { ConsoleModule } from './console/console.module';
+import { ToolsModule } from './tools/tools.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ConsoleModule } from './console/console.module';
     AgentModule,
     ChatsModule,
     ConsoleModule,
+    ToolsModule,
   ],
   exports: [
     FileModule,
@@ -28,6 +30,7 @@ import { ConsoleModule } from './console/console.module';
     AgentModule,
     ChatsModule,
     ConsoleModule,
+    ToolsModule,
   ],
 })
 export class V1Module {} 
