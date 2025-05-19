@@ -130,13 +130,30 @@ export class GoogleCalendarService {
       this.logger.log(`Creating event in calendar ${calendarId}`);
       this.logger.log('Event data received:', JSON.stringify(eventData));
       
+      // Ensure the OAuth client has the correct client ID and secret
+      const clientId = this.configService.get('GOOGLE_CLIENT_ID');
+      const clientSecret = this.configService.get('GOOGLE_CLIENT_SECRET');
+      const redirectUri = this.configService.get('GOOGLE_REDIRECT_URI') || 'http://localhost:3000/api/auth/callback/google';
+      
+      if (!clientId || !clientSecret) {
+        this.logger.error('Missing Google OAuth credentials - check environment variables');
+        throw new Error('Google OAuth credentials not configured');
+      }
+      
+      // Recreate the OAuth client to ensure it has the latest credentials
+      this.oauth2Client = new google.auth.OAuth2(
+        clientId,
+        clientSecret,
+        redirectUri
+      );
+      
       let calendar;
       
       try {
         // Try multiple authentication methods to ensure we can create the event
         
         // Method 1: Use provided tokens if available
-        if (tokens) {
+        if (tokens && tokens.access_token) {
           this.logger.log('Using provided tokens from request');
           this.oauth2Client.setCredentials(tokens);
           calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
@@ -144,7 +161,7 @@ export class GoogleCalendarService {
         // Method 2: Use stored tokens if available
         else {
           const storedTokens = this.getStoredTokens();
-          if (storedTokens) {
+          if (storedTokens && storedTokens.access_token) {
             this.logger.log('Using stored tokens from memory');
             this.oauth2Client.setCredentials(storedTokens);
             calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
@@ -202,24 +219,7 @@ export class GoogleCalendarService {
         // Check for invalid_grant error which is common with OAuth
         if (insertError.message === 'invalid_grant') {
           this.logger.error('Invalid grant error - OAuth token issue');
-          
-          // For demonstration purposes, return a mock event
-          this.logger.log('Falling back to mock implementation for demonstration');
-          
-          return {
-            id: `mock-event-${Date.now()}`,
-            summary: event.summary,
-            description: event.description,
-            created: new Date().toISOString(),
-            creator: { email: 'user@example.com' },
-            organizer: { email: 'user@example.com' },
-            start: event.start,
-            end: event.end,
-            attendees: event.attendees,
-            status: 'confirmed',
-            htmlLink: 'https://calendar.google.com',
-            message: 'Event created in mock mode due to OAuth token issue. To fix this, complete the OAuth flow again.',
-          };
+          throw new Error('OAuth authentication failed. Please complete the OAuth flow again with valid credentials.');
         }
         else if (insertError.code === 401 || (insertError.response && insertError.response.status === 401)) {
           this.logger.error('Authentication error - token may be invalid or expired');
@@ -273,12 +273,12 @@ export class GoogleCalendarService {
 
   async getStatus() {
     try {
-      // In a real implementation, you would check if the user has valid tokens in your database
-      // For now, we'll return a mock response
-      // You would typically store these settings in your database per user/organization
+      // Check if we have the required OAuth credentials configured
+      const clientId = this.configService.get('GOOGLE_CLIENT_ID');
+      const clientSecret = this.configService.get('GOOGLE_CLIENT_SECRET');
+      const storedTokens = this.getStoredTokens();
       
-      // Mock implementation - in production, check for actual tokens
-      const hasValidTokens = false; // Replace with actual token validation logic
+      const hasValidTokens = !!(clientId && clientSecret && storedTokens && storedTokens.access_token);
       
       return {
         connected: hasValidTokens,
@@ -286,7 +286,10 @@ export class GoogleCalendarService {
           calendarId: 'primary',
           checkAvailabilityEnabled: true,
           createEventsEnabled: true
-        } : null
+        } : null,
+        clientIdConfigured: !!clientId,
+        clientSecretConfigured: !!clientSecret,
+        tokensAvailable: !!(storedTokens && storedTokens.access_token)
       };
     } catch (error) {
       this.logger.error('Error checking Google Calendar status', error);
@@ -324,6 +327,60 @@ export class GoogleCalendarService {
     } catch (error) {
       this.logger.error('Error disconnecting Google Calendar', error);
       throw error;
+    }
+  }
+
+  async testConnection() {
+    try {
+      const status = await this.getStatus();
+      return {
+        success: true,
+        connected: status.connected,
+        message: status.connected ? 'Successfully connected to Google Calendar' : 'Not connected to Google Calendar',
+        status
+      };
+    } catch (error) {
+      this.logger.error('Error testing Google Calendar connection:', error);
+      return {
+        success: false,
+        connected: false,
+        message: `Failed to test Google Calendar connection: ${error.message}`,
+        error: error.message
+      };
+    }
+  }
+
+  async createTestEvent() {
+    try {
+      // Create a test event one hour from now
+      const now = new Date();
+      const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+      
+      const testEvent = {
+        title: 'New Event',
+        description: 'This is a test event created at ' + now.toISOString(),
+        startTime: now.toISOString(),
+        endTime: oneHourLater.toISOString(),
+        timeZone: 'UTC',
+        attendees: []
+      };
+      
+      this.logger.log('Creating test event:', JSON.stringify(testEvent));
+      
+      const result = await this.createEvent(testEvent, 'primary');
+      
+      return {
+        success: true,
+        message: 'Test event created successfully',
+        event: result
+      };
+    } catch (error) {
+      this.logger.error('Error creating test event:', error);
+      return {
+        success: false,
+        message: `Failed to create test event: ${error.message}`,
+        error: error.message
+      };
     }
   }
 }

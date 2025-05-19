@@ -96,92 +96,12 @@ export class GoogleCalendarController {
   }
   
   @Get('test')
-  @ApiOperation({ summary: 'Test Google Calendar integration' })
-  @ApiResponse({ status: 200, description: 'Returns test results' })
+  @ApiOperation({ summary: 'Test Google Calendar connection' })
+  @ApiResponse({ status: 200, description: 'Connection test results' })
   @SetMetadata('isPublic', true) // Bypass authentication for testing
-  async testGoogleCalendar() {
-    this.logger.log('Testing Google Calendar integration');
-    
-    try {
-      // First, check the OAuth configuration
-      const clientId = this.googleCalendarService.getClientId();
-      const clientSecret = this.googleCalendarService.hasClientSecret();
-      const redirectUri = this.googleCalendarService.getRedirectUri();
-      
-      // Create a simple test event
-      const now = new Date();
-      const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
-      
-      const testEvent = {
-        title: `Test Event ${now.toISOString().substring(0, 16)}`,
-        description: 'This is a test event created by the backend API',
-        startTime: now.toISOString(),
-        endTime: oneHourLater.toISOString(),
-        timeZone: 'UTC',
-        attendees: [],
-      };
-      
-      this.logger.log('Creating test event:', JSON.stringify(testEvent));
-      
-      try {
-        // Try to create the event with the Google Calendar API
-        const result = await this.googleCalendarService.createEvent(testEvent, 'primary');
-        
-        return {
-          success: true,
-          message: 'Test event created successfully',
-          event: result,
-          oauth: {
-            clientIdConfigured: !!clientId,
-            clientSecretConfigured: clientSecret,
-            redirectUriConfigured: !!redirectUri,
-          },
-        };
-      } catch (apiError) {
-        this.logger.error('API call failed:', apiError.message);
-        
-        // Create a mock event as fallback
-        const mockEvent = {
-          id: `mock-event-${Date.now()}`,
-          summary: testEvent.title,
-          description: testEvent.description,
-          created: new Date().toISOString(),
-          creator: { email: 'test@example.com' },
-          organizer: { email: 'test@example.com' },
-          start: {
-            dateTime: testEvent.startTime,
-            timeZone: testEvent.timeZone,
-          },
-          end: {
-            dateTime: testEvent.endTime,
-            timeZone: testEvent.timeZone,
-          },
-          status: 'confirmed',
-          htmlLink: 'https://calendar.google.com',
-        };
-        
-        return {
-          success: true,
-          message: 'Test completed with mock implementation due to API error: ' + apiError.message,
-          event: mockEvent,
-          mockMode: true,
-          error: apiError.message,
-          oauth: {
-            clientIdConfigured: !!clientId,
-            clientSecretConfigured: clientSecret,
-            redirectUriConfigured: !!redirectUri,
-          },
-        };
-      }
-    } catch (error) {
-      this.logger.error('Test failed:', error);
-      
-      return {
-        success: false,
-        message: `Test failed: ${error.message}`,
-        error: error.message,
-      };
-    }
+  async testConnection() {
+    this.logger.log('Testing Google Calendar connection');
+    return this.googleCalendarService.testConnection();
   }
 
   @Get('calendars')
@@ -190,12 +110,13 @@ export class GoogleCalendarController {
   async getCalendars() {
     return this.googleCalendarService.getCalendars();
   }
-
-  @Get('status')
-  @ApiOperation({ summary: 'Check if Google Calendar is connected' })
-  @ApiResponse({ status: 200, description: 'Returns connection status and settings' })
-  async getStatus() {
-    return this.googleCalendarService.getStatus();
+  
+  @Post('test-event')
+  @ApiOperation({ summary: 'Create a test event in Google Calendar' })
+  @ApiResponse({ status: 201, description: 'Test event created successfully' })
+  @SetMetadata('isPublic', true) // Bypass authentication for testing
+  async createTestEvent() {
+    return this.googleCalendarService.createTestEvent();
   }
 
   @Post('settings')

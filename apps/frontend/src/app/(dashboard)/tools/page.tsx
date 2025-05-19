@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription } from '@libs/shadcn-ui/src/components/ui/card';
+import { Input } from '@libs/shadcn-ui/src/components/ui/input';
+import { Button } from '@libs/shadcn-ui/src/components/ui/button';
 import { CalendarIcon, Hash, Music, Code, MessageSquare, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 

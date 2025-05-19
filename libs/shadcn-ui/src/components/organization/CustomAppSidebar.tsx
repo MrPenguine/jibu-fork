@@ -162,7 +162,7 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
       },
       {
         title: "Tools",
-        url: "#",
+        url: "/tools",
         icon: <Wrench className="size-4" />
       },
       {
