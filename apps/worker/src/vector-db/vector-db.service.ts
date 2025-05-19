@@ -341,14 +341,48 @@ export class VectorDbService {
         filter: query.filter
       });
       
-      return response.data.result.map(item => ({
-        id: item.id,
-        score: item.score,
-        ...(item.vector && { vector: item.vector }),
-        ...(item.payload && { payload: item.payload })
-      }));
+      return response.data.result || [];
     } catch (error) {
       this.logger.error(`Failed to search in collection ${collection}: ${error.message}`);
+      return [];
+    }
+  }
+  
+  /**
+   * Scroll through all points in a collection
+   * This is useful for retrieving all points for local processing
+   */
+  async scroll(
+    collection: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      with_payload?: boolean;
+      with_vector?: boolean;
+      filter?: any;
+    } = {}
+  ): Promise<SearchResult[]> {
+    try {
+      const { limit = 100, offset = 0, with_payload = true, with_vector = false, filter } = options;
+      
+      // Check if collection exists first
+      const exists = await this.collectionExists(collection);
+      if (!exists) {
+        this.logger.warn(`Collection ${collection} does not exist for scroll operation`);
+        return [];
+      }
+      
+      const response = await axios.post(`${this.qdrantUrl}/collections/${collection}/points/scroll`, {
+        limit,
+        offset,
+        with_payload,
+        with_vector,
+        filter
+      });
+      
+      return response.data.result || [];
+    } catch (error) {
+      this.logger.error(`Failed to scroll collection ${collection}: ${error.message}`);
       return [];
     }
   }

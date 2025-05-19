@@ -1,15 +1,19 @@
 import { Module } from '@nestjs/common';
 import { LangchainAgentService } from './langchain-agent.service';
+import { RagService } from './rag.service';
 import { DatabaseModule } from '../../../../core/database/database.module';
+import { RedisModule } from '../../../../core/redis/redis.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
     DatabaseModule,
-    ConfigModule
+    ConfigModule,
+    RedisModule
   ],
   providers: [
-    LangchainAgentService
+    LangchainAgentService,
+    RagService
   ],
   exports: [
     LangchainAgentService

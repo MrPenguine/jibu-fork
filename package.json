@@ -83,6 +83,7 @@
     "@langchain/core": "^0.3.55",
     "@langchain/google-genai": "^0.2.9",
     "@langchain/textsplitters": "^0.1.0",
+    "@nestjs/axios": "^4.0.0",
     "@nestjs/bull": "^11.0.2",
     "@nestjs/common": "^10.0.2",
     "@nestjs/config": "^4.0.2",

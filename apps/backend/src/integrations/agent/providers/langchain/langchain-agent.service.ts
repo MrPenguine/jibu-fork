@@ -5,6 +5,7 @@ import { PrismaService } from '../../../../core/database/prisma.service';
 import { XaiProvider } from './providers/xai-provider';
 import { GeminiProvider } from './providers/gemini-provider';
 import { MistralProvider } from './providers/mistral-provider';
+import { RagService } from './rag.service';
 import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableSequence, RunnablePassthrough } from '@langchain/core/runnables';
@@ -13,6 +14,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import OpenAI from 'openai';
 import axios from 'axios';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class LangchainAgentService implements IAgentService {
@@ -21,6 +24,7 @@ export class LangchainAgentService implements IAgentService {
   private readonly xaiApiKey: string;
   private readonly mistralApiKey: string;
   private readonly openaiClient: OpenAI;
+  private readonly workerApiUrl: string;
   
   // Provider instances
   private readonly xaiProvider: XaiProvider;
@@ -30,10 +34,12 @@ export class LangchainAgentService implements IAgentService {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly ragService: RagService,
   ) {
     this.googleApiKey = this.configService.get<string>('GOOGLE_API_KEY');
     this.xaiApiKey = this.configService.get<string>('XAI_API_KEY');
     this.mistralApiKey = this.configService.get<string>('MISTRAL_API_KEY');
+    this.workerApiUrl = this.configService.get<string>('WORKER_API_URL') || 'http://localhost:3001';
     
     // Initialize OpenAI client for Grok
     this.openaiClient = new OpenAI({
@@ -201,14 +207,23 @@ export class LangchainAgentService implements IAgentService {
       // Get chat history
       const rawMessages = await this.getChatHistory(sessionId);
       
-      // Get knowledge base results if needed
-      let context = '';
-      if (knowledgeBaseId) {
-        const kbResults = await this.searchKnowledgeBase(knowledgeBaseId, input);
+     // Get knowledge base results if needed
+let context = '';
+      // Use knowledgeBaseId from request config or from the assistant if not provided
+      const effectiveKnowledgeBaseId = knowledgeBaseId || assistant.knowledgeBaseId;
+
+      if (effectiveKnowledgeBaseId) {
+        this.logger.log(`Using knowledge base ID: ${effectiveKnowledgeBaseId} for query`);
+        const kbResults = await this.searchKnowledgeBase(effectiveKnowledgeBaseId, input);
         if (kbResults.length > 0) {
+          this.logger.log(`Found ${kbResults.length} results from knowledge base`);
           context = 'Here is some relevant information:\n\n' + 
             kbResults.map(result => result.payload?.text || '').join('\n\n');
+        } else {
+          this.logger.warn(`No results found from knowledge base ${effectiveKnowledgeBaseId}`);
         }
+      } else {
+        this.logger.log('No knowledge base ID available for this assistant');
       }
       
       // Process request based on provider
@@ -471,12 +486,21 @@ export class LangchainAgentService implements IAgentService {
       
       // Get knowledge base results if needed
       let context = '';
-      if (knowledgeBaseId) {
-        const kbResults = await this.searchKnowledgeBase(knowledgeBaseId, input);
+      // Use knowledgeBaseId from request config or from the assistant if not provided
+      const effectiveKnowledgeBaseId = knowledgeBaseId || assistant.knowledgeBaseId;
+
+      if (effectiveKnowledgeBaseId) {
+        this.logger.log(`Using knowledge base ID: ${effectiveKnowledgeBaseId} for streaming query`);
+        const kbResults = await this.searchKnowledgeBase(effectiveKnowledgeBaseId, input);
         if (kbResults.length > 0) {
+          this.logger.log(`Found ${kbResults.length} results from knowledge base for streaming request`);
           context = 'Here is some relevant information:\n\n' + 
             kbResults.map(result => result.payload?.text || '').join('\n\n');
+        } else {
+          this.logger.warn(`No results found from knowledge base ${effectiveKnowledgeBaseId} for streaming request`);
         }
+      } else {
+        this.logger.log('No knowledge base ID available for this assistant');
       }
       
       // Process streaming request based on provider
@@ -830,11 +854,39 @@ export class LangchainAgentService implements IAgentService {
         this.logger.warn(`Knowledge base with ID ${knowledgeBaseId} not found`);
         return [];
       }
+
+      // Preprocess the query to improve search results
+      const processedQuery = this.ragService.preprocessQuery(query);
+      if (processedQuery !== query) {
+        this.logger.log(`Preprocessed query from "${query}" to "${processedQuery}"`);
+      }
       
-      // In a real implementation, this would perform a vector search
-      // For now, just return an empty array as a placeholder
-      this.logger.log(`Searching knowledge base ${knowledgeBaseId} for query: ${query}`);
-      return [];
+      // Try multiple search attempts with different strategies if needed
+      let results = [];
+      
+      // Use the RAG service to search the knowledge base
+      this.logger.log(`Searching knowledge base ${knowledgeBaseId} for query: ${processedQuery}`);
+      results = await this.ragService.searchKnowledgeBase(knowledgeBaseId, processedQuery);
+      
+      // If no results found and the query is about a category or classification
+      if (results.length === 0 && 
+          (query.toLowerCase().includes('category') || 
+           query.toLowerCase().includes('which category') || 
+           query.toLowerCase().includes('what type') || 
+           query.toLowerCase().includes('classified as'))) {
+        
+        // Extract potential entity names using regex
+        const entityMatch = query.match(/([A-Z][a-z]+(\s[A-Z][a-z]+)*)/g);
+        if (entityMatch && entityMatch.length > 0) {
+          const entityName = entityMatch[0];
+          this.logger.log(`No results found. Trying again with extracted entity name: ${entityName}`);
+          
+          // Try searching with just the entity name
+          results = await this.ragService.searchKnowledgeBase(knowledgeBaseId, entityName);
+        }
+      }
+      
+      return results;
     } catch (error) {
       this.logger.error(`Error searching knowledge base: ${error.message}`);
       return [];
