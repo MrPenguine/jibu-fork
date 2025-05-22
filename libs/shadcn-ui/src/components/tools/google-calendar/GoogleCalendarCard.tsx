@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { CalendarIcon, ExternalLink, Plus, Check, X, Loader2 } from 'lucide-react';
+import { toast } from '../../ui/use-toast';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
@@ -74,17 +75,116 @@ export function GoogleCalendarCard() {
     }
   }, [status]);
 
+  // Add event listener for messages from the OAuth popup window
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Check if the message is from our OAuth callback
+      if (event.data && event.data.type === 'GOOGLE_CALENDAR_CONNECTED') {
+        console.log('Received connection success message from OAuth window');
+        // Refresh the connection status immediately
+        getGoogleCalendarStatus().then(newStatus => {
+          setStatus(newStatus);
+          if (newStatus.connected) {
+            setSuccess('Google Calendar connected successfully!');
+          }
+          setLoading(false);
+        }).catch(error => {
+          console.error('Error refreshing connection status:', error);
+          setLoading(false);
+        });
+      }
+    };
+
+    // Add the event listener
+    window.addEventListener('message', handleMessage);
+
+    // Clean up the event listener when the component unmounts
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
   const connectToGoogle = async () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
     try {
       const authUrl = await getGoogleCalendarAuthUrl();
-      window.open(authUrl, '_blank');
-    } catch (err) {
-      setError('Failed to get Google Calendar authorization URL');
-      console.error('Error getting Google Calendar auth URL:', err);
-    } finally {
+      
+      // Open the auth URL in a popup window
+      const popup = window.open(authUrl, 'Google Calendar Authorization', 'width=600,height=600');
+      
+      if (!popup) {
+        setError('Popup blocked. Please allow popups for this site.');
+        setLoading(false);
+        return;
+      }
+      
+      // Set up event listener for messages from the popup window
+      const messageHandler = async (event: MessageEvent) => {
+        // Validate the origin of the message (optional security measure)
+        // if (event.origin !== window.location.origin) return;
+        
+        console.log('Received message from popup:', event.data);
+        
+        if (event.data?.type === 'GOOGLE_CALENDAR_CONNECTED' && event.data?.success) {
+          console.log('Google Calendar connected successfully!');
+          
+          // Remove the event listener
+          window.removeEventListener('message', messageHandler);
+          
+          // Refresh the connection status
+          try {
+            const status = await getGoogleCalendarStatus();
+            setStatus(status);
+            setLoading(false);
+            setSuccess('Successfully connected to Google Calendar!');
+          } catch (error) {
+            console.error('Error refreshing connection status:', error);
+            setLoading(false);
+            setError('Connected, but failed to refresh status');
+          }
+        }
+      };
+      
+      // Add event listener for messages from the popup
+      window.addEventListener('message', messageHandler);
+      
+      // Poll for connection status as a fallback
+      const checkInterval = setInterval(async () => {
+        try {
+          const status = await getGoogleCalendarStatus();
+          
+          if (status.connected) {
+            clearInterval(checkInterval);
+            window.removeEventListener('message', messageHandler);
+            setStatus(status);
+            setLoading(false);
+            setSuccess('Successfully connected to Google Calendar!');
+            
+            // Close the popup if it's still open
+            if (!popup.closed) {
+              popup.close();
+            }
+          }
+        } catch (error) {
+          console.error('Error checking connection status:', error);
+        }
+      }, 5000); // Check every 5 seconds
+      
+      // Stop checking after 2 minutes (timeout)
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        window.removeEventListener('message', messageHandler);
+        if (loading) {
+          setLoading(false);
+          setError('Connection timeout. Please try again.');
+        }
+      }, 120000);
+      
+    } catch (error) {
+      console.error('Error connecting to Google Calendar:', error);
+      setError('Failed to connect to Google Calendar');
       setLoading(false);
     }
   };

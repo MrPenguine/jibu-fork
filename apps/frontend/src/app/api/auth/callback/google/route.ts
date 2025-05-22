@@ -26,11 +26,28 @@ export async function GET(request: NextRequest) {
     try {
       console.log('Sending authorization code to backend for token exchange');
       
+      // Get organization ID from local storage if available
+      let organizationId = '';
+      if (typeof localStorage !== 'undefined') {
+        const orgData = localStorage.getItem('activeOrganization');
+        if (orgData) {
+          try {
+            const parsedOrgData = JSON.parse(orgData);
+            organizationId = parsedOrgData.id || '';
+            console.log(`Using organization ID from local storage: ${organizationId}`);
+          } catch (e) {
+            console.error('Failed to parse organization data from localStorage', e);
+          }
+        }
+      }
+      
       // Try to send the code to the backend to exchange it for tokens
       const response = await fetch(`${backendUrl}/api/v1/tools/google-calendar/callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Organization-ID': organizationId,
+          'organization-id': organizationId,
         },
         body: JSON.stringify({ code }),
       });
@@ -137,10 +154,18 @@ export async function GET(request: NextRequest) {
             <p>Your Google Calendar has been successfully connected to Jibu Console. You can close this window now.</p>
           </div>
           <script>
-            // Close the window automatically after 3 seconds
+            // Send a message to the opener window to refresh the connection status immediately
+            if (window.opener) {
+              window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', success: true }, '*');
+              console.log('Sent connection success message to opener window');
+            }
+            
+            // Close the window automatically after 1.5 seconds
+            // This delay gives time for the message to be received by the opener
             setTimeout(() => {
+              console.log('Closing OAuth window...');
               window.close();
-            }, 3000);
+            }, 1500);
           </script>
         </body>
       </html>

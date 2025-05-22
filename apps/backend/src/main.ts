@@ -5,6 +5,12 @@ import { json } from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
+  // Set NODE_ENV to development if not set
+  process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+  
+  // Log the current environment
+  console.log(`Starting application in ${process.env.NODE_ENV} mode`);
+  
   // Create app WITHOUT built-in body parser
   const app = await NestFactory.create(AppModule, { 
     bodyParser: false // Disable NestJS built-in body parser

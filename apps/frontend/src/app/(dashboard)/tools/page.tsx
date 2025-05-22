@@ -49,7 +49,7 @@ const tools: Tool[] = [
     description: 'Execute custom JavaScript functions',
     icon: Code,
     color: 'bg-purple-500',
-    path: '/tools/function',
+    path: '/tools/function-tool',
   },
   {
     id: 'slack_send_message_tool',

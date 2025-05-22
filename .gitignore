@@ -33,6 +33,7 @@ pnpm-debug.log*
 
 # IDEs and editors
 /.idea
+/.cursor
 .project
 .classpath
 .c9/

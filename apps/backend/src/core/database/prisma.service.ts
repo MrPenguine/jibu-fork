@@ -5,6 +5,18 @@ import { PrismaClient } from '@prisma/client';
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
     super();
+    // Add aliases for models with casing issues
+    Object.defineProperty(this, 'Tool', {
+      get: function() {
+        return this.tool;
+      }
+    });
+    
+    Object.defineProperty(this, 'Credential', {
+      get: function() {
+        return this.credential;
+      }
+    });
   }
 
   async onModuleInit() {
@@ -14,4 +26,4 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleDestroy() {
     await this.$disconnect();
   }
-} 
+}

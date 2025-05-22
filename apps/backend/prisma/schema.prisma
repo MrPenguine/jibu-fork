@@ -31,6 +31,8 @@ model User {
   lastOrg         Organization?            @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
   sentInvitations Invitation[] // Invitations sent by this user
   apiKeys         ApiKey[] // API keys created by this user
+  createdTools    Tool[] // Tools created by this user
+  toolExecutions  ToolExecution[] // Tool executions performed by this user
 
   @@index([lastOrgId])
 }
@@ -52,6 +54,7 @@ model Organization {
   knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this organization
   assistants           Assistant[] // Assistants belonging to this organization
   chats                Chat[] // All chats in this organization
+  tools                Tool[] // Tools belonging to this organization
 }
 
 model OrganizationMembership {
@@ -107,6 +110,7 @@ model Credential {
   updatedAt            DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tools        Tool[] // Tools that use this credential
 
   @@unique([organizationId, provider, name])
   @@index([organizationId])
@@ -187,28 +191,29 @@ model KnowledgeBaseSource {
 }
 
 model Assistant {
-  id                         String         @id @default(uuid())
+  id                         String          @id @default(uuid())
   name                       String
   organizationId             String
-  organization               Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization               Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   knowledgeBaseId            String?
-  knowledgeBase              KnowledgeBase? @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
+  knowledgeBase              KnowledgeBase?  @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
   voice                      Json?
   model                      Json?
   firstMessage               String?
   voicemailMessage           String?
   endCallMessage             String?
   transcriber                Json?
-  endCallPhrases             String[]       @default([])
+  endCallPhrases             String[]        @default([])
   startSpeakingPlan          Json?
-  isServerUrlSecretSet       Boolean        @default(false)
-  backgroundDenoisingEnabled Boolean        @default(false)
-  serverMessages             String[]       @default([])
-  clientMessages             String[]       @default([])
-  hipaaEnabled               Boolean        @default(false)
-  createdAt                  DateTime       @default(now())
-  updatedAt                  DateTime       @updatedAt
+  isServerUrlSecretSet       Boolean         @default(false)
+  backgroundDenoisingEnabled Boolean         @default(false)
+  serverMessages             String[]        @default([])
+  clientMessages             String[]        @default([])
+  hipaaEnabled               Boolean         @default(false)
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
   chats                      Chat[]
+  tools                      AssistantTool[] // Tools assigned to this assistant
 
   @@index([organizationId])
   @@index([knowledgeBaseId])
@@ -235,12 +240,12 @@ model ChunkMetadata {
 
 model Chat {
   id             String   @id @default(uuid())
-  name           String?  // Optional name for the chat
+  name           String? // Optional name for the chat
   organizationId String
   assistantId    String
-  sessionId      String   // Required: For calls: phone number, For chats: user identifier or anonymous session
+  sessionId      String // Required: For calls: phone number, For chats: user identifier or anonymous session
   sessionType    String   @default("chat") // "chat" or "call"
-  metadata       Json?    // Additional metadata for the chat/call session
+  metadata       Json? // Additional metadata for the chat/call session
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -248,24 +253,24 @@ model Chat {
   assistant    Assistant    @relation(fields: [assistantId], references: [id], onDelete: Cascade)
   messages     Message[]
 
+  @@unique([assistantId, sessionId]) // Ensure we have a unique chat per assistant and sessionId
   @@index([organizationId])
   @@index([assistantId])
   @@index([sessionId])
   @@index([sessionType])
-  @@unique([assistantId, sessionId]) // Ensure we have a unique chat per assistant and sessionId
 }
 
 model Message {
-  id           String   @id @default(uuid())
-  chatId       String
-  content      String   // The actual message content
-  role         String   // 'user', 'assistant', 'system'
-  type         String   @default("text") // 'text', 'audio', 'transcript', etc.
-  sequenceId   Int      // Order of messages in the conversation
-  redisStatus  String?  @default("pending") // 'pending', 'synced', 'failed'
-  metadata     Json?    // Additional metadata about the message (e.g., audio duration, sentiment, etc.)
-  createdAt    DateTime @default(now())
-  
+  id          String   @id @default(uuid())
+  chatId      String
+  content     String // The actual message content
+  role        String // 'user', 'assistant', 'system'
+  type        String   @default("text") // 'text', 'audio', 'transcript', etc.
+  sequenceId  Int // Order of messages in the conversation
+  redisStatus String?  @default("pending") // 'pending', 'synced', 'failed'
+  metadata    Json? // Additional metadata about the message (e.g., audio duration, sentiment, etc.)
+  createdAt   DateTime @default(now())
+
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
@@ -273,3 +278,68 @@ model Message {
   @@index([type])
   @@index([chatId, sequenceId]) // For efficient retrieval of messages in order
 }
+
+model Tool {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  type           String // e.g., "google.calendar.availability.check", "google.sheets.row.append"
+  function       Json // Stores function name and parameters schema
+  messages       Json[] // Array of message configurations
+  metadata       Json? // Tool-specific configuration
+  credentialId   String? // Optional reference to a credential
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String
+
+  // Relationships
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credential     Credential?     @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  toolExecutions ToolExecution[]
+  assistantTools AssistantTool[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([credentialId])
+  @@index([createdById])
+  @@index([type])
+}
+
+model ToolExecution {
+  id           String    @id @default(uuid())
+  toolId       String
+  status       String // "pending", "running", "completed", "failed"
+  input        Json? // Input parameters for the execution
+  output       Json? // Output result of the execution
+  errorMessage String?
+  executedById String
+  executedAt   DateTime  @default(now())
+  completedAt  DateTime?
+
+  tool       Tool @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  executedBy User @relation(fields: [executedById], references: [id])
+
+  @@index([toolId])
+  @@index([executedById])
+  @@index([status])
+}
+
+model AssistantTool {
+  id          String   @id @default(uuid())
+  assistantId String
+  toolId      String
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assistant Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  tool      Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@unique([assistantId, toolId])
+  @@index([assistantId])
+  @@index([toolId])
+}
+ 
