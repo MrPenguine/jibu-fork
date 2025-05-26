@@ -5,9 +5,10 @@ import { IntegrationsModule } from '../../../integrations/integrations.module';
 import { ITtsService } from '../../../integrations/tts/interfaces/tts.interface';
 import { TtsService } from '../../../integrations/tts/tts.service';
 import { RedisModule } from '../../../core/redis/redis.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
-  imports: [IntegrationsModule, RedisModule],
+  imports: [IntegrationsModule, RedisModule, ScheduleModule.forRoot()],
   controllers: [VoicesController],
   providers: [VoicesService],
   exports: [VoicesService],
