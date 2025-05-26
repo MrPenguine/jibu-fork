@@ -13,11 +13,17 @@ import { AgentModule } from './agent/agent.module';
 import { IAgentService } from './agent/interfaces/agent.interface';
 import { AgentService } from './agent/agent.service';
 
+// TTS
+import { TtsModule } from './tts/tts.module';
+import { ITtsService } from './tts/interfaces/tts.interface';
+import { TtsService } from './tts/tts.service';
+
 @Module({
   imports: [
     ConfigModule,
     StorageModule,
     AgentModule,
+    TtsModule,
   ],
   providers: [
     
@@ -30,6 +36,11 @@ import { AgentService } from './agent/agent.service';
     {
       provide: IAgentService,
       useExisting: AgentService
+    },
+    // Re-export the TTS service interface
+    {
+      provide: ITtsService,
+      useExisting: TtsService
     }
   ],
   exports: [
@@ -37,9 +48,11 @@ import { AgentService } from './agent/agent.service';
 
     IStorageService,
     IAgentService,
+    ITtsService,
     
     StorageModule,
     AgentModule,
+    TtsModule,
   ],
 })
 export class IntegrationsModule {} 

@@ -8,6 +8,7 @@ import { AgentModule } from './agent/agent.module';
 import { ChatsModule } from './chats/chats.module';
 import { ConsoleModule } from './console/console.module';
 import { ToolsModule } from './tools/tools.module';
+import { VoicesModule } from './voices/voices.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ToolsModule } from './tools/tools.module';
     ChatsModule,
     ConsoleModule,
     ToolsModule,
+    VoicesModule,
   ],
   exports: [
     FileModule,
@@ -31,6 +33,7 @@ import { ToolsModule } from './tools/tools.module';
     ChatsModule,
     ConsoleModule,
     ToolsModule,
+    VoicesModule,
   ],
 })
 export class V1Module {} 

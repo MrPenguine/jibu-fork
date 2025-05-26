@@ -208,7 +208,7 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
     community: [
       {
         title: "Voice Library",
-        url: "#",
+        url: "/voices",
         icon: <LayoutGrid className="size-4" />
       },
     ],
