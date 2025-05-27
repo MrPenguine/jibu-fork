@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { IoArrowBack, IoClose } from "react-icons/io5";
 import { FaRobot } from "react-icons/fa";
 import { Button } from "../ui/button";
@@ -13,6 +13,7 @@ import {
 import { getAssistant, Assistant } from '../../../../../apps/frontend/src/utils/AssistantsApi';
 import { sendStreamingAgentRequest, AgentRequest } from '../../../../../apps/frontend/src/utils/AgentApi';
 import { Chat, ChatList, Message, saveMessageToDatabase, extractCleanMessageText } from './chat';
+import { playTextToSpeech, stopTextToSpeech } from '../../../../../apps/frontend/src/utils/ttsUtils';
 
 // Define types
 interface AssistantDetails extends Assistant {}
@@ -41,6 +42,10 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
   const [showBackButton, setShowBackButton] = useState(!!currentChatId);
   const [showingChatHistory, setShowingChatHistory] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false); // Track if component has been initialized
+  const [ttsEnabled, setTtsEnabled] = useState(true); // Enable TTS by default
+  
+  // Refs
+  const assistantResponseRef = useRef<string>(''); // Store the complete assistant response for TTS
   
   // Get organization context
   const { activeOrganization } = useOrganization();
@@ -339,6 +344,37 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
                 // Silently handle the error since the UI is already updated
                 console.log('Note: Failed to save assistant message to database, but UI is already updated');
               });
+              
+            // Play the assistant's response using TTS if enabled and voice settings are available
+            if (ttsEnabled && assistantDetails?.voice?.voiceId) {
+              // Store the complete response for TTS
+              assistantResponseRef.current = responseText;
+              
+              // Extract clean text for TTS
+              let ttsText = responseText;
+              try {
+                if (responseText.trim().startsWith('{') && responseText.includes('"message"')) {
+                  const jsonResponse = JSON.parse(responseText);
+                  const extractedText = extractCleanMessageText(jsonResponse);
+                  if (extractedText && extractedText.length > 0) {
+                    ttsText = extractedText;
+                  }
+                }
+              } catch (e) {
+                console.log('Not valid JSON, using raw text for TTS');
+              }
+              
+              // Play the text using TTS
+              playTextToSpeech(ttsText, {
+                voiceId: assistantDetails.voice.voiceId,
+                modelId: assistantDetails.voice.model,
+                stability: assistantDetails.voice.stability,
+                similarityBoost: assistantDetails.voice.similarityBoost,
+                speakerBoost: assistantDetails.voice.speakerBoost
+              }, true).catch(error => {
+                console.error('Error playing TTS:', error);
+              });
+            }
           },
           onError: (error) => {
             console.error('Error in streaming request:', error);
@@ -428,6 +464,16 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
     
     // Close chat history if it's open
     setShowingChatHistory(false);
+  };
+  
+  // Function to toggle TTS
+  const handleToggleTts = () => {
+    setTtsEnabled(!ttsEnabled);
+    
+    // If turning off TTS, stop any currently playing audio
+    if (ttsEnabled) {
+      stopTextToSpeech();
+    }
   };
   
   if (!isOpen) return null;

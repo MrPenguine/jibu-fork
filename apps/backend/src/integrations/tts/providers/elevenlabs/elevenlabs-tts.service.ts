@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { ITtsService } from '../../interfaces/tts.interface';
+import { ITtsService, TtsVoiceSettings } from '../../interfaces/tts.interface';
 import { ListVoicesResponseDTO, VoiceDTO } from '../../dto/voice.dto';
+import { ElevenLabsClient } from 'elevenlabs';
+import { Readable } from 'stream';
 
 /**
  * ElevenLabs TTS service implementation
@@ -12,11 +14,129 @@ export class ElevenLabsTtsService implements ITtsService {
   private readonly logger = new Logger(ElevenLabsTtsService.name);
   private readonly apiKey: string;
   private readonly baseUrl = 'https://api.elevenlabs.io/v2';
+  private readonly client: ElevenLabsClient;
 
   constructor(private readonly configService: ConfigService) {
     this.apiKey = this.configService.get<string>('ELEVENLABS_API_KEY');
     if (!this.apiKey) {
       this.logger.warn('ELEVENLABS_API_KEY not set. ElevenLabs TTS service will not function properly.');
+    }
+    
+    // Initialize the ElevenLabs client
+    this.client = new ElevenLabsClient({
+      apiKey: this.apiKey,
+    });
+  }
+  
+  /**
+   * Convert text to speech using ElevenLabs API
+   * @param text The text to convert to speech
+   * @param settings Voice settings including voice ID and parameters
+   * @returns Promise with audio buffer
+   */
+  async textToSpeech(text: string, settings: TtsVoiceSettings): Promise<Buffer> {
+    try {
+      this.logger.log(`Converting text to speech with voice ID: ${settings.voiceId}`);
+      
+      // Set default model if not provided
+      const modelId = settings.modelId || 'eleven_multilingual_v2';
+      
+      // Convert voice settings to ElevenLabs format
+      const voiceSettings = {
+        stability: settings.stability || 0.5,
+        similarity_boost: settings.similarityBoost || 0.75,
+        style: settings.style || 0,
+        use_speaker_boost: settings.speakerBoost || true
+      };
+      
+      // Get audio stream from ElevenLabs API
+      const audioStream = await this.client.textToSpeech.convertAsStream(
+        settings.voiceId,
+        {
+          output_format: 'mp3_44100_128',
+          model_id: modelId,
+          text,
+          voice_settings: voiceSettings,
+          // Additional parameters from the API documentation
+          optimize_streaming_latency: 0, // Default mode (no latency optimizations)
+          apply_text_normalization: 'auto' // Let the system decide whether to apply text normalization
+        }
+      );
+      
+      // Collect all chunks from the stream
+      const chunks: Buffer[] = [];
+      for await (const chunk of audioStream) {
+        chunks.push(chunk);
+      }
+      
+      // Combine chunks into a single buffer
+      const content = Buffer.concat(chunks);
+      this.logger.log(`Successfully converted text to speech, audio size: ${content.length} bytes`);
+      
+      return content;
+    } catch (error) {
+      this.logger.error(`Error converting text to speech: ${error.message}`, error.stack);
+      throw new Error(`Failed to convert text to speech: ${error.message}`);
+    }
+  }
+
+  /**
+   * Stream text to speech using ElevenLabs API
+   * @param text The text to convert to speech
+   * @param settings Voice settings including voice ID and parameters
+   * @returns Promise with a readable stream
+   */
+  async streamTextToSpeech(text: string, settings: TtsVoiceSettings): Promise<Readable> {
+    try {
+      this.logger.log(`Streaming text to speech with voice ID: ${settings.voiceId}`);
+      
+      // Set default model if not provided
+      const modelId = settings.modelId || 'eleven_multilingual_v2';
+      
+      // Convert voice settings to ElevenLabs format
+      const voiceSettings = {
+        stability: settings.stability || 0.5,
+        similarity_boost: settings.similarityBoost || 0.75,
+        style: settings.style || 0,
+        use_speaker_boost: settings.speakerBoost || true
+      };
+      
+      // Get audio stream from ElevenLabs API
+      const audioStream = await this.client.textToSpeech.convertAsStream(
+        settings.voiceId,
+        {
+          output_format: 'mp3_44100_128',
+          model_id: modelId,
+          text,
+          voice_settings: voiceSettings,
+          optimize_streaming_latency: 1, // Normal latency optimizations for streaming
+          apply_text_normalization: 'auto'
+        }
+      );
+      
+      // Create a readable stream to return
+      const readableStream = new Readable({
+        read() {}
+      });
+      
+      // Pipe the audio stream to the readable stream
+      (async () => {
+        try {
+          for await (const chunk of audioStream) {
+            readableStream.push(chunk);
+          }
+          // Signal the end of the stream
+          readableStream.push(null);
+        } catch (error) {
+          this.logger.error(`Error in stream processing: ${error.message}`, error.stack);
+          readableStream.destroy(error);
+        }
+      })();
+      
+      return readableStream;
+    } catch (error) {
+      this.logger.error(`Error streaming text to speech: ${error.message}`, error.stack);
+      throw new Error(`Failed to stream text to speech: ${error.message}`);
     }
   }
 

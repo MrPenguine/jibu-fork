@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { TtsService } from '../../../integrations/tts/tts.service';
 import { VoiceDTO } from '../../../integrations/tts/dto/voice.dto';
+import { TtsVoiceSettings } from '../../../integrations/tts/interfaces/tts.interface';
 import { RedisService } from '../../../core/redis/redis.service';
 import { Interval } from '@nestjs/schedule';
+import { Readable } from 'stream';
 
 @Injectable()
 export class VoicesService implements OnModuleInit {
@@ -130,11 +132,8 @@ export class VoicesService implements OnModuleInit {
   
   /**
    * Get a fresh preview URL for a specific voice
-   * This is particularly useful for AI-generated voices that may not have a preview URL
-   * or whose preview URL has expired
-   * 
    * @param voiceId The ID of the voice to get a preview URL for
-   * @returns A fresh preview URL or null if the voice is not found
+   * @returns Promise with the preview URL or null if not available
    */
   async getVoicePreviewUrl(voiceId: string): Promise<string | null> {
     try {
@@ -142,39 +141,66 @@ export class VoicesService implements OnModuleInit {
       
       // Check if we have this voice in our cache
       const cachedVoices = await this.redisService.get(this.CACHE_KEY);
-      let voiceExists = false;
+      let foundVoice: VoiceDTO | null = null;
       
       if (cachedVoices) {
         const voices = JSON.parse(cachedVoices) as VoiceDTO[];
-        voiceExists = voices.some(voice => voice.voiceId === voiceId);
+        foundVoice = voices.find(v => v.voiceId === voiceId) || null;
       }
       
-      // If the voice doesn't exist in our cache, we need to check directly with the TTS service
-      if (!voiceExists) {
-        this.logger.log(`Voice ID ${voiceId} not found in cache, checking with TTS service`);
-        const voices = await this.ttsService.getVoices();
-        voiceExists = voices.some(voice => voice.voiceId === voiceId);
-        
-        if (!voiceExists) {
-          this.logger.warn(`Voice ID ${voiceId} not found in TTS service`);
-          return null;
-        }
-      }
-      
-      // At this point, we know the voice exists, so we can fetch a fresh preview URL
-      // This would typically be an API call to the TTS service to get a fresh signed URL
-      // For ElevenLabs, we need to make a specific API call to get a sample for this voice
-      const previewUrl = await this.fetchFreshPreviewUrl(voiceId);
-      
-      if (!previewUrl) {
-        this.logger.warn(`Failed to fetch preview URL for voice ID ${voiceId}`);
+      // If the voice doesn't exist in our cache, return null
+      if (!foundVoice) {
+        this.logger.warn(`Voice ID ${voiceId} not found in cache`);
         return null;
       }
       
-      return previewUrl;
+      // If the voice already has a preview URL, return it
+      if (foundVoice.previewUrl) {
+        return foundVoice.previewUrl;
+      }
+      
+      // Otherwise, fetch a fresh preview URL from the TTS service
+      // This is particularly useful for AI-generated voices that may not have a preview URL
+      // or whose preview URL has expired
+      this.logger.log(`Fetching fresh preview URL for voice ID: ${voiceId}`);
+      
+      // Use the existing fetchFreshPreviewUrl method which should make the appropriate API call
+      return this.fetchFreshPreviewUrl(voiceId);
     } catch (error) {
-      this.logger.error(`Error fetching preview URL for voice ID ${voiceId}: ${error.message}`);
+      this.logger.error(`Error getting preview URL for voice ID ${voiceId}: ${error.message}`, error.stack);
       return null;
+    }
+  }
+  
+  /**
+   * Convert text to speech using the specified voice and settings
+   * @param text The text to convert to speech
+   * @param voiceSettings Voice settings including voice ID and parameters
+   * @returns Promise with audio buffer
+   */
+  async textToSpeech(text: string, voiceSettings: TtsVoiceSettings): Promise<Buffer> {
+    try {
+      this.logger.log(`Converting text to speech with voice ID: ${voiceSettings.voiceId}`);
+      return this.ttsService.textToSpeech(text, voiceSettings);
+    } catch (error) {
+      this.logger.error(`Error converting text to speech: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+  
+  /**
+   * Stream text to speech using the specified voice and settings
+   * @param text The text to convert to speech
+   * @param voiceSettings Voice settings including voice ID and parameters
+   * @returns Promise with a readable stream
+   */
+  async streamTextToSpeech(text: string, voiceSettings: TtsVoiceSettings): Promise<Readable> {
+    try {
+      this.logger.log(`Streaming text to speech with voice ID: ${voiceSettings.voiceId}`);
+      return this.ttsService.streamTextToSpeech(text, voiceSettings);
+    } catch (error) {
+      this.logger.error(`Error streaming text to speech: ${error.message}`, error.stack);
+      throw error;
     }
   }
   
