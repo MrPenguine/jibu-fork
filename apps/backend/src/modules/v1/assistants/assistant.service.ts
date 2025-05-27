@@ -163,7 +163,7 @@ export class AssistantService {
     }
 
     // Map update DTO to Assistant schema fields
-    const { name, description, systemPrompt, knowledgeBaseId, hipaaEnabled, model } = updateAssistantDto;
+    const { name, description, systemPrompt, knowledgeBaseId, hipaaEnabled, model, voice } = updateAssistantDto;
     const updateData: any = {};
     
     if (name !== undefined) updateData.name = name;
@@ -193,6 +193,32 @@ export class AssistantService {
       });
       
       console.log('New model configuration:', updateData.model);
+    }
+    
+    // Handle voice configuration
+    if (voice !== undefined) {
+      console.log('Received voice configuration:', voice);
+      
+      // Create a new voice configuration
+      updateData.voice = {
+        provider: voice.provider,
+        voiceId: voice.voiceId,
+        name: voice.name,
+        model: voice.model,
+        similarityBoost: voice.similarityBoost,
+        stability: voice.stability,
+        speakerBoost: voice.speakerBoost,
+        autoMode: voice.autoMode
+      };
+      
+      // Remove any undefined values
+      Object.keys(updateData.voice).forEach(key => {
+        if (updateData.voice[key] === undefined) {
+          delete updateData.voice[key];
+        }
+      });
+      
+      console.log('New voice configuration:', updateData.voice);
     }
 
     // Update the assistant

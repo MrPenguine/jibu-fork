@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@libs/shadcn-ui/components/ui/tabs"
 import { ModelConfig } from "@libs/shadcn-ui/components/assistants/ModelConfig"
+import { VoiceConfig } from "@libs/shadcn-ui/components/assistants/VoiceConfig"
 import { LatencyCard } from "libs/shadcn-ui/src/components/assistants/LatencyCard"
 import { CostCard } from "libs/shadcn-ui/src/components/assistants/CostCard"
 import { AssistantHeader } from "@libs/shadcn-ui/components/assistants"
@@ -51,6 +52,12 @@ export default function AssistantDetailPage() {
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(2048);
   const [modelPreference, setModelPreference] = useState<'latency' | 'balance' | 'capability'>('latency');
+  
+  // Voice settings state
+  const [voiceProvider, setVoiceProvider] = useState<'elevenlabs' | 'azure'>('elevenlabs');
+  const [voiceId, setVoiceId] = useState<string>('');
+  const [useCustomVoiceId, setUseCustomVoiceId] = useState<boolean>(false);
+  const [voiceSettings, setVoiceSettings] = useState<any>(null);
   
   // State for UI
   const [selectedProvider, setSelectedProvider] = useState<ProviderType>('web');
@@ -111,6 +118,35 @@ export default function AssistantDetailPage() {
           if (assistantData.model.preference) {
             setModelPreference(assistantData.model.preference);
           }
+        }
+        
+        // Set voice settings if available
+        if (assistantData.voice) {
+          console.log('Loading voice settings from assistant data:', assistantData.voice);
+          
+          // Set voice provider (convert from backend format to component format)
+          if (assistantData.voice.provider) {
+            // Backend uses '11labs', component uses 'elevenlabs'
+            if (assistantData.voice.provider === '11labs') {
+              setVoiceProvider('elevenlabs');
+            } else {
+              setVoiceProvider(assistantData.voice.provider as 'elevenlabs' | 'azure');
+            }
+          }
+          
+          // Set voice ID
+          if (assistantData.voice.voiceId) {
+            setVoiceId(assistantData.voice.voiceId);
+          }
+          
+          // Set custom voice ID flag if needed
+          // We'll set this to true if we have a voice ID
+          if (assistantData.voice.voiceId) {
+            setUseCustomVoiceId(false); // Start with false, the component will determine if it needs to be true
+          }
+          
+          // Store the entire voice settings object to pass to the VoiceConfig component
+          setVoiceSettings(assistantData.voice);
         }
         
         if (assistantData.knowledgeBaseId) {
@@ -300,6 +336,33 @@ export default function AssistantDetailPage() {
     });
   };
 
+  // Voice settings handlers
+  const handleVoiceProviderChange = (value: 'elevenlabs' | 'azure') => {
+    setVoiceProvider(value);
+    setIsDirty(true);
+  };
+  
+  const handleVoiceIdChange = (value: string) => {
+    setVoiceId(value);
+    setIsDirty(true);
+  };
+  
+  const handleUseCustomVoiceIdChange = (value: boolean) => {
+    setUseCustomVoiceId(value);
+    setIsDirty(true);
+  };
+  
+  const handleVoiceSettingsChange = (settings: any) => {
+    console.log('[handleVoiceSettingsChange] New voice settings:', settings);
+    setVoiceSettings(settings);
+    setIsDirty(true);
+    
+    // Save voice settings to assistant
+    debouncedSave({ 
+      voice: settings
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -313,13 +376,22 @@ export default function AssistantDetailPage() {
       
       console.log("[handleSave] Saving assistant with model config:", modelConfig);
       
-      const updated = await updateAssistant(id, {
+      // Create the update payload
+      const updatePayload: any = {
         name,
         description: firstMessage, // maps to firstMessage in backend
         systemPrompt: systemPrompt, // maps to voicemailMessage in backend
         knowledgeBaseId: knowledgeBaseId, // add knowledge base ID
         model: modelConfig
-      });
+      };
+      
+      // Add voice settings if they exist
+      if (voiceSettings) {
+        console.log("[handleSave] Including voice settings:", voiceSettings);
+        updatePayload.voice = voiceSettings;
+      }
+      
+      const updated = await updateAssistant(id, updatePayload);
       
       setLastSaved(new Date(updated.updatedAt));
       setIsDirty(false);
@@ -519,9 +591,17 @@ export default function AssistantDetailPage() {
                 <div id="voice-section" className="mb-4">
                   <h2 className="text-xl font-bold border-b-2 border-gray-200 pb-2">Voice Configuration</h2>
                 </div>
-                <div className="p-4 bg-white rounded-lg shadow-sm">
-                  <p className="text-sm text-muted-foreground">Configure the voice settings.</p>
-                </div>
+                <VoiceConfig
+                  voiceProvider={voiceProvider}
+                  voiceId={voiceId}
+                  useCustomVoiceId={useCustomVoiceId}
+                  voiceSettings={voiceSettings}
+                  assistantId={id !== 'new' ? id : undefined}
+                  onVoiceProviderChange={handleVoiceProviderChange}
+                  onVoiceIdChange={handleVoiceIdChange}
+                  onUseCustomVoiceIdChange={handleUseCustomVoiceIdChange}
+                  onVoiceSettingsChange={handleVoiceSettingsChange}
+                />
               </TabsContent>
               
               <TabsContent value="tools" className="space-y-4">

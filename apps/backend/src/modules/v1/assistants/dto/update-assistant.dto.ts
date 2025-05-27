@@ -36,6 +36,52 @@ export class ModelConfigDto {
   preference?: 'latency' | 'balance' | 'capability';
 }
 
+export class VoiceConfigDto {
+  @ApiProperty({ description: 'The voice provider (e.g., elevenlabs, 11labs)', required: false })
+  @IsString()
+  @IsOptional()
+  provider?: string;
+  
+  @ApiProperty({ description: 'The voice ID', required: false })
+  @IsString()
+  @IsOptional()
+  voiceId?: string;
+  
+  @ApiProperty({ description: 'The voice name', required: false })
+  @IsString()
+  @IsOptional()
+  name?: string;
+  
+  @ApiProperty({ description: 'The voice model', required: false })
+  @IsString()
+  @IsOptional()
+  model?: string;
+  
+  @ApiProperty({ description: 'Similarity boost setting (0-1)', required: false })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @IsOptional()
+  similarityBoost?: number;
+  
+  @ApiProperty({ description: 'Stability setting (0-1)', required: false })
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  @IsOptional()
+  stability?: number;
+  
+  @ApiProperty({ description: 'Whether speaker boost is enabled', required: false })
+  @IsBoolean()
+  @IsOptional()
+  speakerBoost?: boolean;
+  
+  @ApiProperty({ description: 'Whether auto mode is enabled', required: false })
+  @IsBoolean()
+  @IsOptional()
+  autoMode?: boolean;
+}
+
 export class UpdateAssistantDto {
   @ApiProperty({ description: 'The name of the assistant', required: false })
   @IsString()
@@ -67,4 +113,10 @@ export class UpdateAssistantDto {
   @Type(() => ModelConfigDto)
   @IsOptional()
   model?: ModelConfigDto;
-} 
+  
+  @ApiProperty({ description: 'Voice configuration settings', required: false, type: VoiceConfigDto })
+  @ValidateNested()
+  @Type(() => VoiceConfigDto)
+  @IsOptional()
+  voice?: VoiceConfigDto;
+}

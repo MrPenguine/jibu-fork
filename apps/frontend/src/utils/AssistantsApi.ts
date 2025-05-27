@@ -19,6 +19,17 @@ export interface Assistant {
     preference?: 'latency' | 'balance' | 'capability';
     [key: string]: any;
   };
+  voice?: {
+    provider?: string;
+    voiceId?: string;
+    name?: string;
+    model?: string;
+    stability?: number;
+    similarityBoost?: number;
+    speakerBoost?: boolean;
+    autoMode?: boolean;
+    [key: string]: any;
+  };
   hipaaEnabled?: boolean;
   backgroundDenoisingEnabled?: boolean;
   endCallPhrases?: string[];
@@ -47,6 +58,7 @@ interface UpdateAssistantParams {
   systemPrompt?: string; // Maps to voicemailMessage
   knowledgeBaseId?: string | null;
   hipaaEnabled?: boolean;
+  voice?: any; // Voice settings for TTS
   model?: {
     provider?: string;
     model?: string;
