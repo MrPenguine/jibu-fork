@@ -151,6 +151,7 @@ const VoicesPage = () => {
               onClearFilters={clearAllFilters}
               activeFilters={hasActiveFilters}
               filteredCount={filteredCount}
+              filters={filters}
             />
             <VoicesCategories 
               selectedProvider={selectedProvider} 

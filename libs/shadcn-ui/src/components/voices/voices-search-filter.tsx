@@ -11,6 +11,7 @@ interface VoicesSearchFilterProps {
   onClearFilters?: () => void;
   activeFilters?: boolean;
   filteredCount?: number;
+  filters?: VoiceFilters; // External filters passed from parent
 }
 
 export const VoicesSearchFilter: React.FC<VoicesSearchFilterProps> = ({ 
@@ -18,7 +19,8 @@ export const VoicesSearchFilter: React.FC<VoicesSearchFilterProps> = ({
   onFilterClick, 
   onClearFilters,
   activeFilters: externalActiveFilters,
-  filteredCount: externalFilteredCount
+  filteredCount: externalFilteredCount,
+  filters: externalFilters
 }) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,9 +138,46 @@ export const VoicesSearchFilter: React.FC<VoicesSearchFilterProps> = ({
       {activeFilters && filteredCount !== null && (
         <div className="mb-4 p-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
           <div className="flex justify-between items-center">
-            <span>
-              <strong>{filteredCount}</strong> {filteredCount === 1 ? 'voice' : 'voices'} found
-            </span>
+            <div className="flex items-center gap-2">
+              <span>
+                <strong>{filteredCount}</strong> {filteredCount === 1 ? 'voice' : 'voices'} found
+              </span>
+              
+              {/* Filter badges */}
+              <div className="flex flex-wrap gap-1 ml-2">
+                {/* Use external filters if available, otherwise use internal filters */}
+                {(externalFilters?.language || internalActiveFilters?.language) && (
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                    {externalFilters?.language || internalActiveFilters?.language}
+                  </span>
+                )}
+                {(externalFilters?.accent || internalActiveFilters?.accent) && (
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                    {externalFilters?.accent || internalActiveFilters?.accent}
+                  </span>
+                )}
+                {/* Gender filters */}
+                {(externalFilters?.gender || internalActiveFilters?.gender || []).map((g, idx) => (
+                  <span key={idx} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                    {g}
+                  </span>
+                ))}
+                {/* Provider/UseCase filters */}
+                {(externalFilters?.useCase || internalActiveFilters?.useCase || []).map((uc, idx) => (
+                  <span key={idx} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                    {uc}
+                  </span>
+                ))}
+                
+                {/* Check for models filter in the extended filters */}
+                {((externalFilters as any)?.models?.length > 0 || (internalActiveFilters as any)?.models?.length > 0) && (
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                    {(externalFilters as any)?.models?.length || (internalActiveFilters as any)?.models?.length} 
+                    {((externalFilters as any)?.models?.length || (internalActiveFilters as any)?.models?.length) === 1 ? 'model' : 'models'}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

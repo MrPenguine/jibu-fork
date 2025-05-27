@@ -153,6 +153,33 @@ export const VoicesList: React.FC<VoicesListProps> = ({
       }
     }
     
+    // Handle model filtering for all ElevenLabs voices regardless of selected provider
+    // Check if models filter exists in the extended filters object
+    const extendedFilters = filters as any;
+    if (extendedFilters.models && extendedFilters.models.length > 0) {
+      
+      result = result.filter(voice => {
+        // Only apply model filtering to ElevenLabs voices
+        if (voice.provider !== 'ElevenLabs') {
+          return true; // Keep non-ElevenLabs voices
+        }
+        
+        // Skip ElevenLabs voices without highQualityBaseModelIds
+        if (!voice.highQualityBaseModelIds || voice.highQualityBaseModelIds.length === 0) {
+          return false;
+        }
+        
+        // Check if any of the selected models match this voice's models
+        return extendedFilters.models.some((selectedModel: string) => {
+          // Convert the formatted model name back to the original format for comparison
+          const originalModelFormat = 'eleven_' + selectedModel.replace(/ /g, '_').toLowerCase();
+          return voice.highQualityBaseModelIds?.some(modelId => 
+            modelId.toLowerCase() === originalModelFormat.toLowerCase()
+          );
+        });
+      });
+    }
+    
     return result;
   }, [allVoices, selectedProvider, filters]);
   
@@ -160,12 +187,14 @@ export const VoicesList: React.FC<VoicesListProps> = ({
   useEffect(() => {
     if (onFilteredCountChange) {
       // Check if any filters are active
+      const extendedFilters = filters as any;
       const hasActiveFilters = !!(  // Convert to boolean with double negation
         filters.language || 
         filters.accent || 
         filters.gender.length > 0 || 
         filters.useCase.length > 0 ||
-        selectedProvider !== 'All'
+        selectedProvider !== 'All' ||
+        (extendedFilters.models && extendedFilters.models.length > 0)
       );
       
       // Pass both the count and whether filters are active
@@ -292,6 +321,8 @@ export const VoicesList: React.FC<VoicesListProps> = ({
                 isSelected={selectedVoice === voice.id}
                 onSelect={() => handleVoiceSelect(voice.id)}
                 onMenuOpen={() => handleMenuOpen(voice.id)}
+                category={voice.category} // Pass the category to identify generated voices
+                highQualityBaseModelIds={voice.highQualityBaseModelIds} // Pass available models
               />
             );
           })}

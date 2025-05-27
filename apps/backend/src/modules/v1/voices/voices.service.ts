@@ -129,6 +129,97 @@ export class VoicesService implements OnModuleInit {
   }
   
   /**
+   * Get a fresh preview URL for a specific voice
+   * This is particularly useful for AI-generated voices that may not have a preview URL
+   * or whose preview URL has expired
+   * 
+   * @param voiceId The ID of the voice to get a preview URL for
+   * @returns A fresh preview URL or null if the voice is not found
+   */
+  async getVoicePreviewUrl(voiceId: string): Promise<string | null> {
+    try {
+      this.logger.log(`Fetching fresh preview URL for voice ID: ${voiceId}`);
+      
+      // Check if we have this voice in our cache
+      const cachedVoices = await this.redisService.get(this.CACHE_KEY);
+      let voiceExists = false;
+      
+      if (cachedVoices) {
+        const voices = JSON.parse(cachedVoices) as VoiceDTO[];
+        voiceExists = voices.some(voice => voice.voiceId === voiceId);
+      }
+      
+      // If the voice doesn't exist in our cache, we need to check directly with the TTS service
+      if (!voiceExists) {
+        this.logger.log(`Voice ID ${voiceId} not found in cache, checking with TTS service`);
+        const voices = await this.ttsService.getVoices();
+        voiceExists = voices.some(voice => voice.voiceId === voiceId);
+        
+        if (!voiceExists) {
+          this.logger.warn(`Voice ID ${voiceId} not found in TTS service`);
+          return null;
+        }
+      }
+      
+      // At this point, we know the voice exists, so we can fetch a fresh preview URL
+      // This would typically be an API call to the TTS service to get a fresh signed URL
+      // For ElevenLabs, we need to make a specific API call to get a sample for this voice
+      const previewUrl = await this.fetchFreshPreviewUrl(voiceId);
+      
+      if (!previewUrl) {
+        this.logger.warn(`Failed to fetch preview URL for voice ID ${voiceId}`);
+        return null;
+      }
+      
+      return previewUrl;
+    } catch (error) {
+      this.logger.error(`Error fetching preview URL for voice ID ${voiceId}: ${error.message}`);
+      return null;
+    }
+  }
+  
+  /**
+   * Fetch a fresh preview URL for a specific voice from the TTS service
+   * This makes a direct API call to get a new sample URL for the voice
+   * 
+   * @param voiceId The ID of the voice to get a preview URL for
+   * @returns A fresh preview URL or null if unable to fetch
+   */
+  private async fetchFreshPreviewUrl(voiceId: string): Promise<string | null> {
+    try {
+      // For ElevenLabs, we need to make a specific API call to get a sample
+      // This would typically be implemented in the TTS service
+      // For now, we'll delegate to the TTS service to get a fresh sample
+      
+      // Check if the TTS service has a method to get a voice sample
+      if (typeof this.ttsService['getVoiceSample'] === 'function') {
+        this.logger.log(`Requesting fresh voice sample for voice ID: ${voiceId}`);
+        const sampleUrl = await this.ttsService['getVoiceSample'](voiceId);
+        return sampleUrl;
+      }
+      
+      // If the TTS service doesn't have a method to get a voice sample,
+      // we'll need to fetch all voices and find the one we want
+      this.logger.log(`TTS service doesn't have getVoiceSample method, fetching all voices`);
+      const voices = await this.ttsService.getVoices();
+      const voice = voices.find(v => v.voiceId === voiceId);
+      
+      if (voice && voice.previewUrl) {
+        return voice.previewUrl;
+      }
+      
+      // If we still don't have a preview URL, we'll need to generate one
+      // This would typically involve generating a sample audio file and getting a URL for it
+      // For now, we'll return null and handle this case in the frontend
+      this.logger.warn(`No preview URL available for voice ID: ${voiceId}`);
+      return null;
+    } catch (error) {
+      this.logger.error(`Error fetching fresh preview URL: ${error.message}`);
+      return null;
+    }
+  }
+  
+  /**
    * Trigger a background refresh of voice data without waiting for completion
    * This is used to keep the cache fresh while still returning quickly to the user
    */

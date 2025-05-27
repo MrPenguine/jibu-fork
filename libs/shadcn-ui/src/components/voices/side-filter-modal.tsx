@@ -4,6 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { VoiceFilters } from './voices-filter-modal';
 import { getVoices, VoiceData } from '../../../../../apps/frontend/src/utils/voicesApi';
 
+// Extend VoiceFilters to include models
+interface ExtendedVoiceFilters extends VoiceFilters {
+  models?: string[];
+}
+
 interface SideFilterModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -18,6 +23,8 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
   const [accent, setAccent] = useState('');
   const [gender, setGender] = useState<string[]>([]);
   const [providers, setProviders] = useState<string[]>(['All']);
+  const [models, setModels] = useState<string[]>([]);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [voices, setVoices] = useState<VoiceData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filteredCount, setFilteredCount] = useState(0);
@@ -30,6 +37,23 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
         const voicesData = await getVoices();
         setVoices(voicesData);
         setFilteredCount(voicesData.length);
+        
+        // Extract all unique models from the voices data
+        const allModels = new Set<string>();
+        voicesData.forEach(voice => {
+          if (voice.highQualityBaseModelIds && voice.highQualityBaseModelIds.length > 0) {
+            voice.highQualityBaseModelIds.forEach(model => {
+              // Format model names to be more readable
+              const formattedModel = model
+                .replace('eleven_', '')
+                .replace(/_/g, ' ')
+                .replace(/v(\d)/, 'v$1'); // Keep version numbers
+              allModels.add(formattedModel);
+            });
+          }
+        });
+        
+        setAvailableModels(Array.from(allModels).sort());
       } catch (error) {
         console.error('Error fetching voices:', error);
       } finally {
@@ -71,6 +95,24 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
       filtered = filtered.filter(voice => voice.provider === selectedProvider);
     }
     
+    // Apply model filter (only if ElevenLabs is selected and models are selected)
+    if ((providers.includes('ElevenLabs') || selectedProvider === 'ElevenLabs') && models.length > 0) {
+      filtered = filtered.filter(voice => {
+        if (!voice.highQualityBaseModelIds || voice.highQualityBaseModelIds.length === 0) {
+          return false;
+        }
+        
+        // Check if any of the selected models match this voice's models
+        return models.some(selectedModel => {
+          // Convert the formatted model name back to the original format for comparison
+          const originalModelFormat = 'eleven_' + selectedModel.replace(/ /g, '_').toLowerCase();
+          return voice.highQualityBaseModelIds?.some(modelId => 
+            modelId.toLowerCase() === originalModelFormat.toLowerCase()
+          ) || false;
+        });
+      });
+    }
+    
     // Get the count of items that would be shown on the current page
     // This ensures the count matches what's actually visible in the list
     const itemsPerPage = 5; // Same as in VoicesList
@@ -90,7 +132,7 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
   // Update filtered count whenever filters change
   useEffect(() => {
     setFilteredCount(calculateFilteredCount());
-  }, [language, accent, gender, providers]);
+  }, [language, accent, gender, providers, models]);
   
   // Initialize providers based on selectedProvider when modal opens
   useEffect(() => {
@@ -115,23 +157,25 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
     setAccent('');
     setGender([]);
     setProviders(['All']);
+    setModels([]);
     // Filtered count will be updated automatically via useEffect
   };
   
   const handleApply = () => {
     // Create filters object
-    const filters: VoiceFilters = {
+    const filters: ExtendedVoiceFilters = {
       language,
       accent,
       gender,
-      useCase: [] // Not used in the side filter modal
+      useCase: [], // Not used in the side filter modal
+      models: models // Include selected models
     };
     
     // Calculate the filtered count one more time to ensure it's accurate
     const count = calculateFilteredCount();
     
     // Apply the filters and pass the count
-    onApplyFilters(filters, count);
+    onApplyFilters(filters as VoiceFilters, count);
     
     // Close the modal
     onClose();
@@ -142,6 +186,14 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
       setGender(gender.filter(g => g !== value));
     } else {
       setGender([...gender, value]);
+    }
+  };
+  
+  const handleModelToggle = (value: string) => {
+    if (models.includes(value)) {
+      setModels(models.filter(m => m !== value));
+    } else {
+      setModels([...models, value]);
     }
   };
   
@@ -355,6 +407,31 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
             </div>
           </div>
           
+          {/* Model Selection - Show when ElevenLabs is selected or when we have models already selected */}
+          {(providers.includes('ElevenLabs') || selectedProvider === 'ElevenLabs' || models.length > 0) && availableModels.length > 0 && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium uppercase tracking-wider mb-2">ElevenLabs Models</label>
+              <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2">
+                {availableModels.map(model => (
+                  <div 
+                    key={model}
+                    onClick={() => handleModelToggle(model)}
+                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${models.includes(model) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+                  >
+                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${models.includes(model) ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                      {models.includes(model) && (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-sm">{model}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           {/* Filter Summary */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-medium mb-2">Current Filters:</h3>
@@ -370,7 +447,10 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
               {selectedProvider !== 'All' && (
                 <li>• Selected Provider: <span className="font-medium">{selectedProvider}</span></li>
               )}
-              {!language && !accent && gender.length === 0 && (providers.includes('All') || providers.length === 0) && selectedProvider === 'All' && (
+              {models.length > 0 && (
+                <li>• Models: <span className="font-medium">{models.join(', ')}</span></li>
+              )}
+              {!language && !accent && gender.length === 0 && (providers.includes('All') || providers.length === 0) && selectedProvider === 'All' && models.length === 0 && (
                 <li className="text-gray-500">No filters applied</li>
               )}
             </ul>
@@ -394,8 +474,39 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
               </div>
             ) : (
               <div className="text-sm">
-                <span className="font-medium text-primary">{filteredCount}</span> 
-                <span className="text-muted-foreground"> {filteredCount === 1 ? 'voice' : 'voices'} found</span>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-medium text-primary">{filteredCount}</span> 
+                  <span className="text-muted-foreground"> {filteredCount === 1 ? 'voice' : 'voices'} found</span>
+                  
+                  {/* Show active filter badges */}
+                  <div className="flex flex-wrap gap-1 ml-2">
+                    {language && (
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                        {language}
+                      </span>
+                    )}
+                    {accent && (
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                        {accent}
+                      </span>
+                    )}
+                    {gender.map((g, idx) => (
+                      <span key={idx} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                        {g}
+                      </span>
+                    ))}
+                    {providers.length > 0 && !providers.includes('All') && providers.map((p, idx) => (
+                      <span key={idx} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                        {p}
+                      </span>
+                    ))}
+                    {models.length > 0 && (
+                      <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                        {models.length} {models.length === 1 ? 'model' : 'models'}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>

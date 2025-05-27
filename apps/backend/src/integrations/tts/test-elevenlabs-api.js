@@ -70,8 +70,7 @@ async function testGetVoices() {
   }
 }
 
-// Run VError: Failed to play audio: Unknown error
-    at Audio.eval (webpack-internal:///(app-pages-browser)/./src/utils/voicesApi.ts:185:20)the test
+// Run the test
 testGetVoices()
   .then(() => console.log('\nTest completed successfully'))
   .catch(error => {

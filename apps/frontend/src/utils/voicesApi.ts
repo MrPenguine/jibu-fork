@@ -106,6 +106,8 @@ export interface VoiceData {
   provider: string;
   previewUrl?: string;
   pricePerMinute?: string;
+  category?: string; // Added to identify generated voices
+  highQualityBaseModelIds?: string[]; // Available models for the voice
 }
 
 /**
@@ -130,7 +132,10 @@ function mapElevenLabsVoiceToVoiceData(voice: any): VoiceData {
   const tags = [];
   if (voice.labels?.gender) tags.push(voice.labels.gender);
   if (voice.labels?.accent) tags.push(voice.labels.accent);
-  if (voice.category) tags.push(voice.category);
+  // Only add category to tags if it's not 'generated' or 'cloned'
+  if (voice.category && voice.category !== 'generated' && voice.category !== 'cloned') {
+    tags.push(voice.category);
+  }
   
   // Extract properties with fallbacks
   const gender = voice.labels?.gender || 'neutral';
@@ -140,6 +145,9 @@ function mapElevenLabsVoiceToVoiceData(voice: any): VoiceData {
   let language = 'english'; // Default to English
   if (accent === 'italian') language = 'italian';
   if (accent === 'swedish') language = 'swedish';
+  
+  // Determine if this is a generated voice (Jibu-generated)
+  const isGenerated = voice.category === 'cloned' || voice.name.includes('Generated') || voice.name.includes('Jibu');
   
   return {
     id: voice.voiceId || voice.voice_id,
@@ -151,7 +159,9 @@ function mapElevenLabsVoiceToVoiceData(voice: any): VoiceData {
     useCase: useCase,
     provider: 'ElevenLabs',
     previewUrl: voice.previewUrl || voice.preview_url,
-    pricePerMinute: '$0.015'
+    pricePerMinute: '$0.015',
+    category: isGenerated ? 'generated' : voice.category || '',
+    highQualityBaseModelIds: voice.high_quality_base_model_ids || []
   };
 }
 

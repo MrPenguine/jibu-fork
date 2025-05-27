@@ -12,6 +12,8 @@ interface VoiceListItemProps {
   isSelected?: boolean;
   onSelect?: () => void;
   onMenuOpen?: () => void;
+  category?: string; // Added category to identify generated voices
+  highQualityBaseModelIds?: string[]; // Available models for the voice
 }
 
 // Define provider colors mapping
@@ -40,11 +42,14 @@ export const VoiceListItem: React.FC<VoiceListItemProps> = ({
   pricePerMinute = '$0.015',
   isSelected = false,
   onSelect,
-  onMenuOpen
+  onMenuOpen,
+  category = '',
+  highQualityBaseModelIds = []
 }) => {
   // Using the primary color from CSS variables
   const primaryColor = 'var(--primary)';
   const [isHovered, setIsHovered] = React.useState(false);
+  const [showModelTooltip, setShowModelTooltip] = React.useState(false);
   
   return (
     <div 
@@ -81,29 +86,66 @@ export const VoiceListItem: React.FC<VoiceListItemProps> = ({
         <div>
           <h3 className="font-medium">{name}</h3>
           <div className="flex flex-wrap gap-1 mt-1">
+            {/* Show Jibu badge for generated voices */}
+            {category === 'generated' && (
+              <span className="px-2 py-0.5 text-white text-xs rounded-full" style={{ backgroundColor: '#6366f1' }}>
+                Jibu
+              </span>
+            )}
             {tags.map((tag, index) => (
               <span key={index} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                {tag}
+                {tag !== 'generated' ? tag : null}
               </span>
-            ))}
+            )).filter(tag => tag !== null)}
           </div>
         </div>
       </div>
       
-      {/* Middle section - Price per minute */}
-      <div className="text-center mx-4">
-        <div className="text-sm font-medium text-gray-500">Price</div>
-        <div className="font-bold" style={{ color: primaryColor }}>{pricePerMinute}/min</div>
-      </div>
-      
+      {/* Right section - Provider badge, price badge, and menu button */}
       <div className="flex items-center gap-3">
-        {/* Provider badge - always show a provider or Custom */}
+        {/* Provider badge */}
         <div 
           className="px-3 py-1 rounded-full text-white text-xs font-medium"
           style={{ backgroundColor: providerColors[provider] || providerColors['Custom'] }}
         >
           {provider !== 'All' ? provider : 'Custom'}
         </div>
+        
+        {/* Price badge */}
+        <div 
+          className="px-3 py-1 rounded-full text-white text-xs font-medium"
+          style={{ backgroundColor: '#10b981' }}
+        >
+          {pricePerMinute}/min
+        </div>
+        
+        {/* Models badge with tooltip */}
+        {highQualityBaseModelIds && highQualityBaseModelIds.length > 0 && (
+          <div className="relative">
+            <div 
+              className="px-3 py-1 rounded-full text-white text-xs font-medium cursor-help"
+              style={{ backgroundColor: '#8b5cf6' }}
+              onMouseEnter={() => setShowModelTooltip(true)}
+              onMouseLeave={() => setShowModelTooltip(false)}
+            >
+              Available in {highQualityBaseModelIds.length} models
+            </div>
+            
+            {/* Tooltip */}
+            {showModelTooltip && (
+              <div className="absolute z-10 p-2 mt-2 bg-white rounded-md shadow-lg text-xs w-48 right-0">
+                <div className="font-medium mb-1">Available models:</div>
+                <ul className="list-disc pl-4">
+                  {highQualityBaseModelIds.map((model, index) => (
+                    <li key={index} className="text-gray-700">
+                      {model.replace('eleven_', '').replace('_', ' ')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* Three-dot menu button */}
         <button 
