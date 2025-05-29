@@ -152,7 +152,7 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
       },
       {
         title: "Workflows",
-        url: "#",
+        url: "/workflows",
         icon: <FileCog className="size-4" />
       },
       {

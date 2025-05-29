@@ -55,6 +55,8 @@ model Organization {
   assistants           Assistant[] // Assistants belonging to this organization
   chats                Chat[] // All chats in this organization
   tools                Tool[] // Tools belonging to this organization
+  workflows            Workflow[] // Workflows belonging to this organization
+  workflowSessions     WorkflowSession[] // Workflow sessions belonging to this organization
 }
 
 model OrganizationMembership {
@@ -214,6 +216,7 @@ model Assistant {
   updatedAt                  DateTime        @updatedAt
   chats                      Chat[]
   tools                      AssistantTool[] // Tools assigned to this assistant
+  workflows                  Workflow[]      // Workflows associated with this assistant
 
   @@index([organizationId])
   @@index([knowledgeBaseId])
@@ -249,9 +252,10 @@ model Chat {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assistant    Assistant    @relation(fields: [assistantId], references: [id], onDelete: Cascade)
-  messages     Message[]
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assistant       Assistant        @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  messages        Message[]
+  workflowSessions WorkflowSession[] // Workflow sessions associated with this chat
 
   @@unique([assistantId, sessionId]) // Ensure we have a unique chat per assistant and sessionId
   @@index([organizationId])
@@ -342,4 +346,88 @@ model AssistantTool {
   @@index([assistantId])
   @@index([toolId])
 }
- 
+
+// --- Enums for Workflow ---
+enum WorkflowNodeType {
+  START
+  END
+  MESSAGE // Send a message (text, or for voice: TTS)
+  LISTEN // Wait for user input (text, or for voice: ASR + VAD)
+  CHOICE // Present options to the user (buttons for text, DTMF/spoken for voice)
+  CONDITION // Branch logic based on variables or input
+  SET_VARIABLE // Set/modify conversation variables
+  API_CALL // Make an HTTP request
+  TOOL_CALL // Execute one of your existing custom Tools
+  FUNCTION_CALL // More generic than TOOL_CALL, might execute a predefined server-side function
+  TRANSFER // For voice: transfer call (e.g., to SIP URI, phone number)
+  RECORD // For voice: record audio
+  PLAY_AUDIO // For voice: play a pre-recorded audio URL
+}
+
+// --- Workflow Definition ---
+model Workflow {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name        String
+  description String?
+
+  // Link to an Assistant (most common scenario)
+  assistantId String
+  assistant   Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+
+  // Link to Organization for ownership/scoping
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The actual flow structure
+  nodes Json // Array of FlowNode objects (defined in TypeScript, stored as JSON)
+  edges Json // Array of FlowEdge objects (defined in TypeScript, stored as JSON)
+
+  startNodeId String? // ID of the node where execution begins
+
+  // For versioning
+  version         Int     @default(1)
+  isPublished     Boolean @default(false)
+  publishedAt     DateTime?
+
+  sessions WorkflowSession[] // Active and past execution sessions for this workflow
+
+  @@index([assistantId])
+  @@index([organizationId])
+}
+
+// --- Workflow Execution State (Session) ---
+model WorkflowSession {
+  id        String   @id @default(uuid()) // The unique session ID
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  currentNodeId String?  // The ID of the node the flow is currently at (if paused waiting for input)
+  variables     Json     // Conversation variables: Record<string, any>
+  history       Json?    // Log of executed nodes and I/O: Array<{ nodeId: string, input?: any, output?: any, timestamp: Date }>
+
+  status        String   @default("ACTIVE") // e.g., ACTIVE, PAUSED, COMPLETED, ERROR, CANCELLED
+  endedAt       DateTime?
+
+  // For voice-specific state
+  callSid       String?  @unique // SID from your voice provider (e.g., Twilio, or your own)
+  phoneNumber   String?  // User's phone number (if applicable)
+
+  // If this workflow session is part of a larger Chat
+  chatId        String?
+  chat          Chat?    @relation(fields: [chatId], references: [id])
+
+  @@index([workflowId])
+  @@index([organizationId])
+  @@index([callSid])
+  @@index([chatId])
+  @@index([status])
+}
