@@ -2,9 +2,9 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { MessageSquare } from 'lucide-react';
+import { BrainCircuit } from 'lucide-react';
 
-export const MessageNode = memo(({ data, selected }: NodeProps) => {
+export const PromptNode = memo(({ data, selected }: NodeProps) => {
   const handleTestClick = (event: React.MouseEvent) => {
     // Stop propagation to prevent node selection
     event.stopPropagation();
@@ -19,7 +19,7 @@ export const MessageNode = memo(({ data, selected }: NodeProps) => {
     <div className="shadow-sm rounded-lg bg-blue-50 min-w-[200px] overflow-hidden">
       {/* Block title with play button */}
       <div className="px-4 py-2 text-sm font-medium text-blue-700 flex justify-between items-center bg-blue-100">
-        <div>New Block {data.blockNumber || 3}</div>
+        <div>New Block {data.blockNumber || 13}</div>
         <button 
           onClick={handleTestClick}
           className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-blue-200 transition-colors"
@@ -34,20 +34,33 @@ export const MessageNode = memo(({ data, selected }: NodeProps) => {
       {/* Block content */}
       <div className="p-3">
         <div className="bg-white rounded-md p-3 flex items-center space-x-2 border border-blue-200">
-          <MessageSquare className="h-5 w-5 text-blue-500" />
-          <div className="text-sm text-blue-700">{data.message || 'Select agent'}</div>
+          <BrainCircuit className="h-5 w-5 text-blue-500" />
+          <div className="text-sm text-blue-700">Prompt</div>
         </div>
+        
+        {data.prompt && (
+          <div className="mt-2 px-1 text-xs text-blue-700">
+            <div className="font-medium">Prompt:</div>
+            <div className="truncate max-w-[250px] text-blue-700">
+              {data.prompt.length > 50 ? data.prompt.substring(0, 50) + '...' : data.prompt}
+            </div>
+            {data.outputVariableName && (
+              <div className="mt-1">
+                Store in: <span className="font-mono">{data.outputVariableName}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      
       <Handle
         type="target"
         position={Position.Top}
-        className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white"
+        className="w-2 h-2 bg-blue-500"
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white"
+        className="w-2 h-2 bg-blue-500"
       />
     </div>
   );

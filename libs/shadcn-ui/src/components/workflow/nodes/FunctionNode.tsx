@@ -2,9 +2,9 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Square } from 'lucide-react';
+import { Code2 } from 'lucide-react';
 
-export const EndNode = memo(({ data, selected }: NodeProps) => {
+export const FunctionNode = memo(({ data, selected }: NodeProps) => {
   const handleTestClick = (event: React.MouseEvent) => {
     // Stop propagation to prevent node selection
     event.stopPropagation();
@@ -19,7 +19,7 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
     <div className="shadow-sm rounded-lg bg-slate-50 min-w-[200px] overflow-hidden">
       {/* Block title with play button */}
       <div className="px-4 py-2 text-sm font-medium text-slate-700 flex justify-between items-center bg-slate-100">
-        <div>New Block {data.blockNumber || 5}</div>
+        <div>New Block {data.blockNumber || 14}</div>
         <button 
           onClick={handleTestClick}
           className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors"
@@ -34,15 +34,40 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
       {/* Block content */}
       <div className="p-3">
         <div className="bg-white rounded-md p-3 flex items-center space-x-2 border border-slate-200">
-          <Square className="h-5 w-5 text-slate-500" />
-          <div className="text-sm text-slate-500">Agent ends in current state</div>
+          <Code2 className="h-5 w-5 text-slate-500" />
+          <div className="text-sm text-slate-700">Function</div>
         </div>
+        
+        {data.functionName && (
+          <div className="mt-2 px-1 text-xs text-slate-700">
+            <div className="font-medium">Function: {data.functionName}</div>
+            {data.parameters && (
+              <div className="mt-1">
+                <div className="font-medium">Parameters:</div>
+                <div className="truncate max-w-[250px] font-mono text-slate-700">
+                  {typeof data.parameters === 'object' 
+                    ? JSON.stringify(data.parameters).substring(0, 50) + (JSON.stringify(data.parameters).length > 50 ? '...' : '')
+                    : String(data.parameters)}
+                </div>
+              </div>
+            )}
+            {data.outputVariableName && (
+              <div className="mt-1">
+                Store in: <span className="font-mono">{data.outputVariableName}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      
       <Handle
         type="target"
         position={Position.Top}
-        className="w-3 h-3 rounded-full bg-slate-500 border-2 border-white"
+        className="w-2 h-2 bg-slate-500"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="w-2 h-2 bg-slate-500"
       />
     </div>
   );

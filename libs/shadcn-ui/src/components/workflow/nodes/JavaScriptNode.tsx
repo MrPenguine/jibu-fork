@@ -2,9 +2,9 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Variable } from 'lucide-react';
+import { Code } from 'lucide-react';
 
-export const SetVariableNode = memo(({ data, selected }: NodeProps) => {
+export const JavaScriptNode = memo(({ data, selected }: NodeProps) => {
   const handleTestClick = (event: React.MouseEvent) => {
     // Stop propagation to prevent node selection
     event.stopPropagation();
@@ -19,7 +19,7 @@ export const SetVariableNode = memo(({ data, selected }: NodeProps) => {
     <div className="shadow-sm rounded-lg bg-yellow-50 min-w-[200px] overflow-hidden">
       {/* Block title with play button */}
       <div className="px-4 py-2 text-sm font-medium text-yellow-700 flex justify-between items-center bg-yellow-100">
-        <div>New Block {data.blockNumber || 7}</div>
+        <div>New Block {data.blockNumber || 11}</div>
         <button 
           onClick={handleTestClick}
           className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-yellow-200 transition-colors"
@@ -34,22 +34,21 @@ export const SetVariableNode = memo(({ data, selected }: NodeProps) => {
       {/* Block content */}
       <div className="p-3">
         <div className="bg-white rounded-md p-3 flex items-center space-x-2 border border-yellow-200">
-          <Variable className="h-5 w-5 text-yellow-500" />
-          <div className="text-sm text-yellow-700">Set Variable</div>
+          <Code className="h-5 w-5 text-yellow-500" />
+          <div className="text-sm text-yellow-700">JavaScript</div>
         </div>
         
-        {data.assignments && data.assignments.length > 0 && (
+        {data.code && (
           <div className="mt-2 px-1 text-xs text-yellow-700">
-            <div className="font-medium mb-1">Assignments:</div>
-            <ul className="list-disc list-inside">
-              {data.assignments.map((assignment: { variableName: string; value: any }, index: number) => (
-                <li key={index} className="truncate max-w-[250px] font-mono text-yellow-700">
-                  {assignment.variableName} = {typeof assignment.value === 'object' 
-                    ? JSON.stringify(assignment.value).substring(0, 20) + '...' 
-                    : String(assignment.value).substring(0, 20) + (String(assignment.value).length > 20 ? '...' : '')}
-                </li>
-              ))}
-            </ul>
+            <div className="font-medium">Code:</div>
+            <div className="truncate max-w-[250px] font-mono text-yellow-700">
+              {data.code.length > 50 ? data.code.substring(0, 50) + '...' : data.code}
+            </div>
+            {data.outputVariableName && (
+              <div className="mt-1">
+                Store in: <span className="font-mono">{data.outputVariableName}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

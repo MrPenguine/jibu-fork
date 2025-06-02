@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req, BadRequestException } from '@nestjs/common';
 import { WorkflowService } from '../services/workflow.service';
 import { CreateWorkflowDto, UpdateWorkflowDto } from '../dto';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
@@ -17,7 +17,14 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Create a new workflow' })
   @ApiResponse({ status: 201, description: 'The workflow has been successfully created.' })
   create(@Body() createWorkflowDto: CreateWorkflowDto, @Req() req): Promise<Workflow> {
-    const organizationId = req.user.organizationId;
+    // Get organization ID from req.user.orgId (set by JWT strategy)
+    const organizationId = req.user.orgId;
+    
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected. Please select an organization first.');
+    }
+    
+    console.log('Controller received organization ID:', organizationId);
     return this.workflowService.create(createWorkflowDto, organizationId);
   }
 
@@ -25,7 +32,10 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Get all workflows for the organization' })
   @ApiResponse({ status: 200, description: 'Return all workflows for the organization.' })
   findAll(@Req() req): Promise<Workflow[]> {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
     return this.workflowService.findAll(organizationId);
   }
 
@@ -33,7 +43,10 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Get all workflows for a specific assistant' })
   @ApiResponse({ status: 200, description: 'Return all workflows for the assistant.' })
   findAllByAssistant(@Param('assistantId') assistantId: string, @Req() req): Promise<Workflow[]> {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
     return this.workflowService.findAllByAssistant(assistantId, organizationId);
   }
 
@@ -42,7 +55,10 @@ export class WorkflowController {
   @ApiResponse({ status: 200, description: 'Return the workflow.' })
   @ApiResponse({ status: 404, description: 'Workflow not found.' })
   findOne(@Param('id') id: string, @Req() req): Promise<Workflow> {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
     return this.workflowService.findOne(id, organizationId);
   }
 
@@ -55,7 +71,10 @@ export class WorkflowController {
     @Body() updateWorkflowDto: UpdateWorkflowDto,
     @Req() req,
   ): Promise<Workflow> {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
     return this.workflowService.update(id, updateWorkflowDto, organizationId);
   }
 
@@ -64,7 +83,10 @@ export class WorkflowController {
   @ApiResponse({ status: 200, description: 'The workflow has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'Workflow not found.' })
   remove(@Param('id') id: string, @Req() req): Promise<Workflow> {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
     return this.workflowService.remove(id, organizationId);
   }
 
@@ -73,7 +95,10 @@ export class WorkflowController {
   @ApiResponse({ status: 200, description: 'The workflow has been successfully published.' })
   @ApiResponse({ status: 404, description: 'Workflow not found.' })
   publish(@Param('id') id: string, @Req() req): Promise<Workflow> {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
     return this.workflowService.publish(id, organizationId);
   }
 
@@ -82,7 +107,10 @@ export class WorkflowController {
   @ApiResponse({ status: 200, description: 'The workflow has been successfully unpublished.' })
   @ApiResponse({ status: 404, description: 'Workflow not found.' })
   unpublish(@Param('id') id: string, @Req() req): Promise<Workflow> {
-    const organizationId = req.user.organizationId;
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
     return this.workflowService.unpublish(id, organizationId);
   }
 }

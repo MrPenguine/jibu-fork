@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom styles for hiding React Flow panels */
+.hide-react-flow-panel .react-flow__panel.top.left {
+  display: none !important;
+}
+
 @layer base {
   :root {
     --radius: 1rem;

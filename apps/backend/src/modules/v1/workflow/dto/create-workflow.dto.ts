@@ -25,5 +25,6 @@ export class CreateWorkflowDto {
   startNodeId?: string;
 
   @IsUUID()
-  assistantId: string;
+  @IsOptional()
+  assistantId?: string;
 }

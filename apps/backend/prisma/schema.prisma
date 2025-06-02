@@ -373,9 +373,9 @@ model Workflow {
   name        String
   description String?
 
-  // Link to an Assistant (most common scenario)
-  assistantId String
-  assistant   Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  // Link to an Assistant (optional - assistants can be specified at the node level)
+  assistantId String?
+  assistant   Assistant? @relation(fields: [assistantId], references: [id], onDelete: SetNull)
 
   // Link to Organization for ownership/scoping
   organizationId String

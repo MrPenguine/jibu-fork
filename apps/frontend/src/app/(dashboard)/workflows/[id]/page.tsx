@@ -1,181 +1,353 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@libs/shadcn-ui/components/ui/button';
+import React, { useState, useCallback, useRef } from 'react';
+import { useParams } from 'next/navigation';
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  NodeMouseHandler,
+  Connection,
+  MarkerType,
+  Controls,
+  Background,
+  useReactFlow,
+  ReactFlowInstance,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import { Input } from '@libs/shadcn-ui/components/ui/input';
-import { Textarea } from '@libs/shadcn-ui/components/ui/textarea';
-import { Checkbox } from '@libs/shadcn-ui/components/ui/checkbox';
-import { Label } from '@libs/shadcn-ui/components/ui/label';
-import { workflowApi, Workflow } from '../../../../utils/workflowApi';
-import { WorkflowDesignerWithProvider } from '@jibu/reactflow-workflow-editor'; // Assuming this is the correct path
-import { toast } from 'sonner'; // Or your preferred toast library
+import { Button } from '@libs/shadcn-ui/components/ui/button';
+import { Separator } from '@libs/shadcn-ui/components/ui/separator';
+import { Dialog } from '@libs/shadcn-ui/components/ui/dialog';
+import {
+  WorkflowNodeType,
+  FlowNode,
+  FlowEdge,
+} from '@libs/shadcn-ui';
+import {
+  StartNode,
+  EndNode,
+  MessageNode,
+  ListenNode,
+  ChoiceNode,
+  ConditionNode,
+  SetVariableNode,
+  ApiCallNode,
+  ToolCallNode,
+  WorkflowExecutionDialog,
+  WorkflowNodeInspector,
+} from '@libs/shadcn-ui/components/workflow';
+import {
+  Save,
+  Play,
+  ZoomIn,
+  ZoomOut,
+  Rocket,
+} from 'lucide-react';
 
-// Mock assistantId - replace with actual logic
-const MOCK_ASSISTANT_ID = 'assistant_123';
+// Import our custom hook and components
+import { useWorkflow, getDefaultNodeData } from '@libs/shadcn-ui/hooks/workflow';
+import { WorkflowSidebar } from '@libs/shadcn-ui/components/workflow';
+import { NodeInspectorPanel } from '@libs/shadcn-ui/components/workflow';
 
-export default function WorkflowDetailPage() {
-  const router = useRouter();
+// Define node types for React Flow
+const nodeTypes = {
+  [WorkflowNodeType.START]: StartNode,
+  [WorkflowNodeType.END]: EndNode,
+  [WorkflowNodeType.MESSAGE]: MessageNode,
+  [WorkflowNodeType.LISTEN]: ListenNode,
+  [WorkflowNodeType.CHOICE]: ChoiceNode,
+  [WorkflowNodeType.CONDITION]: ConditionNode,
+  [WorkflowNodeType.SET_VARIABLE]: SetVariableNode,
+  [WorkflowNodeType.API_CALL]: ApiCallNode,
+  [WorkflowNodeType.TOOL_CALL]: ToolCallNode,
+};
+
+// Default edge options
+const defaultEdgeOptions = {
+  type: 'smoothstep',
+  markerEnd: {
+    type: MarkerType.ArrowClosed,
+  },
+  style: {
+    strokeWidth: 2,
+  },
+};
+
+// Import the workflow API
+import { workflowApi } from '../../../../utils/workflowApi';
+
+// Main workflow editor component
+function WorkflowDetailContent() {
   const params = useParams();
   const workflowId = params.id as string;
-
-  const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [workflowName, setWorkflowName] = useState('');
-  const [workflowDescription, setWorkflowDescription] = useState('');
-  const [isPublished, setIsPublished] = useState(false);
-  const [nodes, setNodes] = useState<any[]>([]); // Adjust type as per your reactflow setup
-  const [edges, setEdges] = useState<any[]>([]); // Adjust type as per your reactflow setup
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const fetchWorkflowData = useCallback(async () => {
-    if (!workflowId) return;
-    setIsLoading(true);
-    try {
-      const data = await workflowApi.getWorkflowById(workflowId);
-      setWorkflow(data);
-      setWorkflowName(data.name);
-      setWorkflowDescription(data.description || '');
-      setIsPublished(data.isPublished);
-      // Assuming workflow data contains nodes and edges for the designer
-      setNodes(data.definition?.nodes || []); 
-      setEdges(data.definition?.edges || []);
-    } catch (error) {
-      console.error('Failed to fetch workflow:', error);
-      toast.error('Failed to load workflow details.');
-      // Optionally redirect if workflow not found or error occurs
-      // router.push('/workflows'); 
-    }
-    setIsLoading(false);
-  }, [workflowId]);
-
-  useEffect(() => {
-    fetchWorkflowData();
-  }, [fetchWorkflowData]);
-
-  const handleSaveWorkflow = async () => {
-    if (!workflow) return;
-    setIsSaving(true);
-    try {
-      const updatedWorkflowData = {
-        name: workflowName,
-        description: workflowDescription,
-        isPublished: isPublished,
-        definition: { nodes, edges }, // Save current state of the designer
-        // assistantId should ideally be part of the workflow object or handled by the API
-        assistantId: workflow.assistantId || MOCK_ASSISTANT_ID, 
-      };
-      await workflowApi.updateWorkflow(workflowId, updatedWorkflowData);
-      toast.success('Workflow saved successfully!');
-      // Optionally refetch or update local state more granularly
-      fetchWorkflowData(); 
-    } catch (error) {
-      console.error('Failed to save workflow:', error);
-      toast.error('Failed to save workflow.');
-    }
-    setIsSaving(false);
-  };
-
-  const handleDeleteWorkflow = async () => {
-    if (!workflowId) return;
-    if (!confirm('Are you sure you want to delete this workflow? This action cannot be undone.')) {
-      return;
-    }
-    setIsDeleting(true);
-    try {
-      await workflowApi.deleteWorkflow(workflowId);
-      toast.success('Workflow deleted successfully!');
-      router.push('/workflows');
-    } catch (error) {
-      console.error('Failed to delete workflow:', error);
-      toast.error('Failed to delete workflow.');
-    }
-    setIsDeleting(false);
-  };
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const { fitView } = useReactFlow();
   
-  // Placeholder for Run functionality - to be integrated later
-  const handleRunWorkflow = () => {
-    toast.info('Run functionality will be implemented here.');
-    // This could open a modal, a new tab, or display results in a panel
-  };
+  // Use our custom hook for workflow management
+  const {
+    workflow,
+    workflowName,
+    setWorkflowName,
+    nodes,
+    setNodes,
+    edges,
+    isLoading,
+    isSaving,
+    selectedNode,
+    setSelectedNode,
+    isRunDialogOpen,
+    setIsRunDialogOpen,
+    isPublished,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    updateNodeData,
+    saveWorkflow,
+    publishWorkflow,
+    scheduleAutoSave
+  } = useWorkflow(workflowId, workflowApi);
+
+  // State for React Flow instance and active popover
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [activePopover, setActivePopover] = useState<string | null>(null);
+
+  // Node click handler
+  const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
+    setSelectedNode(node as FlowNode);
+  }, [setSelectedNode]);
+
+  // Drag over handler for drag and drop
+  const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Test node handler
+  const handleTestNode = useCallback((nodeId: string) => {
+    // Find the node
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      setSelectedNode(node as FlowNode);
+      setIsRunDialogOpen(true);
+    }
+  }, [nodes, setSelectedNode, setIsRunDialogOpen]);
+
+  // Drop handler for drag and drop
+  const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+
+    if (!reactFlowWrapper.current || !reactFlowInstance) return;
+
+    const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
+    const dataTransfer = event.dataTransfer.getData('application/reactflow');
+    
+    if (!dataTransfer) return;
+
+    const { nodeType, label } = JSON.parse(dataTransfer);
+
+    // Calculate position relative to the viewport
+    const position = reactFlowInstance.project({
+      x: event.clientX - reactFlowBounds.left,
+      y: event.clientY - reactFlowBounds.top,
+    });
+
+    // Generate a block number based on existing nodes
+    const blockNumber = nodes.length + 1;
+
+    // Create a new node with appropriate data based on type
+    const newNode: FlowNode = {
+      id: `${nodeType.toLowerCase()}_${Date.now()}`,
+      type: nodeType,
+      position,
+      data: { 
+        label: label || nodeType.toString(),
+        ...getDefaultNodeData(nodeType),
+        blockNumber,
+        onTest: handleTestNode
+      },
+    };
+
+    // Add the new node to the graph
+    setNodes((nds: FlowNode[]) => [...nds, newNode]);
+    scheduleAutoSave();
+  }, [reactFlowInstance, scheduleAutoSave, setNodes]);
+
+  // Handle adding a node via click
+  const handleAddNode = useCallback((nodeType: WorkflowNodeType, label: string) => {
+    if (!reactFlowInstance) return;
+
+    // Calculate a position in the center of the viewport
+    const center = reactFlowInstance.getViewport();
+    const position = reactFlowInstance.project({
+      x: center.x,
+      y: center.y,
+    });
+
+    // Create a new node with appropriate data based on type
+    const newNode: FlowNode = {
+      id: `${nodeType.toLowerCase()}_${Date.now()}`,
+      type: nodeType,
+      position,
+      data: { 
+        label: label || nodeType.toString(),
+        ...getDefaultNodeData(nodeType)
+      },
+    };
+
+    // Add the new node to the graph
+    setNodes((nds: FlowNode[]) => [...nds, newNode]);
+    scheduleAutoSave();
+    setActivePopover(null);
+  }, [reactFlowInstance, scheduleAutoSave, setNodes, setActivePopover]);
+
+  // Handle run workflow
+  const handleRunWorkflow = useCallback(() => {
+    setIsRunDialogOpen(true);
+  }, [setIsRunDialogOpen]);
+
+  // Handle publish workflow
+  const handlePublishWorkflow = useCallback(() => {
+    publishWorkflow();
+  }, [publishWorkflow]);
 
   if (isLoading) {
-    return <div className="container mx-auto py-6 text-center">Loading workflow...</div>;
-  }
-
-  if (!workflow) {
-    return <div className="container mx-auto py-6 text-center">Workflow not found.</div>;
+    return <div className="p-8 flex items-center justify-center">Loading workflow...</div>;
   }
 
   return (
-    <div className="container mx-auto py-6 flex flex-col h-[calc(100vh-theme(spacing.16))]">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Edit Workflow: {workflow.name}</h1>
-          <p className="text-muted-foreground">
-            Modify the workflow details and design.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleSaveWorkflow} disabled={isSaving || isDeleting}>
-            {isSaving ? 'Saving...' : 'Save Workflow'}
-          </Button>
-          <Button variant="outline" onClick={handleRunWorkflow} disabled={!isPublished || isSaving || isDeleting}>
-            Run Workflow
-          </Button>
-          <Button variant="destructive" onClick={handleDeleteWorkflow} disabled={isSaving || isDeleting}>
-            {isDeleting ? 'Deleting...' : 'Delete Workflow'}
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6 flex-grow">
-        {/* Workflow Settings Panel */}
-        <div className="md:col-span-1 space-y-6 bg-card p-6 rounded-lg shadow">
-          <div>
-            <Label htmlFor="workflowName">Workflow Name</Label>
-            <Input 
-              id="workflowName" 
-              value={workflowName} 
-              onChange={(e) => setWorkflowName(e.target.value)} 
-              placeholder="Enter workflow name"
-            />
-          </div>
-          <div>
-            <Label htmlFor="workflowDescription">Description</Label>
-            <Textarea 
-              id="workflowDescription" 
-              value={workflowDescription} 
-              onChange={(e) => setWorkflowDescription(e.target.value)} 
-              placeholder="Enter workflow description (optional)"
-              rows={3}
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="isPublished" 
-              checked={isPublished} 
-              onCheckedChange={(checked) => setIsPublished(checked as boolean)} 
-            />
-            <Label htmlFor="isPublished">Publish Workflow</Label>
-          </div>
-          {/* Add more settings as needed */}
-        </div>
-
-        {/* Workflow Designer */}
-        <div className="md:col-span-2 bg-card p-1 rounded-lg shadow flex flex-col h-full">
-          <WorkflowDesignerWithProvider
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={setNodes} // Or use the reactflow onNodesChange handler
-            onEdgesChange={setEdges} // Or use the reactflow onEdgesChange handler
-            // onConnect, onLayout, etc. as needed by your designer component
-            // assistantId={workflow.assistantId || MOCK_ASSISTANT_ID} // Pass assistantId if required by the designer
-            // Ensure the designer can handle initial empty nodes/edges if creating new
+    <div className="h-screen flex flex-col bg-slate-100 text-slate-800">
+      {/* Top Bar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-white shadow-sm h-14 shrink-0">
+        <div className="flex items-center">
+          <Input 
+            value={workflowName} 
+            onChange={(e) => setWorkflowName(e.target.value)}
+            onBlur={saveWorkflow}
+            className="border-none bg-transparent h-9 px-2 text-lg font-medium focus-visible:ring-0 focus-visible:ring-offset-0 w-64"
+            placeholder="Untitled Workflow"
           />
         </div>
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-slate-600" 
+            onClick={saveWorkflow} 
+            disabled={isSaving}
+          >
+            <Save size={16} className="mr-1" /> 
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+          <Separator orientation="vertical" className="h-6" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-slate-600" 
+            onClick={handleRunWorkflow}
+          >
+            <Play size={16} className="mr-1" /> 
+            Test
+          </Button>
+          <Button 
+            variant={isPublished ? "secondary" : "default"}
+            size="sm" 
+            className={isPublished ? "bg-green-100 text-green-800 hover:bg-green-200" : ""}
+            onClick={handlePublishWorkflow}
+          >
+            <Rocket size={16} className="mr-1" /> 
+            {isPublished ? 'Published' : 'Publish'}
+          </Button>
+        </div>
       </div>
+      
+      {/* Main Content Area with Sidebar */}
+      <div className="flex flex-grow overflow-hidden">
+        {/* Sidebar with Node Categories */}
+        <WorkflowSidebar 
+          activePopover={activePopover}
+          setActivePopover={setActivePopover}
+          onDragStart={(event, nodeType, label) => {
+            event.dataTransfer.setData('application/reactflow', JSON.stringify({ nodeType, label }));
+            event.dataTransfer.effectAllowed = 'move';
+            setActivePopover(null);
+          }}
+          onAddNode={handleAddNode}
+        />
+        
+        {/* Canvas Area */}
+        <div className="flex-grow relative">
+          <div 
+            ref={reactFlowWrapper} 
+            className="w-full h-full bg-muted/40 relative hide-react-flow-panel"
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+          >
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              defaultEdgeOptions={defaultEdgeOptions}
+              onInit={setReactFlowInstance}
+              fitView
+              proOptions={{ hideAttribution: true }}
+            >
+              <Controls />
+              <Background color="#aaa" gap={16} />
+            </ReactFlow>
+            
+            {/* Node Inspector Panel */}
+            {selectedNode && (
+              <NodeInspectorPanel
+                selectedNode={selectedNode}
+                onClose={() => setSelectedNode(null)}
+                onNodeUpdate={(nodeId, data) => {
+                  updateNodeData(nodeId, data);
+                }}
+                assistantId={workflow?.assistantId}
+              />
+            )}
+          </div>
+          
+          {/* Bottom Bar with Zoom Controls */}
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center space-x-1 p-1.5 bg-white rounded-lg shadow-md border border-slate-200">
+            <Button variant="ghost" size="icon" className="text-slate-600" onClick={() => reactFlowInstance?.zoomOut()}>
+              <ZoomOut size={18}/>
+            </Button>
+            <Button variant="ghost" size="sm" className="text-slate-600" onClick={() => reactFlowInstance?.setViewport({ x: 0, y: 0, zoom: 1 })}>
+              100%
+            </Button>
+            <Button variant="ghost" size="icon" className="text-slate-600" onClick={() => reactFlowInstance?.zoomIn()}>
+              <ZoomIn size={18}/>
+            </Button>
+            <div className="h-5 border-l border-slate-300 mx-1"></div>
+            <Button variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5" onClick={handleRunWorkflow}>
+              <Play size={14}/> Test your agent
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Workflow Execution Dialog */}
+      {isRunDialogOpen && workflow && (
+        <WorkflowExecutionDialog
+          workflowId={workflowId}
+          isOpen={isRunDialogOpen}
+          onClose={() => setIsRunDialogOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+// Wrap with ReactFlowProvider
+export default function WorkflowDetailPage() {
+  return (
+    <ReactFlowProvider>
+      <WorkflowDetailContent />
+    </ReactFlowProvider>
   );
 }
