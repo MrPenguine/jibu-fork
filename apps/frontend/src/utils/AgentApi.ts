@@ -1,4 +1,10 @@
 import { fetchAPI } from './api';
+import { FlowNode, FlowEdge, AgentDefinition, AgentSessionOutput } from '../../../../libs/src';
+import { createClient } from './supabase/client';
+import { getActiveOrgId } from './fileApi';
+
+// Base URL for API requests
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 /**
  * Utility for making requests to the Agent API
@@ -282,3 +288,354 @@ export async function sendStreamingAgentRequest(
     }
   }
 }
+
+// Get the current organization ID
+function getCurrentOrganizationId(specificOrgId?: string): string | null {
+  // Prioritize the specificOrgId if provided
+  if (specificOrgId) {
+    return specificOrgId;
+  }
+  
+  // Try to get organization ID from local storage or other sources
+  const orgId = getActiveOrgId();
+  
+  if (!orgId) {
+    console.warn('[agentApi] No organization ID available');
+  }
+  
+  return orgId;
+}
+
+// Get authorization headers with token and organization ID
+async function getAuthHeaders(orgId: string) {
+  const supabase = createClient();
+  const session = await supabase.auth.getSession();
+  const token = session.data.session?.access_token;
+  
+  if (!token) {
+    throw new Error('No authentication token available');
+  }
+  
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+    'X-Organization-ID': orgId,
+    'organization-id': orgId
+  };
+}
+
+// Interface for agent definition creation
+interface CreateAgentDefinitionRequest {
+  name: string;
+  description?: string;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  startNodeId?: string;
+  assistantId?: string;
+}
+
+// Interface for agent definition update
+interface UpdateAgentDefinitionRequest {
+  name?: string;
+  description?: string;
+  nodes?: FlowNode[] | string;
+  edges?: FlowEdge[] | string;
+  startNodeId?: string;
+  assistantId?: string;
+  isPublished?: boolean;
+}
+
+// Interface for agent execution
+interface ExecuteAgentRequest {
+  initialVariables?: Record<string, any>;
+  chatId?: string;
+  callSid?: string;
+}
+
+// Interface for continuing agent execution
+interface ContinueAgentRequest {
+  userInput?: string;
+  event?: Record<string, any>;
+}
+
+// Agent API client functions
+export const agentApiClient = {
+  // Fetch all agent definitions
+  async getAgentDefinitions(specificOrgId?: string): Promise<AgentDefinition[]> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agent definitions: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error fetching agent definitions:', error);
+      throw error;
+    }
+  },
+
+  // Fetch agent definitions for a specific assistant
+  async getAgentDefinitionsByAssistant(assistantId: string, specificOrgId?: string): Promise<AgentDefinition[]> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/assistant/${assistantId}`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agent definitions for assistant: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error fetching agent definitions for assistant:', error);
+      throw error;
+    }
+  },
+
+  // Fetch a specific agent definition by ID
+  async getAgentDefinition(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agent definition: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error fetching agent definition:', error);
+      throw error;
+    }
+  },
+
+  // Create a new agent definition
+  async createAgentDefinition(data: CreateAgentDefinitionRequest, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      // Ensure nodes and edges are serialized if they are arrays
+      const requestData = {
+        ...data,
+        nodes: Array.isArray(data.nodes) ? data.nodes : JSON.parse(data.nodes as unknown as string),
+        edges: Array.isArray(data.edges) ? data.edges : JSON.parse(data.edges as unknown as string)
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create agent definition: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error creating agent definition:', error);
+      throw error;
+    }
+  },
+
+  // Update an existing agent definition
+  async updateAgentDefinition(agentId: string, data: UpdateAgentDefinitionRequest, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update agent definition: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error updating agent definition:', error);
+      throw error;
+    }
+  },
+
+  // Delete an agent definition
+  async deleteAgentDefinition(agentId: string, specificOrgId?: string): Promise<void> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete agent definition: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('[agentApi] Error deleting agent definition:', error);
+      throw error;
+    }
+  },
+
+  // Publish an agent definition
+  async publishAgentDefinition(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/publish`, {
+        method: 'POST',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to publish agent definition: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error publishing agent definition:', error);
+      throw error;
+    }
+  },
+
+  // Unpublish an agent definition
+  async unpublishAgentDefinition(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/unpublish`, {
+        method: 'POST',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to unpublish agent definition: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error unpublishing agent definition:', error);
+      throw error;
+    }
+  },
+
+  // Execute an agent
+  async executeAgent(agentId: string, data: ExecuteAgentRequest, specificOrgId?: string): Promise<AgentSessionOutput> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agent-execution/agents/${agentId}/execute`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to execute agent: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error executing agent:', error);
+      throw error;
+    }
+  },
+
+  // Continue an agent session
+  async continueAgentSession(sessionId: string, data: ContinueAgentRequest, specificOrgId?: string): Promise<AgentSessionOutput> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agent-execution/sessions/${sessionId}/continue`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to continue agent session: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error continuing agent session:', error);
+      throw error;
+    }
+  }
+};

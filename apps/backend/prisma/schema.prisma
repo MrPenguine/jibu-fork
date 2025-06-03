@@ -55,8 +55,8 @@ model Organization {
   assistants           Assistant[] // Assistants belonging to this organization
   chats                Chat[] // All chats in this organization
   tools                Tool[] // Tools belonging to this organization
-  workflows            Workflow[] // Workflows belonging to this organization
-  workflowSessions     WorkflowSession[] // Workflow sessions belonging to this organization
+  agents            Agent[] // Agents belonging to this organization
+  agentSessions     AgentSession[] // Agent sessions belonging to this organization
 }
 
 model OrganizationMembership {
@@ -216,7 +216,7 @@ model Assistant {
   updatedAt                  DateTime        @updatedAt
   chats                      Chat[]
   tools                      AssistantTool[] // Tools assigned to this assistant
-  workflows                  Workflow[]      // Workflows associated with this assistant
+  agents                  Agent[]      // Agents associated with this assistant
 
   @@index([organizationId])
   @@index([knowledgeBaseId])
@@ -255,7 +255,7 @@ model Chat {
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assistant       Assistant        @relation(fields: [assistantId], references: [id], onDelete: Cascade)
   messages        Message[]
-  workflowSessions WorkflowSession[] // Workflow sessions associated with this chat
+  agentSessions AgentSession[] // Agent sessions associated with this chat
 
   @@unique([assistantId, sessionId]) // Ensure we have a unique chat per assistant and sessionId
   @@index([organizationId])
@@ -347,8 +347,8 @@ model AssistantTool {
   @@index([toolId])
 }
 
-// --- Enums for Workflow ---
-enum WorkflowNodeType {
+// --- Enums for Agent ---
+enum AgentNodeType {
   START
   END
   MESSAGE // Send a message (text, or for voice: TTS)
@@ -364,8 +364,8 @@ enum WorkflowNodeType {
   PLAY_AUDIO // For voice: play a pre-recorded audio URL
 }
 
-// --- Workflow Definition ---
-model Workflow {
+// --- Agent Definition ---
+model Agent {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -392,20 +392,20 @@ model Workflow {
   isPublished     Boolean @default(false)
   publishedAt     DateTime?
 
-  sessions WorkflowSession[] // Active and past execution sessions for this workflow
+  sessions AgentSession[] // Active and past execution sessions for this agent
 
   @@index([assistantId])
   @@index([organizationId])
 }
 
-// --- Workflow Execution State (Session) ---
-model WorkflowSession {
+// --- Agent Execution State (Session) ---
+model AgentSession {
   id        String   @id @default(uuid()) // The unique session ID
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workflowId String
-  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  agentId String
+  agent   Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -421,11 +421,11 @@ model WorkflowSession {
   callSid       String?  @unique // SID from your voice provider (e.g., Twilio, or your own)
   phoneNumber   String?  // User's phone number (if applicable)
 
-  // If this workflow session is part of a larger Chat
+  // If this agent session is part of a larger Chat
   chatId        String?
   chat          Chat?    @relation(fields: [chatId], references: [id])
 
-  @@index([workflowId])
+  @@index([agentId])
   @@index([organizationId])
   @@index([callSid])
   @@index([chatId])

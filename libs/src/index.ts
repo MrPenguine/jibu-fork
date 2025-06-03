@@ -1,5 +1,5 @@
-// Define WorkflowNodeType enum for both frontend and backend
-export enum WorkflowNodeType {
+// Define AgentNodeType enum for both frontend and backend
+export enum AgentNodeType {
   START = 'START',
   END = 'END',
   MESSAGE = 'MESSAGE',
@@ -76,7 +76,7 @@ export interface ApiCallNodeData extends BaseNodeData {
 // Tool call node data
 export interface ToolCallNodeData extends BaseNodeData {
   toolId: string; // ID of the tool from your existing Tools system
-  inputMapping: Record<string, string>; // Map workflow variables to tool input parameters, e.g., { "toolParamName": "{{variables.workflowVar}}" }
+  inputMapping: Record<string, string>; // Map agent variables to tool input parameters, e.g., { "toolParamName": "{{variables.agentVar}}" }
   outputVariableName?: string; // Where to store the tool's output
 }
 
@@ -125,8 +125,8 @@ export type FlowNodeData =
 
 // Flow node interface
 export interface FlowNode {
-  id: string; // Unique ID for the node within the workflow
-  type: WorkflowNodeType;
+  id: string; // Unique ID for the node within the agent
+  type: AgentNodeType;
   data: FlowNodeData;
   position: { x: number; y: number }; // For visual designer (React Flow)
 }
@@ -146,8 +146,8 @@ export interface FlowEdge {
   };
 }
 
-// Workflow definition interface
-export interface WorkflowDefinition {
+// Agent definition interface
+export interface AgentDefinition {
   id: string;
   name: string;
   description?: string;
@@ -161,8 +161,8 @@ export interface WorkflowDefinition {
   publishedAt?: Date;
 }
 
-// Workflow session output interface
-export interface WorkflowSessionOutput {
+// Agent session output interface
+export interface AgentSessionOutput {
   sessionId: string;
   status: string; // ACTIVE, PAUSED, COMPLETED, ERROR
   currentNodeId?: string;
@@ -174,10 +174,10 @@ export interface WorkflowSessionOutput {
   error?: string; // Error message if status is ERROR
 }
 
-// Workflow session interface
-export interface WorkflowSession {
+// Agent session interface
+export interface AgentSession {
   id: string;
-  workflowId: string;
+  agentId: string;
   organizationId: string;
   currentNodeId?: string;
   variables: Record<string, any>;

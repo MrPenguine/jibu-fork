@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Textarea } from "@libs/shadcn-ui/components/ui/textarea"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { Slider } from "@libs/shadcn-ui/components/ui/slider"
@@ -16,13 +16,7 @@ import {
   DropdownMenuRadioItem
 } from "@libs/shadcn-ui/components/ui/dropdown-menu"
 import { KnowledgeBaseConfig } from "./KnowledgeBaseConfig"
-import { getAvailableModels, updateAssistant, ModelInfo as ApiModelInfo } from "../../../../../apps/frontend/src/utils/AssistantsApi"
-
-// Use the imported type but with our own local interface
-type ModelInfo = ApiModelInfo;
-
-// Define CategorizedModels to match the API type
-type CategorizedModels = Record<string, ModelInfo[]>;
+import { getAvailableModels, CategorizedModels, ModelInfo, updateAssistant } from "../../../../../apps/frontend/src/utils/AssistantsApi"
 import { format } from "date-fns"
 
 // Minimum context length for filtering
@@ -129,13 +123,10 @@ const filterAndSortModels = (
 
 // Function to get model speed tier
 const getModelSpeedTier = (modelId: string): string => {
-  if (KNOWN_FAST_MODELS.includes(modelId)) {
-    return 'Fast';
-  } else if (modelId.includes('fast')) {
-    return 'Fast';
-  } else {
-    return 'Standard';
-  }
+  if (KNOWN_FAST_MODELS.includes(modelId)) return 'Fastest';
+  if (KNOWN_BALANCED_MODELS.includes(modelId)) return 'Balanced';
+  if (KNOWN_CAPABLE_MODELS.includes(modelId)) return 'Capable';
+  return 'Standard';
 };
 
 // Define props interface
@@ -183,7 +174,7 @@ export function ModelConfig({
   // State for models
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [models, setModels] = useState<Record<string, ModelInfo[]>>({});
+  const [models, setModels] = useState<CategorizedModels>({});
   
   // Autosave state
   const [saving, setSaving] = useState(false);
@@ -216,39 +207,39 @@ export function ModelConfig({
     
     try {
       // Attempt to fetch models from API
-      const fetchedModels = await getAvailableModels();
+      const fetchedModels = await getAvailableModels(organizationId);
       
       // Check if we got valid data
       if (fetchedModels && Object.keys(fetchedModels).length > 0) {
-        setModels(fetchedModels as Record<string, ModelInfo[]>);
+        setModels(fetchedModels);
       } else {
         // If no models returned, use fallback data
         console.warn('No models returned from API, using fallback data');
         
         // Create fallback model data
-        const fallbackModels: Record<string, ModelInfo[]> = {
-          "x-ai": [
-            { id: 'x-ai/grok-3-latest', name: 'Grok 3', contextLength: 128000, description: '' },
-            { id: 'x-ai/grok-3-mini-latest', name: 'Grok 3 Mini', contextLength: 32000, description: '' },
-            { id: 'x-ai/grok-3-fast-latest', name: 'Grok 3 Fast', contextLength: 128000, description: '' },
-            { id: 'x-ai/grok-3-mini-fast-latest', name: 'Grok 3 Mini Fast', contextLength: 32000, description: '' },
-            { id: 'x-ai/grok-2-vision-latest', name: 'Grok 2 Vision', contextLength: 32000, description: '' }
+        const fallbackModels: CategorizedModels = {
+          'x-ai': [
+            { id: 'x-ai/grok-3-latest', name: 'Grok 3', contextLength: 128000 },
+            { id: 'x-ai/grok-3-mini-latest', name: 'Grok 3 Mini', contextLength: 32000 },
+            { id: 'x-ai/grok-3-fast-latest', name: 'Grok 3 Fast', contextLength: 128000 },
+            { id: 'x-ai/grok-3-mini-fast-latest', name: 'Grok 3 Mini Fast', contextLength: 32000 },
+            { id: 'x-ai/grok-2-vision-latest', name: 'Grok 2 Vision', contextLength: 32000 }
           ],
-          "google": [
-            { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', contextLength: 1000000, description: '' },
-            { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', contextLength: 128000, description: '' },
-            { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', contextLength: 32000, description: '' }
+          'google': [
+            { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', contextLength: 1000000 },
+            { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', contextLength: 128000 },
+            { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', contextLength: 32000 }
           ],
-          "mistralai": [
-            { id: 'mistral-large-latest', name: 'Mistral Large', contextLength: 32000, description: '' },
-            { id: 'mistral-medium-latest', name: 'Mistral Medium', contextLength: 32000, description: '' },
-            { id: 'mistral-small-latest', name: 'Mistral Small', contextLength: 32000, description: '' },
-            { id: 'codestral-latest', name: 'Codestral', contextLength: 32000, description: '' },
-            { id: 'ministral-3b-latest', name: 'Ministral 3B', contextLength: 8000, description: '' }
+          'mistralai': [
+            { id: 'mistral-large-latest', name: 'Mistral Large', contextLength: 32000 },
+            { id: 'mistral-medium-latest', name: 'Mistral Medium', contextLength: 32000 },
+            { id: 'mistral-small-latest', name: 'Mistral Small', contextLength: 32000 },
+            { id: 'codestral-latest', name: 'Codestral', contextLength: 32000 },
+            { id: 'ministral-3b-latest', name: 'Ministral 3B', contextLength: 8000 }
           ]
         };
         
-        setModels(fallbackModels as Record<string, ModelInfo[]>);
+        setModels(fallbackModels);
       }
     } catch (error) {
       console.error('Error fetching models:', error);
@@ -269,67 +260,8 @@ export function ModelConfig({
   }, [organizationId]);
   
   // Filter models based on selected provider
-  const filteredModels = useMemo(() => {
-    // Check if we have models for the selected provider
-    if (!provider) {
-      return [];
-    }
-    
-    // Use models for the selected provider if available
-    if (models[provider] && models[provider].length > 0) {
-      return models[provider];
-    }
-    
-    // If no models found for provider, use fallback models
-    const fallbackModels: Record<string, ModelInfo[]> = {
-      "x-ai": [
-        { id: 'x-ai/grok-3-latest', name: 'Grok 3', contextLength: 128000, description: '' },
-        { id: 'x-ai/grok-3-mini-latest', name: 'Grok 3 Mini', contextLength: 32000, description: '' },
-        { id: 'x-ai/grok-3-fast-latest', name: 'Grok 3 Fast', contextLength: 128000, description: '' },
-        { id: 'x-ai/grok-3-mini-fast-latest', name: 'Grok 3 Mini Fast', contextLength: 32000, description: '' },
-        { id: 'x-ai/grok-2-vision-latest', name: 'Grok 2 Vision', contextLength: 32000, description: '' }
-      ],
-      "google": [
-        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', contextLength: 1000000, description: '' },
-        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', contextLength: 128000, description: '' },
-        { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', contextLength: 32000, description: '' }
-      ],
-      "mistralai": [
-        { id: 'mistral-large-latest', name: 'Mistral Large', contextLength: 32000, description: '' },
-        { id: 'mistral-medium-latest', name: 'Mistral Medium', contextLength: 32000, description: '' },
-        { id: 'mistral-small-latest', name: 'Mistral Small', contextLength: 32000, description: '' },
-        { id: 'codestral-latest', name: 'Codestral', contextLength: 32000, description: '' },
-        { id: 'ministral-3b-latest', name: 'Ministral 3B', contextLength: 8000, description: '' }
-      ]
-    };
-    
-    // Return fallback models for the selected provider
-    return fallbackModels[provider] || [];
-  }, [provider, models]);
+  const filteredModels = filterAndSortModels(models, provider);
   
-  // Format provider name for display
-  const formatProviderName = (providerKey: string) => {
-    if (!providerKey) return 'Select a provider';
-    
-    switch (providerKey) {
-      case 'x-ai':
-        return 'X AI (Grok)';
-      case 'google':
-        return 'Google AI (Gemini)';
-      case 'mistralai':
-        return 'Mistral AI';
-      case 'anthropic':
-        return 'Anthropic (Claude)';
-      case 'openai':
-        return 'OpenAI (GPT)';
-      case 'groq':
-        return 'Groq';
-      default:
-        // Capitalize provider name
-        return providerKey.charAt(0).toUpperCase() + providerKey.slice(1);
-    }
-  };
-
   // Get current model name for display
   const currentModelName = (() => {
     // Find the model in the filtered list
@@ -362,6 +294,29 @@ export function ModelConfig({
     ? "This assistant is connected to a knowledge base."
     : "This assistant is not connected to a knowledge base.";
   
+  // Format provider name for display
+  const formatProviderName = (providerKey: string) => {
+    if (!providerKey) return 'Select a provider';
+    
+    switch (providerKey) {
+      case 'x-ai':
+        return 'X AI (Grok)';
+      case 'google':
+        return 'Google AI (Gemini)';
+      case 'mistralai':
+        return 'Mistral AI';
+      case 'anthropic':
+        return 'Anthropic (Claude)';
+      case 'openai':
+        return 'OpenAI (GPT)';
+      case 'groq':
+        return 'Groq';
+      default:
+        // Capitalize provider name
+        return providerKey.charAt(0).toUpperCase() + providerKey.slice(1);
+    }
+  };
+  
   // Handler for model selection to ensure proper state updates
   const handleModelSelection = (modelInfo: ModelInfo) => {
     onModelChange(modelInfo.id);
@@ -393,10 +348,9 @@ export function ModelConfig({
           ) : null}
         </div>
       )}
-      
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Main Configuration Area - Left Side */}
-        <div className="lg:flex-1">
+      <div className="space-y-6">
+        {/* Main Configuration Area */}
+        <div>
           <div className="flex items-center mb-2">
             <h2 className="text-xl font-bold">Model</h2>
             <div className="ml-2 text-muted-foreground">
@@ -493,22 +447,17 @@ export function ModelConfig({
           </div>
         </div>
         
-        {/* Right Settings Panel - Sidebar */}
-        <div className="lg:w-[350px] space-y-8 mt-8 lg:mt-0">
-          {/* LLM Provider Header */}
-          <div className="flex items-center mb-4">
-            <h2 className="text-lg font-medium">Model Provider</h2>
-            <div className="ml-2 text-muted-foreground">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 15V17M12 7V13M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          </div>
-          
-          {/* Provider Selection */}
+        {/* Right Settings Panel */}
+        <div className="w-1/3 pl-6 space-y-8">
+          {/* LLM Provider Selection */}
           <div>
-            <div className="mb-2">
-              <div className="text-sm font-medium">Provider</div>
+            <div className="flex items-center mb-2">
+              <label className="block text-xs font-bold uppercase">LLM Provider</label>
+              <div className="ml-2 text-muted-foreground">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 15V17M12 7V13M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -527,42 +476,30 @@ export function ModelConfig({
                 ) : (
                   SUPPORTED_PROVIDERS.map((providerKey) => {
                     // Count available models for this provider
-                    // For X AI, use fallback models if none are available
-                    let providerModels = models[providerKey] || [];
-                    
-                    // If no models for X AI, use fallback count
-                    if (providerKey === 'x-ai' && providerModels.length === 0) {
-                      // Use the count of fallback X AI models
-                      providerModels = [
-                        { id: 'x-ai/grok-3-latest', name: 'Grok 3', contextLength: 128000, description: '' },
-                        { id: 'x-ai/grok-3-mini-latest', name: 'Grok 3 Mini', contextLength: 32000, description: '' },
-                        { id: 'x-ai/grok-3-fast-latest', name: 'Grok 3 Fast', contextLength: 128000, description: '' },
-                        { id: 'x-ai/grok-3-mini-fast-latest', name: 'Grok 3 Mini Fast', contextLength: 32000, description: '' },
-                        { id: 'x-ai/grok-2-vision-latest', name: 'Grok 2 Vision', contextLength: 32000, description: '' }
-                      ];
-                    }
-                    
+                    const providerModels = models[providerKey] || [];
                     const modelCount = providerModels.length;
                     
-                    // Always show all supported providers
-                    return (
-                      <DropdownMenuItem 
-                        key={providerKey} 
-                        onClick={() => {
-                          onProviderChange(providerKey);
-                          if (assistantId && assistantId !== 'new') {
-                            setIsDirty(true);
-                            debouncedSave({ model: { provider: providerKey } });
-                          }
-                        }}
-                        className="py-2"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{formatProviderName(providerKey)}</span>
-                          <span className="text-xs text-muted-foreground">{modelCount} models available</span>
-                        </div>
-                      </DropdownMenuItem>
-                    );
+                    if (modelCount > 0) {
+                      return (
+                        <DropdownMenuItem 
+                          key={providerKey} 
+                          onClick={() => {
+                            onProviderChange(providerKey);
+                            if (assistantId && assistantId !== 'new') {
+                              setIsDirty(true);
+                              debouncedSave({ model: { provider: providerKey } });
+                            }
+                          }}
+                          className="py-2"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">{formatProviderName(providerKey)}</span>
+                            <span className="text-xs text-muted-foreground">{modelCount} models available</span>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    }
+                    return null;
                   })
                 )}
               </DropdownMenuContent>
@@ -570,120 +507,123 @@ export function ModelConfig({
           </div>
           
           {/* Model Selection */}
-          <div>
-            <div className="mb-2">
-              <div className="text-sm font-medium">AI Model</div>
-              <p className="text-sm text-muted-foreground">Choose the specific model to power your assistant</p>
+          <div className="flex flex-col items-center">
+            <div className="w-full text-center mb-4">
+              <h2 className="text-xl font-bold">AI Model</h2>
+              <p className="text-sm text-muted-foreground mt-1">Choose the specific model to power your assistant</p>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full bg-white rounded-full border justify-between py-3">
-                  {isLoading ? "Loading..." : currentModelName}
-                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
-                    <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
-                  </svg>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" sideOffset={4} className="w-full border-0 max-h-[300px] overflow-y-auto">
-                {isLoading ? (
-                  <DropdownMenuItem disabled>Loading models...</DropdownMenuItem>
-                ) : error ? (
-                  <DropdownMenuItem disabled>Error loading models</DropdownMenuItem>
-                ) : filteredModels.length === 0 ? (
-                  <DropdownMenuItem disabled>No models available</DropdownMenuItem>
-                ) : (
-                  filteredModels.map((modelInfo: ModelInfo) => {
-                    // Get provider name for display
-                    let displayProvider = '';
-                    if (modelInfo.id.startsWith('gemini-')) {
-                      displayProvider = 'Google';
-                    } else if (modelInfo.id.startsWith('x-ai/')) {
-                      displayProvider = 'X AI';
-                    } else if (modelInfo.id.startsWith('mistral-') || 
-                               modelInfo.id === 'codestral-latest' || 
-                               modelInfo.id === 'ministral-3b-latest') {
-                      displayProvider = 'Mistral AI';
-                    } else {
-                      const provider = modelInfo.id.split('/')[0];
-                      displayProvider = formatProviderName(provider);
-                    }
-                    
-                    const speedTier = getModelSpeedTier(modelInfo.id);
-                    
-                    return (
-                      <DropdownMenuItem 
-                        key={modelInfo.id} 
-                        onClick={() => handleModelSelection(modelInfo)}
-                        className="flex flex-col items-start w-full py-3"
-                      >
-                        <div className="font-medium">{modelInfo.name}</div>
-                        <div className="text-xs text-muted-foreground mt-1 w-full flex justify-between">
-                          <span>{displayProvider}</span>
-                          <span>{speedTier}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1 w-full">
-                          Context: {modelInfo.contextLength.toLocaleString()} tokens
-                        </div>
-                      </DropdownMenuItem>
-                    );
-                  })
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="w-full max-w-md mx-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full bg-white rounded-full border justify-between py-6 text-lg">
+                    {isLoading ? "Loading..." : currentModelName}
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
+                      <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" sideOffset={4} className="w-full border-0 max-h-[300px] overflow-y-auto">
+                  {isLoading ? (
+                    <DropdownMenuItem disabled>Loading models...</DropdownMenuItem>
+                  ) : error ? (
+                    <DropdownMenuItem disabled>Error loading models</DropdownMenuItem>
+                  ) : filteredModels.length === 0 ? (
+                    <DropdownMenuItem disabled>No models available</DropdownMenuItem>
+                  ) : (
+                    filteredModels.map((modelInfo: ModelInfo) => {
+                      // Get provider name for display
+                      let displayProvider = '';
+                      if (modelInfo.id.startsWith('gemini-')) {
+                        displayProvider = 'Google';
+                      } else if (modelInfo.id.startsWith('x-ai/')) {
+                        displayProvider = 'X AI';
+                      } else if (modelInfo.id.startsWith('mistral-') || 
+                                 modelInfo.id === 'codestral-latest' || 
+                                 modelInfo.id === 'ministral-3b-latest') {
+                        displayProvider = 'Mistral AI';
+                      } else {
+                        const provider = modelInfo.id.split('/')[0];
+                        displayProvider = formatProviderName(provider);
+                      }
+                      
+                      const speedTier = getModelSpeedTier(modelInfo.id);
+                      
+                      return (
+                        <DropdownMenuItem 
+                          key={modelInfo.id} 
+                          onClick={() => handleModelSelection(modelInfo)}
+                          className="flex flex-col items-start w-full py-3"
+                        >
+                          <div className="font-medium">{modelInfo.name}</div>
+                          <div className="text-xs text-muted-foreground mt-1 w-full flex justify-between">
+                            <span>{displayProvider}</span>
+                            <span>{speedTier}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 w-full">
+                            Context: {modelInfo.contextLength.toLocaleString()} tokens
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           
-          {/* Temperature Control */}
-          <div>
-            <div className="mb-2">
-              <div className="text-sm font-medium">Temperature</div>
-              <p className="text-sm text-muted-foreground">Control creativity vs. predictability</p>
+          <div className="flex flex-col items-center">
+            <div className="w-full text-center mb-4">
+              <h2 className="text-xl font-bold">Temperature</h2>
+              <p className="text-sm text-muted-foreground mt-1">Control creativity vs. predictability</p>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                <span>Precise</span>
-                <span>Creative</span>
+            <div className="w-full max-w-md mx-auto">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm">Precise</span>
+                <span className="text-sm">Creative</span>
               </div>
-              <Slider
-                value={[temperature]}
-                min={0}
-                max={1}
-                step={0.1}
-                onValueChange={(values) => {
-                  onTemperatureChange(values[0]);
+              <div className="flex items-center justify-between">
+                <Slider 
+                  className="w-full" 
+                  value={[temperature]} 
+                  min={0} 
+                  max={1} 
+                  step={0.1}
+                  onValueChange={(values) => {
+                    onTemperatureChange(values[0]);
+                    if (assistantId && assistantId !== 'new') {
+                      setIsDirty(true);
+                      debouncedSave({ model: { temperature: values[0] } });
+                    }
+                  }}
+                />
+              </div>
+              <div className="text-center mt-2">
+                <span className="text-lg font-medium">{temperature}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <div className="w-full text-center mb-4">
+              <h2 className="text-xl font-bold">Max Tokens</h2>
+              <p className="text-sm text-muted-foreground mt-1">Set the maximum response length</p>
+            </div>
+            <div className="w-full max-w-md mx-auto">
+              <Input 
+                type="number" 
+                className="w-full bg-white rounded-full border text-center text-lg py-6" 
+                value={maxTokens}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  onMaxTokensChange(value);
                   if (assistantId && assistantId !== 'new') {
                     setIsDirty(true);
-                    debouncedSave({ model: { temperature: values[0] } });
+                    debouncedSave({ model: { maxTokens: value } });
                   }
                 }}
               />
-              <div className="text-center text-sm font-medium">
-                {temperature.toFixed(1)}
-              </div>
+              <p className="text-xs text-muted-foreground mt-2 text-center">Higher values allow longer responses but may use more resources</p>
             </div>
-          </div>
-          
-          {/* Max Tokens */}
-          <div>
-            <div className="mb-2">
-              <div className="text-sm font-medium">Max Tokens</div>
-              <p className="text-sm text-muted-foreground">Set the maximum response length</p>
-            </div>
-            <Input
-              type="number"
-              value={maxTokens}
-              onChange={(e) => {
-                const value = parseInt(e.target.value);
-                onMaxTokensChange(value);
-                if (assistantId && assistantId !== 'new') {
-                  setIsDirty(true);
-                  debouncedSave({ model: { maxTokens: value } });
-                }
-              }}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground mt-4">
-              Higher values allow longer responses but may use more resources.
-            </p>
           </div>
         </div>
       </div>

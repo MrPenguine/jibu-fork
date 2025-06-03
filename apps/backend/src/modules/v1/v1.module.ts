@@ -9,7 +9,6 @@ import { ChatsModule } from './chats/chats.module';
 import { ConsoleModule } from './console/console.module';
 import { ToolsModule } from './tools/tools.module';
 import { VoicesModule } from './voices/voices.module';
-import { WorkflowModule } from './workflow/workflow.module';
 
 @Module({
   imports: [
@@ -23,7 +22,6 @@ import { WorkflowModule } from './workflow/workflow.module';
     ConsoleModule,
     ToolsModule,
     VoicesModule,
-    WorkflowModule,
   ],
   exports: [
     FileModule,
@@ -36,7 +34,6 @@ import { WorkflowModule } from './workflow/workflow.module';
     ConsoleModule,
     ToolsModule,
     VoicesModule,
-    WorkflowModule,
   ],
 })
 export class V1Module {}

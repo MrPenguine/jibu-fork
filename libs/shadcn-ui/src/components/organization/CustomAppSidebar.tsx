@@ -151,8 +151,8 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
         icon: <MessageSquare className="size-4" />
       },
       {
-        title: "Workflows",
-        url: "/workflows",
+        title: "Agents",
+        url: "/agents",
         icon: <FileCog className="size-4" />
       },
       {
