@@ -9,6 +9,8 @@ import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { AssistantConfigModal } from './AssistantConfigModal';
+import { AssistantNodeData } from './nodes/AssistantNode';
 
 interface AgentNodeInspectorProps {
   node: FlowNode;
@@ -23,11 +25,47 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
 }) => {
   const [localData, setLocalData] = useState<any>(node.data || {});
   const [activeTab, setActiveTab] = useState('general');
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
 
   // Update local data when node changes
   useEffect(() => {
-    setLocalData(node.data || {});
+    let initialData = node.data || {};
+    if (node.type === AgentNodeType.ASSISTANT) {
+      // Cast to AssistantNodeData to properly type the model property
+      const assistantData = initialData as any;
+      
+      // If model is not an object (e.g. undefined, or old string format), initialize it.
+      if (typeof assistantData.model !== 'object' || assistantData.model === null) {
+        initialData = {
+          ...initialData,
+          model: {
+            provider: typeof assistantData.model === 'string' ? 'default' : (assistantData.model?.provider || 'openai'),
+            model: typeof assistantData.model === 'string' ? assistantData.model : (assistantData.model?.model || 'gpt-4-turbo'),
+            temperature: assistantData.model?.temperature === undefined ? 0.7 : assistantData.model.temperature,
+            maxTokens: assistantData.model?.maxTokens === undefined ? 2048 : assistantData.model.maxTokens,
+            preference: assistantData.model?.preference || 'balance',
+          },
+        };
+        
+        // If old modelName existed, remove it to avoid confusion after migrating to model object
+        if (typeof (node.data as any)?.modelName === 'string') {
+          delete (initialData as any).modelName;
+        }
+      }
+    }
+    setLocalData(initialData);
   }, [node]);
+
+  // Handle model sub-property changes
+  const handleModelChange = (modelKey: string, modelValue: any) => {
+    setLocalData((prev: any) => ({
+      ...prev,
+      model: {
+        ...(prev.model || {}), // Ensure model object exists
+        [modelKey]: modelValue,
+      },
+    }));
+  };
 
   // Handle input changes
   const handleChange = (key: string, value: any) => {
@@ -626,6 +664,55 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
                 </Button>
               </div>
             </div>
+          </div>
+        );
+
+
+      case AgentNodeType.ASSISTANT:
+        // For assistant nodes, we now only show basic information in the inspector
+        // since the ModelConfig is shown directly in the node when double-clicked
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={localData.name || ''}
+                onChange={(e) => handleChange('name', e.target.value)}
+                placeholder="Assistant name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="apiAssistantId">API Assistant ID</Label>
+              <Input
+                id="apiAssistantId"
+                value={localData.apiAssistantId || ''}
+                onChange={(e) => handleChange('apiAssistantId', e.target.value)}
+                placeholder="OpenAI Assistant ID"
+                disabled={!!assistantId} // Disable if assistantId is provided from props
+              />
+            </div>
+            
+            <div className="p-4 bg-blue-50 rounded-md text-blue-800">
+              <p>Double-click on the assistant node in the workspace to edit its configuration.</p>
+              <Button 
+                className="w-full mt-2" 
+                onClick={() => setIsConfigModalOpen(true)}
+              >
+                Edit Configuration
+              </Button>
+            </div>
+
+            {/* AssistantConfigModal */}
+            <AssistantConfigModal
+              isOpen={isConfigModalOpen}
+              onClose={() => setIsConfigModalOpen(false)}
+              assistantData={localData as any}
+              onSave={(updatedData) => {
+                setLocalData(updatedData);
+                onUpdate(node.id, updatedData);
+              }}
+            />
           </div>
         );
 

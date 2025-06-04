@@ -15,9 +15,15 @@ const nodeGroups = [
     ],
   },
   {
+    title: 'Assistants',
+    types: [
+      { type: AgentNodeType.ASSISTANT, label: 'Assistant', description: 'Represents an AI assistant' },
+    ],
+  },
+  {
     title: 'Conversation',
     types: [
-      { type: AgentNodeType.MESSAGE, label: 'Message', description: 'Send a message to the user' },
+      // { type: AgentNodeType.MESSAGE, label: 'Message', description: 'Send a message to the user' }, // Removed
       { type: AgentNodeType.LISTEN, label: 'Listen', description: 'Wait for user input' },
       { type: AgentNodeType.CHOICE, label: 'Choice', description: 'Present choices to the user' },
     ],

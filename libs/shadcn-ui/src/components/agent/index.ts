@@ -9,3 +9,4 @@ export * from './AssistantList';
 export * from './nodes';
 export * from './constants';
 export * from './utils';
+export * from './AssistantConfigModal';

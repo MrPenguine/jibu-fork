@@ -1,9 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover';
 import { AgentNodeType } from '../../types';
+import { useAssistants, Assistant } from '../../../../../apps/frontend/src/utils/AssistantsApi'; // Adjusted path
+import type { LucideIcon } from 'lucide-react'; // Import LucideIcon type
 import { 
   MessageCircle, 
   MousePointer, 
@@ -36,17 +38,16 @@ import {
   Puzzle
 } from 'lucide-react';
 
-// Sidebar navigation items with node types and their colors
-const sidebarNavItems = [
+// Base structure for sidebar navigation items
+// The 'Assistants' section will be populated dynamically
+const baseSidebarNavItems = [
   {
-    id: 'agent',
-    label: 'Agent',
-    icon: Bot,
+    id: 'assistants',
+    label: 'Assistants',
+    icon: Bot, // Changed icon to Bot for the main category
     color: 'slate',
-    items: [
-      { id: 'agent_message', label: 'Message', icon: MessageCircle, type: AgentNodeType.MESSAGE },
-      { id: 'agent_prompt', label: 'Prompt', icon: PenTool, type: AgentNodeType.SET_VARIABLE },
-    ],
+    items: [], // This will be populated dynamically by fetched assistants
+    isDynamic: true, // Flag to indicate dynamic items
   },
   {
     id: 'talk',
@@ -109,10 +110,88 @@ const sidebarNavItems = [
 ];
 
 interface AgentSidebarProps {
-  onAddNode: (nodeType: AgentNodeType, label: string) => void;
-  onDragStart: (event: React.DragEvent<HTMLElement>, nodeType: AgentNodeType, label: string) => void;
+  onAddNode: (nodeType: AgentNodeType, label: string) => void; // This might need adjustment if adding nodes directly without drag
+  onDragStart: (event: React.DragEvent<HTMLElement>, nodeType: AgentNodeType, data: { label: string } | PopulatedSidebarItem['assistantData']) => void;
   activePopover: string | null;
   setActivePopover: (id: string | null) => void;
+}
+
+// Define a more specific type for sidebar items after dynamic population
+interface PopulatedSidebarItem {
+  id: string;
+  label: string;
+  icon: LucideIcon; // Lucide icons are components
+  type: AgentNodeType;
+  assistantData?: {
+    apiAssistantId: string;
+    name: string;
+    systemMessage: string;
+    model?: Assistant['model']; // Use the model object type from Assistant
+    knowledgeBaseId?: string | null;
+  };
+  apiAssistantId?: string;
+  name?: string;
+  systemMessage?: string;
+  model?: Assistant['model'];
+  knowledgeBaseId?: string | null;
+}
+
+interface PopulatedSidebarSection {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  color?: string; // Made color optional
+  items: PopulatedSidebarItem[];
+  isDynamic?: boolean;
+}
+
+// Cache key prefix for localStorage
+const ASSISTANTS_CACHE_KEY_PREFIX = 'jibu_assistants_cache_';
+const ASSISTANTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+// Helper function to retrieve cached assistants
+function getCachedAssistants(orgId: string): any[] | null {
+  if (typeof window === 'undefined') return null; // Check if we're in the browser
+  
+  try {
+    const cacheKey = `${ASSISTANTS_CACHE_KEY_PREFIX}${orgId}`;
+    const cachedData = localStorage.getItem(cacheKey);
+    
+    if (!cachedData) return null;
+    
+    const { data, timestamp } = JSON.parse(cachedData);
+    const now = Date.now();
+    
+    // Check if cache is still valid (not expired)
+    if (now - timestamp < ASSISTANTS_CACHE_TTL) {
+      console.log(`[AgentSidebar] Using cached assistants data (${data.length} items)`);
+      return data;
+    } else {
+      console.log(`[AgentSidebar] Cache expired, will fetch fresh data`);
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+  } catch (error) {
+    console.error('[AgentSidebar] Error reading from cache:', error);
+    return null;
+  }
+}
+
+// Helper function to store assistants in cache
+function cacheAssistants(orgId: string, data: any[]) {
+  if (typeof window === 'undefined') return; // Check if we're in the browser
+  
+  try {
+    const cacheKey = `${ASSISTANTS_CACHE_KEY_PREFIX}${orgId}`;
+    const cacheData = {
+      data,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    console.log(`[AgentSidebar] Cached ${data.length} assistants for organization ${orgId}`);
+  } catch (error) {
+    console.error('[AgentSidebar] Error writing to cache:', error);
+  }
 }
 
 export function AgentSidebar({ 
@@ -121,6 +200,92 @@ export function AgentSidebar({
   activePopover, 
   setActivePopover 
 }: AgentSidebarProps) {
+  // Use the assistants hook - only get the organization ID and the fetch function
+  const { getAssistants, organizationId } = useAssistants();
+  
+  // Local state for assistants data, loading, and error
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
+  const [isLoadingAssistants, setIsLoadingAssistants] = useState(false);
+  const [assistantsError, setAssistantsError] = useState<Error | null>(null);
+
+  const [sidebarNavItems, setSidebarNavItems] = useState<PopulatedSidebarSection[]>(baseSidebarNavItems);
+
+  // Effect to fetch assistants only when organizationId changes
+  useEffect(() => {
+    // Skip if no organizationId is available
+    if (!organizationId) {
+      setAssistants([]);
+      setIsLoadingAssistants(false);
+      return;
+    }
+    
+    // Attempt to use cached data first
+    const cachedAssistantData = getCachedAssistants(organizationId);
+    if (cachedAssistantData) {
+      setAssistants(cachedAssistantData);
+      setIsLoadingAssistants(false);
+      return;
+    }
+    
+    // Set loading state and fetch fresh data
+    setIsLoadingAssistants(true);
+    
+    // Fetch assistants data
+    console.log(`[AgentSidebar] Fetching assistants for organization: ${organizationId}`);
+    getAssistants()
+      .then(data => {
+        console.log(`[AgentSidebar] Successfully loaded ${data?.length || 0} assistants`);
+        setAssistants(data || []);
+        
+        // Cache the fetched data
+        if (data && data.length > 0) {
+          cacheAssistants(organizationId, data);
+        }
+      })
+      .catch(error => {
+        console.error('[AgentSidebar] Error fetching assistants:', error);
+        setAssistantsError(error);
+        setAssistants([]); // Set to empty array on error
+      })
+      .finally(() => {
+        setIsLoadingAssistants(false);
+      });
+    
+    // Only depend on organizationId
+  }, [organizationId]);
+
+  // Effect to update sidebarNavItems when assistants data changes
+  useEffect(() => {
+    if (assistants) {
+      const dynamicItems = assistants.map((assistant: Assistant) => ({
+        id: assistant.id,
+        label: assistant.name,
+        icon: Bot, // Using Bot icon for individual assistants too
+        type: AgentNodeType.ASSISTANT,
+        assistantData: {
+          apiAssistantId: assistant.id,
+          name: assistant.name,
+          systemMessage: assistant.description || assistant.voicemailMessage || assistant.firstMessage || '',
+          model: assistant.model || { provider: 'openai', model: 'gpt-4-turbo', temperature: 0.7, maxTokens: 2048, preference: 'balance' },
+          knowledgeBaseId: assistant.knowledgeBaseId,
+        },
+      }));
+
+      setSidebarNavItems(prevItems => 
+        prevItems.map(section => 
+          section.id === 'assistants' ? { ...section, items: dynamicItems } : section
+        )
+      );
+    } else if (!isLoadingAssistants) {
+        // If not loading and assistants is undefined/null (e.g. initial state or error without data)
+        // ensure the assistants section is empty
+        setSidebarNavItems(prevItems => 
+            prevItems.map(section => 
+              section.id === 'assistants' ? { ...section, items: [] } : section
+            )
+          );
+    }
+  }, [assistants, isLoadingAssistants]);
   return (
     <div className="w-16 border-r border-slate-200 bg-white flex flex-col items-center py-4 space-y-4 shrink-0">
       {sidebarNavItems.map((section) => (
@@ -164,48 +329,82 @@ export function AgentSidebar({
                   </div>
                 </div>
                 <div className="p-2">
-                  {section.items.map((item) => (
-                  <div
-                    key={item.id}
-                    draggable
-                    onDragStart={(e) => onDragStart(e, item.type as AgentNodeType, item.label)}
-                    className="cursor-grab hover:bg-slate-100 rounded-md transition-all duration-200 group"
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start text-sm w-full hover:bg-transparent focus:bg-transparent"
-                      type="button"
-                    >
-                      <div className="flex items-center w-full">
-                        <item.icon className="mr-2 h-4 w-4 flex-shrink-0 group-hover:opacity-50" />
-                        <span className="flex-grow">{item.label}</span>
-                        <svg 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2" 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round" 
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-2"
+                  {(section.id === 'assistants' && isLoadingAssistants) ? (
+                    <div className="p-2 text-sm text-slate-500">Loading assistants...</div>
+                  ) : section.items.length === 0 && section.id === 'assistants' ? (
+                    <div className="p-2 text-sm text-slate-500">No assistants found.</div>
+                  ) : (
+                    section.items.map((item: PopulatedSidebarItem) => (
+                      <div
+                        key={item.id}
+                        draggable
+                        onDragStart={(e) => {
+                          // Prepare the data to be transferred via drag and drop
+                          // For assistant nodes, ensure we have the apiAssistantId
+                          // Create a properly typed assistantData object
+                          const assistantData: any = item.assistantData ? { ...item.assistantData } : { 
+                            name: item.label, 
+                            systemMessage: '', 
+                            model: { model: 'default-model', provider: 'openai' } 
+                          };
+                          
+                          // Ensure apiAssistantId is included if this is an assistant
+                          if (item.type === AgentNodeType.ASSISTANT && item.apiAssistantId) {
+                            assistantData.apiAssistantId = item.apiAssistantId;
+                            console.log(`[AgentSidebar] Dragging assistant with apiAssistantId: ${item.apiAssistantId}`);
+                          }
+                          
+                          const dragData = {
+                            type: item.type as AgentNodeType,
+                            assistantData: assistantData
+                          };
+                          
+                          // Log the drag data for debugging
+                          console.log(`[AgentSidebar] Drag data:`, JSON.stringify(dragData, null, 2));
+                          
+                          // Set the data for ReactFlow to use on drop
+                          e.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));
+                          
+                          // Pass only strings to the parent component to avoid React rendering issues
+                          if (typeof onDragStart === 'function') {
+                            // Use just the label as a string to avoid React trying to render objects
+                            onDragStart(e, item.type as AgentNodeType, assistantData);
+                          }
+                        }}
+                        className="cursor-grab hover:bg-slate-100 rounded-md transition-all duration-200 group"
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start text-sm w-full hover:bg-transparent focus:bg-transparent"
+                          type="button"
                         >
-                          <path d="M14 4a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M14 12a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M14 20a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M4 4a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M4 12a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M4 20a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M24 4a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M24 12a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                          <path d="M24 20a2 2 0 1 0-4 0a2 2 0 0 0 4 0z"/>
-                        </svg>
+                          <div className="flex items-center w-full">
+                            <item.icon className="mr-2 h-4 w-4 flex-shrink-0 group-hover:opacity-50" />
+                            <span className="flex-grow">{item.label}</span>
+                            {/* Draggable icon hint */}
+                            <svg 
+                              xmlns="http://www.w3.org/2000/svg" 
+                              width="16" 
+                              height="16" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-2"
+                            >
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="16" />
+                              <line x1="8" y1="12" x2="16" y2="12" />
+                            </svg>
+                          </div>
+                        </Button>
                       </div>
-                    </Button>
-                  </div>
-                ))}
+                    ))
+                  )
+                }
                 </div>
               </div>
             </PopoverContent>

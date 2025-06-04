@@ -175,15 +175,63 @@ export const getAssistants = async (organizationId?: string): Promise<Assistant[
  */
 export const getAssistant = async (assistantId: string): Promise<Assistant> => {
   try {
+    console.log(`[getAssistant] Fetching assistant with ID: ${assistantId}`);
+    
+    // Get active organization ID for logging purposes
+    const orgId = getActiveOrganizationId();
+    console.log(`[getAssistant] Current organization ID: ${orgId || 'none'}`);
+    
     try {
+      // Add extra debugging to trace the exact headers being sent
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        console.error('[getAssistant] No authentication token available');
+        throw new Error('No authentication token available');
+      }
+      
+      console.log(`[getAssistant] Making API call to /assistants/${assistantId}`);
       const assistant = await fetchAPI(`/assistants/${assistantId}`);
+      
+      if (!assistant || !assistant.id) {
+        console.error('[getAssistant] Received invalid assistant data:', assistant);
+        throw new Error('Received invalid assistant data from API');
+      }
+      
+      console.log(`[getAssistant] Successfully fetched assistant:`, assistant);
       return transformAssistant(assistant);
     } catch (error: any) {
+      console.error(`[getAssistant] Error in API call:`, error);
+      
       // If the endpoint doesn't exist, return mock data
       if (shouldUseMockData(error)) {
+        console.warn(`[getAssistant] Using mock data for assistant ${assistantId}`);
         const mockAssistant = MOCK_ASSISTANTS.find(a => a.id === assistantId);
-        if (mockAssistant) return mockAssistant;
+        if (mockAssistant) {
+          console.log(`[getAssistant] Found mock assistant:`, mockAssistant);
+          return mockAssistant;
+        }
+        
+        // Create a new mock assistant if not found
+        console.log(`[getAssistant] Creating new mock assistant with ID ${assistantId}`);
+        const newMockAssistant: Assistant = {
+          id: assistantId,
+          name: `Assistant ${assistantId.substring(0, 5)}`,
+          organizationId: getActiveOrganizationId() || 'mock-org',
+          firstMessage: 'Hello! How can I help you today?',
+          voicemailMessage: 'I am a helpful assistant.',
+          model: { provider: 'openai', model: 'gpt-4-turbo' },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        // Add to mock assistants array for future reference
+        MOCK_ASSISTANTS.push(newMockAssistant);
+        return newMockAssistant;
       }
+      
       // Re-throw if not a mock-able error or assistant not found
       throw error;
     }

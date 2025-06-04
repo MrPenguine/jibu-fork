@@ -7,3 +7,4 @@ export * from './ConditionNode';
 export * from './SetVariableNode';
 export * from './ApiCallNode';
 export * from './ToolCallNode';
+export * from './AssistantNode';

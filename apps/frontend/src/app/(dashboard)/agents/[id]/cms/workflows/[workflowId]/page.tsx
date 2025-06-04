@@ -24,6 +24,9 @@ import {
   FlowEdge,
 } from '@libs/shadcn-ui';
 import {
+  AssistantConfigModal,
+} from '@libs/shadcn-ui/components/agent';
+import {
   StartNode,
   EndNode,
   MessageNode,
@@ -33,6 +36,7 @@ import {
   SetVariableNode,
   ApiCallNode,
   ToolCallNode,
+  AssistantNode,
   AgentExecutionDialog,
   AgentNodeInspector,
 } from '@libs/shadcn-ui/components/agent';
@@ -60,6 +64,7 @@ const nodeTypes = {
   [AgentNodeType.SET_VARIABLE]: SetVariableNode,
   [AgentNodeType.API_CALL]: ApiCallNode,
   [AgentNodeType.TOOL_CALL]: ToolCallNode,
+  [AgentNodeType.ASSISTANT]: AssistantNode,
 };
 
 // Default edge options
@@ -75,6 +80,8 @@ const defaultEdgeOptions = {
 
 // Import the agent API client
 import { agentApiClient } from '../../../../../../../utils/AgentApi';
+// Import the assistants API for fetching assistant data
+import { getAssistant } from '../../../../../../../utils/AssistantsApi';
 
 // Main agent editor component
 function AgentDetailContent() {
@@ -110,6 +117,9 @@ function AgentDetailContent() {
   // State for React Flow instance and active popover
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [activePopover, setActivePopover] = useState<string | null>(null);
+  const [isAssistantConfigOpen, setIsAssistantConfigOpen] = useState(false);
+  const [selectedAssistantData, setSelectedAssistantData] = useState<any>(null);
+  const [selectedAssistantNodeId, setSelectedAssistantNodeId] = useState<string | null>(null);
 
   // Node click handler
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
@@ -132,48 +142,247 @@ function AgentDetailContent() {
     }
   }, [nodes, setSelectedNode, setIsRunDialogOpen]);
 
+  // Create a ref to track if a modal is already open to prevent duplicate API calls
+  const isModalOpenRef = useRef(false);
+
+  // Function to handle opening assistant config modal with debounce
+  const handleOpenAssistantConfigModal = useCallback((event: React.MouseEvent, nodeId: string) => {
+    console.log(`[WorkflowPage] Opening assistant config modal for node: ${nodeId}`);
+    
+    // Prevent duplicate calls if modal is already being opened
+    if (isModalOpenRef.current) {
+      console.log('[WorkflowPage] Modal already opening, ignoring duplicate call');
+      return;
+    }
+    
+    // Set flag to prevent duplicate calls
+    isModalOpenRef.current = true;
+    
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isModalOpenRef.current = false;
+    }, 1000);
+    
+    // Find the node by ID
+    const node = nodes.find(n => n.id === nodeId);
+    
+    if (!node) {
+      console.warn(`[WorkflowPage] Node not found: ${nodeId}`);
+      return;
+    }
+    
+    console.log(`[WorkflowPage] Node data:`, node.data);
+    
+    // Set the selected node and assistant node ID
+    setSelectedNode(node);
+    setSelectedAssistantNodeId(nodeId);
+    
+    // Get the apiAssistantId from the node data
+    const apiAssistantId = (node.data as any).apiAssistantId;
+    
+    if (apiAssistantId) {
+      console.log(`[WorkflowPage] Found apiAssistantId: ${apiAssistantId}, fetching fresh data from API`);
+      
+      // Use a single API call instead of potentially triggering multiple
+      getAssistant(apiAssistantId)
+        .then(assistant => {
+          if (!assistant || !assistant.id) {
+            console.error(`[WorkflowPage] Received invalid assistant data from API:`, assistant);
+            throw new Error('Received invalid assistant data from API');
+          }
+          
+          console.log(`[WorkflowPage] Successfully fetched assistant data:`, JSON.stringify(assistant, null, 2));
+          
+          // Prepare the assistant data for the modal with the fresh API data
+          const assistantData = {
+            id: assistant.id,
+            apiAssistantId: apiAssistantId,
+            name: assistant.name || node.data.name || 'New Assistant',
+            systemMessage: assistant.voicemailMessage || node.data.systemMessage || '',
+            firstMessage: assistant.firstMessage || node.data.firstMessage || '',
+            knowledgeBaseId: assistant.knowledgeBaseId || node.data.knowledgeBaseId || '',
+            model: assistant.model || node.data.model || { model: 'gpt-4-turbo', provider: 'openai', temperature: 0.7, maxTokens: 2048 }
+          };
+          
+          console.log(`[WorkflowPage] Prepared assistant data for modal with API data:`, JSON.stringify(assistantData, null, 2));
+          
+          // Set the selected assistant data and open the modal
+          setSelectedAssistantData(assistantData);
+          setIsAssistantConfigOpen(true);
+        })
+        .catch(err => {
+          console.error(`[WorkflowPage] Error fetching assistant data:`, err);
+          
+          // Fallback to using the node data if API fetch fails
+          const assistantData = {
+            id: node.data.id || '',
+            apiAssistantId: apiAssistantId,
+            name: node.data.name || 'New Assistant',
+            systemMessage: node.data.systemMessage || '',
+            firstMessage: node.data.firstMessage || '',
+            knowledgeBaseId: node.data.knowledgeBaseId || '',
+            model: node.data.model || { model: 'gpt-4-turbo', provider: 'openai', temperature: 0.7, maxTokens: 2048 }
+          };
+          
+          console.log(`[WorkflowPage] Falling back to node data for modal:`, JSON.stringify(assistantData, null, 2));
+          
+          // Set the selected assistant data and open the modal
+          setSelectedAssistantData(assistantData);
+          setIsAssistantConfigOpen(true);
+        });
+    } else {
+      console.log(`[WorkflowPage] No apiAssistantId found, using node data`);
+      
+      // Get nodeData from the current scope or use an empty object as fallback
+      // Type cast to any to handle the union type safely
+      const nodeData = node.data as any || {};
+      
+      // Prepare the assistant data for the modal using just the node data
+      const assistantData = {
+        id: node.data.id || '',
+        apiAssistantId: '',
+        name: node.data.name || 'New Assistant',
+        // Use node.data for these properties
+        systemMessage: node.data.systemMessage || '',
+        firstMessage: node.data.firstMessage || '',
+        knowledgeBaseId: node.data.knowledgeBaseId || '',
+        // Ensure we have the model object with all required fields
+        model: node.data.model || {
+          provider: nodeData.model?.provider || 'openai',
+          model: nodeData.model?.model || 'gpt-4-turbo',
+          temperature: nodeData.model?.temperature ?? 0.7,
+          maxTokens: nodeData.model?.maxTokens ?? 2048,
+          preference: nodeData.model?.preference || 'balance'
+        }
+      };
+      
+      console.log(`[WorkflowPage] Setting assistant data for config modal:`, JSON.stringify(assistantData, null, 2));
+      
+      setSelectedAssistantData(assistantData);
+      setSelectedAssistantNodeId(nodeId);
+      setIsAssistantConfigOpen(true);
+    }
+  }, [nodes, setSelectedNode, getAssistant]);
+
   // Drop handler for drag and drop
   const onDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
 
-    if (!reactFlowWrapper.current || !reactFlowInstance) return;
+    if (!reactFlowWrapper.current || !reactFlowInstance) {
+      console.warn('onDrop: reactFlowWrapper or reactFlowInstance not available');
+      return;
+    }
 
     const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-    const dataTransfer = event.dataTransfer.getData('application/reactflow');
-    
-    if (!dataTransfer) return;
+    const assistantDataString = event.dataTransfer.getData('application/reactflow');
+    console.log('[WorkflowPage onDrop] assistantDataString from drag event:', assistantDataString);
 
-    const { nodeType, label } = JSON.parse(dataTransfer);
+    if (!assistantDataString) {
+      console.warn('onDrop: No dataTransferString found');
+      return;
+    }
 
-    // Calculate position relative to the viewport
+    let parsedDragData: any;
+    try {
+      parsedDragData = JSON.parse(assistantDataString);
+      console.log('[WorkflowPage onDrop] Parsed assistantData:', JSON.stringify(parsedDragData, null, 2));
+    } catch (error) {
+      console.error('onDrop: Failed to parse dataTransferString', error);
+      return;
+    }
+
+    const nodeType = parsedDragData.type || parsedDragData.nodeType as AgentNodeType | undefined;
+    const label = parsedDragData.label as string | undefined;
+    // assistantData is expected to be a complete object if present
+    const droppedAssistantData = parsedDragData.assistantData as any | undefined; 
+
+    if (!nodeType) {
+      console.warn('onDrop: nodeType is undefined after parsing dragData');
+      return;
+    }
+
     const position = reactFlowInstance.project({
       x: event.clientX - reactFlowBounds.left,
       y: event.clientY - reactFlowBounds.top,
     });
 
-    // Generate a block number based on existing nodes
     const blockNumber = nodes.length + 1;
+    const nodeId = `${nodeType.toString().toLowerCase()}_${Date.now()}`;
+    let nodeData: any;
 
-    // Create a new node with appropriate data based on type
-    const newNode: FlowNode = {
-      id: `${nodeType.toLowerCase()}_${Date.now()}`,
-      type: nodeType,
-      position,
-      data: { 
-        label: label || nodeType.toString(),
-        ...getDefaultNodeData(nodeType),
+    if (nodeType === AgentNodeType.ASSISTANT && droppedAssistantData) {
+      // Case 1: Assistant node with full data from sidebar
+      nodeData = {
+        label: droppedAssistantData.name || 'Assistant',
+        name: droppedAssistantData.name || 'Assistant',
+        apiAssistantId: droppedAssistantData.apiAssistantId,
+        systemMessage: droppedAssistantData.systemMessage,
+        firstMessage: droppedAssistantData.firstMessage,
+        knowledgeBaseId: droppedAssistantData.knowledgeBaseId,
+        model: droppedAssistantData.model, // Directly use the model object
         blockNumber,
-        onTest: handleTestNode
-      },
+        onNodeDoubleClick: (e: React.MouseEvent, id: string) => handleOpenAssistantConfigModal(id),
+        onTest: handleTestNode,
+        onNodeDataChange: (updatedData: any) => {
+          setNodes((nds: FlowNode[]) =>
+            nds.map((n: FlowNode) => (n.id === nodeId ? { ...n, data: { ...n.data, ...updatedData } } : n))
+          );
+          scheduleAutoSave();
+        },
+        onSave: (updatedData: any) => {
+          setNodes((nds: FlowNode[]) =>
+            nds.map((n: FlowNode) => (n.id === nodeId ? { ...n, data: { ...n.data, ...updatedData } } : n))
+          );
+          scheduleAutoSave();
+        },
+      };
+    } else if (nodeType === AgentNodeType.ASSISTANT) {
+      // Case 2: Assistant node (e.g., from a generic palette item) without full initial data
+      nodeData = {
+        label: label || 'New Assistant',
+        name: label || 'New Assistant',
+        // Provide sensible defaults; AssistantNode will fetch full data if apiAssistantId is set later or by default
+        systemMessage: 'I am a helpful assistant.',
+        model: { provider: 'openai', model: 'gpt-4-turbo', temperature: 0.7, maxTokens: 2048, preference: 'balance' }, 
+        blockNumber,
+        onNodeDoubleClick: (e: React.MouseEvent, id: string) => handleOpenAssistantConfigModal(id),
+        onTest: handleTestNode,
+        onNodeDataChange: (updatedData: any) => {
+          setNodes((nds: FlowNode[]) =>
+            nds.map((n: FlowNode) => (n.id === nodeId ? { ...n, data: { ...n.data, ...updatedData } } : n))
+          );
+          scheduleAutoSave();
+        },
+        onSave: (updatedData: any) => {
+          setNodes((nds: FlowNode[]) =>
+            nds.map((n: FlowNode) => (n.id === nodeId ? { ...n, data: { ...n.data, ...updatedData } } : n))
+          );
+          scheduleAutoSave();
+        },
+      };
+    } else {
+      // Case 3: All other node types
+      nodeData = {
+        label: label || nodeType.toString(),
+        ...getDefaultNodeData(nodeType as AgentNodeType), // Ensure nodeType is AgentNodeType here
+        blockNumber,
+        onTest: handleTestNode,
+      };
+    }
+
+    const newNode: FlowNode = {
+      id: nodeId,
+      type: nodeType as AgentNodeType, // Ensure nodeType is AgentNodeType here
+      position,
+      data: nodeData,
     };
 
-    // Add the new node to the graph
     setNodes((nds: FlowNode[]) => [...nds, newNode]);
     scheduleAutoSave();
-  }, [reactFlowInstance, scheduleAutoSave, setNodes]);
+  }, [reactFlowInstance, nodes, getDefaultNodeData, handleOpenAssistantConfigModal, handleTestNode, scheduleAutoSave, setNodes]);
 
   // Handle adding a node via click
-  const handleAddNode = useCallback((nodeType: AgentNodeType, label: string) => {
+  const handleAddNode = useCallback((nodeType: AgentNodeType, label: string, assistantData?: any) => {
     if (!reactFlowInstance) return;
 
     // Calculate a position in the center of the viewport
@@ -183,22 +392,91 @@ function AgentDetailContent() {
       y: center.y,
     });
 
-    // Create a new node with appropriate data based on type
+    // Create a unique ID for the node
+    const nodeId = `${nodeType.toLowerCase()}_${Date.now()}`;
+
+    // Create node data with appropriate properties based on type
+    let nodeData;
+
+    if (nodeType === AgentNodeType.ASSISTANT) {
+      // Special handling for assistant nodes
+      const isFromSidebar = !!assistantData?.apiAssistantId;
+      
+      nodeData = {
+        label: isFromSidebar ? assistantData.name : (label || 'New Assistant'),
+        name: isFromSidebar ? assistantData.name : (label || 'New Assistant'),
+        apiAssistantId: assistantData?.apiAssistantId,
+        systemMessage: assistantData?.systemMessage || 'I am a helpful assistant.',
+        firstMessage: assistantData?.firstMessage || '',
+        knowledgeBaseId: assistantData?.knowledgeBaseId || null,
+        model: assistantData?.model || { 
+          provider: 'openai', 
+          model: 'gpt-4-turbo', 
+          temperature: 0.7, 
+          maxTokens: 2048,
+          preference: 'balance'
+        },
+        onNodeDoubleClick: (e: React.MouseEvent, id: string) => handleOpenAssistantConfigModal(id),
+        onTest: handleTestNode,
+        onNodeDataChange: (updatedData: any) => {
+          // Update the node data in the flow when it changes
+          setNodes((nds) => 
+            nds.map((node) => {
+              if (node.id === nodeId) {
+                return { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    ...updatedData 
+                  } 
+                };
+              }
+              return node;
+            })
+          );
+          scheduleAutoSave();
+        },
+        onSave: (updatedData: any) => {
+          // For backward compatibility
+          setNodes((nds) => 
+            nds.map((node) => {
+              if (node.id === nodeId) {
+                return { 
+                  ...node, 
+                  data: { 
+                    ...node.data, 
+                    ...updatedData 
+                  } 
+                };
+              }
+              return node;
+            })
+          );
+          scheduleAutoSave();
+        }
+      };
+    } else {
+      // Default handling for other node types
+      nodeData = {
+        label: label || nodeType.toString(),
+        ...getDefaultNodeData(nodeType),
+        onTest: handleTestNode
+      };
+    }
+
+    // Create a new node with the data
     const newNode: FlowNode = {
-      id: `${nodeType.toLowerCase()}_${Date.now()}`,
+      id: nodeId,
       type: nodeType,
       position,
-      data: { 
-        label: label || nodeType.toString(),
-        ...getDefaultNodeData(nodeType)
-      },
+      data: nodeData,
     };
 
     // Add the new node to the graph
     setNodes((nds: FlowNode[]) => [...nds, newNode]);
     scheduleAutoSave();
     setActivePopover(null);
-  }, [reactFlowInstance, scheduleAutoSave, setNodes, setActivePopover]);
+  }, [reactFlowInstance, scheduleAutoSave, setNodes, setActivePopover, handleTestNode]);
 
   // Handle run agent
   const handleRunAgent = useCallback(() => {
@@ -266,12 +544,23 @@ function AgentDetailContent() {
         <AgentSidebar 
           activePopover={activePopover}
           setActivePopover={setActivePopover}
-          onDragStart={(event, nodeType, label) => {
-            event.dataTransfer.setData('application/reactflow', JSON.stringify({ nodeType, label }));
+          onDragStart={(event, nodeType, data) => {
+            // Handle both string labels and assistant data objects
+            const dragData = typeof data === 'string' 
+              ? { nodeType, label: data }
+              : { 
+                  nodeType, 
+                  label: data && typeof data === 'object' && 'name' in data ? data.name : 'Assistant',
+                  assistantData: data
+                };
+            event.dataTransfer.setData('application/reactflow', JSON.stringify(dragData));
             event.dataTransfer.effectAllowed = 'move';
             setActivePopover(null);
           }}
-          onAddNode={handleAddNode}
+          onAddNode={(nodeType: AgentNodeType, label: string, assistantData?: any) => {
+            handleAddNode(nodeType, label, assistantData);
+            setActivePopover(null);
+          }}
         />
         
         {/* Canvas Area */}
@@ -289,6 +578,15 @@ function AgentDetailContent() {
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
               onNodeClick={onNodeClick}
+              onNodeDoubleClick={(event, node) => {
+                // Set the node as selected to open the inspector
+                setSelectedNode(node as FlowNode);
+                
+                // If it's an assistant node, also open the config modal
+                if (node.type === AgentNodeType.ASSISTANT) {
+                  handleOpenAssistantConfigModal(event, node.id);
+                }
+              }}
               nodeTypes={nodeTypes}
               defaultEdgeOptions={defaultEdgeOptions}
               onInit={setReactFlowInstance}
@@ -337,6 +635,57 @@ function AgentDetailContent() {
           agentId={agentId}
           isOpen={isRunDialogOpen}
           onClose={() => setIsRunDialogOpen(false)}
+          agentApi={agentApiClient}
+        />
+      )}
+      
+      {/* Assistant Configuration Modal */}
+      {selectedAssistantData && (
+        <AssistantConfigModal
+          isOpen={isAssistantConfigOpen}
+          onClose={() => setIsAssistantConfigOpen(false)}
+          assistantData={selectedAssistantData}
+          onSave={(updatedData: any) => {
+            console.log(`[WorkflowPage] Received updated data from AssistantConfigModal:`, JSON.stringify(updatedData, null, 2));
+            
+            if (selectedNode && selectedAssistantNodeId) {
+              console.log(`[WorkflowPage] Updating node ${selectedAssistantNodeId} with new data`);
+              
+              // Update the node data with the changes, ensuring we preserve the apiAssistantId
+              setNodes((nds) => 
+                nds.map((node) => {
+                  if (node.id === selectedAssistantNodeId) {
+                    // Create the updated node with merged data
+                    // Type cast to any to handle the union type safely
+                    const nodeData = node.data as any;
+                    const updatedNode = { 
+                      ...node, 
+                      data: { 
+                        ...nodeData, 
+                        ...updatedData,
+                        // Ensure we preserve the apiAssistantId
+                        apiAssistantId: nodeData.apiAssistantId || updatedData.apiAssistantId
+                      } 
+                    };
+                    
+                    console.log(`[WorkflowPage] Updated node data:`, JSON.stringify(updatedNode.data, null, 2));
+                    return updatedNode;
+                  }
+                  return node;
+                })
+              );
+              
+              // Update the selected assistant data to reflect the changes
+              setSelectedAssistantData((prevData: any) => ({
+                ...prevData,
+                ...updatedData
+              }));
+              
+              scheduleAutoSave();
+            } else {
+              console.warn(`[WorkflowPage] Cannot update node: selectedNode=${!!selectedNode}, selectedAssistantNodeId=${selectedAssistantNodeId}`);
+            }
+          }}
         />
       )}
     </div>

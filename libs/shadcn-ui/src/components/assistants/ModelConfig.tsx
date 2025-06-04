@@ -109,8 +109,12 @@ const filterAndSortModels = (
   // Sort models by name and capability
   filteredModels.sort((a, b) => {
     // Sort by provider priority (XAI/Grok first, then Groq for speed)
-    const providerA = a.id.split('/')[0];
-    const providerB = b.id.split('/')[0];
+    // Add type checking to prevent TypeError when id is not a string
+    const aId = typeof a.id === 'string' ? a.id : '';
+    const bId = typeof b.id === 'string' ? b.id : '';
+    
+    const providerA = aId.includes('/') ? aId.split('/')[0] : aId;
+    const providerB = bId.includes('/') ? bId.split('/')[0] : bId;
     
     // Prioritize XAI (Grok) models
     if (providerA === 'x-ai' && providerB !== 'x-ai') return -1;
@@ -121,7 +125,7 @@ const filterAndSortModels = (
     if (providerA !== 'groq' && providerB === 'groq') return 1;
     
     // Finally, alphabetical by name
-    return a.name.localeCompare(b.name);
+    return (a.name || '').localeCompare(b.name || '');
   });
   
   return filteredModels;
