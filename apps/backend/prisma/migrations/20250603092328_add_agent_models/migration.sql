@@ -1,36 +1,5 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Workflow` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `WorkflowSession` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "AgentNodeType" AS ENUM ('START', 'END', 'MESSAGE', 'LISTEN', 'CHOICE', 'CONDITION', 'SET_VARIABLE', 'API_CALL', 'TOOL_CALL', 'FUNCTION_CALL', 'TRANSFER', 'RECORD', 'PLAY_AUDIO');
-
--- DropForeignKey
-ALTER TABLE "Workflow" DROP CONSTRAINT "Workflow_assistantId_fkey";
-
--- DropForeignKey
-ALTER TABLE "Workflow" DROP CONSTRAINT "Workflow_organizationId_fkey";
-
--- DropForeignKey
-ALTER TABLE "WorkflowSession" DROP CONSTRAINT "WorkflowSession_chatId_fkey";
-
--- DropForeignKey
-ALTER TABLE "WorkflowSession" DROP CONSTRAINT "WorkflowSession_organizationId_fkey";
-
--- DropForeignKey
-ALTER TABLE "WorkflowSession" DROP CONSTRAINT "WorkflowSession_workflowId_fkey";
-
--- DropTable
-DROP TABLE "Workflow";
-
--- DropTable
-DROP TABLE "WorkflowSession";
-
--- DropEnum
-DROP TYPE "WorkflowNodeType";
 
 -- CreateTable
 CREATE TABLE "Agent" (

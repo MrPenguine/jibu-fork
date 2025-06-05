@@ -49,6 +49,7 @@ model Organization {
   files                File[] // Reverse relation
   usersLastOrg         User[]                   @relation("UserLastOrg") // Users who have this as their last organization
   invitations          Invitation[] // Invitations for this organization
+  workflows            Workflow[] // Relation to workflows
   apiKeys              ApiKey[] // API keys belonging to this organization
   knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this organization
   knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this organization
@@ -362,6 +363,12 @@ enum AgentNodeType {
   TRANSFER // For voice: transfer call (e.g., to SIP URI, phone number)
   RECORD // For voice: record audio
   PLAY_AUDIO // For voice: play a pre-recorded audio URL
+  WORKFLOW_CALL // Execute a secondary workflow
+}
+
+enum WorkflowType {
+  MASTER
+  SECONDARY
 }
 
 // --- Agent Definition ---
@@ -381,21 +388,54 @@ model Agent {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // The actual flow structure
-  nodes Json // Array of FlowNode objects (defined in TypeScript, stored as JSON)
-  edges Json // Array of FlowEdge objects (defined in TypeScript, stored as JSON)
-
-  startNodeId String? // ID of the node where execution begins
-
-  // For versioning
-  version         Int     @default(1)
-  isPublished     Boolean @default(false)
-  publishedAt     DateTime?
+  // Relation to workflows
+  workflows      Workflow[]
 
   sessions AgentSession[] // Active and past execution sessions for this agent
 
   @@index([assistantId])
   @@index([organizationId])
+}
+
+// --- Workflow Definition ---
+model Workflow {
+  id             String       @id @default(uuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  name           String
+  description    String?
+  
+  // The actual flow structure
+  nodes          Json         // Array of FlowNode objects (defined in TypeScript, stored as JSON)
+  edges          Json         // Array of FlowEdge objects (defined in TypeScript, stored as JSON)
+  startNodeId    String?      // ID of the node where execution begins
+
+  // For versioning
+  version        Int          @default(1)
+  isPublished    Boolean      @default(false)
+  publishedAt    DateTime?
+
+  // Workflow type and relationships
+  workflowType   WorkflowType @default(MASTER)
+  
+  // Master-Secondary relationship
+  masterWorkflowId String?
+  masterWorkflow   Workflow?   @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
+  secondaryWorkflows Workflow[] @relation("SecondaryWorkflows")
+  
+  // Link to Agent (owner)
+  agentId        String
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Link to Organization for ownership/scoping
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([workflowType])
+  @@index([masterWorkflowId])
 }
 
 // --- Agent Execution State (Session) ---

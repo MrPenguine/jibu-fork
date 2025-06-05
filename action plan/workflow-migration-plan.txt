@@ -1,0 +1,123 @@
+# Workflow System Migration Plan
+
+## 1. Schema Modifications
+
+We need to extend the current Agent model to support the concept of a master workflow and secondary workflows. Currently, each Agent has its own nodes and edges, but we need to create a hierarchy of workflows.
+
+### Option 1: Extend Agent Model
+- Add `workflowType` enum field to Agent (MASTER, SECONDARY)
+- Add `masterAgentId` field that references the master agent when a workflow is secondary
+- Agents with workflowType=MASTER can have secondary workflows associated with them
+- Secondary workflows reference their master through masterAgentId
+
+### Option 2: Create New Workflow Model
+- Keep Agent as is but create a new Workflow model that separates the workflow definition
+- Agent references a master workflow
+- Workflows have types (MASTER, SECONDARY)
+- Secondary workflows reference their master workflow
+
+We'll proceed with Option 2 for better separation of concerns and cleaner architecture.
+
+## 2. Schema Migration Requirements
+
+```prisma
+// Add enum for workflow types
+enum WorkflowType {
+  MASTER
+  SECONDARY
+}
+
+// Keep Agent model but remove workflow-specific fields
+model Agent {
+  id             String     @id @default(uuid())
+  name           String
+  description    String?
+  // Other agent fields...
+  
+  // Relation to workflows
+  workflows      Workflow[]
+  
+  // Organization relationship
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  // Other existing fields...
+}
+
+// Create new Workflow model
+model Workflow {
+  id              String       @id @default(uuid())
+  name            String
+  description     String?
+  workflowType    WorkflowType @default(MASTER)
+  
+  // Workflow definition data
+  nodes           Json         @default("{}")
+  edges           Json         @default("{}")
+  startNodeId     String?
+  
+  // Agent relationship
+  agentId         String
+  agent           Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Master-Secondary relationship
+  masterWorkflowId String?
+  masterWorkflow   Workflow?   @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
+  secondaryWorkflows Workflow[] @relation("SecondaryWorkflows")
+  
+  // Publishing status
+  isPublished     Boolean      @default(false)
+  
+  // Timestamps
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  // Organization context
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+}
+```
+
+## 3. Backend Service Modifications
+
+### AgentService
+- Update CRUD operations to handle workflow relationships
+- Add methods for:
+  - Creating secondary workflows
+  - Importing secondary workflows into master
+  - Managing relationships between workflows
+- Ensure agent publishing handles workflow relationships
+
+### AgentExecutionService
+- Enhance to support jumping between workflows
+- Add support for variables shared across workflows
+- Implement sub-workflow execution logic
+
+## 4. Frontend UI Modifications
+
+### Workflow List Page
+- Split into two sections: "Master Workflow" and "Secondary Workflows"
+- Add filtering by workflow type
+- Implement creation of both workflow types
+- Show relationship between workflows
+
+### Workflow Editor
+- Add support for importing secondary workflows
+- Create UI for jumping between workflows
+- Implement node component for executing secondary workflows
+
+## 5. Implementation Steps
+
+1. Create database migration
+2. Update Prisma schema
+3. Update agent DTOs and service methods
+4. Update execution service
+5. Create UI components for workflow separation
+6. Implement workflow relationship management
+
+## 6. APIs to Implement/Update
+
+- GET /agents?workflowType=MASTER|SECONDARY&masterAgentId=X
+- POST /agents with workflowType parameter
+- GET /agents/:id/secondary-workflows
+- POST /agents/:id/secondary-workflows
+- PUT /agents/:id/workflow-relationships

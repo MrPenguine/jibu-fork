@@ -358,6 +358,30 @@ interface ContinueAgentRequest {
   event?: Record<string, any>;
 }
 
+// Interface for workflow data
+export interface Workflow {
+  id: string;
+  name: string;
+  description: string;
+  trigger?: string;
+  status?: string;
+  assignee?: string;
+  updatedAt: string;
+  workflowType: 'MASTER' | 'SECONDARY';
+  masterAgentId?: string;
+  nodes?: any[];
+  edges?: any[];
+}
+
+// Interface for creating secondary workflow
+export interface CreateSecondaryWorkflowRequest {
+  name: string;
+  description?: string;
+  nodes?: any;
+  edges?: any;
+  startNodeId?: string;
+}
+
 // Agent API client functions
 export const agentApiClient = {
   // Fetch all agent definitions
@@ -635,6 +659,62 @@ export const agentApiClient = {
       return response.json();
     } catch (error) {
       console.error('[agentApi] Error continuing agent session:', error);
+      throw error;
+    }
+  },
+
+  // Get all workflows for an agent
+  async getAgentWorkflows(agentId: string, specificOrgId?: string): Promise<Workflow[]> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/workflows`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agent workflows: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error fetching agent workflows:', error);
+      throw error;
+    }
+  },
+
+  // Create a secondary workflow for an agent
+  async createSecondaryWorkflow(masterWorkflowId: string, data: CreateSecondaryWorkflowRequest, specificOrgId?: string): Promise<Workflow> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      // Using the correct endpoint URL that matches the backend controller
+      const response = await fetch(`${API_BASE_URL}/v1/workflows/${masterWorkflowId}/secondary`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create secondary workflow: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error creating secondary workflow:', error);
       throw error;
     }
   }

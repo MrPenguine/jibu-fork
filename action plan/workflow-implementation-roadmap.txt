@@ -1,0 +1,279 @@
+# JIBU-CONSOLE WORKFLOW SYSTEM - IMPLEMENTATION ROADMAP
+
+## Overview
+
+This roadmap outlines the necessary steps to implement the agent-based workflow system, based on the specifications in the accompanying documents. The implementation is divided into phases, with estimated timelines and dependencies for each phase.
+
+## Phase 1: Foundation (2-3 Weeks)
+
+### Database Schema Extensions
+
+**Week 1**
+- Create Prisma schema extensions for new models:
+  - WorkflowTemplate
+  - NodeComponent
+  - AgentKnowledgeBase
+- Write and test database migrations
+- Update existing Agent model as needed
+
+**Dependencies:**
+- Current Prisma schema
+- Database access
+
+### Core Services Implementation
+
+**Week 1-2**
+- Implement WorkflowTemplateService
+- Implement NodeComponentService
+- Enhance AgentExecutionService with workflow capabilities
+- Create NodeTypeRegistryService
+
+**Dependencies:**
+- Updated database schema
+- Existing agent service structure
+
+### Node Type Implementation
+
+**Week 2-3**
+- Implement base node processor interface
+- Implement core node types:
+  - START
+  - END
+  - MESSAGE
+  - LISTEN
+  - CHOICE
+  - CONDITION
+  - SET_VARIABLE
+- Create processors for each node type
+- Implement variable resolution system
+
+**Dependencies:**
+- NodeTypeRegistryService
+- Enhanced AgentExecutionService
+
+## Phase 2: Visual Editor (3-4 Weeks)
+
+### React Flow Integration
+
+**Week 1-2**
+- Set up React Flow in the frontend
+- Create base node and edge components
+- Implement WorkflowCanvas component
+- Implement basic drag-and-drop functionality
+
+**Dependencies:**
+- React Flow library
+- React component architecture
+- Frontend build system
+
+### Node Components
+
+**Week 2-3**
+- Implement custom node components for each node type
+- Create NodePalette component for component library
+- Implement NodeProperties component for configuration
+
+**Dependencies:**
+- React Flow setup
+- Node type definitions from backend
+
+### State Management
+
+**Week 3-4**
+- Set up workflow state management (Zustand/Redux)
+- Implement undo/redo functionality
+- Create API integration for loading/saving workflows
+
+**Dependencies:**
+- Workflow editor components
+- Backend API endpoints
+
+## Phase 3: Advanced Features (3-4 Weeks)
+
+### Sub-Workflows
+
+**Week 1-2**
+- Enhance AgentExecutionService for sub-workflow support
+- Implement SubWorkflowNode component
+- Create workflow import/export functionality
+
+**Dependencies:**
+- Core workflow execution
+- Visual editor basics
+
+### Knowledge Base Integration
+
+**Week 2-3**
+- Implement AgentKnowledgeBaseService
+- Create KnowledgeBase node type and processor
+- Build UI components for knowledge base linking
+
+**Dependencies:**
+- Existing KnowledgeBase module
+- Node type system
+
+### Assistant Integration
+
+**Week 3-4**
+- Enhance assistant integration with workflow context
+- Implement AssistantNode component
+- Create UI for assistant configuration in workflows
+
+**Dependencies:**
+- Existing Assistant module
+- Variable management system
+
+## Phase 4: Template System (2-3 Weeks)
+
+### Template Creation
+
+**Week 1**
+- Implement template creation from existing workflows
+- Create template categories and tagging system
+- Build template versioning
+
+**Dependencies:**
+- WorkflowTemplateService
+- Workflow editor
+
+### Template Gallery
+
+**Week 1-2**
+- Build template gallery UI
+- Implement template preview functionality
+- Create template import mechanism
+
+**Dependencies:**
+- Template creation system
+- Workflow import/export
+
+### Template Sharing
+
+**Week 2-3**
+- Implement public/private template settings
+- Create organization-level template sharing
+- Build template discovery features
+
+**Dependencies:**
+- Template gallery
+- User permission system
+
+## Phase 5: Testing & Optimization (2-3 Weeks)
+
+### Unit Testing
+
+**Week 1**
+- Write tests for node processors
+- Test variable resolution system
+- Test template import/export
+
+**Dependencies:**
+- All core implementations
+
+### Integration Testing
+
+**Week 1-2**
+- Test workflow execution
+- Test knowledge base integration
+- Test assistant integration
+
+**Dependencies:**
+- Working system components
+
+### End-to-End Testing
+
+**Week 2-3**
+- Create test workflows for common scenarios
+- Test publishing and execution flow
+- Performance testing for complex workflows
+
+**Dependencies:**
+- Complete system integration
+
+## Phase 6: Launch & Documentation (1-2 Weeks)
+
+### User Documentation
+
+**Week 1**
+- Create workflow editor documentation
+- Document node types and their configuration
+- Write tutorials for common workflow patterns
+
+**Dependencies:**
+- Stable feature implementation
+
+### Admin Documentation
+
+**Week 1-2**
+- Document system architecture
+- Create troubleshooting guides
+- Performance optimization recommendations
+
+**Dependencies:**
+- Complete system implementation
+
+### Launch Preparation
+
+**Week 2**
+- Final QA testing
+- Deployment planning
+- User training materials
+
+**Dependencies:**
+- Documentation
+- Tested system
+
+## Total Estimated Timeline: 13-19 Weeks
+
+## Technical Dependencies
+
+### Frontend
+- React 18+
+- React Flow 11+
+- Zustand or Redux for state management
+- Tailwind CSS (existing)
+- React Hook Form for node configuration
+
+### Backend
+- NestJS (existing)
+- Prisma ORM (existing)
+- PostgreSQL database (existing)
+- Redis for session management (existing)
+
+### Development Tools
+- TypeScript
+- Jest for testing
+- Nx workspace (existing)
+
+## Resource Requirements
+
+### Development Team
+- 1-2 Backend developers
+- 1-2 Frontend developers
+- 1 QA engineer
+- 1 Product manager
+
+### Infrastructure
+- Development environment
+- Testing environment
+- CI/CD pipeline
+
+## Risk Assessment
+
+### Technical Risks
+- Complex state management in the workflow editor
+- Performance issues with large workflows
+- Sub-workflow circular references
+
+### Mitigation Strategies
+- Early prototyping of critical components
+- Progressive performance testing
+- Implement validation for circular references
+
+## Success Criteria
+
+- Workflow editor allows complete configuration of agents
+- All node types function correctly
+- Templates can be created and imported
+- Workflows execute correctly across chat and voice interfaces
+- Knowledge bases and assistants are properly integrated

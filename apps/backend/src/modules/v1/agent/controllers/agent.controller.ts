@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req, BadRequestException, Logger, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req, BadRequestException, Logger, Query, HttpStatus, HttpCode } from '@nestjs/common';
 import { AgentService } from '../services/agent.service';
 import { AgentService as IntegrationsAgentService } from '../../../../integrations/agent/agent.service';
 import { CreateAgentDto, UpdateAgentDto } from '../dto';
@@ -14,6 +14,7 @@ import { AgentRequest, AgentResponse } from '../../../../integrations/agent/inte
 import { StreamableFile } from '@nestjs/common';
 import { PassThrough } from 'stream';
 import { ChatsService } from '../../chats/chats.service';
+import { WorkflowService } from '../../workflow/services/workflow.service';
 import { CreateMessageDto } from '../../chats/dto/create-message.dto';
 
 // Define a custom interface for our streaming response
@@ -33,7 +34,8 @@ export class AgentController {
   constructor(
     private readonly agentService: AgentService,
     private readonly integrationsAgentService: IntegrationsAgentService,
-    private readonly chatsService: ChatsService
+    private readonly chatsService: ChatsService,
+    private readonly workflowService: WorkflowService,
   ) {}
 
   @Post()
@@ -279,10 +281,45 @@ export class AgentController {
     });
   }
 
+  @Get(':id/workflows')
+  @ApiOperation({ summary: 'Get all workflows for an agent' })
+  @ApiResponse({ status: 200, description: 'Return all workflows for the agent.' })
+  async getAgentWorkflows(@Param('id') id: string, @Req() req): Promise<any[]> {
+    const organizationId = req.user.orgId;
+    if (!organizationId) {
+      throw new BadRequestException('No organization selected');
+    }
+    console.log(`Getting workflows for agent ${id} in organization ${organizationId}`);
+    // Use WorkflowService instead of AgentService for workflow operations
+    return this.workflowService.getAgentWorkflows(id, organizationId);
+  }
+
+  // Secondary workflow creation moved to WorkflowController
+
+  @Get('health-check')
+  @ApiOperation({ summary: 'Check if the agent service is running properly' })
+  @Public()
+  @ApiResponse({ status: 200, description: 'Agent service is running.' })
+  @ApiResponse({ status: 500, description: 'Agent service is not running.' })
+  async healthCheck(): Promise<{ status: string; connected: boolean }> {
+    try {
+      // Simple health check
+      return {
+        status: 'ok',
+        connected: true,
+      };
+    } catch (error) {
+      return {
+        status: 'error: ' + error.message,
+        connected: false,
+      };
+    }
+  }
+
   @Post('health')
   @Public()
   @ApiOperation({ summary: 'Check agent service health' })
-  async healthCheck(): Promise<{ status: string; connected: boolean }> {
+  async healthCheckAgent(): Promise<{ status: string; connected: boolean }> {
     try {
       // Check connection to the agent service
       const connected = await this.integrationsAgentService.checkConnection();
