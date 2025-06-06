@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 // Define AgentNodeType enum for both frontend and backend
 export enum AgentNodeType {
   START = 'START',
@@ -12,7 +14,8 @@ export enum AgentNodeType {
   ASSISTANT = 'ASSISTANT',
   TRANSFER = 'TRANSFER',
   RECORD = 'RECORD',
-  PLAY_AUDIO = 'PLAY_AUDIO'
+  PLAY_AUDIO = 'PLAY_AUDIO',
+  KNOWLEDGE_BASE_SEARCH = 'knowledgeBaseSearchNode'
 }
 
 // Base node data interface
@@ -82,10 +85,40 @@ export interface ToolCallNodeData extends BaseNodeData {
 
 // Assistant node data
 export interface AssistantNodeData extends BaseNodeData {
-  assistantId: string; // ID of the assistant to use
+  // Support both API ID patterns
+  assistantId?: string; // ID of the assistant to use (original field)
+  apiAssistantId?: string; // Alternative ID (used by the AssistantNode component)
+  
+  // Fields from AssistantNode.tsx component
+  name?: string;
+  systemMessage?: string;
+  firstMessage?: string;
   prompt?: string; // Optional prompt to send to the assistant
   inputVariableName?: string; // Variable containing user input to send to assistant
   outputVariableName?: string; // Where to store the assistant's response
+  
+  // Model configuration
+  model?: {
+    provider?: string;
+    model?: string; // Specific model identifier, e.g., 'gpt-4-turbo'
+    temperature?: number;
+    maxTokens?: number;
+    preference?: 'latency' | 'balance' | 'capability';
+  };
+  
+  // Other fields
+  knowledgeBaseId?: string | null;
+  organizationId?: string;
+  voice?: {
+    provider?: string;
+    voiceId?: string;
+  };
+  
+  // Callbacks (not serialized, used only in UI)
+  onNodeDoubleClick?: (event: React.MouseEvent, nodeId: string) => void;
+  onNodeDataChange?: (updatedData: Partial<AssistantNodeData>) => void;
+  onSave?: (updatedData: Partial<AssistantNodeData>) => void;
+  onTest?: (nodeId: string) => void;
 }
 
 // Transfer node data

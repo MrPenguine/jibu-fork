@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 // Define AgentNodeType enum for both frontend and backend
 export enum AgentNodeType {
   START = 'START',
@@ -13,6 +15,7 @@ export enum AgentNodeType {
   TRANSFER = 'TRANSFER',
   RECORD = 'RECORD',
   PLAY_AUDIO = 'PLAY_AUDIO',
+  KNOWLEDGE_BASE_SEARCH = 'knowledgeBaseSearchNode',
   CUSTOM = 'CUSTOM'
 }
 
@@ -83,10 +86,42 @@ export interface ToolCallNodeData extends BaseNodeData {
 
 // Assistant node data
 export interface AssistantNodeData extends BaseNodeData {
-  assistantId: string; // ID of the assistant to use
+  // Support both API ID patterns
+  assistantId?: string; // ID of the assistant to use (original field)
+  apiAssistantId?: string; // Alternative ID (used by the AssistantNode component)
+  
+  // Fields from AssistantNode.tsx component
+  id?: string; // For use with React Flow node ID
+  name?: string;
+  systemMessage?: string;
+  firstMessage?: string;
   prompt?: string; // Optional prompt to send to the assistant
   inputVariableName?: string; // Variable containing user input to send to assistant
   outputVariableName?: string; // Where to store the assistant's response
+  
+  // Model configuration
+  model?: {
+    provider?: string;
+    model?: string; // Specific model identifier, e.g., 'gpt-4-turbo'
+    temperature?: number;
+    maxTokens?: number;
+    preference?: 'latency' | 'balance' | 'capability';
+  };
+  
+  // Other fields
+  knowledgeBaseId?: string | null;
+  organizationId?: string;
+  voice?: {
+    provider?: string;
+    voiceId?: string;
+  };
+  
+  // Callbacks (not serialized, used only in UI)
+  onNodeDoubleClick?: (event: React.MouseEvent, nodeId: string) => void;
+  onNodeDataChange?: (updatedData: any) => void;
+  onSave?: (updatedData: any) => void;
+  onTest?: (nodeId: string) => void;
+  onEdit?: (node: any) => void;
 }
 
 // Transfer node data
@@ -160,6 +195,22 @@ export interface AgentDefinition {
   version: number;
   isPublished: boolean;
   publishedAt?: Date;
+}
+
+// Workflow definition interface
+export interface WorkflowDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  nodes: FlowNode[] | string;
+  edges: FlowEdge[] | string;
+  startNodeId?: string; 
+  organizationId: string;
+  version?: number;
+  isPublished: boolean;
+  publishedAt?: Date;
+  assistantId?: string; // Link to assistant if applicable
+  viewport?: string | { x: number; y: number; zoom: number }; // Store viewport data for zoom and position
 }
 
 // Agent session output interface

@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { AgentNodeType, FlowNode } from '../../../../src';
+// AgentNodeType.KNOWLEDGE_BASE_SEARCH is now properly defined in types.ts
+import { KnowledgeBaseSearchNode, KnowledgeBaseSearchNodeData } from './nodes/KnowledgeBaseSearchNode';
+import { KnowledgeBaseConfig } from '../assistants/KnowledgeBaseConfig';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
@@ -82,6 +85,56 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
 
   // Render different forms based on node type
   const renderNodeForm = () => {
+    // Check if it's a KnowledgeBaseSearchNode or a ToolCallNode being used as a knowledge base search
+    if ((node.type as string === 'knowledgeBaseSearchNode') ||
+        (node.type === AgentNodeType.TOOL_CALL && (node.data as any)?.toolName === 'knowledgeBaseSearch')) {
+      // We need to create a custom rendering for KB search nodes
+      const data = node.data as KnowledgeBaseSearchNodeData;
+      
+      return (
+        <div className="p-4 space-y-4">
+          <div>
+            <Label htmlFor="knowledgeBaseName">Knowledge Base</Label>
+            <div className="mt-2">
+              <KnowledgeBaseConfig
+                knowledgeBaseId={data.knowledgeBaseId}
+                onKnowledgeBaseChange={(knowledgeBaseId) => {
+                  handleChange('knowledgeBaseId', knowledgeBaseId);
+                }}
+              />
+            </div>
+          </div>
+          
+          <div>
+            <Label htmlFor="query">Query</Label>
+            <Textarea
+              id="query"
+              value={data.query || ''}
+              onChange={(e) => handleChange('query', e.target.value)}
+              placeholder="Enter query or use input variable"
+              rows={3}
+              className="mt-1"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="outputVariableName">Output Variable Name</Label>
+            <Input
+              id="outputVariableName"
+              value={data.outputVariableName || ''}
+              onChange={(e) => handleChange('outputVariableName', e.target.value)}
+              placeholder="Variable name for results"
+              className="mt-1"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This variable will contain the search results
+            </p>
+          </div>
+        </div>
+      );
+    }
+    
+    // Regular node types
     switch (node.type) {
       case AgentNodeType.START:
         return (
@@ -668,6 +721,49 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
         );
 
 
+      // Special case for KB Search nodes - they're not in the enum but use a string constant
+      case 'knowledgeBaseSearchNode':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="label">Label</Label>
+              <Input
+                id="label"
+                value={localData.label || 'KB Search'}
+                onChange={(e) => handleChange('label', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="knowledgeBaseId">Knowledge Base ID</Label>
+              <Input
+                id="knowledgeBaseId"
+                value={localData.knowledgeBaseId || ''}
+                onChange={(e) => handleChange('knowledgeBaseId', e.target.value)}
+                placeholder="ID of the knowledge base to search"
+              />
+            </div>
+            <div>
+              <Label htmlFor="query">Query</Label>
+              <Textarea
+                id="query"
+                value={localData.query || ''}
+                onChange={(e) => handleChange('query', e.target.value)}
+                placeholder="Enter query or use input variable"
+                className="min-h-20"
+              />
+            </div>
+            <div>
+              <Label htmlFor="outputVariableName">Output Variable Name</Label>
+              <Input
+                id="outputVariableName"
+                value={localData.outputVariableName || 'kbSearchResult'}
+                onChange={(e) => handleChange('outputVariableName', e.target.value)}
+                placeholder="Where to store search results"
+              />
+            </div>
+          </div>
+        );
+        
       case AgentNodeType.ASSISTANT:
         // For assistant nodes, we now only show basic information in the inspector
         // since the ModelConfig is shown directly in the node when double-clicked
@@ -732,10 +828,18 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
     }
   };
 
+  // Helper function to get a display friendly node type name
+  const getNodeTypeDisplay = (nodeType: string) => {
+    if (nodeType === 'knowledgeBaseSearchNode') {
+      return 'Knowledge Base Search';
+    }
+    return nodeType;
+  };
+  
   return (
     <Card className="w-full">
       <CardHeader className="py-3">
-        <CardTitle className="text-sm font-medium">Node Properties: {node.type}</CardTitle>
+        <CardTitle className="text-sm font-medium">Node Properties: {getNodeTypeDisplay(node.type)}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {renderNodeForm()}

@@ -37,6 +37,7 @@ import {
   ApiCallNode,
   ToolCallNode,
   AssistantNode,
+  KnowledgeBaseSearchNode,
   AgentExecutionDialog,
   AgentNodeInspector,
 } from '@libs/shadcn-ui/components/agent';
@@ -49,7 +50,8 @@ import {
 } from 'lucide-react';
 
 // Import our custom hook and components
-import { useAgent, getDefaultNodeData } from '@libs/shadcn-ui/hooks/agent';
+import { getDefaultNodeData } from '@libs/shadcn-ui/hooks/agent';
+import { useWorkflow } from '@libs/shadcn-ui/hooks/workflow';
 import { AgentSidebar } from '@libs/shadcn-ui/components/agent';
 import { NodeInspectorPanel } from '@libs/shadcn-ui/components/agent';
 
@@ -65,6 +67,8 @@ const nodeTypes = {
   [AgentNodeType.API_CALL]: ApiCallNode,
   [AgentNodeType.TOOL_CALL]: ToolCallNode,
   [AgentNodeType.ASSISTANT]: AssistantNode,
+  // Register the dedicated KB Search node with its string literal value
+  'knowledgeBaseSearchNode': KnowledgeBaseSearchNode,
 };
 
 // Default edge options
@@ -78,8 +82,8 @@ const defaultEdgeOptions = {
   },
 };
 
-// Import the agent API client
-import { agentApiClient } from '../../../../../../../utils/AgentApi';
+// Import the workflow API client
+import { workflowApi } from '../../../../../../../utils/workflowApi';
 // Import the assistants API for fetching assistant data
 import { getAssistant } from '../../../../../../../utils/AssistantsApi';
 
@@ -87,32 +91,37 @@ import { getAssistant } from '../../../../../../../utils/AssistantsApi';
 function AgentDetailContent() {
   const params = useParams();
   const agentId = params.id as string;
+  const workflowId = params.workflowId as string;
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { fitView } = useReactFlow();
   
-  // Use our custom hook for agent management
+  // Use our custom hook for workflow management
   const {
-    agent,
-    agentName,
-    setAgentName,
+    workflow,
+    workflowName,
+    setWorkflowName,
     nodes,
     setNodes,
     edges,
     isLoading,
     isSaving,
+    saveError,
     selectedNode,
     setSelectedNode,
     isRunDialogOpen,
     setIsRunDialogOpen,
     isPublished,
+    viewport,
+    updateViewport,
+    lastSavedAt,
     onNodesChange,
     onEdgesChange,
     onConnect,
     updateNodeData,
-    saveAgent,
-    publishAgent,
+    saveWorkflow,
+    publishWorkflow,
     scheduleAutoSave
-  } = useAgent(agentId, agentApiClient);
+  } = useWorkflow(workflowId, workflowApi);
 
   // State for React Flow instance and active popover
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
@@ -283,18 +292,37 @@ function AgentDetailContent() {
     }
 
     let parsedDragData: any;
+    let nodeType: AgentNodeType | string | undefined;
+    let label: string | undefined;
+    let droppedAssistantData: any | undefined;
+    
     try {
+      // Try to parse the drag data
       parsedDragData = JSON.parse(assistantDataString);
-      console.log('[WorkflowPage onDrop] Parsed assistantData:', JSON.stringify(parsedDragData, null, 2));
+      console.log('[WorkflowPage onDrop] Parsed data:', JSON.stringify(parsedDragData, null, 2));
+      
+      // Check explicitly for KB Search node with isKnowledgeBaseSearchNode flag
+      if (parsedDragData.isKnowledgeBaseSearchNode) {
+        console.log('[WorkflowPage onDrop] KB Search Node detected!');
+        nodeType = 'knowledgeBaseSearchNode';
+        label = 'Knowledge Base Search';
+      } else {
+        // Standard node type handling
+        nodeType = parsedDragData.type || parsedDragData.nodeType;
+        label = parsedDragData.label;
+        // assistantData is expected to be a complete object if present
+        droppedAssistantData = parsedDragData.assistantData;
+      }
     } catch (error) {
-      console.error('onDrop: Failed to parse dataTransferString', error);
-      return;
-    }
-
-    const nodeType = parsedDragData.type || parsedDragData.nodeType as AgentNodeType | undefined;
-    const label = parsedDragData.label as string | undefined;
-    // assistantData is expected to be a complete object if present
-    const droppedAssistantData = parsedDragData.assistantData as any | undefined; 
+      // If parsing fails, it might be a simple string (older drag format)
+      console.log('[WorkflowPage onDrop] Parse failed, using raw string:', assistantDataString);
+      nodeType = assistantDataString;
+      
+      // Special handling for KB Search string literal
+      if (nodeType === 'knowledgeBaseSearchNode') {
+        console.log('[WorkflowPage onDrop] KB Search Node detected from string!');
+      }
+    } 
 
     if (!nodeType) {
       console.warn('onDrop: nodeType is undefined after parsing dragData');
@@ -337,13 +365,10 @@ function AgentDetailContent() {
         },
       };
     } else if (nodeType === AgentNodeType.ASSISTANT) {
-      // Case 2: Assistant node (e.g., from a generic palette item) without full initial data
+      // Case 2: Assistant node without data (rare case)
       nodeData = {
-        label: label || 'New Assistant',
-        name: label || 'New Assistant',
-        // Provide sensible defaults; AssistantNode will fetch full data if apiAssistantId is set later or by default
-        systemMessage: 'I am a helpful assistant.',
-        model: { provider: 'openai', model: 'gpt-4-turbo', temperature: 0.7, maxTokens: 2048, preference: 'balance' }, 
+        label: 'Assistant',
+        name: 'Assistant',
         blockNumber,
         onNodeDoubleClick: (e: React.MouseEvent, id: string) => handleOpenAssistantConfigModal(id),
         onTest: handleTestNode,
@@ -360,8 +385,36 @@ function AgentDetailContent() {
           scheduleAutoSave();
         },
       };
+    } else if (nodeType === 'knowledgeBaseSearchNode') {
+      // Case 3: KB Search Node - needs special handling with dedicated type
+      console.log('[WorkflowPage onDrop] Creating KB Search node data');
+      const kbNodeId = `kb_search_${Date.now()}`;
+      
+      nodeData = {
+        id: kbNodeId,
+        label: 'Knowledge Base Search',
+        knowledgeBaseId: '', // Will be configured by user
+        knowledgeBaseName: '',
+        query: '',
+        outputVariableName: 'kbSearchResult',
+        blockNumber,
+        // Add callbacks for the node
+        onUpdateBlockData: (nodeId: string, updatedData: any) => {
+          console.log(`[WorkflowPage] KB Search node data change for node ${nodeId}:`, updatedData);
+          setNodes((nds: FlowNode[]) => 
+            nds.map((node) => {
+              if (node.id === nodeId) {
+                return { ...node, data: { ...node.data, ...updatedData } };
+              }
+              return node;
+            })
+          );
+          scheduleAutoSave();
+        },
+        onTest: handleTestNode
+      };
     } else {
-      // Case 3: All other node types
+      // Case 4: All other node types
       nodeData = {
         label: label || nodeType.toString(),
         ...getDefaultNodeData(nodeType as AgentNodeType), // Ensure nodeType is AgentNodeType here
@@ -370,12 +423,19 @@ function AgentDetailContent() {
       };
     }
 
+    // Create the new node with the appropriate type
+    // For KB Search nodes, we need special handling
+    let newNodeId = nodeType === 'knowledgeBaseSearchNode' ? nodeData.id : nodeId;
+    
     const newNode: FlowNode = {
-      id: nodeId,
-      type: nodeType as AgentNodeType, // Ensure nodeType is AgentNodeType here
+      id: newNodeId,
+      // Use a type assertion to make TypeScript happy while preserving the correct string at runtime
+      type: nodeType === 'knowledgeBaseSearchNode' ? 'knowledgeBaseSearchNode' as any : (nodeType as AgentNodeType),
       position,
       data: nodeData,
     };
+    
+    console.log(`[WorkflowPage onDrop] Creating node: ${newNodeId} with type: ${nodeType}`, newNode);
 
     setNodes((nds: FlowNode[]) => [...nds, newNode]);
     scheduleAutoSave();
@@ -484,13 +544,15 @@ function AgentDetailContent() {
   }, [setIsRunDialogOpen]);
 
   // Handle publish agent
-  const handlePublishAgent = useCallback(() => {
-    publishAgent();
-  }, [publishAgent]);
+  const handleSave = useCallback(() => {
+    saveWorkflow();
+  }, [saveWorkflow]);
 
   if (isLoading) {
-    return <div className="p-8 flex items-center justify-center">Loading agent...</div>;
+    return <div className="p-8 flex items-center justify-center">Loading workflow...</div>;
   }
+
+  // ... rest of the code remains the same ...
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 text-slate-800">
@@ -498,11 +560,11 @@ function AgentDetailContent() {
       <div className="flex items-center justify-between px-4 py-2 border-b bg-white shadow-sm h-14 shrink-0">
         <div className="flex items-center">
           <Input 
-            value={agentName} 
-            onChange={(e) => setAgentName(e.target.value)}
-            onBlur={saveAgent}
+            value={workflowName} 
+            onChange={(e) => setWorkflowName(e.target.value)}
+            onBlur={handleSave}
             className="border-none bg-transparent h-9 px-2 text-lg font-medium focus-visible:ring-0 focus-visible:ring-offset-0 w-64"
-            placeholder="Untitled Agent"
+            placeholder="Untitled Workflow"
           />
         </div>
         <div className="flex items-center space-x-2">
@@ -510,11 +572,11 @@ function AgentDetailContent() {
             variant="outline" 
             size="sm" 
             className="text-slate-600" 
-            onClick={saveAgent} 
-            disabled={isSaving}
+            onClick={handleSave} 
+            disabled={isLoading}
           >
             <Save size={16} className="mr-1" /> 
-            {isSaving ? 'Saving...' : 'Save'}
+            {isLoading ? 'Saving...' : 'Save'}
           </Button>
           <Separator orientation="vertical" className="h-6" />
           <Button 
@@ -530,7 +592,7 @@ function AgentDetailContent() {
             variant={isPublished ? "secondary" : "default"}
             size="sm" 
             className={isPublished ? "bg-green-100 text-green-800 hover:bg-green-200" : ""}
-            onClick={handlePublishAgent}
+            onClick={publishWorkflow}
           >
             <Rocket size={16} className="mr-1" /> 
             {isPublished ? 'Published' : 'Publish'}
@@ -605,7 +667,7 @@ function AgentDetailContent() {
                 onNodeUpdate={(nodeId, data) => {
                   updateNodeData(nodeId, data);
                 }}
-                assistantId={agent?.assistantId}
+                assistantId={workflow?.assistantId}
               />
             )}
           </div>
@@ -615,27 +677,27 @@ function AgentDetailContent() {
             <Button variant="ghost" size="icon" className="text-slate-600" onClick={() => reactFlowInstance?.zoomOut()}>
               <ZoomOut size={18}/>
             </Button>
-            <Button variant="ghost" size="sm" className="text-slate-600" onClick={() => reactFlowInstance?.setViewport({ x: 0, y: 0, zoom: 1 })}>
-              100%
+            <Button variant="outline" className="gap-1" onClick={() => setWorkflowName(prompt("Enter workflow name:", workflowName) || workflowName)}>
+              Rename
             </Button>
             <Button variant="ghost" size="icon" className="text-slate-600" onClick={() => reactFlowInstance?.zoomIn()}>
               <ZoomIn size={18}/>
             </Button>
             <div className="h-5 border-l border-slate-300 mx-1"></div>
             <Button variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5" onClick={handleRunAgent}>
-              <Play size={14}/> Test your agent
+              <Play size={14}/> Test your workflow
             </Button>
           </div>
         </div>
       </div>
       
       {/* Agent Execution Dialog */}
-      {isRunDialogOpen && agent && (
+      {isRunDialogOpen && workflow && (
         <AgentExecutionDialog
           agentId={agentId}
           isOpen={isRunDialogOpen}
           onClose={() => setIsRunDialogOpen(false)}
-          agentApi={agentApiClient}
+          agentApi={workflowApi}
         />
       )}
       

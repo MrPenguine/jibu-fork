@@ -4,7 +4,7 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { ListFilter } from 'lucide-react';
 
-export const ChoiceNode = memo(({ data, selected }: NodeProps) => {
+export const ChoiceNode = memo(({ id, data, selected }: NodeProps) => {
   const handleTestClick = (event: React.MouseEvent) => {
     // Stop propagation to prevent node selection
     event.stopPropagation();
@@ -55,11 +55,13 @@ export const ChoiceNode = memo(({ data, selected }: NodeProps) => {
         type="target"
         position={Position.Top}
         className="w-3 h-3 rounded-full bg-green-500 border-2 border-white"
+        isValidConnection={(connection) => connection.source !== id} // Prevent connecting to itself
       />
       <Handle
         type="source"
         position={Position.Bottom}
         className="w-3 h-3 rounded-full bg-green-500 border-2 border-white"
+        isValidConnection={(connection) => connection.target !== id} // Prevent connecting to itself
       />
     </div>
   );

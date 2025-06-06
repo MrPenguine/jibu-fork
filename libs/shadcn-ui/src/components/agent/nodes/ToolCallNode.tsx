@@ -16,10 +16,15 @@ export const ToolCallNode = memo(({ data, selected }: NodeProps) => {
   };
   
   return (
-    <div className="shadow-sm rounded-lg bg-slate-50 min-w-[200px] overflow-hidden">
+    <div 
+      className="shadow-sm rounded-lg bg-slate-50 min-w-[200px] overflow-hidden"
+      data-tool-name={data.toolName || ''}
+      data-node-type="toolCallNode"
+      data-type="toolCallNode"
+    >
       {/* Block title with play button */}
-      <div className="px-4 py-2 text-sm font-medium text-slate-700 flex justify-between items-center bg-slate-100">
-        <div>New Block {data.blockNumber || 9}</div>
+      <div className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 flex justify-between items-center">
+        <div>{data.toolName || `Tool Call ${data.blockNumber || ''}`}</div>
         <button 
           onClick={handleTestClick}
           className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors"
@@ -50,6 +55,8 @@ export const ToolCallNode = memo(({ data, selected }: NodeProps) => {
           </div>
         )}
       </div>
+
+      {/* Standard handles for Tool Call node */}
       <Handle
         type="target"
         position={Position.Top}

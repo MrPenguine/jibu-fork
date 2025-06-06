@@ -4,7 +4,7 @@ import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Square } from 'lucide-react';
 
-export const EndNode = memo(({ data, selected }: NodeProps) => {
+export const EndNode = memo(({ id, data, selected }: NodeProps) => {
   const handleTestClick = (event: React.MouseEvent) => {
     // Stop propagation to prevent node selection
     event.stopPropagation();
@@ -43,6 +43,7 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
         type="target"
         position={Position.Top}
         className="w-3 h-3 rounded-full bg-slate-500 border-2 border-white"
+        isValidConnection={(connection) => connection.source !== id} // Prevent connecting to itself
       />
     </div>
   );

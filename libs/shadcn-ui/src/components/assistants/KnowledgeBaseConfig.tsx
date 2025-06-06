@@ -77,8 +77,10 @@ interface KnowledgeBaseConfigProps {
   assistantId?: string;
   knowledgeBaseId?: string;
   organizationId?: string; // Keep for backward compatibility
-  onKnowledgeBaseChange?: (knowledgeBaseId: string | null) => void;
+  onKnowledgeBaseChange?: (knowledgeBaseId: string | null, knowledgeBaseName?: string) => void;
   maxFileHeight?: number; // Maximum number of files to show before scrolling
+  showEditControls?: boolean; // Whether to show edit controls by default
+  standalone?: boolean; // Whether this component is used standalone (not in assistant page)
 }
 
 // Define explicit types for our knowledge base data
@@ -100,7 +102,9 @@ export function KnowledgeBaseConfig({
   knowledgeBaseId,
   organizationId: propOrgId, // Rename to avoid conflict
   onKnowledgeBaseChange,
-  maxFileHeight = 4 // Default to 4 files before scrolling
+  maxFileHeight = 4, // Default to 4 files before scrolling
+  showEditControls = false, // Default to not showing edit controls
+  standalone = false // Default to not standalone mode
 }: KnowledgeBaseConfigProps) {
   // Get organization from context
   const { activeOrganization } = useOrganization();
@@ -115,7 +119,7 @@ export function KnowledgeBaseConfig({
   const [knowledgeBaseSources, setKnowledgeBaseSources] = useState<KnowledgeBaseSourceWithFile[]>([])
   const [isLoadingSources, setIsLoadingSources] = useState(false)
   const [sourcesError, setSourcesError] = useState<string | null>(null)
-  const [isEditMode, setIsEditMode] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(showEditControls)
   
   // UI state
   const [openCombobox, setOpenCombobox] = useState(false)
@@ -238,7 +242,7 @@ export function KnowledgeBaseConfig({
     
   // Create new entry for "Create new knowledge base"
   const comboboxOptions = [
-    { id: "create-new", name: "Create new knowledge base" },
+    { id: "create-new", name: "Create New Knowledge Base" },
     ...filteredKnowledgeBases
   ];
 
@@ -296,54 +300,93 @@ export function KnowledgeBaseConfig({
     }
   };
   
-  // Function to handle knowledge base selection - linking a knowledge base to an assistant
+  // Function to handle knowledge base selection - supporting both standalone and assistant modes
   const handleSelectKnowledgeBase = async (knowledgeBaseId: string) => {
-    if (!assistantId) return;
-    
-    // Handle "Create new" option
+    // Check if this is the special "create-new" option
     if (knowledgeBaseId === "create-new") {
       setIsCreateDialogOpen(true);
       setOpenCombobox(false);
       return;
     }
     
-    setIsLinkingKnowledgeBase(true);
-    console.log(`[KnowledgeBaseConfig] Linking knowledge base ${knowledgeBaseId} to assistant ${assistantId}`);
-    console.log(`[KnowledgeBaseConfig] Using organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
-    
+    // Get the knowledge base name for the callback
+    const selectedKB = knowledgeBases.find(kb => kb.id === knowledgeBaseId);
+    const knowledgeBaseName = selectedKB?.name;
+
     try {
-      // Use PATCH to update knowledgeBaseId like in unlink function
-      await fetchAPI(`/assistants/${assistantId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          knowledgeBaseId: knowledgeBaseId
-        })
+      // If no assistantId is provided or in standalone mode, just update the selected knowledge base
+      if (!assistantId || standalone) {
+        console.log(`[KnowledgeBaseConfig] Selecting knowledge base ${knowledgeBaseId} in standalone mode`);
+        setActiveKnowledgeBase(selectedKB || null);
+        // Notify parent component about the change
+        if (onKnowledgeBaseChange) {
+          onKnowledgeBaseChange(knowledgeBaseId, knowledgeBaseName);
+        }
+        
+        // Refresh sources for the newly selected knowledge base
+        try {
+          const sources = await listKnowledgeBaseSources(knowledgeBaseId, organizationId);
+          setKnowledgeBaseSources(sources);
+          setIsEditMode(true);
+        } catch (sourceError) {
+          console.error('[KnowledgeBaseConfig] Error fetching sources:', sourceError);
+          setSourcesError('Failed to load files for this knowledge base');
+        }
+        return;
+      }
+      
+      // If we get here, we're linking a knowledge base to an assistant
+      setIsLinkingKnowledgeBase(true);
+      
+      // Make API call to link knowledge base to assistant
+      await fetch(`${API_BASE_URL}/assistants/${assistantId}/knowledge-bases/${knowledgeBaseId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
       });
       
-      console.log(`[KnowledgeBaseConfig] Successfully linked knowledge base ${knowledgeBaseId} to assistant ${assistantId}`);
+      // Update local state
+      setActiveKnowledgeBase(selectedKB || null);
+      
+      // Load the sources for the newly selected knowledge base
+      try {
+        const sources = await listKnowledgeBaseSources(knowledgeBaseId, organizationId);
+        setKnowledgeBaseSources(sources);
+      } catch (sourceError) {
+        console.error('[KnowledgeBaseConfig] Error fetching sources:', sourceError);
+        setSourcesError('Failed to load files for this knowledge base');
+      }
       
       // Notify parent component about the change
       if (onKnowledgeBaseChange) {
-        onKnowledgeBaseChange(knowledgeBaseId);
+        onKnowledgeBaseChange(knowledgeBaseId, knowledgeBaseName);
       }
       
-      // Update local state
-      setActiveKnowledgeBase(knowledgeBases.find(kb => kb.id === knowledgeBaseId) || null);
-      setIsEditMode(true);
-      
-      // Refresh sources for the newly selected knowledge base
-      const sources = await listKnowledgeBaseSources(knowledgeBaseId, organizationId);
-      setKnowledgeBaseSources(sources);
+      // Show success toast
+      toast({
+        title: "Knowledge base connected",
+        description: `Successfully linked ${knowledgeBaseName || "knowledge base"} to assistant`,
+      });
       
     } catch (error) {
-      console.error('[KnowledgeBaseConfig] Error linking knowledge base to assistant:', error);
+      console.error('[KnowledgeBaseConfig] Error setting knowledge base:', error);
+      setError(`Failed to set knowledge base: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
       toast({
         title: "Error setting knowledge base",
-        description: "Could not link the knowledge base to the assistant. Please try again.",
+        description: assistantId 
+          ? "Could not link the knowledge base to the assistant. Please try again."
+          : "Could not set the knowledge base. Please try again.",
         variant: "destructive"
       });
+      
+      // Reset UI state on error
+      setActiveKnowledgeBase(null);
+      if (onKnowledgeBaseChange) {
+        onKnowledgeBaseChange(null);
+      }
     } finally {
       setIsLinkingKnowledgeBase(false);
+      setOpenCombobox(false);
     }
   };
   
@@ -412,10 +455,8 @@ export function KnowledgeBaseConfig({
       // Reset the name
       setNewKbName('');
       
-      // Link the new knowledge base to the assistant if we have an assistantId
-      if (assistantId) {
-        await handleSelectKnowledgeBase(newKb.id);
-      }
+      // Always select the newly created knowledge base (works for both standalone mode and with assistant)
+      await handleSelectKnowledgeBase(newKb.id);
       
       // Show success toast
       toast({
@@ -605,25 +646,165 @@ export function KnowledgeBaseConfig({
     }
   };
   
-  // Add a function to get status indicator for individual files
-  const getSourceStatusIndicator = (source: KnowledgeBaseSource) => {
-    // Explicitly type as string to avoid TypeScript issues with literal types
-    const status: string = source.indexingStatus || 'UNKNOWN';
+  // Add a function to manually trigger indexing for a source
+  const requestReindexing = async (source: KnowledgeBaseSource) => {
+    if (!source || !source.id || !activeKnowledgeBase) return;
     
-    // Use string comparison to avoid TypeScript issues
-    if (status === 'COMPLETED' || status === 'INDEXED') {
-      return <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Indexed</Badge>;
-    } else if (status === 'PROCESSING') {
-      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Processing</Badge>;
-    } else if (status === 'PENDING') {
-      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Pending</Badge>;
-    } else if (status === 'FAILED') {
-      return <Badge className="ml-2 bg-red-100 text-red-800 text-xs">Failed</Badge>;
-    } else {
-      return <Badge className="ml-2 bg-gray-100 text-gray-800 text-xs">Unknown</Badge>;
+    console.log(`[KnowledgeBaseConfig] Requesting reindexing for source ${source.id}`);
+    
+    try {
+      // Show loading state through UI
+      setKnowledgeBaseSources(prev => 
+        prev.map(s => 
+          s.id === source.id 
+            ? { ...s, indexingStatus: 'PENDING' } 
+            : s
+        )
+      );
+      
+      // Send request to re-queue the source for indexing
+      const response = await fetch(`${API_BASE_URL}/v1/queue/reindex-source`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getAuthHeaders(organizationId || '')),
+        },
+        body: JSON.stringify({
+          knowledgeBaseId: activeKnowledgeBase.id,
+          sourceId: source.id,
+          organizationId: organizationId
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to request reindexing: ${response.status} ${response.statusText}`);
+      }
+      
+      toast({
+        title: "Indexing requested",
+        description: "Source has been queued for indexing",
+        duration: 3000,
+      });
+      
+      // Refresh status after a short delay to see the updated status
+      setTimeout(async () => {
+        if (activeKnowledgeBase) {
+          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+          setKnowledgeBaseSources(refreshedSources);
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error(`[KnowledgeBaseConfig] Error requesting reindexing:`, error);
+      toast({
+        title: "Error",
+        description: "Failed to request reindexing. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Reset status on error
+      const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+      setKnowledgeBaseSources(refreshedSources);
     }
   };
-
+  
+  // Add a new function to request reindexing of all sources
+  const requestReindexAll = async () => {
+    if (!activeKnowledgeBase || knowledgeBaseSources.length === 0) return;
+    
+    console.log(`[KnowledgeBaseConfig] Requesting reindexing for all sources in knowledge base ${activeKnowledgeBase.id}`);
+    
+    try {
+      // Show loading state through UI
+      setIsLoadingSources(true);
+      
+      // Update all sources to PENDING in UI immediately for feedback
+      setKnowledgeBaseSources(prev => 
+        prev.map(s => ({ ...s, indexingStatus: 'PENDING' }))
+      );
+      
+      // Queue each source for reindexing
+      const reindexPromises = knowledgeBaseSources.map(async (source) => {
+        try {
+          await fetch(`${API_BASE_URL}/v1/queue/reindex-source`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(await getAuthHeaders(organizationId || '')),
+            },
+            body: JSON.stringify({
+              knowledgeBaseId: activeKnowledgeBase.id,
+              sourceId: source.id,
+              organizationId: organizationId
+            }),
+          });
+          return true;
+        } catch (error) {
+          console.error(`[KnowledgeBaseConfig] Error reindexing source ${source.id}:`, error);
+          return false;
+        }
+      });
+      
+      // Wait for all reindex requests to complete
+      await Promise.all(reindexPromises);
+      
+      toast({
+        title: "Reindexing all files",
+        description: `${knowledgeBaseSources.length} files have been queued for indexing`,
+        duration: 3000,
+      });
+      
+      // Refresh sources after a short delay to get updated statuses
+      setTimeout(async () => {
+        if (activeKnowledgeBase) {
+          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+          setKnowledgeBaseSources(refreshedSources);
+        }
+        
+        setIsLoadingSources(false);
+      }, 2000);
+      
+    } catch (error) {
+      console.error(`[KnowledgeBaseConfig] Error reindexing all sources:`, error);
+      toast({
+        title: "Error",
+        description: "Failed to reindex all files. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Reset on error
+      if (activeKnowledgeBase) {
+        const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+        setKnowledgeBaseSources(refreshedSources);
+      }
+      
+      setIsLoadingSources(false);
+    }
+  };
+  
+  // Add a function to get authorization headers with token and organization ID
+  // We don't have access to this function from the other file, so we'll implement it here
+  async function getAuthHeaders(orgId: string) {
+    try {
+      const supabase = createClient();
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+      
+      return {
+        'Authorization': `Bearer ${token}`,
+        'X-Organization-ID': orgId,
+        'organization-id': orgId,
+      };
+    } catch (error) {
+      console.error('[getAuthHeaders] Error getting auth headers:', error);
+      throw error;
+    }
+  }
+  
   // Render the selection component
   const renderKnowledgeBaseSelector = () => {
   return (
@@ -641,7 +822,7 @@ export function KnowledgeBaseConfig({
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading knowledge bases...</span>
-      </div>
+    </div>
               ) : knowledgeBaseId ? (
                 <div className="flex items-center gap-2">
                   <Book className="h-4 w-4" />
@@ -666,11 +847,18 @@ export function KnowledgeBaseConfig({
               <CommandList>
                 <CommandEmpty>No knowledge bases found.</CommandEmpty>
                 <CommandGroup>
-                  {comboboxOptions.map((kb) => (
+                  {filteredOptions.map((kb) => (
                     <CommandItem
                       key={kb.id}
                       value={kb.id}
-                      onSelect={() => handleSelectKnowledgeBase(kb.id)}
+                      onSelect={() => {
+                        if (kb.id === "create-new") {
+                          setIsCreateDialogOpen(true);
+                          setOpenCombobox(false);
+                        } else {
+                          handleSelectKnowledgeBase(kb.id);
+                        }
+                      }}
                       className="flex items-center justify-between"
                     >
                       {kb.id === "create-new" ? (
@@ -706,6 +894,9 @@ export function KnowledgeBaseConfig({
   // Render card for connected knowledge base
   const renderConnectedKnowledgeBase = () => {
     if (!activeKnowledgeBase) return null;
+    
+    // In standalone mode, always show the edit controls by default
+    const showEditOption = standalone;
     
     // Get overall indexing status
     const indexingStatus = getKnowledgeBaseIndexingStatus();
@@ -759,24 +950,28 @@ export function KnowledgeBaseConfig({
             </TooltipProvider>
           </div>
           <div className="flex items-center gap-2">
-              <Button 
-              variant="ghost"
-                size="sm"
-              className="h-8 text-blue-600"
-              onClick={() => setIsEditMode(!isEditMode)}
-              >
-              <Edit3 className="h-4 w-4 mr-1" />
-              {isEditMode ? "Done" : "Edit"}
-              </Button>
-              <Button 
-              variant="ghost"
-                size="sm"
-              className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={handleUnlinkKnowledgeBase}
-              >
-              <X className="h-4 w-4 mr-1" />
-                Unlink
-              </Button>
+              {(showEditOption || !standalone) && (
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-blue-600"
+                  onClick={() => setIsEditMode(!isEditMode)}
+                >
+                  <Edit3 className="h-4 w-4 mr-1" />
+                  {isEditMode ? "Done" : "Edit"}
+                </Button>
+              )}
+              {!standalone ? (
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={handleUnlinkKnowledgeBase}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Unlink
+                </Button>
+              ) : null}
             </div>
           </div>
           
@@ -1021,176 +1216,50 @@ export function KnowledgeBaseConfig({
     );
   };
   
-  // Add a function to manually trigger indexing for a source
-  const requestReindexing = async (source: KnowledgeBaseSource) => {
-    if (!source || !source.id || !activeKnowledgeBase) return;
+  // Define a function to get status indicator for individual files
+  const getSourceStatusIndicator = (source: KnowledgeBaseSource) => {
+    // Explicitly type as string to avoid TypeScript issues with literal types
+    const status: string = source.indexingStatus || 'UNKNOWN';
     
-    console.log(`[KnowledgeBaseConfig] Requesting reindexing for source ${source.id}`);
-    
-    try {
-      // Show loading state through UI
-      setKnowledgeBaseSources(prev => 
-        prev.map(s => 
-          s.id === source.id 
-            ? { ...s, indexingStatus: 'PENDING' } 
-            : s
-        )
-      );
-      
-      // Send request to re-queue the source for indexing
-      const response = await fetch(`${API_BASE_URL}/v1/queue/reindex-source`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(await getAuthHeaders(organizationId || '')),
-        },
-        body: JSON.stringify({
-          knowledgeBaseId: activeKnowledgeBase.id,
-          sourceId: source.id,
-          organizationId: organizationId
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to request reindexing: ${response.status} ${response.statusText}`);
-      }
-      
-      toast({
-        title: "Indexing requested",
-        description: "Source has been queued for indexing",
-        duration: 3000,
-      });
-      
-      // Refresh status after a short delay to see the updated status
-      setTimeout(async () => {
-        if (activeKnowledgeBase) {
-          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
-          setKnowledgeBaseSources(refreshedSources);
-        }
-      }, 2000);
-      
-    } catch (error) {
-      console.error(`[KnowledgeBaseConfig] Error requesting reindexing:`, error);
-      toast({
-        title: "Error",
-        description: "Failed to request reindexing. Please try again.",
-        variant: "destructive",
-      });
-      
-      // Reset status on error
-      const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
-      setKnowledgeBaseSources(refreshedSources);
+    // Use string comparison to avoid TypeScript issues
+    if (status === 'COMPLETED' || status === 'INDEXED') {
+      return <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Indexed</Badge>;
+    } else if (status === 'PROCESSING') {
+      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Processing</Badge>;
+    } else if (status === 'PENDING') {
+      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Pending</Badge>;
+    } else if (status === 'FAILED') {
+      return <Badge className="ml-2 bg-red-100 text-red-800 text-xs">Failed</Badge>;
+    } else {
+      return <Badge className="ml-2 bg-gray-100 text-gray-800 text-xs">Unknown</Badge>;
     }
   };
   
-  // Add a new function to request reindexing of all sources
-  const requestReindexAll = async () => {
-    if (!activeKnowledgeBase || knowledgeBaseSources.length === 0) return;
-    
-    console.log(`[KnowledgeBaseConfig] Requesting reindexing for all sources in knowledge base ${activeKnowledgeBase.id}`);
-    
-    try {
-      // Show loading state through UI
-      setIsLoadingSources(true);
-      
-      // Update all sources to PENDING in UI immediately for feedback
-      setKnowledgeBaseSources(prev => 
-        prev.map(s => ({ ...s, indexingStatus: 'PENDING' }))
-      );
-      
-      // Queue each source for reindexing
-      const reindexPromises = knowledgeBaseSources.map(async (source) => {
-        try {
-          await fetch(`${API_BASE_URL}/v1/queue/reindex-source`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(await getAuthHeaders(organizationId || '')),
-            },
-            body: JSON.stringify({
-              knowledgeBaseId: activeKnowledgeBase.id,
-              sourceId: source.id,
-              organizationId: organizationId
-            }),
-          });
-          return true;
-        } catch (error) {
-          console.error(`[KnowledgeBaseConfig] Error reindexing source ${source.id}:`, error);
-          return false;
-        }
-      });
-      
-      // Wait for all reindex requests to complete
-      await Promise.all(reindexPromises);
-      
-      toast({
-        title: "Reindexing all files",
-        description: `${knowledgeBaseSources.length} files have been queued for indexing`,
-        duration: 3000,
-      });
-      
-      // Refresh sources after a short delay to get updated statuses
-      setTimeout(async () => {
-        if (activeKnowledgeBase) {
-          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
-          setKnowledgeBaseSources(refreshedSources);
-        }
-        
-        setIsLoadingSources(false);
-      }, 2000);
-      
-    } catch (error) {
-      console.error(`[KnowledgeBaseConfig] Error reindexing all sources:`, error);
-      toast({
-        title: "Error",
-        description: "Failed to reindex all files. Please try again.",
-        variant: "destructive",
-      });
-      
-      // Reset on error
-      if (activeKnowledgeBase) {
-        const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
-        setKnowledgeBaseSources(refreshedSources);
-      }
-      
-      setIsLoadingSources(false);
-    }
-  };
-  
-  // Add a function to get authorization headers with token and organization ID
-  // We don't have access to this function from the other file, so we'll implement it here
-  async function getAuthHeaders(orgId: string) {
-    try {
-      const supabase = createClient();
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
-      
-      if (!token) {
-        throw new Error('No authentication token available');
-      }
-      
-      return {
-        'Authorization': `Bearer ${token}`,
-        'X-Organization-ID': orgId,
-        'organization-id': orgId,
-      };
-    } catch (error) {
-      console.error('[getAuthHeaders] Error getting auth headers:', error);
-      throw error;
-    }
-  }
-  
+  // Filter combobox options based on search query
+  const filteredOptions = searchQuery
+    ? comboboxOptions.filter((kb) =>
+        kb.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : comboboxOptions;
+
+  // Main render - conditionally show selector or connected knowledge base
   return (
-    <div className="mb-6">
-      <div className="p-4 bg-gray-50 shadow-sm">
-        {!activeKnowledgeBase ? (
-          renderKnowledgeBaseSelector()
-        ) : (
-          renderConnectedKnowledgeBase()
-        )}
-        
-        {renderCreateKBDialog()}
-      </div>
+    <div className="space-y-4">
+      {knowledgeBaseId ? (
+        renderConnectedKnowledgeBase()
+      ) : (
+        renderKnowledgeBaseSelector()
+      )}
+      {renderCreateKBDialog()}
+      
+      {/* Show instructions in standalone mode when nothing is selected */}
+      {standalone && !knowledgeBaseId && (
+        <div className="p-4 border border-dashed border-gray-300 rounded-md mt-4">
+          <p className="text-sm text-gray-500">
+            Select or create a knowledge base to use with this node. 
+            Once connected, you'll be able to add files and manage the knowledge base directly here.
+          </p>
+        </div>
+      )}
     </div>
   )
 } 

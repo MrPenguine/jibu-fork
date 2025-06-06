@@ -242,12 +242,15 @@ export const AssistantNode = memo<NodeProps<AssistantNodeData>>(({ id, data, sel
         height: defaultHeight
       }}
       onDoubleClick={handleDoubleClick}
+      data-type="assistantNode"
+      data-node-type="assistantNode"
     >
-      {/* Top handle for connection */}
+      {/* Top handle for connection - this accepts connections from other nodes but not itself */}
       <Handle
         type="target"
         position={Position.Top}
         className="w-3 h-3 bg-blue-500/80"
+        isValidConnection={(connection) => connection.source !== id}
       />
 
       {/* Header with name and test button */}
@@ -313,11 +316,50 @@ export const AssistantNode = memo<NodeProps<AssistantNodeData>>(({ id, data, sel
         )}
       </div>
 
-      {/* Bottom handle for connection */}
+      {/* Bottom handle for connection - prevent connecting to itself */}
       <Handle
         type="source"
         position={Position.Bottom}
         className="w-3 h-3 bg-blue-500/80"
+        isValidConnection={(connection) => connection.target !== id}
+      />
+
+      {/* Right side handle - specifically for connecting to KnowledgeBase Search */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-3 h-3 bg-green-500/80 hover:bg-green-700 transition-colors"
+        id="kb-connection"
+        style={{ cursor: 'pointer' }}
+        isValidConnection={(connection) => {
+          // Be more permissive about connections - only prevent self-connections
+          // We'll leave the visual feedback to guide users instead of blocking connections
+          return connection.target !== id;
+        }}
+        data-tooltip="Knowledge Base Connection"
+        onMouseEnter={(e) => {
+          // Create tooltip element when hovering
+          const tooltip = document.createElement('div');
+          tooltip.textContent = 'Knowledge Base Connection';
+          tooltip.style.position = 'absolute';
+          tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+          tooltip.style.color = 'white';
+          tooltip.style.padding = '5px 10px';
+          tooltip.style.borderRadius = '4px';
+          tooltip.style.fontSize = '12px';
+          tooltip.style.zIndex = '1000';
+          tooltip.style.top = `${e.clientY - 40}px`;
+          tooltip.style.left = `${e.clientX}px`;
+          tooltip.classList.add('kb-connection-tooltip-assistant');
+          document.body.appendChild(tooltip);
+        }}
+        onMouseLeave={() => {
+          // Remove tooltip when not hovering
+          const tooltip = document.querySelector('.kb-connection-tooltip-assistant');
+          if (tooltip) {
+            document.body.removeChild(tooltip);
+          }
+        }}
       />
     </div>
   );

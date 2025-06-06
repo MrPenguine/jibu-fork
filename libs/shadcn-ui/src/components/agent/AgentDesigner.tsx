@@ -1,29 +1,34 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import ReactFlow, {
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import {
+  ReactFlow,
   ReactFlowProvider,
   Controls,
   Background,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
-  Edge,
-  Node,
-  NodeTypes,
-  EdgeTypes,
-  Panel,
   useReactFlow,
-  MarkerType,
+  Node,
+  Edge,
+  Connection,
+  NodeChange,
+  EdgeChange,
+  addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
+  Panel,
+  OnConnectEnd,
+  Viewport
 } from 'reactflow';
-import 'reactflow/dist/style.css';
-import { AgentNodeType, FlowNode, FlowEdge } from '../../../../src';
+
+import { toast } from '../../components/ui/use-toast';
+import { useWorkflow } from '../../hooks/workflow';
+import { AgentNodeType, AssistantNodeData, BaseNodeData, FlowNode, FlowEdge } from '../../types';
+import { FlowNode as InspectorFlowNode } from '../../../../src'; // Import for Inspector compatibility
 import { Button } from '../ui/button';
 import { AgentPalette } from './AgentPalette';
 import { AgentNodeInspector } from './AgentNodeInspector';
-import { AssistantConfigModal } from './AssistantConfigModal'; // Added import
-import { AssistantNodeData } from './nodes/AssistantNode'; // Added import
+import { AssistantConfigModal } from './AssistantConfigModal'; 
+import { AssistantNodeData as NodeAssistantNodeData } from './nodes/AssistantNode'; 
 
 // Import custom node components
 import { StartNode } from './nodes/StartNode';
@@ -36,9 +41,10 @@ import { SetVariableNode } from './nodes/SetVariableNode';
 import { ApiCallNode } from './nodes/ApiCallNode';
 import { ToolCallNode } from './nodes/ToolCallNode';
 import { AssistantNode } from './nodes/AssistantNode'; // Added import
+import { KnowledgeBaseSearchNode } from './nodes/KnowledgeBaseSearchNode'; // Added KnowledgeBaseSearchNode import
 
 // Define node types for React Flow
-const nodeTypes: NodeTypes = {
+const nodeTypes: any = {
   [AgentNodeType.START]: StartNode,
   [AgentNodeType.END]: EndNode,
   [AgentNodeType.MESSAGE]: MessageNode,
@@ -49,21 +55,29 @@ const nodeTypes: NodeTypes = {
   [AgentNodeType.API_CALL]: ApiCallNode,
   [AgentNodeType.TOOL_CALL]: ToolCallNode,
   [AgentNodeType.ASSISTANT]: AssistantNode, // Added AssistantNode mapping
+  [AgentNodeType.KNOWLEDGE_BASE_SEARCH]: KnowledgeBaseSearchNode, // Use enum member
 };
 
 // Define edge types for React Flow
-const edgeTypes: EdgeTypes = {};
+const edgeTypes: any = {};
 
 // Default edge options
-const defaultEdgeOptions = {
+const defaultEdgeOptions: any = {
   type: 'smoothstep',
   markerEnd: {
-    type: MarkerType.ArrowClosed,
+    type: 'arrowclosed',
   },
   style: {
     strokeWidth: 2,
   },
 };
+
+// Type definition for API client - will be provided by the parent component
+export interface WorkflowApiClient {
+  updateWorkflow: (workflowId: string, data: any, specificOrgId?: string) => Promise<any>;
+  getWorkflow: (workflowId: string, specificOrgId?: string) => Promise<any>;
+  publishWorkflow?: (workflowId: string, specificOrgId?: string) => Promise<any>;
+}
 
 export interface AgentDesignerProps {
   initialNodes?: FlowNode[];
@@ -71,6 +85,10 @@ export interface AgentDesignerProps {
   onSave?: (nodes: FlowNode[], edges: FlowEdge[]) => void;
   assistantId?: string;
   readOnly?: boolean;
+  workflowId?: string;
+  autoSaveInterval?: number; // in milliseconds
+  apiClient?: WorkflowApiClient; // API client for workflow operations
+  organizationId?: string; // The organization ID for API calls
 }
 
 export const AgentDesigner: React.FC<AgentDesignerProps> = ({
@@ -79,307 +97,352 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
   onSave,
   assistantId,
   readOnly = false,
+  workflowId,
+  autoSaveInterval = 5000, // Default to 5 seconds
+  apiClient,
+  organizationId,
 }) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes as Node[]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as Edge[]);
-  const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
-  const { project } = useReactFlow();
+  const reactFlowInstance = useRef<any>(null);
 
   // State for Assistant Configuration Modal
   const [isAssistantConfigModalOpen, setIsAssistantConfigModalOpen] = useState(false);
   const [editingAssistantNodeData, setEditingAssistantNodeData] = useState<AssistantNodeData | null>(null);
 
+  // Use the workflow hook for state management
+  const {
+    nodes,
+    setNodes,
+    edges,
+    setEdges,
+    isLoading,
+    isSaving,
+    saveError,
+    lastSavedAt: lastSaved,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    updateNodeData,
+    saveWorkflow,
+    scheduleAutoSave,
+    viewport,
+    updateViewport
+  } = useWorkflow(workflowId, apiClient, organizationId);
+
+  // Track dirty state
+  const [isDirty, setIsDirty] = useState(false);
+  const [isNodeInspectorOpen, setIsNodeInspectorOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Storage keys for workspace data - ONLY use localStorage for existing workflows with IDs
+  const workspaceStorageKey = useMemo(() => {
+    // Only use localStorage for workflows with real IDs
+    if (workflowId && workflowId !== 'create' && workflowId !== 'new') {
+      return `workspace-${workflowId}`;
+    }
+    // Return null for new workflows to prevent localStorage use
+    return null;
+  }, [workflowId]);
+  const workflowConfigStorageKey = useMemo(() => {
+    if (workflowId && workflowId !== 'create' && workflowId !== 'new') {
+      return `workflow-config-${workflowId}`;
+    }
+    return null;
+  }, [workflowId]);
+
   // Initialize the designer with initial nodes and edges
   useEffect(() => {
     if (initialNodes.length > 0 || initialEdges.length > 0) {
-      setNodes(initialNodes as Node[]);
-      setEdges(initialEdges as Edge[]);
+      // Handle potential type incompatibilities between different FlowNode/FlowEdge definitions
+      setNodes(initialNodes.map(node => ({
+        ...node,
+        type: node.type // Ensure type compatibility
+      })) as any);
+      setEdges(initialEdges as any);
     }
   }, [initialNodes, initialEdges, setNodes, setEdges]);
-  
-  // Handle node updates from the inspector
-  const onNodeUpdate = useCallback(
-    (nodeId: string, data: any) => {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === nodeId) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                ...data,
-              },
-            };
-          }
-          return node;
-        })
-      );
-    },
-    [setNodes]
-  );
 
-  // Function to open the assistant configuration modal
-  const handleOpenAssistantConfigModal = useCallback((nodeId: string, data: AssistantNodeData) => {
-    setEditingAssistantNodeData({ ...data, id: nodeId }); // Ensure id is part of the data for the modal if needed
-    setIsAssistantConfigModalOpen(true);
-  }, []);
+  // Handle node updates and track dirty state
+  const onNodeUpdate = useCallback((nodeId: string, data: any) => {
+    updateNodeData(nodeId, data);
+    setIsDirty(true);
+  }, [updateNodeData]);
 
-  // Function to save assistant configuration from the modal
-  const handleSaveAssistantConfig = useCallback((updatedData: AssistantNodeData) => {
-    if (updatedData.id) {
-      // Log updates for debugging
-      console.log('Updating node with data:', updatedData);
-      
-      // Update node data in the flow
-      setNodes((nds) => 
-        nds.map((node) => {
-          if (node.id === updatedData.id) {
-            // Create a deep merge of the node data with the updated data
-            const mergedData = {
-              ...node.data,
-              ...updatedData,
-              // Ensure model is properly merged
-              model: {
-                ...(node.data.model || {}),
-                ...(updatedData.model || {})
-              }
-            };
-            return {
-              ...node,
-              data: mergedData
-            };
-          }
-          return node;
-        })
-      );
-    }
-    setIsAssistantConfigModalOpen(false);
-    setEditingAssistantNodeData(null);
-  }, [setNodes]); // Use setNodes instead of onNodeUpdate for more control
-
-  // Handle node selection
+  // Handle node click and highlight the selected node
+  const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
   const onNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => { // Changed node type to Node
-      // Now, single click on any node, including Assistant, will select it and open the inspector.
-      // Double-click on AssistantNode will still be handled by the node itself to open the modal.
-      setSelectedNode(node as FlowNode); // Cast to FlowNode for setSelectedNode
+    (event: React.MouseEvent, node: Node) => {
+      console.log("[AgentDesigner] Node clicked:", node);
+      setSelectedNode(node as FlowNode);
     },
     [setSelectedNode]
   );
+  
+  // Function to save workflow with current viewport data
+  const saveWorkspaceWithViewport = useCallback(() => {
+    if (reactFlowInstance.current) {
+      const currentViewport = reactFlowInstance.current.getViewport();
+      updateViewport(currentViewport);
+      saveWorkflow();
+    } else {
+      saveWorkflow();
+    }
+  }, [saveWorkflow, updateViewport, reactFlowInstance]);
 
-  // Handle edge connection
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      setEdges((eds) => addEdge({ ...connection, ...defaultEdgeOptions }, eds));
+  // Enable continuous autosaving when the component mounts
+  useEffect(() => {
+    // Set up autosaving on component mount
+    if (!readOnly && workflowId && workflowId !== 'create' && workflowId !== 'new') {
+      console.log(`[AgentDesigner] Enabling continuous autosave for workflow: ${workflowId}`);
+      scheduleAutoSave();
+    }
+  }, [workflowId, readOnly, scheduleAutoSave]);
+  
+  // Add event handler for keypresses with command key (removing Ctrl+S as we're autosaving now)
+  const handleKeyUp = useCallback((event: KeyboardEvent, rfInstance: any, isNodeInspectorOpen: boolean) => {
+    // Keep empty handler for future keyboard shortcuts
+    // We've removed the explicit save shortcut since we're autosaving now
+    if ((event.metaKey || event.ctrlKey) && !isNodeInspectorOpen) {
+      // We can add other keyboard shortcuts here in the future
+    }
+    
+    // Handle Delete and Backspace keys to delete selected nodes
+    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNode && !readOnly) {
+      // Ignore if user is typing in an input field
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      console.log(`[AgentDesigner] Deleting node: ${selectedNode.id}`);
+      
+      // Remove the node
+      setNodes((nds) => nds.filter(node => node.id !== selectedNode.id));
+      
+      // Remove any connected edges
+      setEdges((eds) => eds.filter(edge => 
+        edge.source !== selectedNode.id && edge.target !== selectedNode.id
+      ));
+      
+      // Clear the selected node
+      setSelectedNode(null);
+      
+      // Mark as dirty to trigger autosave
+      setIsDirty(true);
+      
+      // Show toast notification
+      toast({
+        title: "Node Deleted",
+        description: "The selected node has been removed.",
+        duration: 2000,
+      });
+    }
+  }, [saveWorkspaceWithViewport, readOnly, toast, selectedNode, setNodes, setEdges, setSelectedNode, setIsDirty]);
+  
+  // Create modified node/edge change handlers that also set dirty state
+  const onNodesChangeWithDirty = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChange(changes);
+      setIsDirty(true);
+      scheduleAutoSave();
     },
-    [setEdges]
+    [onNodesChange, setIsDirty, scheduleAutoSave]
   );
 
-  // Handle drag and drop from palette
+  const onEdgesChangeWithDirty = useCallback(
+    (changes: EdgeChange[]) => {
+      onEdgesChange(changes);
+      setIsDirty(true);
+      scheduleAutoSave();
+    },
+    [onEdgesChange, setIsDirty, scheduleAutoSave]
+  );
+  
+  // Viewport change handler
+  const onViewportChange = useCallback(
+    (viewport: Viewport) => {
+      updateViewport(viewport);
+      scheduleAutoSave();
+    },
+    [updateViewport, scheduleAutoSave]
+  );
+  
+  // Enhanced connect handler for special edge types
+  const onConnectWithSpecialEdges = useCallback(
+    (connection: Connection) => {
+      onConnect(connection);
+      setIsDirty(true);
+      scheduleAutoSave();
+    },
+    [onConnect, setIsDirty, scheduleAutoSave]
+  );
+  
+  // Handlers for drag and drop functionality
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
-
+  
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      if (!reactFlowWrapper.current) return;
+      if (!reactFlowWrapper.current || !reactFlowInstance.current) return;
 
-      const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
-      const dragDataString = event.dataTransfer.getData('application/reactflow');
-
-      // Check if the dropped element is valid
-      if (!dragDataString) return;
-
-      let type: AgentNodeType;
-      let droppedAssistantData: any = null;
-
-      try {
-        const parsedData = JSON.parse(dragDataString);
-        type = parsedData.type as AgentNodeType;
-        if (parsedData.assistantData) {
-          droppedAssistantData = parsedData.assistantData;
-        }
-      } catch (error) {
-        // Fallback for older drag sources or if data is just the type string
-        type = dragDataString as AgentNodeType;
-      }
-
+      const type = event.dataTransfer.getData('application/reactflow');
       if (!type) return;
 
-      const position = project({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+      const position = reactFlowInstance.current.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
 
-      // Create a new node
-      let newNodeData: any;
-      const baseId = `${type.toLowerCase()}_${Date.now()}`;
-
-      if (type === AgentNodeType.ASSISTANT && droppedAssistantData) {
-        // Generate a stable, unique node ID
-        const nodeId = droppedAssistantData.apiAssistantId ? 
-          `${type.toLowerCase()}_${droppedAssistantData.apiAssistantId}` : 
-          `${type.toLowerCase()}_${Date.now()}`;
-        
-        console.log(`[AgentDesigner] Creating new assistant node with ID: ${nodeId} and apiAssistantId: ${droppedAssistantData.apiAssistantId}`);
-        
-        // Only pass the apiAssistantId to the AssistantNode component
-        // The AssistantNode will load the full ModelConfig data dynamically
-        newNodeData = {
-          id: nodeId,
-          apiAssistantId: droppedAssistantData.apiAssistantId, // Store only the assistant ID from API
-          // The rest of the data will be loaded dynamically by the AssistantNode component
-          // We don't need to pass name, systemMessage, model, etc. here
-          onNodeDoubleClick: (event: React.MouseEvent, nodeId: string) => {
-            // Find the node by ID to get its current data
-            const node = nodes.find(n => n.id === nodeId);
-            if (node && node.type === AgentNodeType.ASSISTANT) {
-              // Handle opening the assistant config modal with the node ID
-              // This will be handled by the parent component that receives the event
-              // No need to call anything here as the event will bubble up
-              console.log(`[AgentDesigner] Double-click on assistant node ${nodeId}, event will bubble up`);
-            }
-          },
-          onTest: (nodeId: string) => {
-            console.log(`[AgentDesigner] Test assistant node ${nodeId}`);
-            // Implement test functionality here
-          },
-          onNodeDataChange: (updatedData: any) => {
-            console.log(`[AgentDesigner] Node data change for node ${nodeId}:`, updatedData);
-            // Update the node data in the flow
-            setNodes((nds) => 
-              nds.map((node) => {
-                if (node.id === nodeId) {
-                  return { ...node, data: { ...node.data, ...updatedData } };
-                }
-                return node;
-              })
-            );
-          }
-        };
-      } else if (type === AgentNodeType.ASSISTANT) { // Fallback if assistantData is not fully there but type is ASSISTANT
-        // Generate a stable, unique node ID
-        const nodeId = `${type.toLowerCase()}_${Date.now()}`;
-        
-        console.log(`[AgentDesigner] Creating new assistant node with ID: ${nodeId} without assistant data`);
-        
-        // Create a minimal node with just enough data for the AssistantNode to render
-        // The user will need to configure this node manually
-        newNodeData = {
-          id: nodeId,
-          // No apiAssistantId here, so the AssistantNode will show a configuration UI
-          // Only pass minimal data needed for initial rendering
-          // Minimal model data for initial rendering
-          model: { model: 'gpt-4-turbo', provider: 'openai' },
-          onNodeDoubleClick: (event: React.MouseEvent, nodeId: string) => {
-            // Find the node by ID to get its current data
-            const node = nodes.find(n => n.id === nodeId);
-            if (node && node.type === AgentNodeType.ASSISTANT) {
-              // Handle opening the assistant config modal with the node ID
-              // This will be handled by the parent component that receives the event
-              console.log(`[AgentDesigner] Double-click on assistant node ${nodeId}, event will bubble up`);
-            }
-          },
-          onTest: (nodeId: string) => {
-            console.log(`[AgentDesigner] Test assistant node ${nodeId}`);
-            // Implement test functionality here
-          },
-          onNodeDataChange: (updatedData: any) => {
-            console.log(`[AgentDesigner] Node data change for node ${nodeId}:`, updatedData);
-            // Update the node data in the flow using a captured nodeId for closure
-            setNodes((nds) => 
-              nds.map((node) => {
-                if (node.id === nodeId) {
-                  const updatedNode = { ...node, data: { ...node.data, ...updatedData } };
-                  console.log(`[AgentDesigner] Updated node data:`, updatedNode.data);
-                  return updatedNode;
-                }
-                return node;
-              })
-            );
-            
-            // Note: Auto-save will be handled by the parent component
-            // We don't have access to scheduleAutoSave here
-          }
-        };
-      } else {
-        newNodeData = { 
-          id: baseId,
-          label: droppedAssistantData?.label || type 
-        };
-      }
-
-      const newNode: FlowNode = {
-        id: newNodeData.id || `${type.toLowerCase()}_${Date.now()}`,
+      const newNode = {
+        id: `${type}-${Math.random().toString(16).slice(2, 8)}`,
         type,
         position,
-        data: newNodeData,
-      };
+        data: { label: type },
+      } as FlowNode;
 
-      setNodes((nds) => [...nds, newNode as Node]);
+      setNodes((nds) => nds.concat(newNode));
+      setIsDirty(true);
+      scheduleAutoSave();
     },
-    [project, setNodes]
+    [reactFlowInstance, reactFlowWrapper, setNodes, setIsDirty, scheduleAutoSave]
+  );
+  
+  // Handler for saving assistant configuration
+  const handleSaveAssistantConfig = useCallback(
+    (assistantData: AssistantNodeData) => {
+      if (!editingAssistantNodeData) return;
+      
+      // Find the node being edited
+      const nodeId = nodes.find(
+        (n) => n.type === AgentNodeType.ASSISTANT && n.data === editingAssistantNodeData
+      )?.id;
+      
+      if (nodeId) {
+        // Update node data
+        updateNodeData(nodeId, assistantData);
+        setIsDirty(true);
+        scheduleAutoSave();
+        
+        // Close the modal
+        setIsAssistantConfigModalOpen(false);
+        setEditingAssistantNodeData(null);
+      }
+    },
+    [editingAssistantNodeData, nodes, updateNodeData, setIsDirty, scheduleAutoSave]
   );
 
-  // Handle save
-  const handleSave = useCallback(() => {
-    if (onSave) {
-      onSave(nodes as FlowNode[], edges as FlowEdge[]);
+  // Helper function to check if a node is an Assistant node
+  const isAssistantNode = (node: FlowNode): boolean => {
+    return node.type === AgentNodeType.ASSISTANT;
+  };
+
+  // Register event handlers
+  useEffect(() => {
+    const keyUpHandler = (event: KeyboardEvent) => handleKeyUp(event, reactFlowInstance.current, isNodeInspectorOpen);
+    
+    document.addEventListener('keyup', keyUpHandler);
+    
+    return () => {
+      document.removeEventListener('keyup', keyUpHandler);
+    };
+  }, [handleKeyUp, reactFlowInstance, isNodeInspectorOpen]);
+  
+  // Helper for opening the Assistant Configuration Modal
+  const handleOpenAssistantConfigModal = useCallback((node: FlowNode) => {
+    if (isAssistantNode(node)) {
+      setEditingAssistantNodeData(node.data as AssistantNodeData);
+      setIsAssistantConfigModalOpen(true);
     }
-  }, [nodes, edges, onSave]);
+  }, []);
+  
+  // Add edit handlers to assistant nodes
+  useEffect(() => {
+    const needsHandlers = nodes.some(node => 
+      node.type === AgentNodeType.ASSISTANT && 
+      !('onEdit' in node.data)
+    );
+    
+    if (needsHandlers) {
+      const nodesWithHandlers = nodes.map(node => {
+        if (node.type === AgentNodeType.ASSISTANT && !('onEdit' in node.data)) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              onEdit: () => handleOpenAssistantConfigModal(node)
+            }
+          } as FlowNode;
+        }
+        return node;
+      });
+      
+      setNodes(nodesWithHandlers);
+    }
+  }, [nodes, handleOpenAssistantConfigModal, setNodes]);
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 flex" style={{ height: 'calc(100vh - 200px)' }}>
-        <div className="flex-1" ref={reactFlowWrapper}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            defaultEdgeOptions={defaultEdgeOptions}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
-            fitView
-            proOptions={{ hideAttribution: true }}
-            nodesDraggable={!readOnly}
-            nodesConnectable={!readOnly}
-            elementsSelectable={!readOnly}
-          >
-            <Controls />
-            <Background />
-            {!readOnly && (
-              <Panel position="top-left">
-                <AgentPalette />
-              </Panel>
-            )}
-            <Panel position="top-right">
-              {!readOnly && onSave && (
-                <Button onClick={handleSave} variant="default">
-                  Save Agent
-                </Button>
-              )}
+    <div className="flex h-full w-full bg-background text-foreground" ref={reactFlowWrapper}>
+      {/* ReactFlow container */}
+      <div className="flex-grow h-full" data-testid="rf-wrapper">
+        <ReactFlow
+          nodes={nodes as any}
+          edges={edges as any}
+          onNodesChange={onNodesChangeWithDirty}
+          onEdgesChange={onEdgesChangeWithDirty}
+          onConnect={onConnectWithSpecialEdges}
+          onNodeClick={onNodeClick}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          onViewportChange={onViewportChange}
+          defaultViewport={viewport || undefined}
+          fitView={!viewport}
+          className="agent-designer-flow"
+          ref={reactFlowInstance}
+        >
+          <Controls />
+          <Background />
+          {!readOnly && (
+            <Panel position="top-left">
+              <AgentPalette />
             </Panel>
-          </ReactFlow>
-        </div>
-        {selectedNode && !readOnly && (
-          <div className="w-80 border-l p-4 overflow-y-auto">
-            <AgentNodeInspector
-              node={selectedNode}
-              onUpdate={onNodeUpdate}
-              assistantId={assistantId}
-            />
-          </div>
-        )}
+          )}
+          <Panel position="top-right">
+            <div className="flex items-center gap-2 p-2 bg-card border rounded-lg shadow">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  {isDirty && !isSaving && <span className="text-xs text-amber-500">Autosaving...</span>}
+                  {isSaving && <span className="text-xs text-blue-500">Saving...</span>}
+                  {!isSaving && !isDirty && !saveError && nodes.length > 0 && <span className="text-xs text-green-500">All changes saved</span>} 
+                  {saveError && <span className="text-xs text-red-500">Error saving!</span>}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {lastSaved && `Last saved: ${lastSaved.toLocaleTimeString()}`}
+                  {saveError && <div className="text-xs text-red-500 mt-1">{saveError}</div>}
+                </div>
+              </div>
+            </div>
+          </Panel>
+        </ReactFlow>
       </div>
+      
+      {/* Inspector Panel */}
+      {selectedNode && !readOnly && (
+        <div className="w-80 border-l border-border p-4 overflow-y-auto bg-card">
+          <AgentNodeInspector
+            node={selectedNode as unknown as InspectorFlowNode}
+            onUpdate={onNodeUpdate}
+            assistantId={assistantId}
+          />
+        </div>
+      )}
+      
+      {/* Assistant Config Modal */}
       {isAssistantConfigModalOpen && editingAssistantNodeData && (
         <AssistantConfigModal
           isOpen={isAssistantConfigModalOpen}
