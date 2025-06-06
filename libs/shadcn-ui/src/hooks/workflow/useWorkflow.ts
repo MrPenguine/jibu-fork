@@ -126,7 +126,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
   };
 
   // Save workflow with current viewport state
-  const saveWorkflow = useCallback(async (currentViewport?: Viewport) => {
+  const saveWorkflow = useCallback(async (currentViewport?: Viewport, isNewWorkflow?: boolean) => {
     if (!workflowId || isLoading) return;
     
     try {
@@ -136,15 +136,20 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       // Use the most current viewport
       const viewportToSave = currentViewport || viewport;
       
+      // For brand new secondary workflows, explicitly use empty arrays to ensure clean state
+      const nodesToSave = isNewWorkflow ? [] : nodes;
+      const edgesToSave = isNewWorkflow ? [] : edges;
+      
       const workflowData = {
         id: workflowId,
         name: workflowName,
-        nodes: JSON.stringify(nodes),
-        edges: JSON.stringify(edges),
+        nodes: JSON.stringify(nodesToSave),
+        edges: JSON.stringify(edgesToSave),
         isPublished,
         viewport: viewportToSave ? JSON.stringify(viewportToSave) : undefined
       };
       
+      console.log(`Saving workflow ${workflowId}${isNewWorkflow ? ' as new workflow with empty data' : ''}`);
       await workflowApi.updateWorkflow(workflowId, workflowData, orgId);
       setLastSavedAt(new Date());
       console.log('Workflow saved successfully');

@@ -205,11 +205,14 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
       setIsLoading(true);
       
       // Create a new secondary workflow via the API with the updated API signature
+      // Explicitly set nodes and edges to empty arrays for a clean workflow
       await agentApiClient.createSecondaryWorkflow(
         masterWorkflow.id,
         {
           name: newWorkflowName,
           description: newWorkflowDescription || `Secondary workflow linked to ${masterWorkflow.name}`,
+          nodes: JSON.stringify([]), // Explicitly set empty array for nodes, stringified to match backend expectation
+          edges: JSON.stringify([])  // Explicitly set empty array for edges, stringified to match backend expectation
         }
       );
       
