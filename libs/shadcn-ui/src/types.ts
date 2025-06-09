@@ -175,6 +175,7 @@ export interface FlowEdge {
   sourceHandle?: string; // Optional: for nodes with multiple output ports
   targetHandle?: string; // Optional: for nodes with multiple input ports
   label?: string; // Optional: edge label
+  type?: string; // Optional: type of the edge (e.g., 'smoothstep', 'default')
   condition?: { // Optional: condition for conditional edges
     variable: string;
     operator: 'equals' | 'contains' | 'startsWith' | 'isSet' | 'isNotSet' | 'greaterThan' | 'lessThan';

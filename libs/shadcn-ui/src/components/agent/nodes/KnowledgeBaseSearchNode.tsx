@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '../../ui/dialog';
 import { Button } from '../../ui/button';
+import { useAssistants } from '../../../../../../apps/frontend/src/utils/AssistantsApi'; // Added for backend calls
 
 export interface KnowledgeBaseSearchNodeData {
   id?: string;
@@ -44,25 +45,44 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
   const edges = useEdges();
   const nodes = useNodes();
   const nodeId = useNodeId();
+  const { linkKnowledgeBaseToAssistant, removeKnowledgeBaseFromAssistant } = useAssistants(); // Added for backend calls (if any)
   
   // Find connected assistant node (if any)
   useEffect(() => {
-    const connectedEdges = edges.filter(edge => edge.target === nodeId);
-    if (connectedEdges.length > 0) {
-      // Find the source node of the connected edge
-      const sourceNodeId = connectedEdges[0].source;
+    // Filter for substantive edge changes only - connections to this node
+    // Get only properly formed edges with valid source and target
+    const validEdges = edges.filter(edge => 
+      edge && edge.source && edge.target && 
+      (edge.target === nodeId || edge.source === nodeId)
+    );
+    
+    // Edges connecting TO this KB node (from an assistant)
+    const incomingEdges = validEdges.filter(edge => edge.target === nodeId);
+    
+    // Check if connected to an assistant node
+    if (incomingEdges.length > 0) {
+      // Find the source node of the connected edge (should be an assistant)
+      const sourceNodeId = incomingEdges[0].source;
       const sourceNode = nodes.find(node => node.id === sourceNodeId);
       
       // If the source node is an assistant node, store its ID
-      if (sourceNode && sourceNode.type === 'ASSISTANT' && sourceNode.data) {
+      if (sourceNode && 
+          (sourceNode.type === 'ASSISTANT' || sourceNode.type === AgentNodeType.ASSISTANT) && 
+          sourceNode.data) {
+        
         const nodeData = sourceNode.data as any;
-        // Look for apiAssistantId (from backend) or regular id
+        // IMPORTANT: Always prefer the backend API ID for consistency
         const assistantId = nodeData.apiAssistantId || nodeData.id;
+        
         if (assistantId) {
-          setConnectedAssistantId(assistantId);
+          // Only update state if the ID actually changed
+          if (connectedAssistantId !== assistantId) {
+            setConnectedAssistantId(assistantId);
+          }
           
-          // Also update the node data to store the connection
+          // Only update node data if the connection changed
           if (data.onUpdateBlockData && data.connectedAssistantId !== assistantId) {
+            console.log(`[KBNode ${id}] Updating connectedAssistantId to: ${assistantId}`);
             data.onUpdateBlockData(id, {
               connectedAssistantId: assistantId,
               _connectionTimestamp: Date.now()
@@ -71,11 +91,14 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
         }
       }
     } else {
-      // If there's no connection, clear the connected assistant ID
-      setConnectedAssistantId(null);
+      // Only clear if we actually had a connection before
+      if (connectedAssistantId !== null) {
+        setConnectedAssistantId(null);
+      }
       
-      // Also update the node data to clear the connection
+      // Only update node data if we need to clear a previous connection
       if (data.onUpdateBlockData && data.connectedAssistantId) {
+        console.log(`[KBNode ${id}] Clearing connectedAssistantId (was: ${data.connectedAssistantId})`);
         data.onUpdateBlockData(id, {
           connectedAssistantId: undefined,
           _connectionTimestamp: Date.now()
@@ -102,22 +125,63 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
   
   // Handle knowledge base selection from the config component
   const handleKnowledgeBaseChange = useCallback(
-    (knowledgeBaseId: string | null, knowledgeBaseName?: string) => {
-      // Update this node's knowledge base ID and name
+    async (newSelectedKbId: string | null, newSelectedKbName?: string) => {
+      // 1. Update this KnowledgeBaseSearchNode's own data via the callback prop
       if (data.onUpdateBlockData) {
-        data.onUpdateBlockData(id, {
-          knowledgeBaseId: knowledgeBaseId || undefined,
-          knowledgeBaseName: knowledgeBaseName || undefined
+        data.onUpdateBlockData(id, { // `id` is this KnowledgeBaseSearchNode's id
+          knowledgeBaseId: newSelectedKbId ?? undefined,
+          knowledgeBaseName: newSelectedKbName ?? undefined,
         });
       }
-      
-      // If this node is connected to an assistant, we need to link the knowledge base to the assistant
-      if (connectedAssistantId && knowledgeBaseId) {
-        console.log(`Linking knowledge base ${knowledgeBaseId} to assistant ${connectedAssistantId}`);
-        // The actual API call will be handled by KnowledgeBaseConfig component
+
+      const currentConnectedAssistantId = data.connectedAssistantId; // Use the ID from props.data
+
+      if (currentConnectedAssistantId) {
+        // 2. Update the connected AssistantNode's data in React Flow state (frontend)
+        reactFlow.setNodes((nds) =>
+          nds.map((node) => {
+            if (node.id === currentConnectedAssistantId && node.type === AgentNodeType.ASSISTANT) {
+              const updatedAssistantData = { ...node.data };
+              if (newSelectedKbId) {
+                updatedAssistantData.knowledgeBaseId = newSelectedKbId;
+                updatedAssistantData.knowledgeBaseName = newSelectedKbName;
+              } else {
+                delete updatedAssistantData.knowledgeBaseId;
+                delete updatedAssistantData.knowledgeBaseName;
+              }
+              return { ...node, data: updatedAssistantData };
+            }
+            return node;
+          })
+        );
+
+        // 3. Update the backend Assistant entity
+        try {
+          if (newSelectedKbId) {
+            console.log(`[KBNode] Linking KB ${newSelectedKbId} to Assistant ${currentConnectedAssistantId} via API`);
+            await linkKnowledgeBaseToAssistant(currentConnectedAssistantId, newSelectedKbId);
+            console.log(`[KBNode] Successfully linked KB to Assistant via API`);
+          } else {
+            console.log(`[KBNode] Unlinking KB from Assistant ${currentConnectedAssistantId} via API`);
+            await removeKnowledgeBaseFromAssistant(currentConnectedAssistantId);
+            console.log(`[KBNode] Successfully unlinked KB from Assistant via API`);
+          }
+        } catch (error) {
+          console.error('[KBNode] Error updating assistant knowledge base link via API:', error);
+          // TODO: Consider reverting frontend changes or showing an error to the user
+        }
       }
+
+      setIsConfigModalOpen(false); // Close the configuration modal
     },
-    [id, connectedAssistantId, data.onUpdateBlockData]
+    [
+      id,
+      data.onUpdateBlockData,
+      data.connectedAssistantId,
+      reactFlow,
+      linkKnowledgeBaseToAssistant, // from useAssistants
+      removeKnowledgeBaseFromAssistant, // from useAssistants
+    ]
   );
   
   // Function to handle saving output variable name
@@ -201,16 +265,17 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
             <div className="py-4">
               <KnowledgeBaseConfig 
                 assistantId={connectedAssistantId}
-                knowledgeBaseId={data.knowledgeBaseId}
+                knowledgeBaseId={data.knowledgeBaseId} // This prop should be used by KnowledgeBaseConfig for pre-selection
                 onKnowledgeBaseChange={handleKnowledgeBaseChange}
-                maxFileHeight={8}
-                showEditControls={true}
+                // Pass other necessary props like organizationId if KnowledgeBaseConfig needs it
+                // For example, if your KnowledgeBaseConfig fetches KBs based on orgId:
+                // organizationId={data.organizationId || getActiveOrgIdFromSomewhere()}
               />
+              <Button onClick={() => setIsConfigModalOpen(false)}>Close</Button>
             </div>
           )}
           
           <div className="mt-4 flex justify-end">
-            <Button onClick={() => setIsConfigModalOpen(false)}>Close</Button>
           </div>
         </DialogContent>
       </Dialog>

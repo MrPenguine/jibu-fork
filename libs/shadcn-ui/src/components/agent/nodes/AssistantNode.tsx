@@ -1,7 +1,8 @@
 "use client";
 
 import React, { memo, useState, useEffect, useCallback, useRef } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
+import { AgentNodeType } from '../../../types'; // Adjusted path based on types.ts location
 import { Bot, PlayCircle } from 'lucide-react';
 import { getAssistant as fetchAssistant } from '../../../../../../apps/frontend/src/utils/AssistantsApi';
 
@@ -72,12 +73,17 @@ export const AssistantNode = memo<NodeProps<AssistantNodeData>>(({ id, data, sel
     onNodeDoubleClick,
     onTest,
     onSave,
-    onNodeDataChange
+    onNodeDataChange,
+    // xPos and yPos are not in data, they are top-level props in NodeProps
   } = data;
 
   // Track the last fetched assistant ID to prevent redundant API calls
   const lastFetchedAssistantIdRef = useRef<string | null>(null);
   const isInitialMountRef = useRef(true);
+  const processedKnowledgeBaseIdRef = useRef<string | null | undefined>(undefined); // undefined: never processed, null: processed for 'no KB'
+  const { addNodes, getNodes, addEdges, getEdges, getNode, setEdges } = useReactFlow(); // Added setEdges
+  // xPos and yPos are part of NodeProps (passed directly to AssistantNode), not in data. 
+  // The new useEffect for KB node addition correctly uses getNode(id).position.
 
   // Memoize the fetchAssistantData function to prevent recreation on every render
   const fetchAssistantData = useCallback(async () => {
@@ -163,12 +169,112 @@ export const AssistantNode = memo<NodeProps<AssistantNodeData>>(({ id, data, sel
 
   // Fetch assistant data when the component mounts or apiAssistantId changes
   useEffect(() => {
-    // Only fetch when we have an apiAssistantId
-    if (apiAssistantId) {
-      console.log(`[AssistantNode ${id}] Triggering fetch for assistant ID: ${apiAssistantId}`);
-      fetchAssistantData();
+    // If apiAssistantId is cleared (e.g. node is duplicated or reset), clear fetched data
+    if (!apiAssistantId) {
+      setAssistantData(null);
+      lastFetchedAssistantIdRef.current = null; // Reset ref to allow fetching if an ID is later set
+      return;
     }
-  }, [apiAssistantId, fetchAssistantData]); 
+    fetchAssistantData();
+  }, [apiAssistantId, fetchAssistantData, id]);
+
+  // Effect to automatically add and connect KnowledgeBaseSearchNode
+  useEffect(() => {
+    // Determine current KB ID, treating undefined as null for consistent comparison
+    const currentKnowledgeBaseId = assistantData?.knowledgeBaseId || data.knowledgeBaseId || null;
+    const assistantNodeId = id;
+
+    // If we've already processed this exact knowledgeBaseId, we might not need to do anything.
+    if (currentKnowledgeBaseId === processedKnowledgeBaseIdRef.current) {
+      // However, check if the edge actually exists. If not, we should allow re-creation.
+      if (currentKnowledgeBaseId) {
+        const expectedKbNodeId = `kb-search-for-${assistantNodeId}`;
+        const edgeId = `edge-${assistantNodeId}-to-${expectedKbNodeId}`;
+        const edgeExists = getEdges().some(e => e.id === edgeId);
+        console.log(`[AssistantNode ${id}] Ref check: KB ${currentKnowledgeBaseId}. Edge ${edgeId} exists in getEdges(): ${edgeExists}. Current getEdges() IDs:`, getEdges().map(e => e.id));
+        if (edgeExists) {
+          // console.log(`[AssistantNode ${id}] KB ${currentKnowledgeBaseId} already processed and edge ${edgeId} exists. Returning.`);
+          return; // Already processed and edge is present, nothing to do.
+        }
+        console.log(`[AssistantNode ${id}] Ref check: KB ${currentKnowledgeBaseId} was processed, but edge ${edgeId} is missing. Allowing re-creation.`);
+      } else {
+        // console.log(`[AssistantNode ${id}] No KB to process, and 'no KB' state was already processed.`);
+        return; // No KB, and we've already handled this state.
+      }
+    }
+
+    // Proceed with node/edge creation or handling 'no KB' state
+    console.log(`[AssistantNode ${id}] Processing KB ID: ${currentKnowledgeBaseId} (Previous: ${processedKnowledgeBaseIdRef.current})`);
+
+    if (currentKnowledgeBaseId && assistantNodeId) {
+      const expectedKbNodeId = `kb-search-for-${assistantNodeId}`;
+      const existingKbNode = getNode(expectedKbNodeId);
+      const existingEdge = getEdges().find(
+        (edge) =>
+          edge.source === assistantNodeId &&
+          edge.sourceHandle === 'kb-connection' &&
+          edge.target === expectedKbNodeId &&
+          edge.targetHandle === 'kb-connection-target'
+      );
+
+      const currentNode = getNode(assistantNodeId);
+
+      if (currentNode && (!existingKbNode || !existingEdge)) {
+        const assistantNodeWidth = currentNode.width || 280; // Default width from AssistantNode
+        const newNodeX = currentNode.position.x + assistantNodeWidth + 75;
+        const newNodeY = currentNode.position.y; // Align vertically
+
+        if (!existingKbNode) {
+          const newNodeToAdd = {
+            id: expectedKbNodeId,
+            type: AgentNodeType.KNOWLEDGE_BASE_SEARCH as string, // Cast enum to string
+            position: { x: newNodeX, y: newNodeY },
+            data: {
+              knowledgeBaseId: currentKnowledgeBaseId,
+              knowledgeBaseName: assistantData?.name
+                ? `KB for ${assistantData.name}`
+                : currentKnowledgeBaseId,
+              // Automatically connect this KB node to the current assistant
+              // This helps the KB node itself know which assistant it's linked to if needed
+              connectedAssistantId: data.apiAssistantId 
+            },
+          };
+          addNodes([newNodeToAdd]);
+        }
+
+        if (!existingEdge) {
+          const newEdgeToAdd = {
+            id: `edge-${assistantNodeId}-to-${expectedKbNodeId}`,
+            source: assistantNodeId,
+            sourceHandle: 'kb-connection',
+            target: expectedKbNodeId,
+            targetHandle: 'kb-connection-target',
+            type: 'smoothstep',
+          };
+          // Use addEdges from useReactFlow() to ensure it goes through the central onEdgesChange handler
+          // which has more robust de-duplication logic.
+          console.log(`[AssistantNode ${id}] Edge ${newEdgeToAdd.id} determined to be MISSING based on 'existingEdge' variable. 'existingEdge' was:`, existingEdge, `Calling addEdges. Current getEdges() IDs before call:`, getEdges().map(e => e.id));
+          addEdges([newEdgeToAdd]);
+        } else {
+          console.log(`[AssistantNode ${id}] Edge ${newEdgeToAdd.id} determined to be PRESENT based on 'existingEdge' variable. 'existingEdge' was:`, existingEdge, `Skipping addEdges. Current getEdges() IDs:`, getEdges().map(e => e.id));
+        }
+      }
+    }
+
+    // Update the ref to reflect that this currentKnowledgeBaseId has now been processed.
+    processedKnowledgeBaseIdRef.current = currentKnowledgeBaseId;
+
+  }, [
+    assistantData?.knowledgeBaseId,
+    data.knowledgeBaseId, 
+    id, 
+    addNodes, 
+    getNodes, 
+    addEdges, // Keep addEdges if used elsewhere, or remove if setEdges covers all uses from here
+    getNode, 
+    setEdges, 
+    getEdges, // Added getEdges to dependencies
+  ]);
 
   // Get data from either the fetched assistant or the local data
   const displayName = assistantData?.name || name;
