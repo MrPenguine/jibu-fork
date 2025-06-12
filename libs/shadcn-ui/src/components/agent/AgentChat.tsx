@@ -395,6 +395,42 @@ export default function AgentChat({
     scrollToBottom();
   }, [messages]);
 
+  // Polling mechanism to fetch new messages periodically
+  useEffect(() => {
+    // Don't poll if no current chat is selected or we're loading
+    if (!currentChatId || loading || isLoadingMessages) return;
+    
+    console.log(`Setting up polling for chat messages: ${currentChatId}`);
+    
+    // Poll for new messages every 2 seconds
+    const pollingInterval = setInterval(async () => {
+      try {
+        if (!currentChatId) return;
+        
+        const apiMessages = await chatApi.getChatMessages(currentChatId, activeOrganizationId);
+        const latestMessages = (apiMessages || []).map((msg: any) => ({
+          id: msg.id,
+          text: msg.content,
+          sender: msg.role as 'user' | 'assistant',
+          timestamp: new Date(msg.createdAt),
+        })).sort((a: Message, b: Message) => a.timestamp.getTime() - b.timestamp.getTime());
+        
+        // Compare with current messages to see if we have updates
+        if (JSON.stringify(latestMessages) !== JSON.stringify(messages)) {
+          console.log('Detected new or changed messages, updating message list');
+          setMessages(latestMessages);
+        }
+      } catch (error) {
+        console.error('Error polling for new messages:', error);
+        // Don't show toast for polling errors to avoid spamming the user
+      }
+    }, 2000); // Poll every 2 seconds
+    
+    return () => {
+      clearInterval(pollingInterval);
+    };
+  }, [currentChatId, activeOrganizationId, loading, isLoadingMessages, messages]);
+
   useEffect(() => {
     return () => {
       if (isTtsPlaying()) {
