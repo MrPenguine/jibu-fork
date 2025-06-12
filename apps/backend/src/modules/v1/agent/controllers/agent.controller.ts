@@ -98,40 +98,65 @@ export class AgentController {
         try {
           // Get workflows for this agent
           const workflows = await this.workflowService.getAgentWorkflows(id, organizationId);
+          this.logger.log(`Found ${workflows?.length || 0} workflows for agent ${id}`);
           
           // Look for ASSISTANT nodes in each workflow and extract assistantId
           for (const workflow of workflows) {
             try {
-              // Parse the workflow nodes
-              const parsedNodes = workflow.nodes ? 
-                (typeof workflow.nodes === 'string' ? JSON.parse(workflow.nodes) : workflow.nodes) : {};
+              this.logger.log(`[AGENT_ASSISTANT_DEBUG] Processing workflow ${workflow.id}`);
+              let parsedNodes;
+              try {
+                parsedNodes = workflow.nodes ? (typeof workflow.nodes === 'string' ? JSON.parse(workflow.nodes) : workflow.nodes) : {};
+                this.logger.log(`[AGENT_ASSISTANT_DEBUG] Successfully parsed workflow nodes, found ${Object.keys(parsedNodes).length} nodes`);
+                this.logger.debug(`[AGENT_ASSISTANT_DEBUG] Node keys: ${Object.keys(parsedNodes).join(', ')}`);
+              } catch (parseError) {
+                this.logger.error(`[AGENT_ASSISTANT_DEBUG] Error parsing workflow nodes: ${parseError.message}`);
+                this.logger.error(`[AGENT_ASSISTANT_DEBUG] Workflow nodes raw data: ${JSON.stringify(workflow.nodes).substring(0, 200)}...`);
+                continue;
+              }
               
-              // Find assistant nodes - using proper typing
-              const nodes = parsedNodes as Record<string, { type: string; data?: { assistantId?: string } }>;              
-              const assistantNodes = Object.values(nodes).filter(
-                node => node.type === 'ASSISTANT' && node.data?.assistantId
+              // Check for both assistantId and apiAssistantId fields that might exist in the node data
+              const nodes = parsedNodes as Record<string, { type: string; data?: { assistantId?: string, apiAssistantId?: string } }>;
+              
+              // Find nodes with type ASSISTANT that have either assistantId or apiAssistantId
+              const assistantNodes = Object.values(nodes).filter(node => 
+                node.type === 'ASSISTANT' && (node.data?.assistantId || node.data?.apiAssistantId)
               );
               
+              this.logger.log(`[AGENT_ASSISTANT_DEBUG] Found ${assistantNodes?.length || 0} ASSISTANT nodes in workflow ${workflow.id}`);
+              
               if (assistantNodes.length > 0) {
-                // Use the first assistant node's assistantId
-                const assistantId = assistantNodes[0].data?.assistantId;
-                if (assistantId) {
-                  this.logger.log(`Found assistantId ${assistantId} in workflow ${workflow.id}`);
+                for (const assistantNode of assistantNodes) {
+                  this.logger.log(`[AGENT_ASSISTANT_DEBUG] Found ASSISTANT node with data: ${JSON.stringify(assistantNode.data)}`);
                   
-                  // Add assistantId to agent response
-                  agent.assistantId = assistantId;
-                  break;
+                  // Check both possible fields for the assistantId
+                  const assistantId = assistantNode.data?.apiAssistantId || assistantNode.data?.assistantId;
+                  
+                  if (assistantId) {
+                    this.logger.log(`[AGENT_ASSISTANT_DEBUG] Found assistantId ${assistantId} in workflow ${workflow.id} (field: ${assistantNode.data?.apiAssistantId ? 'apiAssistantId' : 'assistantId'})`);
+                    agent.assistantId = assistantId;
+                    break;
+                  }
                 }
+                if (agent.assistantId) break; // Exit the workflow loop if we found an assistantId
+              } else {
+                this.logger.log(`[AGENT_ASSISTANT_DEBUG] No ASSISTANT nodes found with assistantId/apiAssistantId in workflow ${workflow.id}`);
               }
             } catch (error) {
-              this.logger.warn(`Error parsing workflow ${workflow.id}: ${error.message}`);
-              // Continue with next workflow
+              this.logger.error(`[AGENT_ASSISTANT_DEBUG] Error processing workflow ${workflow.id}: ${error.message}`);
             }
           }
+          
+          // Check if we successfully extracted an assistantId
+          if (!agent.assistantId) {
+            this.logger.warn(`[AGENT_ASSISTANT_DEBUG] Failed to extract assistantId from any workflow for agent ${id}`);
+          }
         } catch (error) {
-          this.logger.warn(`Error getting workflows for agent ${id}: ${error.message}`);
+          this.logger.warn(`[AGENT_ASSISTANT_DEBUG] Error getting workflows for agent ${id}: ${error.message}`, error.stack);
           // Continue without assistantId
         }
+      } else {
+        this.logger.log(`[AGENT_ASSISTANT_DEBUG] Agent ${id} already has assistantId ${agent.assistantId}`);
       }
       
       // Check if any workflows for this agent are published
@@ -218,6 +243,36 @@ export class AgentController {
   async processQuery(@Body() request: AgentRequest, @Req() req: Request): Promise<AgentResponse> {
     this.logger.log(`Processing agent query: ${request.input}`);
     
+    // If assistantId is specified, check if it's actually an agent ID
+    if (request.config?.assistantId) {
+      try {
+        this.logger.log(`[AGENT_ASSISTANT_DEBUG] Checking if assistantId ${request.config.assistantId} is actually an agentId...`);
+        const organizationId = req.headers['x-organization-id'] as string;
+        
+        // Try to find an agent with this ID
+        try {
+          const agent = await this.agentService.findOne(request.config.assistantId, organizationId);
+          
+          if (agent) {
+            this.logger.log(`[AGENT_ASSISTANT_DEBUG] ID ${request.config.assistantId} is an agent ID. This is a workflow agent request.`);
+            
+            // Properly mark as a workflow agent request
+            if (!request.config) request.config = {};
+            request.config.workflowAgent = true;
+            
+            // Log the updated request configuration
+            this.logger.log(`[AGENT_ASSISTANT_DEBUG] Updated request config: ${JSON.stringify(request.config)}`);
+          }
+        } catch (agentError) {
+          // Not an agent ID, proceed normally
+          this.logger.log(`[AGENT_ASSISTANT_DEBUG] ID ${request.config.assistantId} is not an agent ID. Proceeding with normal assistant request.`);
+        }
+      } catch (error) {
+        this.logger.error(`[AGENT_ASSISTANT_DEBUG] Error checking if assistantId is actually an agentId: ${error.message}`);
+        // Continue with processing even if checking fails
+      }
+    }
+    
     const response = await this.integrationsAgentService.processRequest(request);
     
     // Save the messages to the database if we have a valid chat ID
@@ -247,6 +302,36 @@ export class AgentController {
   async streamQuery(@Req() req: Request, @Body() request: AgentRequest): Promise<StreamableFile> {
     this.logger.log(`Processing streaming agent query: ${request.input}`);
     this.logger.log(`Request details: ${JSON.stringify(request)}`);
+    
+    // If assistantId is specified, check if it's actually an agent ID
+    if (request.config?.assistantId) {
+      try {
+        this.logger.log(`[AGENT_ASSISTANT_DEBUG] Checking if assistantId ${request.config.assistantId} is actually an agentId...`);
+        const organizationId = req.headers['x-organization-id'] as string;
+        
+        // Try to find an agent with this ID
+        try {
+          const agent = await this.agentService.findOne(request.config.assistantId, organizationId);
+          
+          if (agent) {
+            this.logger.log(`[AGENT_ASSISTANT_DEBUG] ID ${request.config.assistantId} is an agent ID. This is a workflow agent request.`);
+            
+            // Properly mark as a workflow agent request
+            if (!request.config) request.config = {};
+            request.config.workflowAgent = true;
+            
+            // Log the updated request configuration
+            this.logger.log(`[AGENT_ASSISTANT_DEBUG] Updated request config: ${JSON.stringify(request.config)}`);
+          }
+        } catch (agentError) {
+          // Not an agent ID, proceed normally
+          this.logger.log(`[AGENT_ASSISTANT_DEBUG] ID ${request.config.assistantId} is not an agent ID. Proceeding with normal assistant request.`);
+        }
+      } catch (error) {
+        this.logger.error(`[AGENT_ASSISTANT_DEBUG] Error checking if assistantId is actually an agentId: ${error.message}`);
+        // Continue with the streaming response even if checking fails
+      }
+    }
     
     // Save the user message to the database if we have a valid chat ID
     if (request.sessionId && !request.sessionId.startsWith('chat-')) {
@@ -398,18 +483,26 @@ export class AgentController {
         connected
       };
     } catch (error) {
-      this.logger.error(`Error checking agent health: ${error.message}`);
       return { status: 'error', connected: false };
     }
   }
 
   // Helper method to clean and parse message content
   // This handles complex JSON structures that might be embedded in the content
+  // and removes trailing JSON metadata from assistant messages
   private cleanMessageContent(content: string): string {
     try {
       // If content is empty or not a string, return as is
       if (!content || typeof content !== 'string') {
         return content;
+      }
+      
+      // Check for trailing JSON metadata pattern (common in assistant responses)
+      // This regex matches JSON objects at the end of a string that look like chunk metadata
+      const trailingJsonRegex = /(\{"output":.*?"metadata":.*?\})$/;
+      if (trailingJsonRegex.test(content)) {
+        this.logger.log(`[AGENT_ASSISTANT_DEBUG] Removing trailing JSON metadata from message`);
+        return content.replace(trailingJsonRegex, '');
       }
       
       // If content is already a reasonable length, don't try to parse it

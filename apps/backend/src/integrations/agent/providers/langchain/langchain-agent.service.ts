@@ -458,11 +458,19 @@ let context = '';
   async *processStreamingRequest(request: AgentRequest): AsyncIterable<AgentResponse> {
     try {
       const { input, config, sessionId } = request;
-      const { assistantId, knowledgeBaseId } = config || {};
+      const { assistantId, knowledgeBaseId, workflowAgent } = config || {};
       
+      this.logger.log(`[AGENT_ASSISTANT_DEBUG] LangchainAgentService.processStreamingRequest starting with sessionId: ${sessionId}`);
+      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Request config: ${JSON.stringify(config || {})}`);
+      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Workflow agent flag: ${!!workflowAgent}`);
+      
+      // Check for assistantId - this is the critical part where errors occur
       if (!assistantId) {
+        this.logger.error(`[AGENT_ASSISTANT_DEBUG] No assistantId provided in request config. This is required for assistant chat.`);
         throw new Error('Assistant ID is required');
       }
+      
+      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Looking up assistant with ID: ${assistantId}`);
       
       // Get the assistant
       const assistant = await this.prisma.assistant.findUnique({
@@ -470,8 +478,20 @@ let context = '';
       });
       
       if (!assistant) {
+        this.logger.error(`[AGENT_ASSISTANT_DEBUG] Assistant with ID ${assistantId} not found in database`);
+        // Check if the ID might be an agent ID instead of an assistant ID
+        const potentialAgent = await this.prisma.agent.findUnique({
+          where: { id: assistantId }
+        });
+        
+        if (potentialAgent) {
+          this.logger.error(`[AGENT_ASSISTANT_DEBUG] ID ${assistantId} actually belongs to an agent, not an assistant. This suggests incorrect extraction from workflow.`);
+        }
+        
         throw new Error(`Assistant with ID ${assistantId} not found`);
       }
+      
+      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Successfully found assistant with name: ${assistant.name}`);
       
       // Extract model configuration from assistant and determine provider
       const modelConfig = assistant.model as any || {};

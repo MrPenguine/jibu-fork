@@ -30,44 +30,11 @@ DROP COLUMN "startNodeId",
 DROP COLUMN "version",
 DROP COLUMN "workflowType";
 
--- CreateTable
-CREATE TABLE "Workflow" (
-    "id" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "name" TEXT NOT NULL,
-    "description" TEXT,
-    "nodes" JSONB NOT NULL,
-    "edges" JSONB NOT NULL,
-    "startNodeId" TEXT,
-    "version" INTEGER NOT NULL DEFAULT 1,
-    "isPublished" BOOLEAN NOT NULL DEFAULT false,
-    "publishedAt" TIMESTAMP(3),
-    "workflowType" "WorkflowType" NOT NULL DEFAULT 'MASTER',
-    "masterWorkflowId" TEXT,
-    "agentId" TEXT NOT NULL,
-    "organizationId" TEXT NOT NULL,
+-- Workflow table creation removed - already created in previous migration
 
-    CONSTRAINT "Workflow_pkey" PRIMARY KEY ("id")
-);
+-- Workflow indexes removed - already created in previous migration
 
--- CreateIndex
-CREATE INDEX "Workflow_agentId_idx" ON "Workflow"("agentId");
+-- Foreign key constraints removed - already added or will be added in the right order later
 
--- CreateIndex
-CREATE INDEX "Workflow_organizationId_idx" ON "Workflow"("organizationId");
-
--- CreateIndex
-CREATE INDEX "Workflow_workflowType_idx" ON "Workflow"("workflowType");
-
--- CreateIndex
-CREATE INDEX "Workflow_masterWorkflowId_idx" ON "Workflow"("masterWorkflowId");
-
--- AddForeignKey
-ALTER TABLE "Workflow" ADD CONSTRAINT "Workflow_masterWorkflowId_fkey" FOREIGN KEY ("masterWorkflowId") REFERENCES "Workflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
+-- Now add the Agent foreign key constraint that we removed earlier
 ALTER TABLE "Workflow" ADD CONSTRAINT "Workflow_agentId_fkey" FOREIGN KEY ("agentId") REFERENCES "Agent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Workflow" ADD CONSTRAINT "Workflow_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;

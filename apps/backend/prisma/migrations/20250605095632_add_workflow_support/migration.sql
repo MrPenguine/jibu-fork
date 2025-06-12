@@ -1,5 +1,4 @@
--- CreateEnum
-CREATE TYPE "WorkflowType" AS ENUM ('MASTER', 'SECONDARY');
+-- WorkflowType enum already created in previous migration
 
 -- AlterEnum
 ALTER TYPE "AgentNodeType" ADD VALUE 'WORKFLOW_CALL';
