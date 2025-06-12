@@ -29,6 +29,39 @@ export class AgentService {
     private readonly prisma: PrismaService,
     private readonly workflowService: WorkflowService
   ) {}
+  
+  /**
+   * Helper method to extract assistantId from workflow nodes
+   * @param nodes The workflow nodes object
+   * @returns The assistantId if found, otherwise undefined
+   */
+  private extractAssistantIdFromNodes(nodes: any): string | undefined {
+    try {
+      if (!nodes) return undefined;
+      
+      // Parse the nodes if they're a string
+      const parsedNodes = typeof nodes === 'string' ? JSON.parse(nodes) : nodes;
+      
+      // Find assistant nodes that have an assistantId
+      const assistantNodes = Object.values(parsedNodes).filter(
+        (node: any) => node.type === 'ASSISTANT' && node.data?.assistantId
+      );
+      
+      // Return the first assistantId found
+      if (assistantNodes.length > 0) {
+        const assistantId = (assistantNodes[0] as any).data?.assistantId;
+        if (assistantId) {
+          console.log(`Found assistantId ${assistantId} in workflow nodes`);
+          return assistantId;
+        }
+      }
+      
+      return undefined;
+    } catch (error) {
+      console.warn(`Error extracting assistantId from nodes: ${error.message}`);
+      return undefined;
+    }
+  }
 
   async create(createAgentDto: CreateAgentDto, organizationId: string): Promise<Agent> {
     console.log('Creating agent with organization ID:', organizationId);
@@ -102,13 +135,35 @@ export class AgentService {
         // Use type assertion to make TypeScript recognize the properties
         const agentData = newAgent as unknown as { id: string; name: string };
         console.log('Creating master workflow for agent:', agentData.id);
+        
+        // Extract nodes and edges from the DTO if provided
+        const nodes = createAgentDto.nodes || {};
+        const edges = createAgentDto.edges || {};
+        
+        // Check if we need to extract assistantId from nodes
+        if (!createAgentDto.assistantId) {
+          const extractedAssistantId = this.extractAssistantIdFromNodes(nodes);
+          if (extractedAssistantId) {
+            console.log(`Extracted assistantId ${extractedAssistantId} from workflow nodes`);
+            // Update the agent with the extracted assistantId
+            await this.prisma.agent.update({
+              where: { id: newAgent.id },
+              data: {
+                assistant: { connect: { id: extractedAssistantId } }
+              }
+            });
+            // Update our local instance
+            newAgent.assistantId = extractedAssistantId;
+          }
+        }
+        
         const workflowData: CreateWorkflowDto = {
           name: `${agentData.name} Workflow`,
           description: `Master workflow for ${agentData.name}`,
-          nodes: {},
-          edges: {},
-          startNodeId: '',
-          isPublished: false,
+          nodes: nodes,
+          edges: edges,
+          startNodeId: createAgentDto.startNodeId || '',
+          isPublished: false, // Default to false for new agents
           organizationId: organizationId
         };
         
@@ -191,6 +246,19 @@ export class AgentService {
     // Prepare the update data
     const updateData: any = {};
     
+    // Try to extract assistantId from workflow nodes if provided
+    let extractedAssistantId: string | undefined;
+    if (updateAgentDto.nodes !== undefined) {
+      extractedAssistantId = this.extractAssistantIdFromNodes(updateAgentDto.nodes);
+      if (extractedAssistantId && updateAgentDto.assistantId === undefined) {
+        console.log(`Found assistantId ${extractedAssistantId} in workflow nodes during agent update`);
+        // Only use extracted ID if no explicit assistantId was provided
+        updateAgentDto.assistantId = extractedAssistantId;
+      }
+      // Store nodes as usual
+      updateData.nodes = JSON.stringify(updateAgentDto.nodes);
+    }
+    
     // Handle basic fields
     if (updateAgentDto.name !== undefined) {
       updateData.name = updateAgentDto.name;
@@ -198,10 +266,6 @@ export class AgentService {
     
     if (updateAgentDto.description !== undefined) {
       updateData.description = updateAgentDto.description;
-    }
-    
-    if (updateAgentDto.nodes !== undefined) {
-      updateData.nodes = JSON.stringify(updateAgentDto.nodes);
     }
     
     if (updateAgentDto.edges !== undefined) {
@@ -255,18 +319,28 @@ export class AgentService {
 
   async publish(id: string, organizationId: string): Promise<Agent> {
     // Verify the agent exists and belongs to the organization
-    await this.findOne(id, organizationId);
+    const agent = await this.findOne(id, organizationId);
 
-    // Publication status has been moved to the Workflow model
-    // This method is kept for backward compatibility
-    return this.prisma.agent.update({
-      where: {
-        id,
-      },
+    // Since publication status was moved to the Workflow model, we need to:
+    // 1. Update agent's timestamp
+    // 2. Update all workflows associated with this agent to be published
+    
+    // First update the agent
+    const updatedAgent = await this.prisma.agent.update({
+      where: { id },
+      data: { updatedAt: new Date() }
+    });
+    
+    // Then update all workflows associated with this agent
+    await this.prisma.workflow.updateMany({
+      where: { agentId: id },
       data: {
-        updatedAt: new Date(), // Just to trigger an update
+        isPublished: true,
+        publishedAt: new Date()
       }
-    }) as unknown as Agent;
+    });
+    
+    return updatedAgent as unknown as Agent;
   }
 
   async unpublish(id: string, organizationId: string): Promise<Agent> {

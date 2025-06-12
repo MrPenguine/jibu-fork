@@ -181,7 +181,7 @@ export async function sendStreamingAgentRequest(
     
     // Get the API base URL from the api.ts module
     const { API_BASE_URL } = await import('./api');
-    const url = `${API_BASE_URL}/v1/agent/stream`;
+    const url = `${API_BASE_URL}/v1/agents/stream`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -663,6 +663,33 @@ export const agentApiClient = {
     }
   },
 
+  // Get an agent definition by ID
+  async getAgent(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agent: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error fetching agent:', error);
+      throw error;
+    }
+  },
+
   // Get all workflows for an agent
   async getAgentWorkflows(agentId: string, specificOrgId?: string): Promise<Workflow[]> {
     try {
@@ -715,6 +742,60 @@ export const agentApiClient = {
       return response.json();
     } catch (error) {
       console.error('[agentApi] Error creating secondary workflow:', error);
+      throw error;
+    }
+  },
+
+  // Publish an agent
+  async publishAgent(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/publish`, {
+        method: 'POST',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to publish agent: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error publishing agent:', error);
+      throw error;
+    }
+  },
+
+  // Unpublish an agent
+  async unpublishAgent(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+    try {
+      const orgId = getCurrentOrganizationId(specificOrgId);
+      
+      if (!orgId) {
+        throw new Error('No organization ID available');
+      }
+      
+      const headers = await getAuthHeaders(orgId);
+      
+      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/unpublish`, {
+        method: 'POST',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to unpublish agent: ${response.statusText}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[agentApi] Error unpublishing agent:', error);
       throw error;
     }
   }

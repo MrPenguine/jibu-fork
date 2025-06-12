@@ -10,3 +10,5 @@ export * from './nodes';
 export * from './constants';
 export * from './utils';
 export * from './AssistantConfigModal';
+export * from './FloatingChatButton';
+export { default as AgentChat } from './AgentChat';

@@ -43,23 +43,43 @@ export class ChatsController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Get all chats for an assistant' })
-  @ApiQuery({ name: 'assistantId', required: true })
+  @ApiOperation({ summary: 'Get chats by assistantId, agentId, or workflowId' })
+  @ApiQuery({ name: 'assistantId', required: false })
+  @ApiQuery({ name: 'agentId', required: false })
+  @ApiQuery({ name: 'workflowId', required: false })
   @ApiQuery({ name: 'sessionType', required: false })
   @ApiQuery({ name: 'sessionId', required: false })
   async getChats(
-    @Query('assistantId') assistantId: string,
     @Req() req: Request,
+    @Query('assistantId') assistantId?: string,
+    @Query('agentId') agentId?: string,
+    @Query('workflowId') workflowId?: string,
     @Query('sessionType') sessionType?: string,
     @Query('sessionId') sessionId?: string
   ) {
     const organizationId = req.headers['x-organization-id'] as string;
     
-    const filters: { sessionType?: string; sessionId?: string } = {};
+    const filters: { sessionType?: string; sessionId?: string; agentId?: string; workflowId?: string } = {};
     if (sessionType) filters.sessionType = sessionType;
     if (sessionId) filters.sessionId = sessionId;
     
-    return this.chatsService.getChats(organizationId, assistantId, filters);
+    // Handle multiple possible filter types
+    if (assistantId) {
+      // Filtering by assistantId
+      if (agentId) filters.agentId = agentId;
+      if (workflowId) filters.workflowId = workflowId;
+      return this.chatsService.getChats(organizationId, assistantId, filters);
+    } else if (agentId) {
+      // Filtering by agentId
+      if (workflowId) filters.workflowId = workflowId;
+      return this.chatsService.getChatsByAgentId(organizationId, agentId, filters);
+    } else if (workflowId) {
+      // Filtering by workflowId
+      return this.chatsService.getChatsByWorkflowId(organizationId, workflowId, filters);
+    } else {
+      // No filter provided
+      throw new Error('At least one of assistantId, agentId, or workflowId must be provided');
+    }
   }
 
   @Get(':id')

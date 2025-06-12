@@ -15,38 +15,95 @@ export class ChatsService {
   ) {}
 
   async createChat(createChatDto: CreateChatDto & { organizationId: string }) {
-    this.logger.log(`Creating chat for assistant ${createChatDto.assistantId} in organization ${createChatDto.organizationId}`);
+    // Log creation with appropriate entity (assistant or agent)
+    if (createChatDto.assistantId) {
+      this.logger.log(`Creating chat for assistant ${createChatDto.assistantId} in organization ${createChatDto.organizationId}`);
+    } else if (createChatDto.agentId) {
+      this.logger.log(`Creating chat for agent ${createChatDto.agentId} in organization ${createChatDto.organizationId}`);
+    }
+    
     this.logger.log(`Session ID: ${createChatDto.sessionId}, Session Type: ${createChatDto.sessionType || 'chat'}`);
     
-    // Check if assistant exists in this organization
-    const assistant = await this.prisma.assistant.findFirst({
-      where: {
-        id: createChatDto.assistantId,
-        organizationId: createChatDto.organizationId
-      }
-    });
+    // Check if assistant exists if assistantId is provided
+    if (createChatDto.assistantId) {
+      const assistant = await this.prisma.assistant.findFirst({
+        where: {
+          id: createChatDto.assistantId,
+          organizationId: createChatDto.organizationId
+        }
+      });
 
-    if (!assistant) {
-      this.logger.error(`Assistant ${createChatDto.assistantId} not found in organization ${createChatDto.organizationId}`);
-      throw new NotFoundException(`Assistant not found or not accessible in this organization`);
+      if (!assistant) {
+        this.logger.error(`Assistant ${createChatDto.assistantId} not found in organization ${createChatDto.organizationId}`);
+        throw new NotFoundException(`Assistant not found or not accessible in this organization`);
+      }
     }
 
-    // Create the chat
-    const chat = await this.prisma.chat.create({
-      data: {
-        name: createChatDto.name || 'New Chat',
-        organizationId: createChatDto.organizationId,
-        assistantId: createChatDto.assistantId,
-        sessionId: createChatDto.sessionId,
-        sessionType: createChatDto.sessionType || 'chat',
-        metadata: createChatDto.metadata || {}
+    // Check if agent exists if agentId is provided
+    if (createChatDto.agentId) {
+      const agent = await this.prisma.agent.findFirst({
+        where: {
+          id: createChatDto.agentId,
+          organizationId: createChatDto.organizationId
+        }
+      });
+
+      if (!agent) {
+        this.logger.error(`Agent ${createChatDto.agentId} not found in organization ${createChatDto.organizationId}`);
+        throw new NotFoundException(`Agent not found or not accessible in this organization`);
       }
+    }
+
+    // Check if workflow exists if workflowId is provided
+    if (createChatDto.workflowId) {
+      const workflow = await this.prisma.workflow.findFirst({
+        where: {
+          id: createChatDto.workflowId,
+          organizationId: createChatDto.organizationId
+        }
+      });
+
+      if (!workflow) {
+        this.logger.error(`Workflow ${createChatDto.workflowId} not found in organization ${createChatDto.organizationId}`);
+        throw new NotFoundException(`Workflow not found or not accessible in this organization`);
+      }
+    }
+
+    // Build data object conditionally to avoid sending undefined fields to Prisma
+    const chatData: any = {
+      name: createChatDto.name || 'New Chat',
+      organization: { connect: { id: createChatDto.organizationId } }, // Use relation connection
+      sessionId: createChatDto.sessionId,
+      sessionType: createChatDto.sessionType || 'chat',
+      metadata: createChatDto.metadata || {}
+    };
+    
+    // Only include fields if they're defined
+    if (createChatDto.assistantId) {
+      chatData.assistant = { connect: { id: createChatDto.assistantId } }; // Use relation connection
+    }
+    
+    if (createChatDto.agentId) {
+      chatData.agent = { connect: { id: createChatDto.agentId } }; // Use relation connection
+    }
+    
+    if (createChatDto.workflowId) {
+      chatData.workflow = { connect: { id: createChatDto.workflowId } }; // Use relation connection
+    }
+    
+    if (createChatDto.nodeType) {
+      chatData.nodeType = createChatDto.nodeType;
+    }
+
+    // Create the chat with properly formed data object
+    const chat = await this.prisma.chat.create({
+      data: chatData
     });
 
     this.logger.log(`Successfully created chat with ID: ${chat.id}`);
 
     // Initialize Redis chat history if Redis is available
-    await this.initChatInRedis(chat.id, chat.assistantId, chat.sessionId);
+    await this.initChatInRedis(chat.id, chat.assistantId || null, chat.sessionId, chat.agentId || null);
 
     return chat;
   }
@@ -72,7 +129,7 @@ export class ChatsService {
     return updatedChat;
   }
 
-  async getChats(organizationId: string, assistantId: string, filters?: { sessionType?: string, sessionId?: string }) {
+  async getChats(organizationId: string, assistantId: string, filters?: { sessionType?: string, sessionId?: string, agentId?: string, workflowId?: string }) {
     this.logger.log(`Getting chats for assistant ${assistantId} in organization ${organizationId}`);
     if (filters) {
       this.logger.log(`Filters: ${JSON.stringify(filters)}`);
@@ -105,6 +162,14 @@ export class ChatsService {
     if (filters?.sessionId) {
       where.sessionId = filters.sessionId;
     }
+    
+    if (filters?.agentId) {
+      where.agentId = filters.agentId;
+    }
+    
+    if (filters?.workflowId) {
+      where.workflowId = filters.workflowId;
+    }
 
     // Get the chats
     const chats = await this.prisma.chat.findMany({
@@ -129,6 +194,153 @@ export class ChatsService {
       id: chat.id,
       name: chat.name,
       assistantId: chat.assistantId,
+      agentId: chat.agentId,
+      workflowId: chat.workflowId,
+      nodeType: chat.nodeType,
+      sessionId: chat.sessionId,
+      sessionType: chat.sessionType,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      lastMessage: chat.messages[0]?.content || null
+    }));
+  }
+  
+  async getChatsByAgentId(organizationId: string, agentId: string, filters?: { sessionType?: string, sessionId?: string, workflowId?: string }) {
+    this.logger.log(`Getting chats for agent ${agentId} in organization ${organizationId}`);
+    if (filters) {
+      this.logger.log(`Filters: ${JSON.stringify(filters)}`);
+    }
+    
+    // Validate that agent exists in this organization
+    const agent = await this.prisma.agent.findFirst({
+      where: {
+        id: agentId,
+        organizationId
+      }
+    });
+
+    if (!agent) {
+      this.logger.error(`Agent ${agentId} not found in organization ${organizationId}`);
+      throw new NotFoundException(`Agent not found or not accessible in this organization`);
+    }
+
+    // Build the query
+    const where: any = {
+      organizationId,
+      agentId
+    };
+
+    // Add filters if provided
+    if (filters?.sessionType) {
+      where.sessionType = filters.sessionType;
+    }
+
+    if (filters?.sessionId) {
+      where.sessionId = filters.sessionId;
+    }
+    
+    if (filters?.workflowId) {
+      where.workflowId = filters.workflowId;
+    }
+
+    // Get the chats
+    const chats = await this.prisma.chat.findMany({
+      where,
+      orderBy: {
+        updatedAt: 'desc'
+      },
+      include: {
+        messages: {
+          orderBy: {
+            sequenceId: 'desc'
+          },
+          take: 1, // Get only the last message for preview
+        }
+      }
+    });
+
+    this.logger.log(`Found ${chats.length} chats for agent ${agentId}`);
+
+    // Format the response to include the last message content as lastMessage
+    return chats.map(chat => ({
+      id: chat.id,
+      name: chat.name,
+      assistantId: chat.assistantId,
+      agentId: chat.agentId,
+      workflowId: chat.workflowId,
+      nodeType: chat.nodeType,
+      sessionId: chat.sessionId,
+      sessionType: chat.sessionType,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      lastMessage: chat.messages[0]?.content || null
+    }));
+  }
+  
+  async getChatsByWorkflowId(organizationId: string, workflowId: string, filters?: { sessionType?: string, sessionId?: string, agentId?: string }) {
+    this.logger.log(`Getting chats for workflow ${workflowId} in organization ${organizationId}`);
+    if (filters) {
+      this.logger.log(`Filters: ${JSON.stringify(filters)}`);
+    }
+    
+    // Validate that workflow exists in this organization
+    const workflow = await this.prisma.workflow.findFirst({
+      where: {
+        id: workflowId,
+        organizationId
+      }
+    });
+
+    if (!workflow) {
+      this.logger.error(`Workflow ${workflowId} not found in organization ${organizationId}`);
+      throw new NotFoundException(`Workflow not found or not accessible in this organization`);
+    }
+
+    // Build the query
+    const where: any = {
+      organizationId,
+      workflowId
+    };
+
+    // Add filters if provided
+    if (filters?.sessionType) {
+      where.sessionType = filters.sessionType;
+    }
+
+    if (filters?.sessionId) {
+      where.sessionId = filters.sessionId;
+    }
+    
+    if (filters?.agentId) {
+      where.agentId = filters.agentId;
+    }
+
+    // Get the chats
+    const chats = await this.prisma.chat.findMany({
+      where,
+      orderBy: {
+        updatedAt: 'desc'
+      },
+      include: {
+        messages: {
+          orderBy: {
+            sequenceId: 'desc'
+          },
+          take: 1, // Get only the last message for preview
+        }
+      }
+    });
+
+    this.logger.log(`Found ${chats.length} chats for workflow ${workflowId}`);
+
+    // Format the response to include the last message content as lastMessage
+    return chats.map(chat => ({
+      id: chat.id,
+      name: chat.name,
+      assistantId: chat.assistantId,
+      agentId: chat.agentId,
+      workflowId: chat.workflowId,
+      nodeType: chat.nodeType,
       sessionId: chat.sessionId,
       sessionType: chat.sessionType,
       createdAt: chat.createdAt,
@@ -230,9 +442,18 @@ export class ChatsService {
   }
 
   // Helper methods for Redis integration
-  private async initChatInRedis(chatId: string, assistantId: string, sessionId: string) {
+  private async initChatInRedis(chatId: string, assistantId: string | null, sessionId: string, agentId: string | null = null) {
     try {
-      const redisKey = `chat:${assistantId}:${sessionId}`;
+      // Create an appropriate Redis key based on available IDs
+      let redisKey: string;
+      if (assistantId) {
+        redisKey = `chat:assistant:${assistantId}:${sessionId}`;
+      } else if (agentId) {
+        redisKey = `chat:agent:${agentId}:${sessionId}`;
+      } else {
+        redisKey = `chat:${chatId}:${sessionId}`;
+      }
+      
       await this.redis.set(redisKey, JSON.stringify([]));
       this.logger.log(`Initialized Redis chat history for ${redisKey}`);
     } catch (error) {
@@ -241,9 +462,20 @@ export class ChatsService {
     }
   }
 
-  private async updateChatInRedis(chatId: string, assistantId: string, sessionId: string, message: any) {
+  private async updateChatInRedis(chatId: string, assistantId: string | null, sessionId: string, message: any) {
     try {
-      const redisKey = `chat:${assistantId}:${sessionId}`;
+      // Determine the correct Redis key based on the chat type
+      let redisKey: string;
+      const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
+      
+      if (chat?.assistantId) {
+        redisKey = `chat:assistant:${chat.assistantId}:${sessionId}`;
+      } else if (chat?.agentId) {
+        redisKey = `chat:agent:${chat.agentId}:${sessionId}`;
+      } else {
+        redisKey = `chat:${chatId}:${sessionId}`;
+      }
+      
       // Get existing chat history from Redis
       const existingChatHistory = await this.redis.get(redisKey);
       let chatHistory = [];
@@ -269,9 +501,20 @@ export class ChatsService {
     }
   }
 
-  private async removeChatFromRedis(chatId: string, assistantId: string, sessionId: string) {
+  private async removeChatFromRedis(chatId: string, assistantId: string | null, sessionId: string) {
     try {
-      const redisKey = `chat:${assistantId}:${sessionId}`;
+      // Determine the correct Redis key based on the chat type
+      let redisKey: string;
+      const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
+      
+      if (chat?.assistantId) {
+        redisKey = `chat:assistant:${chat.assistantId}:${sessionId}`;
+      } else if (chat?.agentId) {
+        redisKey = `chat:agent:${chat.agentId}:${sessionId}`;
+      } else {
+        redisKey = `chat:${chatId}:${sessionId}`;
+      }
+      
       await this.redis.del(redisKey);
       this.logger.log(`Removed Redis chat history for ${redisKey}`);
     } catch (error) {
@@ -279,4 +522,4 @@ export class ChatsService {
       // Continue even if Redis fails
     }
   }
-} 
+}

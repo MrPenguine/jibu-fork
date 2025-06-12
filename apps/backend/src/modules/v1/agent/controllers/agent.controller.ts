@@ -15,6 +15,7 @@ import { StreamableFile } from '@nestjs/common';
 import { PassThrough } from 'stream';
 import { ChatsService } from '../../chats/chats.service';
 import { WorkflowService } from '../../workflow/services/workflow.service';
+import { PrismaService } from '../../../../core/database/prisma.service';
 import { CreateMessageDto } from '../../chats/dto/create-message.dto';
 
 // Define a custom interface for our streaming response
@@ -36,6 +37,7 @@ export class AgentController {
     private readonly integrationsAgentService: IntegrationsAgentService,
     private readonly chatsService: ChatsService,
     private readonly workflowService: WorkflowService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
@@ -79,12 +81,80 @@ export class AgentController {
   @ApiOperation({ summary: 'Get a agent by ID' })
   @ApiResponse({ status: 200, description: 'Return the agent.' })
   @ApiResponse({ status: 404, description: 'Agent not found.' })
-  findOne(@Param('id') id: string, @Req() req): Promise<Agent> {
+  async findOne(@Param('id') id: string, @Req() req): Promise<any> {
     const organizationId = req.user.orgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }
-    return this.agentService.findOne(id, organizationId);
+    
+    // Get the base agent data
+    const agent = await this.agentService.findOne(id, organizationId);
+    
+    try {
+      // Find and extract assistantId from workflow nodes if not already in agent
+      if (!agent.assistantId) {
+        this.logger.log(`Agent ${id} doesn't have assistantId. Looking for assistant node in workflow...`);
+        
+        try {
+          // Get workflows for this agent
+          const workflows = await this.workflowService.getAgentWorkflows(id, organizationId);
+          
+          // Look for ASSISTANT nodes in each workflow and extract assistantId
+          for (const workflow of workflows) {
+            try {
+              // Parse the workflow nodes
+              const parsedNodes = workflow.nodes ? 
+                (typeof workflow.nodes === 'string' ? JSON.parse(workflow.nodes) : workflow.nodes) : {};
+              
+              // Find assistant nodes - using proper typing
+              const nodes = parsedNodes as Record<string, { type: string; data?: { assistantId?: string } }>;              
+              const assistantNodes = Object.values(nodes).filter(
+                node => node.type === 'ASSISTANT' && node.data?.assistantId
+              );
+              
+              if (assistantNodes.length > 0) {
+                // Use the first assistant node's assistantId
+                const assistantId = assistantNodes[0].data?.assistantId;
+                if (assistantId) {
+                  this.logger.log(`Found assistantId ${assistantId} in workflow ${workflow.id}`);
+                  
+                  // Add assistantId to agent response
+                  agent.assistantId = assistantId;
+                  break;
+                }
+              }
+            } catch (error) {
+              this.logger.warn(`Error parsing workflow ${workflow.id}: ${error.message}`);
+              // Continue with next workflow
+            }
+          }
+        } catch (error) {
+          this.logger.warn(`Error getting workflows for agent ${id}: ${error.message}`);
+          // Continue without assistantId
+        }
+      }
+      
+      // Check if any workflows for this agent are published
+      const workflows = await this.prisma.workflow.findMany({
+        where: {
+          agentId: id,
+          isPublished: true
+        }
+      });
+      
+      // If we have at least one published workflow, consider the agent published
+      const isPublished = workflows.length > 0;
+      
+      // Return agent with additional workflow publication status
+      return {
+        ...agent,
+        isPublished: isPublished
+      };
+    } catch (error) {
+      this.logger.error(`Error checking workflow publication status: ${error.message}`);
+      // Return the agent without workflow status in case of error
+      return agent;
+    }
   }
 
   @Put(':id')

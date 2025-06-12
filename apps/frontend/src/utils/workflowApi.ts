@@ -261,7 +261,7 @@ export const workflowApi = {
       const headers = await getAuthHeaders(orgId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}/publish`, {
-        method: 'POST',
+        method: 'PUT',
         headers
       });
       

@@ -5,6 +5,7 @@ export interface AgentConfig {
   clientId?: string;
   knowledgeBaseId?: string;
   stream?: boolean;
+  workflowAgent?: boolean;  // Flag to indicate if this is a workflow-based agent
 }
 
 export interface AgentRequest {

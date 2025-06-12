@@ -23,6 +23,34 @@ export class AgentService {
 
   async *processStreamingRequest(request: AgentRequest): AsyncIterable<AgentResponse> {
     try {
+      // Check if this is a workflow agent but we received an assistantId that might actually be an agentId
+      if (request.config?.assistantId && request.config?.workflowAgent) {
+        this.logger.log(`Received request for a workflow agent with assistantId: ${request.config.assistantId}`);
+        
+        // Need to extract the correct assistantId from workflow nodes
+        try {
+          // We'll inject a modified request with the correct assistantId
+          const modifiedRequest = { ...request };
+          
+          // Remove the incorrect assistantId from config - let workflow execution handle it
+          if (modifiedRequest.config) {
+            delete modifiedRequest.config.assistantId;
+          }
+          
+          this.logger.log(`Modified request for workflow agent, removing assistantId from request config`);
+          
+          // Continue with the modified request
+          for await (const chunk of this.langchainAgentService.processStreamingRequest(modifiedRequest)) {
+            yield chunk;
+          }
+          return;
+        } catch (extractError) {
+          this.logger.error(`Error extracting assistantId from workflow: ${extractError.message}`);
+          // Fall through to standard processing if extraction fails
+        }
+      }
+      
+      // Standard processing path
       for await (const chunk of this.langchainAgentService.processStreamingRequest(request)) {
         yield chunk;
       }

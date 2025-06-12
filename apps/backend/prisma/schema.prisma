@@ -243,24 +243,33 @@ model ChunkMetadata {
 }
 
 model Chat {
-  id             String   @id @default(uuid())
+  id             String         @id @default(uuid())
   name           String? // Optional name for the chat
   organizationId String
-  assistantId    String
-  sessionId      String // Required: For calls: phone number, For chats: user identifier or anonymous session
-  sessionType    String   @default("chat") // "chat" or "call"
-  metadata       Json? // Additional metadata for the chat/call session
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  assistantId    String?       // Optional: Can be null for agent-based chats
+  agentId        String?       // Optional: For agent-based chats
+  workflowId     String?       // Optional: For associating chats with workflows
+  sessionId      String        // Required: For calls: phone number, For chats: user identifier or anonymous session
+  sessionType    String         @default("chat") // "chat" or "call"
+  nodeType       AgentNodeType? // Store the current node type for agent workflows
+  metadata       Json?          // Additional metadata for the chat/call session
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assistant       Assistant        @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assistant       Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
+  agent           Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  workflow        Workflow?      @relation(fields: [workflowId], references: [id], onDelete: SetNull)
   messages        Message[]
-  agentSessions AgentSession[] // Agent sessions associated with this chat
+  agentSessions   AgentSession[] // Agent sessions associated with this chat
 
-  @@unique([assistantId, sessionId]) // Ensure we have a unique chat per assistant and sessionId
+  // Updated constraints to ensure a chat is uniquely identified by either assistant+session or agent+session
+  @@unique([assistantId, sessionId])
+  @@unique([agentId, sessionId])
   @@index([organizationId])
   @@index([assistantId])
+  @@index([agentId])
+  @@index([workflowId])
   @@index([sessionId])
   @@index([sessionType])
 }
@@ -392,6 +401,7 @@ model Agent {
   workflows      Workflow[]
 
   sessions AgentSession[] // Active and past execution sessions for this agent
+  chats    Chat[]        // Direct relation to chats for this agent
 
   @@index([assistantId])
   @@index([organizationId])
@@ -431,6 +441,9 @@ model Workflow {
   // Link to Organization for ownership/scoping
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Chat sessions associated with this workflow
+  chats          Chat[]       // Chat sessions using this workflow
 
   @@index([agentId])
   @@index([organizationId])

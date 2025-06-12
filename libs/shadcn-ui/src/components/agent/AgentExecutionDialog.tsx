@@ -6,8 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '../ui/input';
 import { AgentNodeType } from '../../types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { AlertCircle, Info, Loader2 } from 'lucide-react';
+import { AlertCircle, Info, Loader2, MessageSquare, Mic } from 'lucide-react';
 import { Badge } from '../ui/badge';
+import AgentChat from './AgentChat';
 
 interface AgentExecutionDialogProps {
   agentId: string;
@@ -37,6 +38,10 @@ export function AgentExecutionDialog({
   const [status, setStatus] = useState<'idle' | 'loading' | 'running' | 'waiting' | 'error' | 'completed'>('idle');
   const [variables, setVariables] = useState<Record<string, any>>({});
   const [executionPath, setExecutionPath] = useState<{nodeId: string, timestamp: Date}[]>([]);
+  
+  // Chat states
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatId, setChatId] = useState<string | null>(null);
 
   // Fetch agent data
   const fetchAgentData = useCallback(async () => {
@@ -75,6 +80,8 @@ export function AgentExecutionDialog({
       setWaitingForInput(false);
       setCurrentNodeId(null);
       setSession(null);
+      setIsChatOpen(false);
+      setChatId(null);
     }
   }, [isOpen]);
 
@@ -97,6 +104,18 @@ export function AgentExecutionDialog({
       setError(`Failed to start agent: ${error.message || 'Unknown error'}`);
       setStatus('error');
     }
+  };
+  
+  // Start agent chat mode
+  const startAgentChat = () => {
+    setIsChatOpen(true);
+    // The AgentChat component will handle creating a new chat or loading existing
+  };
+  
+  // Start agent voice mode (placeholder for future implementation)
+  const startAgentVoice = () => {
+    // This will be implemented in the future
+    alert('Voice mode is coming soon!');
   };
 
   // Continue agent session
@@ -359,26 +378,49 @@ export function AgentExecutionDialog({
     }
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open: boolean) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[650px] max-h-[80vh] flex flex-col">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle className="flex items-center gap-2">
-            {isLoading ? 'Loading agent...' : `Running: ${agent?.name || 'Agent'}`}
-            <StatusIndicator />
-          </DialogTitle>
-          <Button variant="outline" size="sm" onClick={toggleDebugMode}>
-            {debugMode ? 'Hide Debug' : 'Debug Mode'}
-          </Button>
-        </DialogHeader>
+  // Auto-hide error after 5 seconds if not in debug mode
+  useEffect(() => {
+    if (error && !debugMode) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, debugMode]);
 
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+  return (
+    <>
+      {/* Show either the execution dialog or the chat component based on isChatOpen */}
+      {isChatOpen && isOpen && agent ? (
+        // Agent Chat Component - Only shown when chat is opened
+        <AgentChat
+          agentId={agentId}
+          agentName={agent?.name || 'Agent'}
+          chatId={chatId}
+          isOpen={true}
+          onClose={() => {
+            setIsChatOpen(false); // Go back to main dialog instead of fully closing
+          }}
+        />
+      ) : (
+        // Main Execution Dialog
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {agent ? agent.name : 'Loading agent...'}
+              {status === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
+              {status === 'error' && <span className="text-red-500 text-sm font-normal px-2 py-1 rounded-md bg-red-50">Error</span>}
+            </DialogTitle>
+          </DialogHeader>
+
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         
         <div className={`flex ${debugMode ? 'flex-row gap-4' : ''}`}>
           <div className={`flex-grow overflow-y-auto p-4 space-y-4 min-h-[300px] max-h-[50vh] border rounded-md ${debugMode ? 'w-1/2' : 'w-full'}`}>
@@ -564,6 +606,30 @@ export function AgentExecutionDialog({
             )}
           </div>
           <div className="flex gap-2">
+            {/* Agent interaction mode buttons */}
+            <div className="flex mr-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1"
+                onClick={startAgentChat}
+                title="Start chat with the agent"
+              >
+                <MessageSquare className="h-4 w-4" /> Start Chat
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 ml-2"
+                onClick={startAgentVoice}
+                title="Start voice mode (coming soon)"
+                disabled={true} // Disabled until implemented
+              >
+                <Mic className="h-4 w-4" /> Voice Mode
+              </Button>
+            </div>
+            
+            {/* Control buttons */}
             {session && (
               <Button 
                 onClick={handleRestartAgent} 
@@ -577,7 +643,9 @@ export function AgentExecutionDialog({
             <Button onClick={onClose}>Close</Button>
           </div>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      )}
+    </>
   );
 }

@@ -67,13 +67,15 @@ function getCurrentOrganizationId(specificOrgId?: string): string | null {
 }
 
 /**
- * List all chats for an assistant
- * @param assistantId The ID of the assistant
+ * List all chats for an assistant or agent
+ * @param id The ID of the assistant or agent
+ * @param entityType Type of entity to fetch chats for ('assistant' or 'agent')
  * @param sessionType The type of session (default: 'chat')
  * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
  */
 export async function listChats(
-  assistantId: string, 
+  id: string, 
+  entityType: 'assistant' | 'agent' = 'assistant',
   sessionType: string = 'chat',
   specificOrgId?: string
 ): Promise<Chat[]> {
@@ -86,23 +88,24 @@ export async function listChats(
       return [];
     }
     
-    console.log(`[listChats] Fetching chats for assistant: ${assistantId} with organization: ${organizationId}`);
+    console.log(`[listChats] Fetching chats for ${entityType}: ${id} with organization: ${organizationId}`);
     
     try {
-      // Only request by assistantId without any additional filters to get all chats
-      const response = await fetchAPI(`/v1/chats?assistantId=${assistantId}`);
+      // Request based on entity type
+      const queryParam = entityType === 'agent' ? 'agentId' : 'assistantId';
+      const response = await fetchAPI(`/v1/chats?${queryParam}=${id}`);
       
       if (!Array.isArray(response)) {
         console.error('[listChats] Expected array of chats but got:', typeof response);
         return [];
       }
       
-      // Ensure we're getting only chats for this assistant
+      // Ensure we're getting only chats for this entity
       const filteredChats = response.filter(chat => 
-        chat && chat.assistantId === assistantId
+        chat && (entityType === 'agent' ? chat.agentId === id : chat.assistantId === id)
       );
       
-      console.log(`[listChats] Found ${filteredChats.length} chats for assistant ${assistantId}`);
+      console.log(`[listChats] Found ${filteredChats.length} chats for ${entityType} ${id}`);
       return filteredChats;
     } catch (error) {
       // If we get a 404, it might mean that no chats exist yet, which is not an error
@@ -201,11 +204,13 @@ export async function getChatMessages(
  * @param assistantId The ID of the assistant
  * @param name Optional name for the chat
  * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
+ * @param isAgent Whether the chat is for an agent or not
  */
 export async function createChat(
   assistantId: string,
   name?: string,
-  specificOrgId?: string
+  specificOrgId?: string,
+  isAgent: boolean = false
 ): Promise<Chat | null> {
   try {
     // Use provided orgId, or get the current one consistently
@@ -238,7 +243,9 @@ export async function createChat(
       const chatData = await fetchAPI('/v1/chats', {
         method: 'POST',
         body: JSON.stringify({
-          assistantId,
+          // For agent-based chats, we only send agentId
+          // For assistant-based chats, we send assistantId
+          ...(isAgent ? { agentId: assistantId } : { assistantId }),
           sessionId,
           sessionType: 'chat',
           name: chatName,

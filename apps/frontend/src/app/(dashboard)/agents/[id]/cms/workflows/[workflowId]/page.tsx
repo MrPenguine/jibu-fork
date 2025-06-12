@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import {
   ReactFlow,
@@ -84,8 +84,12 @@ const defaultEdgeOptions = {
 
 // Import the workflow API client
 import { workflowApi } from '../../../../../../../utils/workflowApi';
+// Import the agent API client for agent execution
+import { agentApiClient } from '../../../../../../../utils/AgentApi';
 // Import the assistants API for fetching assistant data
 import { getAssistant } from '../../../../../../../utils/AssistantsApi';
+// Import UI toast component for notifications
+import { toast } from '@libs/shadcn-ui/components/ui/use-toast';
 
 // Main agent editor component
 function AgentDetailContent() {
@@ -129,6 +133,8 @@ function AgentDetailContent() {
   const [isAssistantConfigOpen, setIsAssistantConfigOpen] = useState(false);
   const [selectedAssistantData, setSelectedAssistantData] = useState<any>(null);
   const [selectedAssistantNodeId, setSelectedAssistantNodeId] = useState<string | null>(null);
+  const [isAgentPublished, setIsAgentPublished] = useState(false);
+  const [isPublishingAgent, setIsPublishingAgent] = useState(false);
 
   // Node click handler
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
@@ -540,13 +546,57 @@ function AgentDetailContent() {
 
   // Handle run agent
   const handleRunAgent = useCallback(() => {
+    if (!isAgentPublished) {
+      toast({
+        title: "Agent not published",
+        description: "Please publish the agent before testing.",
+        variant: "destructive"
+      });
+      return;
+    }
     setIsRunDialogOpen(true);
-  }, [setIsRunDialogOpen]);
+  }, [setIsRunDialogOpen, isAgentPublished]);
 
-  // Handle publish agent
+  // Handle save workflow
   const handleSave = useCallback(() => {
     saveWorkflow();
   }, [saveWorkflow]);
+  
+  // Handle publish agent
+  const handlePublishAgent = useCallback(async () => {
+    try {
+      setIsPublishingAgent(true);
+      await agentApiClient.publishAgent(agentId);
+      setIsAgentPublished(true);
+      toast({
+        title: "Agent Published",
+        description: "Your agent has been successfully published and is ready to use."
+      });
+    } catch (error) {
+      console.error('Error publishing agent:', error);
+      toast({
+        title: "Publication Failed",
+        description: "There was an error publishing your agent. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPublishingAgent(false);
+    }
+  }, [agentId]);
+  
+  // Check agent published status on component mount
+  useEffect(() => {
+    const checkAgentPublishStatus = async () => {
+      try {
+        const agent = await agentApiClient.getAgent(agentId);
+        setIsAgentPublished(!!agent.isPublished);
+      } catch (error) {
+        console.error('Error checking agent publish status:', error);
+      }
+    };
+    
+    checkAgentPublishStatus();
+  }, [agentId]);
 
   if (isLoading) {
     return <div className="p-8 flex items-center justify-center">Loading workflow...</div>;
@@ -595,7 +645,17 @@ function AgentDetailContent() {
             onClick={publishWorkflow}
           >
             <Rocket size={16} className="mr-1" /> 
-            {isPublished ? 'Published' : 'Publish'}
+            {isPublished ? 'Workflow Published' : 'Publish Workflow'}
+          </Button>
+          <Button 
+            variant={isAgentPublished ? "secondary" : "default"}
+            size="sm" 
+            className={isAgentPublished ? "bg-green-100 text-green-800 hover:bg-green-200" : "ml-2"}
+            onClick={handlePublishAgent}
+            disabled={isPublishingAgent}
+          >
+            <Rocket size={16} className="mr-1" /> 
+            {isAgentPublished ? 'Agent Published' : 'Publish Agent'}
           </Button>
         </div>
       </div>
@@ -697,7 +757,7 @@ function AgentDetailContent() {
           agentId={agentId}
           isOpen={isRunDialogOpen}
           onClose={() => setIsRunDialogOpen(false)}
-          agentApi={workflowApi}
+          agentApi={agentApiClient}
         />
       )}
       
