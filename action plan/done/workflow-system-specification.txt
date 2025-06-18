@@ -1,0 +1,264 @@
+# JIBU-CONSOLE WORKFLOW SYSTEM SPECIFICATION
+
+## System Overview
+
+The Jibu Console Workflow System is an agent-based automation platform that allows users to create, manage, and execute complex workflows through a visual interface. The system follows a component-based architecture where workflows are composed of nodes connected by edges, creating a directed graph of execution flow.
+
+## Core Concepts
+
+### 1. Agents
+
+An Agent is the top-level container for workflows. Each Agent:
+- Has a unique ID and belongs to an organization
+- Contains a collection of nodes and edges defining its behavior
+- Can be connected to an Assistant for AI capabilities
+- Can be published or unpublished
+- Maintains version history
+- Has a defined start node
+
+### 2. Workflows
+
+Workflows are execution graphs within Agents consisting of nodes and edges:
+- **Master Workflow**: The primary workflow within an agent
+- **Sub-Workflows**: Reusable workflow components that can be imported into a master workflow
+- **Workflow Templates**: Pre-defined workflow patterns that can be imported
+
+### 3. Nodes
+
+Nodes are the building blocks of workflows, each representing a discrete action or decision point:
+
+#### Core Node Types
+- **START**: Entry point for workflow execution
+- **END**: Terminal point for workflow execution
+- **MESSAGE**: Sends output to the user
+- **LISTEN**: Waits for and captures user input
+- **CHOICE**: Presents options and branches based on selection
+- **CONDITION**: Evaluates conditions and branches accordingly
+- **SET_VARIABLE**: Assigns or modifies workflow variables
+- **TRANSFER**: Transfers execution to another agent or external system
+
+#### Integration Node Types
+- **API_CALL**: Makes external API requests
+- **TOOL_CALL**: Executes registered tools
+- **FUNCTION_CALL**: Executes custom functions
+- **ASSISTANT_NODE**: Invokes an AI Assistant
+- **KNOWLEDGE_BASE**: Queries a knowledge base
+
+#### Media Node Types
+- **RECORD**: Records user audio input
+- **PLAY_AUDIO**: Plays audio to the user
+
+### 4. Edges
+
+Edges connect nodes and define the flow of execution:
+- Each edge has a source node and target node
+- Edges can be conditional or unconditional
+- Conditional edges only activate when their condition evaluates to true
+
+### 5. Variables
+
+Variables store state within workflow execution:
+- System variables (session ID, user info, etc.)
+- User-defined variables
+- Contextual variables (conversation history, etc.)
+
+### 6. Sessions
+
+A Session represents a single execution instance of an agent:
+- Maintains state across multiple interaction turns
+- Stores variables and execution history
+- Has a status (ACTIVE, COMPLETED, ERROR)
+- Can be associated with a chat or voice call
+
+## Database Schema
+
+The existing schema includes:
+
+```
+Agent {
+  id: string
+  createdAt: datetime
+  updatedAt: datetime
+  name: string
+  description: string?
+  assistantId: string?
+  organizationId: string
+  nodes: JSONB
+  edges: JSONB
+  startNodeId: string?
+  version: integer
+  isPublished: boolean
+  publishedAt: datetime?
+}
+
+AgentSession {
+  id: string
+  agentId: string
+  organizationId: string
+  currentNodeId: string?
+  variables: JSONB
+  history: JSONB?
+  status: string
+  endedAt: datetime?
+  callSid: string?
+  phoneNumber: string?
+  chatId: string?
+}
+```
+
+## Additional Schema Requirements
+
+```
+WorkflowTemplate {
+  id: string
+  organizationId: string
+  name: string
+  description: string?
+  nodes: JSONB
+  edges: JSONB
+  startNodeId: string?
+  version: integer
+  tags: string[]
+  category: string?
+  isPublic: boolean
+  createdById: string
+  createdAt: datetime
+  updatedAt: datetime
+}
+
+NodeComponent {
+  id: string
+  organizationId: string
+  type: string
+  name: string
+  description: string?
+  schema: JSONB
+  defaultConfig: JSONB
+  icon: string?
+  category: string
+  isBuiltIn: boolean
+  isPublic: boolean
+  createdById: string
+  createdAt: datetime
+  updatedAt: datetime
+}
+
+AgentKnowledgeBase {
+  id: string
+  agentId: string
+  knowledgeBaseId: string
+  nodeId: string?
+  createdAt: datetime
+  updatedAt: datetime
+}
+```
+
+## Execution Flow
+
+1. User interaction triggers an agent session
+2. System loads the agent's workflow
+3. Execution begins at the start node
+4. Each node processes according to its type
+5. Variables are updated as needed
+6. Next node is determined by following appropriate edges
+7. Process continues until reaching an END node or waiting for user input
+8. Session state is persisted between interactions
+
+## Frontend Components
+
+### Workflow Editor
+
+The workflow editor consists of:
+
+1. **Canvas**: The main workspace for designing workflows
+   - Drag and drop nodes
+   - Connect nodes with edges
+   - Pan and zoom capabilities
+   - Node selection and multi-selection
+
+2. **Component Library**: A sidebar with available node types
+   - Categorized by function
+   - Searchable
+   - Custom and built-in components
+
+3. **Properties Panel**: For configuring selected nodes/edges
+   - Node-specific configuration options
+   - Edge conditions
+   - Variable assignments
+
+4. **Toolbar**: Common actions and tools
+   - Save, publish, test workflows
+   - Undo/redo
+   - Alignment and layout tools
+
+### Workflow Manager
+
+The workflow manager provides:
+
+1. **Workflow List**: View and manage all workflows
+   - Filter by status, category, etc.
+   - Search capabilities
+   - Bulk actions
+
+2. **Template Gallery**: Browse and import workflow templates
+   - Categories and tags
+   - Preview functionality
+   - Import with customization options
+
+3. **Analytics**: Metrics on workflow performance
+   - Execution counts and success rates
+   - Average completion time
+   - Node-specific metrics
+
+## Integration Points
+
+### Assistant Integration
+
+- Connect an Assistant to provide AI capabilities
+- Configure specific prompts and system messages per node
+- Share context across the workflow
+
+### Knowledge Base Integration
+
+- Connect Knowledge Bases to enhance Assistant responses
+- Configure retrieval settings per node
+- Set scoped context within workflows
+
+### Tool Integration
+
+- Register and manage tools for workflow nodes
+- Configure tool parameters within the workflow
+- Handle tool response mapping to variables
+
+### Voice & Chat Integration
+
+- Connect workflows to voice and chat channels
+- Handle channel-specific behaviors
+- Provide unified conversation history
+
+## Implementation Strategy
+
+### Phase 1: Core Framework
+- Enhance existing agent model with workflow capabilities
+- Implement the workflow execution engine
+- Develop basic node types (START, END, MESSAGE, LISTEN, CONDITION, SET_VARIABLE)
+
+### Phase 2: Visual Editor
+- Create the workflow canvas component
+- Implement drag-and-drop functionality
+- Build the properties panel for node configuration
+
+### Phase 3: Templates & Components
+- Implement workflow templates and importing
+- Build the component library system
+- Create the template gallery
+
+### Phase 4: Advanced Integration
+- Implement sub-workflow functionality
+- Add knowledge base integration
+- Enhance assistant integration with workflow context
+
+### Phase 5: Analytics & Optimization
+- Build workflow analytics dashboard
+- Implement performance monitoring
+- Optimize execution engine

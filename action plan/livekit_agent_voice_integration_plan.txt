@@ -1,0 +1,196 @@
+# LIVEKIT AGENT VOICE MODE INTEGRATION PLAN
+
+## OVERVIEW
+This plan focuses specifically on integrating LiveKit voice mode with the agent execution workflow in Jibu Console. The integration will focus on both backend (AgentExecutionService) and frontend (AgentExecutionDialog) components.
+
+## AGENT BACKEND INTEGRATION
+
+### 1. EXTEND AGENT EXECUTION SERVICE
+
+1. Modify AgentExecutionService in apps/backend/src/modules/v1/agent/execution/agent-execution.service.ts:
+   - Add voice session management methods:
+     - initiateAgentVoiceSession(agentId, userId)
+     - endAgentVoiceSession(sessionId)
+     - handleVoiceStateChange(sessionId, state)
+   - Add voice mode state handling:
+     - pauseAgentVoiceOutput()
+     - resumeAgentVoiceOutput() 
+     - handleUserInterruption()
+   - Integrate with existing agent execution workflow:
+     - Link voice session to agent execution session
+     - Handle voice events within execution state machine
+
+2. Create voice-specific DTOs:
+   - apps/backend/src/modules/v1/agent/execution/dto/voice-execution.dto.ts
+   - apps/backend/src/modules/v1/agent/execution/dto/voice-state.dto.ts
+
+### 2. CREATE AGENT VOICE SERVICES
+
+1. Create agent-specific LiveKit services:
+   - apps/backend/src/modules/v1/livekit/services/agent-voice.service.ts
+     - Methods for connecting LiveKit rooms to agent execution
+     - Voice activity detection specific to agent conversations
+     - Handling real-time audio events in agent context
+
+2. Implement agent voice mode state machine:
+   - Define states: IDLE, AGENT_SPEAKING, USER_SPEAKING, SILENCE, INTERRUPTION
+   - Create transition rules between states specific to agent workflow
+   - Build handlers for each state transition in agent context
+
+### 3. CREATE REDIS STATE TRACKING
+
+1. Implement Redis state management for agent voice:
+   - Track active agent voice sessions
+   - Store conversation state between execution steps
+   - Create pub/sub channels for real-time voice events
+
+2. Create agent voice state handlers:
+   - apps/backend/src/modules/v1/agent/execution/handlers/voice-state.handler.ts
+   - apps/backend/src/modules/v1/agent/execution/handlers/voice-interruption.handler.ts
+   - apps/backend/src/modules/v1/agent/execution/handlers/silence-detection.handler.ts
+
+## AGENT FRONTEND INTEGRATION
+
+### 1. UPDATE AGENT EXECUTION DIALOG
+
+1. Enhance libs/shadcn-ui/src/components/agent/AgentExecutionDialog.tsx:
+   - Update the existing startAgentVoice() function:
+     - Initialize LiveKit connection
+     - Create and join a LiveKit room
+     - Set up audio tracks and permissions
+     - Handle microphone access and audio routing
+   - Add voice mode UI state:
+     - isVoiceModeActive
+     - isMicrophoneActive
+     - isSpeaking
+     - currentSpeaker
+   - Add voice control UI elements:
+     - Microphone toggle
+     - Volume controls
+     - Voice mode activation/deactivation
+   - Handle interruption and silence UI:
+     - Visual indicators for speech detection
+     - Feedback when interrupting the agent
+     - Silence detection indicators
+
+2. Create agent-specific voice hooks:
+   - libs/shadcn-ui/src/hooks/useAgentVoice.ts
+     - Voice session management specific to agent
+     - Audio level monitoring
+     - Speech detection state
+   - libs/shadcn-ui/src/hooks/useVoiceState.ts
+     - State management for voice conversations
+     - Handles transitions between speaking states
+
+### 2. CREATE AGENT VOICE COMPONENTS
+
+1. Create new components in libs/shadcn-ui/src/components/voicechat/:
+   - AgentVoiceControls.tsx
+     - Microphone controls
+     - Volume controls
+     - End call button
+     - Visual feedback for voice state
+   - AgentVoiceIndicator.tsx
+     - Visual indicator showing who is speaking
+     - Animation for voice activity
+     - Silence visualization
+   - AgentSilenceDetector.tsx
+     - Timer visualization for silence
+     - "Are you there?" prompt display
+     - Re-engagement UI
+   - AgentInterruptionHandler.tsx
+     - UI feedback when interruption occurs
+     - Options to continue or let agent resume
+
+### 3. ADD LIVEKIT COMPONENTS
+
+1. Create LiveKit integration components:
+   - libs/shadcn-ui/src/components/voicechat/AgentVoiceRoom.tsx
+     - LiveKit room management specific to agent
+     - Audio publishing and subscription
+     - Event handlers for connection status
+   - libs/shadcn-ui/src/components/voicechat/AgentAudioRenderer.tsx
+     - Handling of audio output for agent voice
+     - Audio visualization during speaking
+
+2. Create LiveKit hooks:
+   - libs/shadcn-ui/src/hooks/useLiveKit/useRoom.ts
+     - Room connection and management
+     - Participant tracking
+     - Error handling for WebRTC
+   - libs/shadcn-ui/src/hooks/useLiveKit/useAudioLevel.ts
+     - Real-time audio level monitoring
+     - Threshold detection for speech
+     - Aggregation of audio data
+   - libs/shadcn-ui/src/hooks/useLiveKit/useSpeechDetection.ts
+     - Advanced speech detection algorithms
+     - Start/stop speech detection
+     - Confidence scoring for detected speech
+
+## VOICE FEATURES FOR AGENT WORKFLOW
+
+### 1. SILENCE DETECTION FOR AGENT
+
+1. Implement silence detection specifically for agent context:
+   - Configure appropriate thresholds for agent conversations
+   - Adjust timeouts based on conversation context
+   - Create different "Are you there?" prompts based on agent context
+   - Handle silence recovery in different agent workflow states
+
+2. Integrate silence detection with agent execution:
+   - Pause agent execution during extended silence
+   - Re-prompt user when silence extends beyond threshold
+   - Provide recovery options after silence
+
+### 2. START/STOP TALKING FOR AGENT
+
+1. Implement speech detection for agent workflow:
+   - Monitor audio levels for user speech during agent's turn
+   - Create mechanism to pause agent output when user interrupts
+   - Design resumption strategy after interruption
+   - Handle partial completion of agent responses
+
+2. Create interruption handling:
+   - Detect when user interrupts agent speech
+   - Gracefully pause the agent's response
+   - Provide visual feedback about the interruption
+   - Allow user to request agent to continue from where it left off
+
+### 3. DTMF FOR AGENT NAVIGATION
+
+1. Implement DTMF handling for agent workflows:
+   - Create command mappings specific to agent workflows
+   - Build shortcuts for common agent tasks via keypad
+   - Design DTMF-based navigation for agent multi-step processes
+
+2. Integrate DTMF with agent execution:
+   - Map DTMF commands to agent execution steps
+   - Create shortcuts for yes/no/more responses
+   - Build navigation system for complex agent workflows
+
+## IMPLEMENTATION APPROACH
+
+1. Start with the AgentExecutionService extensions:
+   - Add voice session management
+   - Create basic voice state tracking
+   - Connect to LiveKit services
+
+2. Build the frontend components:
+   - Update AgentExecutionDialog.tsx
+   - Create basic voice UI components
+   - Implement LiveKit room connection
+
+3. Implement core voice features:
+   - Basic speech detection
+   - Simple interruption handling
+   - Initial silence detection
+
+4. Add advanced features:
+   - Sophisticated interruption recovery
+   - Context-aware silence handling
+   - DTMF command structure
+
+5. Refine and optimize:
+   - Improve voice detection accuracy
+   - Reduce latency in voice interactions
+   - Enhance UI feedback for voice states

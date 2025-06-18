@@ -40,6 +40,20 @@ services:
       - qdrant_storage:/qdrant/storage
       - ./apps/qdrant_config.yaml:/qdrant/config/production.yaml
 
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit
+    restart: unless-stopped
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./apps:/config
+    command: --config /config/livekit.yaml
+    networks:
+      - livekit-network
+
   redis:
     image: redis:latest
     container_name: redis
@@ -49,7 +63,15 @@ services:
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+    networks:
+      - default
+      - livekit-network
+
 volumes:
   postgres_data:
   qdrant_storage:
   redis_data:
+
+networks:
+  default:
+  livekit-network:

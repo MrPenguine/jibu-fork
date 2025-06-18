@@ -1,0 +1,111 @@
+# LIVEKIT SETUP AND TESTING PLAN
+
+## PREREQUISITES
+- Docker and Docker Compose installed
+- Git installed
+- Domain name (for production) with SSL certificates
+- At least 2GB RAM, 1vCPU for testing (4GB RAM, 2vCPU recommended for production)
+
+## DOCKER SETUP FOR LIVEKIT
+1. Create a directory for LiveKit deployment:
+   mkdir -p ~/jibu-livekit/config
+   cd ~/jibu-livekit
+
+2. Create docker-compose.yml:
+   version: '3'
+   services:
+     livekit:
+       image: livekit/livekit-server:latest
+       ports:
+         - "7880:7880"
+         - "7881:7881"
+         - "7882:7882/udp"
+       volumes:
+         - ./config:/config
+       command: --config /config/livekit.yaml
+       restart: unless-stopped
+       networks:
+         - livekit-network
+
+     redis:
+       image: redis:alpine
+       ports:
+         - "6379:6379"
+       networks:
+         - livekit-network
+
+   networks:
+     livekit-network:
+
+3. Create LiveKit configuration file (~/jibu-livekit/config/livekit.yaml):
+   port: 7880
+   rtc:
+     port_range:
+       start: 50000
+       end: 60000
+     tcp_port: 7881
+     udp_port: 7882
+   redis:
+     address: redis:6379
+   keys:
+     jibuapikey: jibuapisecret
+
+4. Start LiveKit:
+   docker-compose up -d
+
+5. Verify LiveKit is running:
+   curl http://localhost:7880/
+   Should return: "LiveKit Server"
+
+## SSL CONFIGURATION (FOR PRODUCTION)
+1. For production setup, add SSL configuration to livekit.yaml:
+   tls:
+     cert: /path/to/fullchain.pem
+     key: /path/to/privkey.pem
+
+2. Configure TURN server for NAT traversal (add to livekit.yaml):
+   turn:
+     enabled: true
+     domain: turn.yourdomain.com
+     tls_port: 3478
+     udp_port: 3478
+
+## LIVEKIT LOAD TESTING (OPTIONAL)
+1. Install the LiveKit CLI:
+   npm install -g livekit-cli
+
+2. Run a simple load test:
+   livekit-cli room create --api-key jibuapikey --api-secret jibuapisecret test-room
+   livekit-cli join-room --api-key jibuapikey --api-secret jibuapisecret --room test-room
+
+## MONITORING SETUP
+1. Set up Prometheus metrics for LiveKit server by adding to livekit.yaml:
+   prometheus:
+     address: 0.0.0.0:6789
+
+2. Setup Grafana dashboards for LiveKit monitoring:
+   - Create Docker service for Grafana
+   - Import LiveKit dashboard templates
+   - Configure alerts for service degradation
+
+## DEPLOYMENT STRATEGY
+
+### LOCAL DEVELOPMENT SETUP
+1. Run LiveKit in Docker
+2. Configure backend to connect to local LiveKit
+3. Test basic voice functionality locally
+
+### STAGING DEPLOYMENT
+1. Deploy LiveKit on staging server with proper SSL configuration
+2. Deploy backend with LiveKit integration
+3. Test all voice features in controlled environment
+
+### PRODUCTION DEPLOYMENT
+1. Deploy LiveKit on production infrastructure:
+   - Consider Kubernetes for high availability
+   - Configure proper scaling parameters
+   - Set up geographic distribution if needed
+
+2. Deploy backend with production LiveKit configuration
+3. Monitor performance metrics during initial rollout
+4. Implement progressive feature rollout

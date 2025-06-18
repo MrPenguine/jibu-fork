@@ -1,0 +1,151 @@
+# LIVEKIT BACKEND INTEGRATION PLAN
+
+## BACKEND DEPENDENCIES
+
+1. Add LiveKit dependencies:
+   pnpm add livekit-server-sdk
+
+2. Additional dependencies:
+   pnpm add @nestjs/websockets @nestjs/platform-socket.io
+
+## BACKEND MODULES
+
+### 1. LIVEKIT MODULE
+
+1. Create directory structure:
+   mkdir -p apps/backend/src/modules/v1/livekit/dto
+   mkdir -p apps/backend/src/modules/v1/livekit/services
+
+2. Create base module files:
+   - apps/backend/src/modules/v1/livekit/livekit.module.ts
+   - apps/backend/src/modules/v1/livekit/livekit.service.ts
+   - apps/backend/src/modules/v1/livekit/livekit.controller.ts
+
+3. Create DTOs:
+   - apps/backend/src/modules/v1/livekit/dto/create-room.dto.ts
+   - apps/backend/src/modules/v1/livekit/dto/join-room.dto.ts
+   - apps/backend/src/modules/v1/livekit/dto/token.dto.ts
+
+4. Create service files:
+   - apps/backend/src/modules/v1/livekit/services/room-manager.service.ts
+   - apps/backend/src/modules/v1/livekit/services/token-manager.service.ts
+   - apps/backend/src/modules/v1/livekit/services/voice-activity.service.ts
+   - apps/backend/src/modules/v1/livekit/services/speech-events.service.ts
+
+### 2. VOICE MODE MODULE
+
+1. Create directory structure:
+   mkdir -p apps/backend/src/modules/v1/voice-mode/dto
+
+2. Create necessary files:
+   - apps/backend/src/modules/v1/voice-mode/voice-mode.module.ts
+   - apps/backend/src/modules/v1/voice-mode/voice-mode.service.ts
+   - apps/backend/src/modules/v1/voice-mode/voice-mode.controller.ts
+   - apps/backend/src/modules/v1/voice-mode/dto/voice-session.dto.ts
+
+## CONFIGURATION
+
+### 1. LIVEKIT ENVIRONMENT CONFIGURATION
+
+1. Add LiveKit configuration to .env:
+   LIVEKIT_URL=ws://localhost:7880
+   LIVEKIT_API_KEY=jibuapikey
+   LIVEKIT_API_SECRET=jibuapisecret
+
+2. Create configuration provider:
+   - apps/backend/src/integrations/livekit/livekit.config.ts
+   - apps/backend/src/integrations/livekit/livekit.types.ts
+   - apps/backend/src/integrations/livekit/livekit-client.provider.ts
+
+## EXISTING MODULE MODIFICATIONS
+
+### 1. CHATS MODULE UPDATES
+
+1. Update files:
+   - apps/backend/src/modules/v1/chats/chats.module.ts (Add LiveKitModule import)
+   - apps/backend/src/modules/v1/chats/chats.service.ts (Add voice chat methods)
+   - apps/backend/src/modules/v1/chats/chats.controller.ts (Add voice endpoints)
+
+2. Create new DTO:
+   - apps/backend/src/modules/v1/chats/dto/voice-chat.dto.ts
+
+### 2. ASSISTANTS MODULE UPDATES
+
+1. Update files:
+   - apps/backend/src/modules/v1/assistants/assistant.module.ts (Add LiveKitModule import)
+   - apps/backend/src/modules/v1/assistants/assistant.service.ts (Add voice capabilities)
+   - apps/backend/src/modules/v1/assistants/assistant.controller.ts (Add voice endpoints)
+
+### 3. VOICES MODULE UPDATES
+
+1. Update files:
+   - apps/backend/src/modules/v1/voices/voices.service.ts (Add LiveKit voice streaming)
+   - apps/backend/src/modules/v1/voices/voices.module.ts (Add LiveKitModule import)
+
+## DATABASE SCHEMA UPDATES
+
+1. Modify Prisma schema (apps/backend/prisma/schema.prisma) to add:
+   - VoiceSession model with fields:
+     - id (UUID)
+     - userId (relation to User)
+     - chatId (optional relation to Chat)
+     - assistantId (optional relation to Assistant)
+     - agentId (optional relation to Agent)
+     - roomName (string)
+     - status (enum: ACTIVE, ENDED)
+     - createdAt (DateTime)
+     - endedAt (DateTime, optional)
+
+2. Generate Prisma client:
+   cd apps/backend
+   npx prisma generate
+
+3. Create migration:
+   cd apps/backend
+   npx prisma migrate dev --name add_voice_session
+
+## BACKEND VOICE FEATURES
+
+### 1. VOICE ACTIVITY DETECTION
+
+1. Implement WebRTC audio analysis:
+   - Configure silence thresholds
+   - Set up real-time audio level monitoring
+   - Create state tracking for active/inactive voice
+
+2. Implement speech event handling:
+   - Create WebSocket gateway for real-time events
+   - Set up Redis pub/sub for distributed events
+   - Build event handlers for speech start/stop
+
+### 2. CONVERSATION STATE MACHINE
+
+1. Design voice conversation states:
+   - IDLE: No active speakers
+   - USER_SPEAKING: User is currently speaking
+   - AGENT_SPEAKING: Agent/Assistant is currently speaking
+   - SILENCE: No speech detected for configurable period
+
+2. Implement state transitions:
+   - Define rules for state changes
+   - Create event triggers for transitions
+   - Track conversation state in Redis
+
+### 3. SILENCE DETECTION
+
+1. Implement silence detection service:
+   - Configure silence thresholds and timeouts
+   - Create "Are you there?" prompt generation
+   - Build middleware for handling detected silence
+
+### 4. DTMF HANDLING
+
+1. Implement DTMF detection:
+   - Set up DTMF tone listeners in LiveKit
+   - Create event handlers for keypad inputs
+   - Design command structure for navigation
+
+2. Create DTMF API endpoint:
+   - POST endpoint to handle DTMF commands
+   - Service methods to process commands
+   - Integration with chat/agent workflows
