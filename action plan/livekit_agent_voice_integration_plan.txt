@@ -3,6 +3,11 @@
 ## OVERVIEW
 This plan focuses specifically on integrating LiveKit voice mode with the agent execution workflow in Jibu Console. The integration will focus on both backend (AgentExecutionService) and frontend (AgentExecutionDialog) components.
 
+✅ LiveKit client dependencies have been installed:
+- livekit-client
+- @livekit/components-react
+- @livekit/components-styles
+
 ## AGENT BACKEND INTEGRATION
 
 ### 1. EXTEND AGENT EXECUTION SERVICE
@@ -19,6 +24,7 @@ This plan focuses specifically on integrating LiveKit voice mode with the agent 
    - Integrate with existing agent execution workflow:
      - Link voice session to agent execution session
      - Handle voice events within execution state machine
+     - Implement system message playback when agent starts
 
 2. Create voice-specific DTOs:
    - apps/backend/src/modules/v1/agent/execution/dto/voice-execution.dto.ts
@@ -43,11 +49,23 @@ This plan focuses specifically on integrating LiveKit voice mode with the agent 
    - Track active agent voice sessions
    - Store conversation state between execution steps
    - Create pub/sub channels for real-time voice events
+   - Track metrics for monitoring dashboard
 
 2. Create agent voice state handlers:
    - apps/backend/src/modules/v1/agent/execution/handlers/voice-state.handler.ts
    - apps/backend/src/modules/v1/agent/execution/handlers/voice-interruption.handler.ts
    - apps/backend/src/modules/v1/agent/execution/handlers/silence-detection.handler.ts
+
+### 4. CREATE MONITORING COMPONENTS
+
+1. Implement agent voice monitoring:
+   - apps/backend/src/modules/v1/agent/execution/monitoring/voice-metrics.service.ts
+   - apps/backend/src/modules/v1/agent/execution/monitoring/voice-health.service.ts
+
+2. Create Prometheus metrics collectors:
+   - Track agent voice session metrics
+   - Monitor voice quality and latency
+   - Collect interruption and speech detection statistics
 
 ## AGENT FRONTEND INTEGRATION
 
@@ -55,10 +73,11 @@ This plan focuses specifically on integrating LiveKit voice mode with the agent 
 
 1. Enhance libs/shadcn-ui/src/components/agent/AgentExecutionDialog.tsx:
    - Update the existing startAgentVoice() function:
-     - Initialize LiveKit connection
+     - Initialize LiveKit connection using @livekit/components-react
      - Create and join a LiveKit room
      - Set up audio tracks and permissions
      - Handle microphone access and audio routing
+     - Play system message when agent starts
    - Add voice mode UI state:
      - isVoiceModeActive
      - isMicrophoneActive
@@ -104,7 +123,7 @@ This plan focuses specifically on integrating LiveKit voice mode with the agent 
 
 ### 3. ADD LIVEKIT COMPONENTS
 
-1. Create LiveKit integration components:
+1. Create LiveKit integration components using @livekit/components-react:
    - libs/shadcn-ui/src/components/voicechat/AgentVoiceRoom.tsx
      - LiveKit room management specific to agent
      - Audio publishing and subscription
@@ -126,6 +145,15 @@ This plan focuses specifically on integrating LiveKit voice mode with the agent 
      - Advanced speech detection algorithms
      - Start/stop speech detection
      - Confidence scoring for detected speech
+
+### 4. CREATE MONITORING COMPONENT
+
+1. Create LiveKit monitoring component:
+   - libs/shadcn-ui/src/components/monitoring/LiveKitMonitor.tsx
+     - Display LiveKit service status
+     - Show active voice sessions
+     - Visualize voice quality metrics
+     - Display connection statistics
 
 ## VOICE FEATURES FOR AGENT WORKFLOW
 
@@ -170,27 +198,37 @@ This plan focuses specifically on integrating LiveKit voice mode with the agent 
 
 ## IMPLEMENTATION APPROACH
 
-1. Start with the AgentExecutionService extensions:
-   - Add voice session management
-   - Create basic voice state tracking
-   - Connect to LiveKit services
+1. Start with the basic LiveKit integration:
+   - Set up LiveKit module and configuration
+   - Implement token generation for rooms
+   - Create basic room management
 
-2. Build the frontend components:
-   - Update AgentExecutionDialog.tsx
-   - Create basic voice UI components
-   - Implement LiveKit room connection
+2. Implement agent voice backend:
+   - Add voice session management to AgentExecutionService
+   - Create voice state tracking in Redis
+   - Implement system message playback
 
-3. Implement core voice features:
-   - Basic speech detection
-   - Simple interruption handling
+3. Build the frontend components:
+   - Create LiveKitMonitor component for service monitoring
+   - Update AgentExecutionDialog.tsx with voice capabilities
+   - Implement basic voice UI components
+
+4. Implement core voice features:
+   - Basic speech detection and interruption
+   - System message playback when agent starts
    - Initial silence detection
 
-4. Add advanced features:
-   - Sophisticated interruption recovery
-   - Context-aware silence handling
+5. Add advanced features:
+   - Interruption handling and recovery
    - DTMF command structure
+   - Context-aware silence handling
 
-5. Refine and optimize:
+6. Set up monitoring and metrics:
+   - Implement Prometheus metrics collection
+   - Create Grafana dashboard for voice metrics
+   - Add health check endpoints
+
+7. Refine and optimize:
    - Improve voice detection accuracy
    - Reduce latency in voice interactions
    - Enhance UI feedback for voice states

@@ -11,5 +11,5 @@ keys:
 
 # Prometheus metrics configuration
 prometheus:
-  address: 0.0.0.0:6789
-  path: /metrics
+  port: 6789
+  enable: true

@@ -9,6 +9,7 @@ import { ChatsModule } from './chats/chats.module';
 import { ConsoleModule } from './console/console.module';
 import { ToolsModule } from './tools/tools.module';
 import { VoicesModule } from './voices/voices.module';
+import { LivekitModule } from './livekit/livekit.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { VoicesModule } from './voices/voices.module';
     ConsoleModule,
     ToolsModule,
     VoicesModule,
+    LivekitModule,
   ],
   exports: [
     FileModule,
@@ -34,6 +36,7 @@ import { VoicesModule } from './voices/voices.module';
     ConsoleModule,
     ToolsModule,
     VoicesModule,
+    LivekitModule,
   ],
 })
 export class V1Module {}

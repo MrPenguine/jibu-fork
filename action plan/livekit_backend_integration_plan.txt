@@ -2,8 +2,8 @@
 
 ## BACKEND DEPENDENCIES
 
-1. Add LiveKit dependencies:
-   pnpm add livekit-server-sdk
+✅ 1. Add LiveKit dependencies:
+   ✅ pnpm add livekit-client @livekit/components-react @livekit/components-styles
 
 2. Additional dependencies:
    pnpm add @nestjs/websockets @nestjs/platform-socket.io
@@ -15,6 +15,7 @@
 1. Create directory structure:
    mkdir -p apps/backend/src/modules/v1/livekit/dto
    mkdir -p apps/backend/src/modules/v1/livekit/services
+   mkdir -p apps/backend/src/modules/v1/livekit/monitoring
 
 2. Create base module files:
    - apps/backend/src/modules/v1/livekit/livekit.module.ts
@@ -32,6 +33,10 @@
    - apps/backend/src/modules/v1/livekit/services/voice-activity.service.ts
    - apps/backend/src/modules/v1/livekit/services/speech-events.service.ts
 
+5. Create monitoring components:
+   - apps/backend/src/modules/v1/livekit/monitoring/livekit-health.service.ts
+   - apps/backend/src/modules/v1/livekit/monitoring/livekit-metrics.service.ts
+
 ### 2. VOICE MODE MODULE
 
 1. Create directory structure:
@@ -47,7 +52,7 @@
 
 ### 1. LIVEKIT ENVIRONMENT CONFIGURATION
 
-1. Add LiveKit configuration to .env:
+1. Add LiveKit configuration to .env (Note: LiveKit is already in Docker):
    LIVEKIT_URL=ws://localhost:7880
    LIVEKIT_API_KEY=jibuapikey
    LIVEKIT_API_SECRET=jibuapisecret
@@ -56,6 +61,9 @@
    - apps/backend/src/integrations/livekit/livekit.config.ts
    - apps/backend/src/integrations/livekit/livekit.types.ts
    - apps/backend/src/integrations/livekit/livekit-client.provider.ts
+
+3. Add Prometheus metrics configuration:
+   - apps/backend/src/integrations/livekit/livekit-metrics.config.ts
 
 ## EXISTING MODULE MODIFICATIONS
 
@@ -118,6 +126,11 @@
    - Set up Redis pub/sub for distributed events
    - Build event handlers for speech start/stop
 
+3. Create agent voice integration:
+   - Implement voice activity detection for agent context
+   - Create interrupt handling for agent speech
+   - Build system message playback functionality
+
 ### 2. CONVERSATION STATE MACHINE
 
 1. Design voice conversation states:
@@ -149,3 +162,44 @@
    - POST endpoint to handle DTMF commands
    - Service methods to process commands
    - Integration with chat/agent workflows
+
+## MONITORING COMPONENTS
+
+### 1. LIVEKIT SERVICE MONITORING
+
+1. Create health check endpoints:
+   - GET /api/v1/livekit/health
+   - Service methods to check LiveKit server status
+   - Integration with existing health check system
+
+2. Implement Prometheus metrics collection:
+   - Track active rooms and participants
+   - Monitor audio quality metrics
+   - Collect latency and connection statistics
+
+3. Create Grafana dashboard:
+   - LiveKit service status panel
+   - Active voice sessions metrics
+   - Audio quality visualization
+   - Error rate tracking
+
+### 2. AGENT VOICE MONITORING
+
+1. Implement agent voice metrics:
+   - Track agent voice session duration
+   - Monitor interruption frequency
+   - Collect speech-to-text accuracy metrics
+
+2. Create agent voice dashboard:
+   - Agent voice session overview
+   - Speech recognition performance
+   - User interaction patterns
+
+## IMPLEMENTATION STEPS
+
+1. Set up basic LiveKit module and configuration
+2. Implement room and token management services
+3. Create agent voice integration components
+4. Set up monitoring and health check services
+5. Implement DTMF handling
+6. Create frontend integration components
