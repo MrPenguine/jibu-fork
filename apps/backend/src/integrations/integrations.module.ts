@@ -18,12 +18,21 @@ import { TtsModule } from './tts/tts.module';
 import { ITtsService } from './tts/interfaces/tts.interface';
 import { TtsService } from './tts/tts.service';
 
+// STT
+import { SttModule } from './stt/stt.module';
+import { ISttService } from './stt/interfaces/stt.interface';
+import { SttService } from './stt/stt.service';
+
+// Service tokens
+export const STT_SERVICE_TOKEN = 'STT_SERVICE_TOKEN';
+
 @Module({
   imports: [
     ConfigModule,
     StorageModule,
     AgentModule,
     TtsModule,
+    SttModule,
   ],
   providers: [
     
@@ -41,6 +50,11 @@ import { TtsService } from './tts/tts.service';
     {
       provide: ITtsService,
       useExisting: TtsService
+    },
+    // Re-export the STT service interface
+    {
+      provide: STT_SERVICE_TOKEN,
+      useExisting: SttService
     }
   ],
   exports: [
@@ -49,10 +63,12 @@ import { TtsService } from './tts/tts.service';
     IStorageService,
     IAgentService,
     ITtsService,
+    STT_SERVICE_TOKEN,
     
     StorageModule,
     AgentModule,
     TtsModule,
+    SttModule,
   ],
 })
 export class IntegrationsModule {} 

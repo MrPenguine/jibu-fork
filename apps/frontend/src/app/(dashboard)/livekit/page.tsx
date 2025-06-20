@@ -13,6 +13,7 @@ type RoomInfo = {
 };
 import { LiveKitRoomComponent } from '../../../../../../libs/shadcn-ui/src/components/livekit/livekit-room';
 import { VoiceDetector } from '../../../../../../libs/shadcn-ui/src/components/livekit/voice-detector';
+import { RealtimeTranscript } from '../../../../../../libs/shadcn-ui/src/components/livekit/realtime-transcript';
 import { Button } from '@libs/shadcn-ui/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@libs/shadcn-ui/components/ui/card';
 import { Input } from '@libs/shadcn-ui/components/ui/input';
@@ -392,6 +393,11 @@ export default function LiveKitTestPage() {
                     </div>
                   )}
                 </CardContent>
+                {isConnected && token && serverUrl && (
+                  <div className="mt-4 mb-2 px-4">
+                    <RealtimeTranscript />
+                  </div>
+                )}
               </Card>
             </TabsContent>
           </Tabs>
