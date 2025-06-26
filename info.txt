@@ -1,0 +1,1 @@
+This is the last version, we have decided to continue with creating the app as an n8n wrapper. 
