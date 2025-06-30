@@ -50,7 +50,7 @@ export async function fetchAPI(
   try {
     // Make the request with a timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for webhook testing
     
     const response = await fetch(url, {
       ...options,
@@ -80,7 +80,7 @@ export async function fetchAPI(
     let errorMessage = 'Unknown error occurred';
     
     if (error.name === 'AbortError') {
-      errorMessage = 'Request timed out after 10 seconds';
+      errorMessage = 'Request timed out after 30 seconds';
     } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
       errorMessage = 'Network error: Unable to connect to the server. Please check your connection.';
     } else if (error.message) {

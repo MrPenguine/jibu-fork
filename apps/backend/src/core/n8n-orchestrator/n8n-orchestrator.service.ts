@@ -141,6 +141,15 @@ export class N8nOrchestratorService implements OnModuleInit {
   }
 
   /**
+   * Get all registered webhooks from n8n
+   * @returns Array of registered webhooks
+   */
+  async getRegisteredWebhooks() {
+    this.ensureN8nIsAvailable();
+    return await this.n8nClient.getRegisteredWebhooks();
+  }
+
+  /**
    * Ensure that n8n is available before calling API methods
    * @throws Error if n8n is not available
    */

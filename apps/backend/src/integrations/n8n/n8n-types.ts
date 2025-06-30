@@ -182,9 +182,10 @@ export interface NodePosition {
 export interface WebhookWorkflowTemplate {
   name: string;
   webhookPath: string;
-  webhookMethod: string;
+  webhookMethod?: string;
   agentPrompt?: string;
   memoryEnabled?: boolean;
+  contextWindowLength?: number;
   integrationNodes?: {
     type: N8nIntegrationNodeType;
     parameters: Record<string, any>;

@@ -28,7 +28,6 @@ export class N8nWorkflowService {
     
     const workflowData = {
       name,
-      active: false, // Workflows start as inactive by default
       nodes: [],
       connections: { main: [] },
       settings: {
@@ -258,7 +257,6 @@ export class N8nWorkflowService {
           ]
         }
       },
-      active: true,
       settings: {
         executionOrder: 'v1'
       }

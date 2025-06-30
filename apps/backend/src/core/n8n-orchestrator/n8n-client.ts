@@ -179,6 +179,21 @@ export class N8nClient {
   }
 
   /**
+   * Get registered webhooks from n8n
+   * @returns Array of registered webhook details
+   */
+  async getRegisteredWebhooks() {
+    try {
+      const response = await this.httpClient.get('/api/v1/webhooks');
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Failed to get webhooks: ${error.message}`);
+      // Return empty array on error instead of throwing, to make webhook checks non-blocking
+      return { data: [] };
+    }
+  }
+
+  /**
    * Helper method to standardize API error handling
    * @param message Error context message
    * @param error The error object from axios

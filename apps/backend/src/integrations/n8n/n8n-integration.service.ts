@@ -85,6 +85,12 @@ export class N8nIntegrationService {
         },
         position: modelPosition,
         typeVersion: 1,
+        credentials: {
+          googlePalmApi: {
+            id: 'STy8vguknZjfysYZ',
+            name: 'GEMINI'
+          }
+        },
       };
       nodes.push(modelNode);
       
@@ -95,9 +101,11 @@ export class N8nIntegrationService {
         type: N8nAiNodeType.LANGCHAIN_AGENT,
         parameters: {
           promptType: 'define',
-          text: '={{ $json.body.sessionId }}',
+          // Use message field from webhook body for the prompt
+          text: '={{ $json.body.message }}',
           options: {
-            systemMessage: template.agentPrompt || 'You are an AI assistant.',
+            // Configure system message to use template value if provided, otherwise use from webhook body, with fallback
+            systemMessage: '={{ $json.body.systemPrompt || "' + (template.agentPrompt || 'You are an AI assistant.') + '" }}',
           },
         },
         position: agentPosition,
@@ -128,6 +136,8 @@ export class N8nIntegrationService {
           parameters: {
             sessionIdType: 'customKey',
             sessionKey: '={{ $("Webhook").item.json.body.sessionId }}',
+            // Use an expression to get contextLength from the webhook body, with fallback to template value or default
+            contextWindowLength: '={{ $("Webhook").item.json.body.contextLength || ' + (template.contextWindowLength || 5) + ' }}',
           },
           position: memoryPosition,
           typeVersion: 1.3,
@@ -151,70 +161,68 @@ export class N8nIntegrationService {
       }
       
       // Create the connections between nodes
-      const connections = {
+      const connections: Record<string, Record<string, Array<Array<{node: string; type: string; index: number}>>>> = {};
+      
+      // Webhook node connections
+      connections[webhookNode.name] = {
         main: [
-          // Webhook -> AI Agent
-          {
-            node: webhookNode.id,
-            type: N8nConnectionType.MAIN,
-            index: 0,
-            destination: {
-              node: agentNode.id,
-              type: N8nConnectionType.MAIN,
-              index: 0,
-            },
-          },
-          // AI Agent -> Respond to Webhook
-          {
-            node: agentNode.id,
-            type: N8nConnectionType.MAIN,
-            index: 0,
-            destination: {
-              node: responseNode.id,
-              type: N8nConnectionType.MAIN,
-              index: 0,
-            },
-          },
-        ],
+          [
+            {
+              node: agentNode.name,
+              type: 'main',
+              index: 0
+            }
+          ]
+        ]
       };
       
-      // Add model connection to agent
-      connections[N8nConnectionType.AI_LANGUAGE_MODEL] = [
-        {
-          node: modelNode.id,
-          type: N8nConnectionType.AI_LANGUAGE_MODEL,
-          index: 0,
-          destination: {
-            node: agentNode.id,
-            type: N8nConnectionType.AI_LANGUAGE_MODEL,
-            index: 0,
-          },
-        },
-      ];
+      // Agent node connections
+      connections[agentNode.name] = {
+        main: [
+          [
+            {
+              node: responseNode.name,
+              type: 'main',
+              index: 0
+            }
+          ]
+        ]
+      };
+      
+      // Model node connections
+      connections[modelNode.name] = {
+        [N8nConnectionType.AI_LANGUAGE_MODEL]: [
+          [
+            {
+              node: agentNode.name,
+              type: N8nConnectionType.AI_LANGUAGE_MODEL,
+              index: 0
+            }
+          ]
+        ]
+      };
       
       // Add memory connection to agent if enabled
       if (template.memoryEnabled) {
         const memoryNode = nodes.find(node => node.type === N8nAiNodeType.MEMORY_BUFFER);
         if (memoryNode) {
-          connections[N8nConnectionType.AI_MEMORY] = [
-            {
-              node: memoryNode.id,
-              type: N8nConnectionType.AI_MEMORY,
-              index: 0,
-              destination: {
-                node: agentNode.id,
-                type: N8nConnectionType.AI_MEMORY,
-                index: 0,
-              },
-            },
-          ];
+          connections[memoryNode.name] = {
+            'ai_memory': [
+              [
+                {
+                  node: agentNode.name,
+                  type: 'ai_memory',
+                  index: 0
+                }
+              ]
+            ]
+          };
         }
       }
       
       // Create the workflow
       const workflowData = {
         name: template.name || `Webhook Workflow ${new Date().toISOString().split('T')[0]}`,
-        active: true,
         nodes,
         connections,
         settings: {
