@@ -1,0 +1,68 @@
+# n8n Configuration
+# This is a minimal configuration file for n8n
+# All sensitive values should be passed via environment variables
+
+general:
+  # Base path where n8n is deployed
+  baseUrl: http://localhost:5678
+  
+  # Security
+  encryptionKey: ${N8N_ENCRYPTION_KEY:your-encryption-key}
+  
+  # Logging
+  logLevel: info
+  logOutput: console
+
+security:
+  # Basic Auth (enable and configure via environment variables if needed)
+  basicAuth:
+    active: ${N8N_BASIC_AUTH_ACTIVE:false}
+    user: ${N8N_BASIC_AUTH_USER:}
+    password: ${N8N_BASIC_AUTH_PASSWORD:}
+
+# Execution settings
+executions:
+  # Process mode (own, main)
+  process: ${EXECUTIONS_PROCESS:main}
+  
+  # Timeouts in seconds
+  timeout: ${EXECUTIONS_TIMEOUT:3600}
+  timeoutMax: ${EXECUTIONS_TIMEOUT_MAX:36000}
+
+# Webhook configuration
+webhook:
+  url: ${N8N_HOST:localhost}:${N8N_PORT:5678}
+  
+# External secrets (optional)
+# externalSecrets:
+#   endpoint: ${N8N_SECRETS_ENDPOINT}
+#   token: ${N8N_SECRETS_TOKEN}
+
+# Email settings (SMTP)
+# email:
+#   smtp:
+#     host: ${N8N_SMTP_HOST:}
+#     port: ${N8N_SMTP_PORT:587}
+#     user: ${N8N_SMTP_USER:}
+#     pass: ${N8N_SMTP_PASS:}
+#     sender: ${N8N_SMTP_SENDER:}
+#     ssl: ${N8N_SMTP_SSL:true}
+
+# Uncomment and configure additional features as needed
+# externalHooks:
+#   workerStarted:
+#     - http://example.com/hook
+
+# Queue configuration (for multi-main setup)
+# queue:
+#   bull:
+#     host: ${QUEUE_BULL_HOST:localhost}
+#     port: ${QUEUE_BULL_PORT:6379}
+#     password: ${QUEUE_BULL_PASSWORD:}
+#     db: ${QUEUE_BULL_DB:0}
+
+# External secrets (Vault, AWS Secrets Manager, etc.)
+# externalSecrets:
+#   enabled: ${EXTERNAL_SECRETS_ENABLED:false}
+#   provider: ${EXTERNAL_SECRETS_PROVIDER:}
+#   # Add provider-specific configuration here

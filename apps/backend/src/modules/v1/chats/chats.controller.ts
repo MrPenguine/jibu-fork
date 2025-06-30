@@ -8,7 +8,8 @@ import {
   Query, 
   UseGuards,
   Req,
-  Patch
+  Patch,
+  Inject
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
@@ -19,13 +20,17 @@ import { UpdateChatDto } from './dto/update-chat.dto';
 import { OrgRoleGuard } from '../../../core/auth/guards/org-role.guard';
 import { Request } from 'express';
 import { Public } from '../../../core/auth/decorators/public.decorator';
+import { N8nClient } from '../../../core/n8n-orchestrator/n8n-client';
 
 @ApiTags('chats')
 @Controller('v1/chats')
 @UseGuards(AuthGuard('jwt'), OrgRoleGuard)
 @ApiBearerAuth()
 export class ChatsController {
-  constructor(private readonly chatsService: ChatsService) {}
+  constructor(
+    private readonly chatsService: ChatsService,
+    @Inject(N8nClient) private readonly n8nClient: N8nClient
+  ) {}
 
   @Post()
   @Public()
@@ -127,5 +132,60 @@ export class ChatsController {
   ) {
     const organizationId = req.headers['x-organization-id'] as string;
     return this.chatsService.createMessage(chatId, createMessageDto, organizationId);
+  }
+
+  @Post('test/n8n-webhook')
+  @Public()
+  @ApiOperation({ summary: 'Test n8n webhook connection' })
+  async testN8nWebhook(@Body() body: { message: string }, @Req() req: Request) {
+    const organizationId = req.headers['x-organization-id'] as string || 'test-org';
+    const testChatId = 'test-chat-id';
+    
+    return this.chatsService.createMessage(testChatId, {
+      content: body.message || 'Test message for n8n',
+      role: 'user',
+      sequenceId: 1,
+      type: 'text',
+      metadata: { isTest: true }
+    }, organizationId);
+  }
+
+  @Get('test/validate-webhook')
+  @Public()
+  @ApiOperation({ summary: 'Validate n8n webhook URL configuration' })
+  @ApiQuery({ name: 'url', required: false, description: 'Optional webhook URL to validate. If not provided, uses N8N_WEBHOOK_URL from env' })
+  async validateN8nWebhook(@Req() req: Request, @Query('url') url?: string) {
+    try {
+      // Get URL from query param or environment
+      const webhookUrl = url || this.n8nClient['configService'].get<string>('N8N_WEBHOOK_URL');
+      
+      if (!webhookUrl) {
+        return {
+          success: false,
+          message: 'No webhook URL provided and N8N_WEBHOOK_URL not found in environment.',
+          validationDetails: null
+        };
+      }
+
+      // Use the N8nClient to validate the webhook URL
+      const validationResult = await this.n8nClient.validateWebhook(webhookUrl);
+      
+      return {
+        success: validationResult.valid,
+        message: validationResult.message,
+        validationDetails: {
+          webhookUrl: webhookUrl.replace(/\/\/.+:.+@/, '//***:***@'), // Mask credentials if present in URL
+          status: validationResult.status,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Validation process error: ${error.message}`,
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      };
+    }
   }
 } 

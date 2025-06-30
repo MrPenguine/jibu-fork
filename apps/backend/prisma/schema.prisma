@@ -56,8 +56,9 @@ model Organization {
   assistants           Assistant[] // Assistants belonging to this organization
   chats                Chat[] // All chats in this organization
   tools                Tool[] // Tools belonging to this organization
-  agents            Agent[] // Agents belonging to this organization
+  agents            Agent[]      // Agents belonging to this organization
   agentSessions     AgentSession[] // Agent sessions belonging to this organization
+  n8nWorkflows       N8nWorkflow[]  // N8n workflows for this organization
 }
 
 model OrganizationMembership {
@@ -197,6 +198,11 @@ model Assistant {
   id                         String          @id @default(uuid())
   name                       String
   organizationId             String
+  // n8n integration fields
+  n8nWorkflowId              String?         
+  n8nWorkflow                N8nWorkflow?     @relation(fields: [n8nWorkflowId], references: [id])
+  oldN8nWorkflowId           String?         // Previous workflow ID from n8n (to be cleaned up)
+  oldWebhookUrl              String?         // Previous webhook URL (to be cleaned up)
   organization               Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   knowledgeBaseId            String?
   knowledgeBase              KnowledgeBase?  @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
@@ -314,6 +320,7 @@ model Tool {
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
   assistantTools AssistantTool[]
+  workflowNodes  WorkflowNode[]  @relation("ToolToWorkflowNode")
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -357,6 +364,9 @@ model AssistantTool {
   @@index([toolId])
 }
 
+// Model for storing n8n workflow configurations
+
+
 // --- Enums for Agent ---
 enum AgentNodeType {
   START
@@ -388,6 +398,10 @@ model Agent {
 
   name        String
   description String?
+  
+  // n8n integration reference
+  n8nWorkflowId String?
+  n8nWorkflow   N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id])
 
   // Link to an Assistant (optional - assistants can be specified at the node level)
   assistantId String?
@@ -442,16 +456,87 @@ model Workflow {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  // n8n integration fields
+  n8nWorkflowId  String?      // ID of the corresponding workflow in n8n
+  webhookUrl     String?      // URL of the webhook for this workflow in n8n
+  agentPrompt    String?      // Agent prompt to use for this workflow
+
   // Chat sessions associated with this workflow
   chats          Chat[]       // Chat sessions using this workflow
+  
+  // Structured workflow nodes and connections
+  workflowNodes       WorkflowNode[]       // Detailed node information
+  workflowConnections  WorkflowConnection[] // Detailed connection information
 
   @@index([agentId])
   @@index([organizationId])
   @@index([workflowType])
   @@index([masterWorkflowId])
+  @@index([n8nWorkflowId])
 }
 
 // --- Agent Execution State (Session) ---
+// WorkflowNode contains the detailed information about a node in a workflow
+model WorkflowNode {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  workflowId    String
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  // Node details
+  nodeType      String   // Type of the node (e.g. "webhook", "ai-agent", "http-request")
+  name          String
+  parameters    String?  // JSON string of parameters
+  positionX     Float    @default(0)
+  positionY     Float    @default(0)
+  
+  // n8n integration fields
+  n8nNodeId     String?  // ID of the corresponding node in n8n
+  
+  // Tool reference (if this node represents a tool)
+  toolId        String?
+  tool          Tool?    @relation("ToolToWorkflowNode", fields: [toolId], references: [id])
+  
+  // Relationships
+  sourceConnections WorkflowConnection[] @relation("SourceNode")
+  targetConnections WorkflowConnection[] @relation("TargetNode")
+  
+  @@index([workflowId])
+  @@index([toolId])
+  @@index([n8nNodeId])
+}
+
+// WorkflowConnection represents a connection between two nodes in a workflow
+model WorkflowConnection {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  workflowId    String
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  sourceNodeId  String
+  sourceNode    WorkflowNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  
+  targetNodeId  String
+  targetNode    WorkflowNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  
+  // Connection details
+  label         String?
+  condition     String?  // Optional condition for the connection
+  
+  // n8n integration fields
+  n8nSourceOutput String?  // The output of the source node in n8n
+  n8nTargetInput  String?  // The input of the target node in n8n
+  
+  @@unique([sourceNodeId, targetNodeId])
+  @@index([workflowId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+}
+
 model AgentSession {
   id        String   @id @default(uuid()) // The unique session ID
   createdAt DateTime @default(now())
@@ -483,4 +568,28 @@ model AgentSession {
   @@index([callSid])
   @@index([chatId])
   @@index([status])
+}
+
+// N8nWorkflow model for managing n8n workflow integration
+model N8nWorkflow {
+  id               String   @id @default(uuid())
+  n8nWorkflowId    String   @unique // The ID of the workflow in n8n
+  webhookUrl       String?  // The webhook URL for this workflow
+  workflowJson     Json?    // The complete workflow JSON definition
+  isActive         Boolean  @default(false) // Whether the workflow is active in n8n
+  lastValidatedAt  DateTime @default(now()) // Last time the workflow was validated
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
+  assistants       Assistant[] // Assistants that use this workflow
+  agents           Agent[]     // Agents that use this workflow
+  
+  @@index([organizationId])
+  @@index([n8nWorkflowId])
+  @@index([isActive])
 }
