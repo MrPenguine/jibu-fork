@@ -52,6 +52,126 @@ export class N8nService {
   }
   
   /**
+   * Triggers a workflow that uses a Chat Trigger node via the n8n API
+   * @param workflowId The ID of the workflow to trigger
+   * @param payload The data payload to send to the workflow
+   * @returns The workflow execution result
+   */
+  async triggerChatWorkflow(workflowId: string, payload: Record<string, any>) {
+    try {
+      // The direct API endpoint for triggering a chat workflow
+      // Format: n8n-url/api/v1/workflows/{id}/trigger
+      const n8nBaseUrl = process.env.N8N_URL || 'http://localhost:5678';
+      const n8nApiKey = process.env.N8N_API_KEY;
+      
+      // Construct the API URL for triggering the workflow
+      const triggerUrl = `${n8nBaseUrl}/api/v1/workflows/${workflowId}/trigger`;
+      
+      this.logger.log(`Triggering chat workflow ${workflowId} via API at: ${triggerUrl}`);
+      
+      // Make the API request to trigger the workflow
+      const response = await axios({
+        method: 'post',
+        url: triggerUrl,
+        data: {
+          // For chat triggers, we need to format the data differently than for webhooks
+          // The actual structure may vary depending on your workflow setup
+          message: payload.message,
+          sessionId: payload.sessionId,
+          systemPrompt: payload.systemPrompt,
+          contextLength: payload.contextLength || 5,
+          // Include any other fields needed by your workflow
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-N8N-API-KEY': n8nApiKey, // Include API key for authentication if required
+        },
+        timeout: 15000 // 15 second timeout
+      });
+      
+      this.logger.log(`Chat workflow triggered successfully. Response status: ${response.status}`);
+      
+      // Log response details for debugging
+      if (typeof response.data === 'object') {
+        this.logger.log(`Response data: ${JSON.stringify(response.data)}`);
+      } else {
+        this.logger.log(`Response data received (non-JSON format)`);
+      }
+      
+      return response.data;
+    } catch (error) {
+      this.logger.error(`Error triggering chat workflow: ${error.message}`);
+      
+      if (error.response) {
+        const { status, data } = error.response;
+        this.logger.error(`API error status: ${status}`);
+        this.logger.error(`API error data: ${JSON.stringify(data)}`);
+      }
+      
+      throw new Error(`Failed to trigger chat workflow: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Verifies if a webhook is registered with N8N
+   * @param webhookId The webhook ID to verify
+   * @returns True if the webhook is registered, false otherwise
+   */
+  async verifyWebhookRegistration(webhookId: string): Promise<boolean> {
+    try {
+      const webhooksResponse = await this.n8nOrchestratorService.getRegisteredWebhooks();
+      
+      // Log the registered webhooks for debugging
+      this.logger.log(`Checking for webhook registration: ${webhookId}`);
+      this.logger.log(`Retrieved webhooks response: ${JSON.stringify(webhooksResponse)}`);
+      
+      // Handle n8n API response format which contains a data property
+      const registeredWebhooks = webhooksResponse?.data || [];
+      
+      if (!Array.isArray(registeredWebhooks)) {
+        this.logger.error('Invalid webhooks response format - expected array in data property');
+        return false;
+      }
+      
+      // Enhanced verification for different webhook formats
+      const isRegistered = registeredWebhooks.some(webhook => {
+        // Direct webhook ID match
+        if (typeof webhook === 'string') {
+          return webhook === webhookId;
+        }
+        
+        // Standard webhook object with ID property
+        if (webhook?.id === webhookId) {
+          return true;
+        }
+        
+        // Chat trigger with webhookId property
+        if (webhook?.webhookId === webhookId) {
+          return true;
+        }
+        
+        // Match by triggerRef for chat triggers
+        if (webhook?.triggerRef === webhookId) {
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (isRegistered) {
+        this.logger.log(`✅ Webhook ${webhookId} is registered with n8n`);
+      } else {
+        this.logger.warn(`⚠️ Webhook ${webhookId} is NOT registered with n8n`);
+      }
+      
+      return isRegistered;
+    } catch (error) {
+      this.logger.error(`Failed to verify webhook registration: ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
    * Test a webhook by calling it with data
    * @param webhookUrl The webhook URL to test
    * @param workflowId Optional workflow ID to check activation status
@@ -150,75 +270,91 @@ export class N8nService {
         }
       }
       
+      const sessionId = `test-session-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const payload = {
         message: 'Hi there',
-        sessionId: `test-session-${Date.now()}`,
-        systemPrompt: `Your name is ${workflowName}, a helpful assistant.`,
+        sessionId: sessionId,
+        systemPrompt: `Your name is ${workflowName}, a helpful assistant to help with scheduling.`,
         contextLength: 100, // Default context length of 100
         ...testData
       };
       
-      // If workflowId is provided, always get the latest production webhook URL directly from the workflow
+      this.logger.log(`Webhook payload: ${JSON.stringify(payload)}`);  
+      
+      // If workflowId is provided, always get the latest production webhook URL or chat trigger directly from the workflow
       if (workflowId) {
         try {
           const workflow = await this.n8nOrchestratorService.getWorkflow(workflowId);
-          const webhookNode = workflow?.nodes?.find(node => node.type === 'n8n-nodes-base.webhook');
           
+          if (!workflow) {
+            throw new Error(`Workflow with ID ${workflowId} not found`);
+          }
+          
+          if (!workflow.active) {
+            this.logger.log(`Workflow ${workflowId} is not active - activating now...`);
+            await this.n8nOrchestratorService.activateWorkflow(workflowId);
+            this.logger.log(`Workflow ${workflowId} activated`);
+            // Short delay to allow activation to complete
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          
+          // Check for chat trigger node first (new format)
+          const chatTriggerNode = workflow?.nodes?.find(node => node.type === '@n8n/n8n-nodes-langchain.chatTrigger');
+          if (chatTriggerNode) {
+            this.logger.log(`Found Chat Trigger node in workflow ${workflowId}. Using n8n API to trigger workflow instead of webhook URL`);
+            
+            // For chat triggers, we'll use the n8n API instead of webhook URLs
+            return await this.triggerChatWorkflow(workflowId, payload);
+          }
+          
+          // Fall back to webhook node (legacy format)
+          const webhookNode = workflow?.nodes?.find(node => node.type === 'n8n-nodes-base.webhook');
           if (webhookNode?.parameters?.webhookId) {
             const webhookId = webhookNode.parameters.webhookId;
+            
+            // IMPORTANT: The correct n8n webhook URL format
+            // Format must be: {n8n_base_url}/webhook/{webhook_id}
+            // NOT: {n8n_base_url}/{workflow_id}/webhook/{webhook_id}
             const n8nBaseUrl = process.env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678';
-            // N8N expects the webhook URL in format: baseUrl/webhook/webhookId
             webhookUrl = `${n8nBaseUrl}/webhook/${webhookId}`;
-            this.logger.log(`Using latest production webhook URL from workflow: ${webhookUrl}`);
+            
+            this.logger.log(`Using correct n8n webhook URL format: ${webhookUrl}`);
+            
+            // Don't attempt to verify webhook registration via API since it's unreliable
+            // Instead, we'll directly try to call the webhook and handle errors appropriately
+          } else {
+            this.logger.warn(`No webhook or chat trigger node found in workflow ${workflowId}`);
           }
         } catch (error) {
-          this.logger.error(`Failed to get latest webhook URL from workflow: ${error.message}`);
+          this.logger.error(`Failed to get latest webhook/chat trigger info from workflow: ${error.message}`);
         }
       }
       
-      // Verify webhook registration status with N8N
+      // Skip webhook registration verification since it's unreliable
+      // Instead focus on direct webhook testing with proper URL format
       try {
-        // Extract webhook ID from URL
-        const webhookIdMatch = webhookUrl.match(/\/webhook\/([^/]+)$/);
-        const webhookId = webhookIdMatch ? webhookIdMatch[1] : null;
+        // Extract webhook ID from URL for logging purposes
+        const webhookUrlParts = webhookUrl.split('/');
+        const targetWebhookId = webhookUrlParts[webhookUrlParts.length - 1];
         
-        if (webhookId) {
-          this.logger.log(`Verifying registration for webhook ID: ${webhookId}`);
-          
-          // Get all registered webhooks from N8N
-          const registeredHooks = await this.n8nOrchestratorService.getRegisteredWebhooks();
-          
-          // Check if our webhook is registered
-          const isRegistered = registeredHooks?.data?.some(
-            (hook) => hook.webhookId === webhookId || hook.path === webhookId
-          );
-          
-          if (!isRegistered) {
-            this.logger.warn(`⚠️ WARNING: Webhook ${webhookId} is NOT registered with N8N despite workflow being active!`);
-            this.logger.warn(`This may explain the 404 errors. Registered webhooks: ${JSON.stringify(registeredHooks?.data)}`);
-            
-            // Try deactivating and reactivating the workflow to force webhook registration
-            if (workflowId) {
-              this.logger.log(`Attempting to force webhook registration by toggling workflow activation...`);
-              await this.n8nOrchestratorService.deactivateWorkflow(workflowId);
-              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
-              await this.n8nOrchestratorService.activateWorkflow(workflowId);
-              await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s after activation
-              
-              // Check registration again
-              const refreshedHooks = await this.n8nOrchestratorService.getRegisteredWebhooks();
-              const isNowRegistered = refreshedHooks?.data?.some(
-                (hook) => hook.webhookId === webhookId || hook.path === webhookId
-              );
-              
-              this.logger.log(`After toggle, webhook registration status: ${isNowRegistered ? 'REGISTERED' : 'STILL NOT REGISTERED'}`);
-            }
+        this.logger.log(`Preparing to test webhook with ID: ${targetWebhookId}`);
+        
+        if (workflowId) {
+          // Ensure the workflow is active before trying to call the webhook
+          const workflow = await this.n8nOrchestratorService.getWorkflow(workflowId);
+          if (workflow && !workflow.active) {
+            this.logger.log(`Activating workflow ${workflowId} before webhook test`);
+            await this.n8nOrchestratorService.activateWorkflow(workflowId);
+            // Brief delay to allow activation to complete
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            this.logger.log(`Workflow activated, proceeding with webhook test`);
           } else {
-            this.logger.log(`✅ Webhook ${webhookId} is properly registered with N8N`);
+            this.logger.log(`Workflow ${workflowId} is already active, proceeding with webhook test`);
           }
         }
       } catch (regErr) {
-        this.logger.error(`Failed to verify webhook registration: ${regErr.message}`);
+        this.logger.warn(`Non-fatal issue during webhook preparation: ${regErr.message}`);
+        this.logger.log(`Proceeding with webhook test anyway`);
       }
       
       // Log the request being made
@@ -248,8 +384,11 @@ export class N8nService {
       let attemptCount = 0;
       let lastError = null;
       
-      // Add detailed logging about the payload
-      this.logger.log(`Webhook payload: ${JSON.stringify(payload)}`);  
+      // Extract webhook ID from URL to help with troubleshooting
+      const webhookUrlParts = webhookUrl.split('/');
+      const targetWebhookId = webhookUrlParts[webhookUrlParts.length - 1];
+      
+      this.logger.log(`Sending test request to webhook: ${webhookUrl}`);
       
       while (attemptCount < maxAttempts) {
         attemptCount++;
@@ -257,15 +396,17 @@ export class N8nService {
           this.logger.log(`Webhook request attempt ${attemptCount}/${maxAttempts} to ${targetUrl}`);
           
           // Using axios to make the request server-side with longer timeout
-          const response = await axios.post(targetUrl, payload, {
+          // Make the HTTP request to the webhook endpoint
+          const response = await axios({
+            method: 'post',
+            url: targetUrl,
+            data: payload,
             headers: {
               'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              // Add N8N specific headers that might help with webhook recognition
-              'X-N8N-Test': 'true',
-              ...headers,
+              'X-Webhook-Test': 'true',  // Mark this as a test request
+              ...headers
             },
-            timeout: 30000 // Increased timeout for webhook response to 30 seconds
+            timeout: 15000 // 15 second timeout for potentially slow systems
           });
           
           // If successful, return the response

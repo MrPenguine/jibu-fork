@@ -127,11 +127,35 @@ services:
     ports:
       - '5678:5678'
     environment:
-      - N8N_CONFIG_FILES=/config/n8n.yaml
       - NODE_ENV=production
+      # Base URL configuration
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_PATH=/
+      # Direct webhook URL override (most important for proper registration)
+      - WEBHOOK_URL=http://localhost:5678/
+      # Webhook handling settings
+      - N8N_WEBHOOK_TEST_TIMEOUT=10000
+      - N8N_WEBHOOKS_RETRY_ATTEMPTS=5
+      - N8N_WEBHOOKS_WAIT_FOR_REGISTRATION=true
+      - N8N_CAPTURE_WEBHOOK_LOGS=true
+      # Database configuration
+      - DB_TYPE=sqlite
+      - DB_SQLITE_VACUUM_ON_STARTUP=true
+      # General settings
+      - GENERIC_TIMEZONE=UTC
+      - N8N_LOG_LEVEL=debug
+      - N8N_DIAGNOSTICS_ENABLED=true
+      # Health check endpoints
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
+      - N8N_METRICS=true
+      # Settings for better webhook reliability
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
+      - N8N_SAVE_EXECUTION_PROGRESS=true
+      - N8N_SAVE_MANUAL_EXECUTIONS=true
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./infra/n8n:/config
     networks:
       - default
 

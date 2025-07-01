@@ -124,57 +124,38 @@ export class N8nWorkflowService {
   }
 
   /**
-   * Create a basic agent workflow with webhook for chat processing
+   * Create a basic agent workflow with chat trigger for chat processing
    * This creates a standard workflow with:
-   * 1. A webhook node to receive user messages
-   * 2. Dynamic parameter parsing for sessionId, systemPrompt, temperature, and chatInput
+   * 1. A chat trigger node to receive user messages
+   * 2. Dynamic parameter parsing for sessionId, systemPrompt, and message
    * 3. AI processing via Google Gemini
-   * 4. Response returned via the webhook
+   * 4. Simple memory for conversation context
    * 
    * @param assistantId The assistant ID this workflow belongs to
    * @param organizationId The organization ID this workflow belongs to
    * @param userId The user ID this workflow belongs to (optional)
    * @param name The name of the workflow (will use a standard name if not provided)
-   * @returns The created N8nWorkflow record including its ID and webhook URL
+   * @returns The created N8nWorkflow record including its ID
    */
   async createAgentChatWorkflow(assistantId: string, organizationId: string, userId?: string, name?: string) {
     const workflowName = name || `Agent Chat Workflow - Assistant ${assistantId}`;
-    const webhookPath = `${assistantId}${userId ? '-' + userId : ''}-${Date.now()}`;
-    const n8nBaseUrl = this.configService.get<string>('N8N_URL');
+    const webhookId = crypto.randomUUID();
     
-    this.logger.log(`Creating agent chat workflow: ${workflowName} with webhook path: ${webhookPath}`);
+    this.logger.log(`Creating agent chat workflow: ${workflowName} with chat trigger node`);
     
     const workflowData = {
       name: workflowName,
       nodes: [
         {
           parameters: {
-            promptType: 'define',
-            text: '={{ $json.body.chatInput }}',
-            options: {
-              systemMessage: '={{ $json.body.systemPrompt }}',
-              maxIterations: 10
-            }
-          },
-          type: '@n8n/n8n-nodes-langchain.agent',
-          typeVersion: 2,
-          position: [160, -160],
-          id: '638884be-6f92-4b3e-991f-62551854d088',
-          name: 'AI Agent'
-        },
-        {
-          parameters: {
             modelName: 'models/gemini-2.5-flash',
-            options: {
-              maxOutputTokens: 2048,
-              temperature: 0.4
-            }
+            options: {}
           },
-          type: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini',
-          typeVersion: 1,
-          position: [40, 80],
-          id: '4b1ad9b1-779e-4438-86e1-d35c74dfdc0c',
+          id: crypto.randomUUID(),
           name: 'Google Gemini Chat Model',
+          type: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini',
+          position: [40, 80],
+          typeVersion: 1,
           credentials: {
             googlePalmApi: {
               id: 'STy8vguknZjfysYZ',
@@ -184,42 +165,52 @@ export class N8nWorkflowService {
         },
         {
           parameters: {
-            path: webhookPath,
-            responseMode: 'responseNode',
-            options: {}
+            promptType: 'define',
+            text: '={{ $json.body.message }}',
+            options: {
+              systemMessage: '={{ $json.body.systemPrompt || "You are a helpful AI assistant. Respond to user queries in a friendly and informative manner." }}'
+            }
           },
-          type: 'n8n-nodes-base.webhook',
-          typeVersion: 2,
-          position: [-120, -160],
-          id: '5465a08a-6be2-47ab-a331-8a88d277fb6d',
-          name: 'Webhook',
-          webhookId: webhookPath
-        },
-        {
-          parameters: {
-            respondWith: 'allIncomingItems',
-            options: {}
-          },
-          type: 'n8n-nodes-base.respondToWebhook',
-          typeVersion: 1.4,
-          position: [500, -160],
-          id: '33979ad1-fe89-43c6-9ba6-bb6bb33ed8db',
-          name: 'Respond to Webhook'
+          id: crypto.randomUUID(),
+          name: 'AI Agent',
+          type: '@n8n/n8n-nodes-langchain.agent',
+          position: [100, -160],
+          typeVersion: 2
         },
         {
           parameters: {
             sessionIdType: 'customKey',
-            sessionKey: '={{ $json.body.sessionId }}'
+            sessionKey: '={{ $("Webhook").item.json.body.sessionId }}',
+            contextWindowLength: '={{ $("Webhook").item.json.body.contextLength || 5 }}'
           },
+          id: crypto.randomUUID(),
+          name: 'Simple Memory',
           type: '@n8n/n8n-nodes-langchain.memoryBufferWindow',
-          typeVersion: 1.3,
-          position: [200, 60],
-          id: '7f6fcc91-fc40-4b50-90c1-8e2d6c2c09ba',
-          name: 'Simple Memory'
+          position: [180, 80],
+          typeVersion: 1.3
+        },
+        {
+          parameters: {
+            public: true,
+            options: {
+              responseMode: 'lastNode'
+            }
+          },
+          type: '@n8n/n8n-nodes-langchain.chatTrigger',
+          typeVersion: 1.1,
+          position: [-200, -140],
+          id: crypto.randomUUID(),
+          name: 'When chat message received',
+          webhookId: webhookId
         }
       ],
       pinData: {},
       connections: {
+        'AI Agent': {
+          main: [
+            []
+          ]
+        },
         'Google Gemini Chat Model': {
           ai_languageModel: [
             [{
@@ -229,29 +220,20 @@ export class N8nWorkflowService {
             }]
           ]
         },
-        'AI Agent': {
-          main: [
-            [{
-              node: 'Respond to Webhook',
-              type: 'main',
-              index: 0
-            }]
-          ]
-        },
-        'Webhook': {
-          main: [
-            [{
-              node: 'AI Agent',
-              type: 'main',
-              index: 0
-            }]
-          ]
-        },
         'Simple Memory': {
           ai_memory: [
             [{
               node: 'AI Agent',
               type: 'ai_memory',
+              index: 0
+            }]
+          ]
+        },
+        'When chat message received': {
+          main: [
+            [{
+              node: 'AI Agent',
+              type: 'main',
               index: 0
             }]
           ]
@@ -268,13 +250,13 @@ export class N8nWorkflowService {
     // Activate the workflow immediately
     await this.n8nClient.activateWorkflow(createdWorkflow.id);
     
-    // Return the workflow data with the webhook URL
-    const webhookUrl = `${n8nBaseUrl}/webhook/${webhookPath}`;
+    // For Chat Trigger nodes, we store the webhook ID for reference
+    const triggerReference = webhookId;
 
     // Create a record in the database using raw SQL since the Prisma client may not be fully synced with the schema
     const n8nWorkflowRecord = await this.createN8nWorkflowRecord(
       createdWorkflow.id,
-      webhookUrl,
+      triggerReference, // Store the trigger reference instead of webhook URL
       workflowData,
       organizationId,
       assistantId,

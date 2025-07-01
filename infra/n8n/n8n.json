@@ -1,0 +1,15 @@
+{
+  "webhook": {
+    "path": "/",
+    "retryAttempts": 5,
+    "waitForRegistration": true,
+    "waitForWebhooksTimeout": 10000
+  },
+  "general": {
+    "timezone": "UTC"
+  },
+  "executions": {
+    "timeout": 3600,
+    "maxTimeout": 36000
+  }
+}

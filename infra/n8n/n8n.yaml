@@ -32,6 +32,10 @@ executions:
 # Webhook configuration
 webhook:
   url: ${N8N_HOST:localhost}:${N8N_PORT:5678}
+  path: /
+  retryAttempts: 5
+  waitForRegistration: true
+  waitForWebhooksTimeout: 10000
   
 # External secrets (optional)
 # externalSecrets:

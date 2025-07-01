@@ -15,40 +15,18 @@ export class N8nClient {
   private readonly n8nApiKey: string;
 
   constructor(private readonly configService: ConfigService) {
-    // Enhanced logging for configuration loading
-    this.logger.log('Initializing N8nClient...');
-    
-    // Try direct process.env access first
-    const envUrl = process.env.N8N_URL;
-    const envApiKey = process.env.N8N_API_KEY;
-    
-    this.logger.log(`Direct process.env N8N_URL: ${envUrl || 'NOT SET'}`);
-    this.logger.log(`Direct process.env N8N_API_KEY: ${envApiKey ? 'FOUND (masked)' : 'NOT SET'}`);
-    
-    // Then try ConfigService
     this.n8nUrl = this.configService.get<string>('N8N_URL');
     this.n8nApiKey = this.configService.get<string>('N8N_API_KEY');
 
     // Debug output for environment variables
-    this.logger.log(`ConfigService N8N_URL: ${this.n8nUrl || 'NOT SET'}`);
-    this.logger.log(`ConfigService N8N_API_KEY: ${this.n8nApiKey ? 'FOUND (masked)' : 'NOT SET'}`);
+    this.logger.debug(`N8N_URL from env: ${this.n8nUrl || 'NOT SET'}`);
+    this.logger.debug(`N8N_API_KEY from env: ${this.n8nApiKey ? 'FOUND (masked)' : 'NOT SET'}`);
     
     // List all environment keys for debugging
     const allConfigKeys = Object.keys(process.env)
       .filter(key => key.startsWith('N8N_'))
       .join(', ');
-    this.logger.log(`Found n8n-related env keys: ${allConfigKeys || 'NONE'}`);
-    
-    // Use direct env variables if ConfigService failed
-    if (!this.n8nUrl && envUrl) {
-      this.logger.log('Using N8N_URL from process.env directly');
-      this.n8nUrl = envUrl;
-    }
-    
-    if (!this.n8nApiKey && envApiKey) {
-      this.logger.log('Using N8N_API_KEY from process.env directly');
-      this.n8nApiKey = envApiKey;
-    }
+    this.logger.debug(`Found n8n-related env keys: ${allConfigKeys || 'NONE'}`);
 
     if (!this.n8nUrl || !this.n8nApiKey) {
       const errorMessage = 'Missing N8N_URL or N8N_API_KEY in environment configuration';
@@ -62,8 +40,6 @@ export class N8nClient {
         'X-N8N-API-KEY': this.n8nApiKey,
         'Content-Type': 'application/json',
       },
-      // Add timeout to avoid hanging requests
-      timeout: 10000,
     });
 
     this.logger.log(`Initialized n8n client with base URL: ${this.n8nUrl}`);
@@ -75,34 +51,11 @@ export class N8nClient {
    */
   async ping(): Promise<boolean> {
     try {
-      this.logger.log(`Pinging n8n health endpoint at ${this.n8nUrl}/healthz`);
-      const response = await this.httpClient.get('/healthz');
-      this.logger.log(`n8n health check successful with status ${response.status}`);
+      await this.httpClient.get('/api/v1/health');
       return true;
     } catch (error) {
-      this.logger.error(`n8n health check failed: ${error.message}`);
-      this.logger.error(`Error details: ${JSON.stringify(error.response?.data || {}, null, 2)}`);
-      
-      // Try a readiness endpoint as fallback
-      try {
-        this.logger.log('Trying alternate endpoint /healthz/readiness as fallback...');
-        await this.httpClient.get('/healthz/readiness');
-        this.logger.log('Readiness health check successful');
-        return true;
-      } catch (fallbackError) {
-        this.logger.error(`Fallback healthz check also failed: ${fallbackError.message}`);
-        
-        // Final fallback - try direct workflow API access
-        try {
-          this.logger.log('Trying direct workflows API as final fallback...');
-          await this.httpClient.get('/api/v1/workflows');
-          this.logger.log('Direct workflows API access successful');
-          return true;
-        } catch (finalError) {
-          this.logger.error(`All health check attempts failed: ${finalError.message}`);
-          return false;
-        }
-      }
+      this.logger.warn(`n8n health check failed: ${error.message}`);
+      return false;
     }
   }
 
@@ -278,70 +231,6 @@ export class N8nClient {
       return response.data.data;
     } catch (error) {
       this.logger.error(`Failed to get credentials: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Get all registered webhooks in n8n
-   * @returns Array of registered webhooks
-   */
-  async getRegisteredWebhooks(): Promise<{ data: any[] }> {
-    try {
-      // First, get all active workflows which might have webhooks
-      const activeWorkflows = await this.getAllWorkflows(true);
-      
-      // For each workflow, check if it has webhook nodes
-      const webhooks = [];
-      
-      for (const workflow of activeWorkflows) {
-        if (workflow.nodes) {
-          const webhookNodeTypes = ['n8n-nodes-base.webhook', 'n8n-nodes-base.chatTrigger'];
-          
-          for (const node of workflow.nodes) {
-            if (webhookNodeTypes.includes(node.type)) {
-              // For webhook nodes, extract the webhook information
-              if (node.type === 'n8n-nodes-base.webhook' && node.parameters?.path) {
-                // Construct webhook URL based on n8n configuration
-                const webhookPath = node.parameters.path;
-                const webhookUrl = `${this.n8nUrl}/webhook/${workflow.id}/${webhookPath}`;
-                
-                webhooks.push({
-                  workflowId: workflow.id,
-                  workflowName: workflow.name,
-                  nodeId: node.id,
-                  nodeName: node.name,
-                  nodeType: node.type,
-                  path: webhookPath,
-                  url: webhookUrl,
-                  active: workflow.active,
-                });
-              }
-              
-              // For chat trigger nodes, include the chat trigger URL
-              if (node.type === 'n8n-nodes-base.chatTrigger') {
-                const chatUrl = `${this.n8nUrl}/chat/${workflow.id}`;
-                
-                webhooks.push({
-                  workflowId: workflow.id,
-                  workflowName: workflow.name,
-                  nodeId: node.id,
-                  nodeName: node.name,
-                  nodeType: node.type,
-                  url: chatUrl,
-                  active: workflow.active,
-                });
-              }
-            }
-          }
-        }
-      }
-      
-      this.logger.debug(`Found ${webhooks.length} registered webhooks`);
-      // Return object with data property to match expected API response format
-      return { data: webhooks };
-    } catch (error) {
-      this.logger.error(`Failed to get registered webhooks: ${error.message}`);
       throw error;
     }
   }

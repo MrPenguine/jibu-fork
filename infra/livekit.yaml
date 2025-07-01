@@ -12,4 +12,3 @@ keys:
 # Prometheus metrics configuration
 prometheus:
   port: 6789
-  enable: true
