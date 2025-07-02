@@ -77,6 +77,18 @@ export class N8nOrchestratorService implements OnModuleInit {
     this.ensureN8nIsAvailable();
     return await this.n8nClient.getWorkflow(workflowId);
   }
+  
+  /**
+   * Get a workflow directly from N8nClient with minimal abstraction
+   * This method bypasses any caching or additional logic to ensure fresh data
+   * @param workflowId The ID of the workflow to get
+   * @returns The workflow data directly from N8N API
+   */
+  async getWorkflowDirect(workflowId: string) {
+    this.ensureN8nIsAvailable();
+    // Direct access to n8nClient to bypass any potential caching or abstraction
+    return await this.n8nClient.getWorkflow(workflowId);
+  }
 
   /**
    * Get all workflows from n8n

@@ -113,10 +113,16 @@ export class N8nClient {
    */
   async getWorkflow(id: string): Promise<any> {
     try {
-      const response = await this.httpClient.get(`/api/v1/workflows/${id}`);
-      return response.data.data;
+      const response = await this.httpClient.get(`/api/v1/workflows/${id}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+      return response.data;
     } catch (error) {
-      this.logger.error(`Failed to get workflow with ID: ${id}: ${error.message}`);
+      this.logger.error(`Failed to get workflow ${id}: ${error.message}`);
       throw error;
     }
   }

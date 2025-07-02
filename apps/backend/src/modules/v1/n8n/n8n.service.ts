@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { N8nIntegrationService } from '../../../integrations/n8n/n8n-integration.service';
 import { N8nOrchestratorService } from '../../../core/n8n-orchestrator/n8n-orchestrator.service';
 import { WebhookWorkflowTemplate } from '../../../integrations/n8n/n8n-types';
 import axios from 'axios';
 
+// Service for handling N8N workflow logic
 @Injectable()
 export class N8nService {
   private readonly logger = new Logger(N8nService.name);
@@ -11,6 +13,7 @@ export class N8nService {
   constructor(
     private readonly n8nIntegrationService: N8nIntegrationService,
     private readonly n8nOrchestratorService: N8nOrchestratorService,
+    private readonly configService: ConfigService,
   ) {}
 
   async checkStatus() {
@@ -50,7 +53,35 @@ export class N8nService {
   async updateAgentPrompt(id: string, prompt: string) {
     return this.n8nIntegrationService.updateAgentPrompt(id, prompt);
   }
-  
+
+  async finalizeWebhookSetup(workflowId: string): Promise<{ status: string; message: string }> {
+    this.logger.log(`[FINALIZE-SETUP] Starting setup for workflow ${workflowId}`);
+
+    // Step 1: Fetch the workflow to get its details, especially the webhook path.
+    const workflow = await this.getWorkflow(workflowId);
+    if (!workflow) {
+      throw new Error(`[FINALIZE-SETUP] Workflow with ID ${workflowId} not found.`);
+    }
+
+    const webhookNode = workflow.nodes.find((node) => node.type === 'n8n-nodes-base.webhook');
+    const webhookPath = webhookNode?.parameters.path;
+
+    if (!webhookPath) {
+      throw new Error(`[FINALIZE-SETUP] Could not find a webhook path for workflow ${workflowId}.`);
+    }
+
+    // Step 2: Poll until the webhook is registered.
+    // The verifyWebhookRegistration method already contains the necessary retry logic.
+    await this.verifyWebhookRegistration(webhookPath);
+
+    this.logger.log(`[FINALIZE-SETUP] Successfully finalized setup for workflow ${workflowId}`);
+
+    return {
+      status: 'success',
+      message: 'Webhook is successfully registered and ready.',
+    };
+  }
+
   /**
    * Triggers a workflow that uses a Chat Trigger node via the n8n API
    * @param workflowId The ID of the workflow to trigger
@@ -135,22 +166,22 @@ export class N8nService {
       
       // Enhanced verification for different webhook formats
       const isRegistered = registeredWebhooks.some(webhook => {
-        // Direct webhook ID match
-        if (typeof webhook === 'string') {
-          return webhook === webhookId;
+        // The webhookId we are checking is the 'path' from the webhook node.
+        // This is the primary and most reliable check.
+        if (webhook?.path === webhookId) {
+          return true;
         }
         
-        // Standard webhook object with ID property
+        // The following are fallbacks for other potential (less likely) formats.
+        if (typeof webhook === 'string' && webhook === webhookId) {
+          return true;
+        }
         if (webhook?.id === webhookId) {
           return true;
         }
-        
-        // Chat trigger with webhookId property
         if (webhook?.webhookId === webhookId) {
           return true;
         }
-        
-        // Match by triggerRef for chat triggers
         if (webhook?.triggerRef === webhookId) {
           return true;
         }
@@ -180,328 +211,218 @@ export class N8nService {
    * @param useTestUrl Whether to use the test URL (deprecated, kept for compatibility)
    */
   async testWebhook(
-    webhookUrl: string, 
-    workflowId?: string, 
-    testData: Record<string, any> = {}, 
+    webhookUrl: string,
+    workflowId?: string,
+    testData: Record<string, any> = {},
     headers: Record<string, string> = {},
     // Always use production URL (useTestUrl parameter is deprecated but kept for compatibility)
     useTestUrl = false
   ) {
-    
+    let targetUrl = webhookUrl;
+
     try {
-      // If we have a workflowId, check if it's active first
+      // If a workflowId is provided, we perform a robust check to ensure it's available and active.
+      // This logic also dynamically determines the correct webhook URL or triggers a chat workflow.
       if (workflowId) {
         try {
-          const workflow = await this.n8nOrchestratorService.getWorkflow(workflowId);
-          
-          // If workflow exists but is not active, activate it
-          if (!workflow.active) {
-            this.logger.log(`Workflow ${workflowId} is not active. Attempting to activate...`);
-            
-            // Check if there's an existing activation attempt in progress
-            // This helps avoid race conditions with multiple webhook test requests
-            const activationKey = `n8n:activation:${workflowId}`;
-            
+          let workflow = null;
+          const maxRetries = 4;
+          const retryDelay = 2500; // 2.5 seconds
+
+          this.logger.log(`[ROBUST-FETCH] Starting robust fetch for workflow ${workflowId}`);
+
+          // Retry loop to handle N8N API race conditions where a workflow isn't immediately available.
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            this.logger.log(`[ROBUST-FETCH] Attempt ${attempt}/${maxRetries}...`);
             try {
-              // Activate the workflow
-              await this.n8nOrchestratorService.activateWorkflow(workflowId);
-              
-              // Log detailed activation process
-              this.logger.log(`Activation request sent for workflow ${workflowId}`);
-              
-              // Wait for webhook registration after activation with more robust polling
-              this.logger.log(`Waiting for webhook to register after activation...`);
-              
-              let isActive = false;
-              let retries = 0;
-              const maxRetries = 5;
-              const baseWaitMs = 1000;
-              
-              // Wait for workflow to become active
-              while (!isActive && retries < maxRetries) {
-                // Wait with exponential backoff
-                const waitTime = baseWaitMs * Math.pow(2, retries);
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-                retries++;
-                
-                try {
-                  const updatedWorkflow = await this.n8nOrchestratorService.getWorkflow(workflowId);
-                  isActive = updatedWorkflow?.active;
-                  if (isActive) break;
-                  this.logger.log(`Checking activation status (attempt ${retries}/${maxRetries})...`);
-                } catch (err) {
-                  this.logger.error(`Error checking workflow status during retry ${retries}: ${err.message}`);
-                }
+              await this.n8nOrchestratorService.onModuleInit(); // Refresh connection
+              workflow = await this.n8nOrchestratorService.getWorkflowDirect(workflowId);
+              if (workflow) {
+                this.logger.log(`[ROBUST-FETCH] SUCCESS: Found workflow on attempt ${attempt}.`);
+                break; // Exit loop on success
               }
-              
-              if (!isActive) {
-                this.logger.error(`Failed to activate workflow ${workflowId} after ${maxRetries} retries`);
-                throw new Error('Workflow activation failed or timed out');
-              } else {
-                this.logger.log(`Workflow ${workflowId} successfully activated after ${retries} checks`);
+            } catch (error) {
+              this.logger.warn(`[ROBUST-FETCH] Attempt ${attempt} failed: ${error.message}`);
+            }
+
+            if (attempt < maxRetries) {
+              this.logger.log(`[ROBUST-FETCH] Workflow not found. Waiting ${retryDelay}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+          }
+
+          if (!workflow) {
+            const errorMsg = `FATAL: Workflow with ID ${workflowId} not found after ${maxRetries} attempts.`;
+            this.logger.error(errorMsg);
+            throw new Error(errorMsg);
+          }
+
+          // If the workflow is found but inactive, activate it and wait for propagation.
+          if (!workflow.active) {
+            this.logger.warn(`[ROBUST-FETCH] Workflow ${workflowId} is inactive. Activating...`);
+            await this.n8nOrchestratorService.activateWorkflow(workflowId);
+            this.logger.log(`[ROBUST-FETCH] Activated workflow. Waiting for propagation...`);
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Wait for activation to propagate
+            
+            // Re-fetch to confirm activation and get the latest state.
+            workflow = await this.n8nOrchestratorService.getWorkflowDirect(workflowId);
+            if (!workflow?.active) {
+              this.logger.error(`[ROBUST-FETCH] FATAL: Failed to activate workflow ${workflowId}.`);
+              throw new Error(`FATAL: Failed to activate workflow ${workflowId}.`);
+            }
+          }
+
+          const freshWorkflow = workflow; // We have the latest workflow object.
+
+          // Check for a Chat Trigger node first. If found, use the API to trigger, not a webhook URL.
+          const chatTriggerNode = freshWorkflow.nodes?.find(node => node.type === '@n8n/n8n-nodes-langchain.chatTrigger');
+          if (chatTriggerNode) {
+            this.logger.log(`Found Chat Trigger node in workflow ${workflowId}. Using n8n API to trigger.`);
+            const chatPayload = {
+              message: testData.message || 'This is a test message from Jibu.',
+              sessionId: testData.sessionId || `test-${Date.now()}`
+            };
+            return this.triggerChatWorkflow(workflowId, chatPayload);
+          }
+
+          // If no Chat Trigger, look for a standard webhook node to get the latest URL path.
+          const webhookNode = freshWorkflow.nodes?.find(node => node.type === 'n8n-nodes-base.webhook');
+          const webhookPath = webhookNode?.parameters?.path;
+
+          if (webhookPath) {
+            const n8nBaseUrl = process.env.N8N_WEBHOOK_BASE_URL || process.env.N8N_URL;
+            // Always use the production URL for programmatic testing
+            targetUrl = `${n8nBaseUrl}/webhook/${webhookPath}`;
+            this.logger.log(`Using PRODUCTION webhook URL from workflow: ${targetUrl}`);
+
+            // Poll to verify webhook is registered before testing
+            const maxVerifyRetries = 5;
+            const verifyDelay = 2000; // 2 seconds
+            let isRegistered = false;
+            for (let i = 1; i <= maxVerifyRetries; i++) {
+              this.logger.log(`[VERIFY-WEBHOOK] Attempt ${i}/${maxVerifyRetries} to verify webhook '${webhookPath}'`);
+              isRegistered = await this.verifyWebhookRegistration(webhookPath);
+              if (isRegistered) {
+                this.logger.log(`[VERIFY-WEBHOOK] SUCCESS: Webhook is registered.`);
+                break;
               }
-            } catch (activationError) {
-              this.logger.error(`Error during workflow activation: ${activationError.message}`);
-              throw activationError;
+              if (i < maxVerifyRetries) {
+                this.logger.log(`[VERIFY-WEBHOOK] Webhook not yet registered. Waiting ${verifyDelay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, verifyDelay));
+              }
+            }
+
+            if (!isRegistered) {
+              const errorMsg = `FATAL: Webhook path ${webhookPath} did not register after ${maxVerifyRetries} attempts.`;
+              this.logger.error(errorMsg);
+              throw new Error(errorMsg);
             }
           } else {
-            this.logger.log(`Workflow ${workflowId} is already active`);
+            this.logger.warn(`Could not find a valid webhook URL in workflow ${workflowId}. Using original URL: ${webhookUrl}`);
           }
         } catch (error) {
-          this.logger.error(`Error checking/activating workflow: ${error.message}`);
-          if (error.response?.status === 404) {
-            throw new Error(`Workflow with ID ${workflowId} not found`);
-          }
-          throw error;
+          this.logger.error(`Error during robust workflow check/activation for ${workflowId}: ${error.message}`);
+          throw error; // Re-throw to be caught by the outer try-catch block.
         }
       }
-      
-      let workflowName = 'AI Assistant';
-      
-      // If workflowId is provided, get the workflow name
-      if (workflowId) {
-        try {
-          const workflow = await this.n8nOrchestratorService.getWorkflow(workflowId);
-          if (workflow?.name) {
-            workflowName = workflow.name;
-          }
-        } catch (error) {
-          this.logger.warn(`Could not get workflow name: ${error.message}`);
-        }
-      }
-      
-      const sessionId = `test-session-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+      // Prepare the payload for the webhook test call.
       const payload = {
-        message: 'Hi there',
-        sessionId: sessionId,
-        systemPrompt: `Your name is ${workflowName}, a helpful assistant to help with scheduling.`,
-        contextLength: 100, // Default context length of 100
-        ...testData
+        message: 'This is a test message from Jibu.',
+        sessionId: `test-session-${Date.now()}`,
+        contextLength: 5,
+        ...testData, // Allow frontend to override defaults if needed
       };
       
-      this.logger.log(`Webhook payload: ${JSON.stringify(payload)}`);  
-      
-      // If workflowId is provided, always get the latest production webhook URL or chat trigger directly from the workflow
-      if (workflowId) {
-        try {
-          const workflow = await this.n8nOrchestratorService.getWorkflow(workflowId);
-          
-          if (!workflow) {
-            throw new Error(`Workflow with ID ${workflowId} not found`);
-          }
-          
-          if (!workflow.active) {
-            this.logger.log(`Workflow ${workflowId} is not active - activating now...`);
-            await this.n8nOrchestratorService.activateWorkflow(workflowId);
-            this.logger.log(`Workflow ${workflowId} activated`);
-            // Short delay to allow activation to complete
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-          
-          // Check for chat trigger node first (new format)
-          const chatTriggerNode = workflow?.nodes?.find(node => node.type === '@n8n/n8n-nodes-langchain.chatTrigger');
-          if (chatTriggerNode) {
-            this.logger.log(`Found Chat Trigger node in workflow ${workflowId}. Using n8n API to trigger workflow instead of webhook URL`);
-            
-            // For chat triggers, we'll use the n8n API instead of webhook URLs
-            return await this.triggerChatWorkflow(workflowId, payload);
-          }
-          
-          // Fall back to webhook node (legacy format)
-          const webhookNode = workflow?.nodes?.find(node => node.type === 'n8n-nodes-base.webhook');
-          if (webhookNode?.parameters?.webhookId) {
-            const webhookId = webhookNode.parameters.webhookId;
-            
-            // IMPORTANT: The correct n8n webhook URL format
-            // Format must be: {n8n_base_url}/webhook/{webhook_id}
-            // NOT: {n8n_base_url}/{workflow_id}/webhook/{webhook_id}
-            const n8nBaseUrl = process.env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678';
-            webhookUrl = `${n8nBaseUrl}/webhook/${webhookId}`;
-            
-            this.logger.log(`Using correct n8n webhook URL format: ${webhookUrl}`);
-            
-            // Don't attempt to verify webhook registration via API since it's unreliable
-            // Instead, we'll directly try to call the webhook and handle errors appropriately
-          } else {
-            this.logger.warn(`No webhook or chat trigger node found in workflow ${workflowId}`);
-          }
-        } catch (error) {
-          this.logger.error(`Failed to get latest webhook/chat trigger info from workflow: ${error.message}`);
-        }
-      }
-      
-      // Skip webhook registration verification since it's unreliable
-      // Instead focus on direct webhook testing with proper URL format
-      try {
-        // Extract webhook ID from URL for logging purposes
-        const webhookUrlParts = webhookUrl.split('/');
-        const targetWebhookId = webhookUrlParts[webhookUrlParts.length - 1];
-        
-        this.logger.log(`Preparing to test webhook with ID: ${targetWebhookId}`);
-        
-        if (workflowId) {
-          // Ensure the workflow is active before trying to call the webhook
-          const workflow = await this.n8nOrchestratorService.getWorkflow(workflowId);
-          if (workflow && !workflow.active) {
-            this.logger.log(`Activating workflow ${workflowId} before webhook test`);
-            await this.n8nOrchestratorService.activateWorkflow(workflowId);
-            // Brief delay to allow activation to complete
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            this.logger.log(`Workflow activated, proceeding with webhook test`);
-          } else {
-            this.logger.log(`Workflow ${workflowId} is already active, proceeding with webhook test`);
-          }
-        }
-      } catch (regErr) {
-        this.logger.warn(`Non-fatal issue during webhook preparation: ${regErr.message}`);
-        this.logger.log(`Proceeding with webhook test anyway`);
-      }
-      
-      // Log the request being made
-      this.logger.log(`Sending test request to webhook: ${webhookUrl}`);
-      
-      // Always use the production webhook URL format for programmatic testing
-      // This ensures we're targeting the URL that's always listening when workflow is active
-      let targetUrl = webhookUrl;
-      
-      // If URL is somehow still in test format, convert to production format
-      if (webhookUrl.includes('/webhook-test/')) {
-        targetUrl = webhookUrl.replace('/webhook-test/', '/webhook/');
-        this.logger.log(`Converting to production webhook URL: ${targetUrl}`);
-      }
-      
-      // For production webhook, add a timestamp to session ID to help with caching/testing
-      if (payload && payload.sessionId) {
-        if (!payload.sessionId.includes(Date.now().toString().slice(-6))) {
-          payload.sessionId = `${payload.sessionId}-${Date.now().toString().slice(-6)}`;
-          this.logger.log(`Updated sessionId to: ${payload.sessionId}`);
-        }
-      }
-      
-      // Enhanced retry logic with progressive backoff
-      const maxAttempts = 5; // Increased from 3 to 5 attempts
-      const baseWaitMs = 3000; // Base wait time between retries
-      let attemptCount = 0;
+      // Retry logic for the actual webhook call to handle intermittent network issues or slow N8N responses.
+      const maxAttempts = 3;
+      const baseWaitMs = 2000;
       let lastError = null;
-      
-      // Extract webhook ID from URL to help with troubleshooting
-      const webhookUrlParts = webhookUrl.split('/');
-      const targetWebhookId = webhookUrlParts[webhookUrlParts.length - 1];
-      
-      this.logger.log(`Sending test request to webhook: ${webhookUrl}`);
-      
-      while (attemptCount < maxAttempts) {
-        attemptCount++;
+
+      // After successful verification, try to send the webhook request with retries.
+      const requestPayload = {
+        message: testData.message || 'This is a test payload from Jibu Console',
+        sessionId: testData.sessionId || `test-session-${Date.now()}`,
+        contextLength: 5,
+        ...(testData.payload || {}),
+      };
+      const requestConfig = {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-N8N-API-KEY': this.configService.get('N8N_API_KEY'),
+        },
+        timeout: 15000, // 15-second timeout
+      };
+
+      this.logger.log('Composing webhook POST request:', {
+        url: targetUrl,
+        payload: requestPayload,
+        config: requestConfig,
+      });
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          this.logger.log(`Webhook request attempt ${attemptCount}/${maxAttempts} to ${targetUrl}`);
-          
-          // Using axios to make the request server-side with longer timeout
-          // Make the HTTP request to the webhook endpoint
-          const response = await axios({
-            method: 'post',
-            url: targetUrl,
-            data: payload,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Webhook-Test': 'true',  // Mark this as a test request
-              ...headers
-            },
-            timeout: 15000 // 15 second timeout for potentially slow systems
-          });
-          
-          // If successful, return the response
-          this.logger.log(`Webhook test successful on attempt ${attemptCount}. Response status: ${response.status}`);
-          
-          // Log response details for debugging
-          if (typeof response.data === 'object') {
-            this.logger.log(`Response data: ${JSON.stringify(response.data)}`); 
-          } else {
-            this.logger.log(`Response data received (non-JSON format)`);
-          }
-          
-          return response.data;
+          this.logger.log(`Webhook POST request attempt ${attempt}/${maxAttempts} to ${targetUrl}`);
+          const response = await axios.post(targetUrl, requestPayload, requestConfig);
+          this.logger.log(`Webhook test successful on attempt ${attempt}. Response status: ${response.status}`);
+          return response.data; // Success, return data.
         } catch (error) {
           lastError = error;
           const status = error.response?.status;
-          
-          // Progressive backoff - wait longer with each retry
-          const waitTime = baseWaitMs * attemptCount;
-          
-          // If it's a 404 and we have more attempts, wait and retry
-          if ((status === 404 || status === 400) && attemptCount < maxAttempts) {
-            this.logger.warn(`Webhook returned ${status} on attempt ${attemptCount}, waiting ${waitTime}ms before retry...`);
-            
-            // Log detailed error for debugging
-            if (error.response?.data) {
-              this.logger.warn(`Response data: ${JSON.stringify(error.response.data)}`);
-            }
-            
+          const waitTime = baseWaitMs * attempt; // Progressive backoff
+
+          if (status === 404 && attempt < maxAttempts) {
+            this.logger.warn(`Webhook returned 404 on attempt ${attempt}, waiting ${waitTime}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
             continue;
           }
-          
-          // For other errors or final attempt, break the loop to handle the error
-          this.logger.error(`Webhook error on final attempt ${attemptCount}: ${error.message}`);
-          
-          // Re-throw the last error to be caught by the outer catch block
-          throw error;
+
+          this.logger.error(`Webhook error on attempt ${attempt}: ${error.message}`);
+          throw error; // Rethrow for other errors or the final attempt.
         }
       }
-      
-      // If we somehow exit the loop without a success or thrown error
+
+      // This part should not be reached if the loop is exited correctly.
       if (lastError) {
-        this.logger.error('Exited retry loop without success or proper error handling');
+        this.logger.error('Exited retry loop without success.');
         throw lastError;
       }
-      
-      // This code shouldn't be reached - all cases should be handled above
-      this.logger.error('Unexpected code path in webhook test function');
-      return { 
-        error: 'An unexpected error occurred in the webhook test function',
-        hint: 'This is likely a bug in the webhook test implementation.'
-      };
+
     } catch (error) {
       this.logger.error(`Error testing webhook: ${error.message}`);
-      
-      // Enhanced error reporting for common webhook issues
+
+      // Enhanced error reporting for common issues.
       if (error.response) {
         const { status, data } = error.response;
         this.logger.error(`Webhook HTTP error status: ${status}`);
-        
         if (status === 404) {
-          // 404 likely means the workflow is not active or webhook not registered
-          return { 
-            error: 'Webhook not found. This usually means the workflow is not active, or the webhook has not been registered yet.', 
+          return {
+            error: 'Webhook not found. This usually means the workflow is not active or the webhook has not been registered yet.',
             status,
-            hint: workflowId 
-              ? 'Try checking if the workflow is active in the N8N dashboard or inspect timing between activation and testing.' 
-              : 'Verify the webhook URL is correct.'
+            hint: workflowId ? 'Try checking if the workflow is active in the N8N dashboard.' : 'Verify the webhook URL is correct.'
           };
         }
-        
-        // Return detailed error information for better debugging
-        return { 
-          error: `Webhook error: ${error.message}`, 
-          status, 
+        return {
+          error: `Webhook error: ${error.message}`,
+          status,
           data,
           hint: 'Check N8N logs for more details about this request failure.'
         };
       }
-      
-      // For network or timeout errors
+
       if (error.code === 'ECONNREFUSED') {
-        return { 
-          error: `Connection refused: ${error.message}`, 
+        return {
+          error: `Connection refused: ${error.message}`,
           hint: 'Check if the N8N server is running and accessible.'
         };
       } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
-        return { 
-          error: `Request timed out: ${error.message}`, 
+        return {
+          error: `Request timed out: ${error.message}`,
           hint: 'The N8N server may be overloaded or the workflow execution is taking too long.'
         };
       }
-      
-      return { 
+
+      // Generic fallback error.
+      return {
         error: `Webhook error: ${error.message}`,
         hint: 'Check console logs for more details.'
       };

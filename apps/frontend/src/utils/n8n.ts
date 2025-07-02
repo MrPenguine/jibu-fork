@@ -45,12 +45,20 @@ export async function checkN8nStatus(): Promise<N8nStatusResponse> {
  */
 export async function createN8nWorkflow(template: WebhookWorkflowTemplate): Promise<N8nWorkflowResponse> {
   try {
-    const workflow = await fetchAPI('/v1/n8n/workflows', {
+    const result = await fetchAPI('/v1/n8n/workflows', {
       method: 'POST',
       body: JSON.stringify(template),
     });
     
-    // Extract webhook URL from the workflow if available
+    // Handle the nested response structure from backend
+    // Backend returns: { workflow, webhookUrl, webhookId }
+    if (result.workflow) {
+      // Return the nested structure as-is for the frontend to handle
+      return result;
+    }
+    
+    // Fallback for direct workflow response (legacy support)
+    const workflow = result;
     const webhookNode = workflow.nodes?.find((node: any) => 
       node.type === 'n8n-nodes-base.webhook'
     );
@@ -58,7 +66,6 @@ export async function createN8nWorkflow(template: WebhookWorkflowTemplate): Prom
     let webhookUrl = '';
     if (webhookNode?.parameters?.webhookId || webhookNode?.webhookId) {
       const webhookId = webhookNode.parameters?.webhookId || webhookNode.webhookId;
-      // Construct webhook URL - you may need to adjust this based on your N8N setup
       webhookUrl = `${process.env.NEXT_PUBLIC_N8N_WEBHOOK_BASE_URL || 'http://localhost:5678'}/webhook/${webhookId}`;
     }
     
@@ -91,12 +98,19 @@ export async function getAllN8nWorkflows(): Promise<N8nWorkflowResponse[]> {
 /**
  * Get a specific N8N workflow by ID
  */
-export async function getN8nWorkflow(id: string): Promise<N8nWorkflowResponse> {
+export async function getN8nWorkflow(id: string): Promise<N8nWorkflowResponse | null> {
   try {
     const response = await fetchAPI(`/v1/n8n/workflows/${id}`);
     return response;
   } catch (error) {
     console.error('Error fetching N8N workflow:', error);
+    
+    // If it's a 404 error (workflow not found), return null instead of throwing
+    if (error instanceof Error && (error.message.includes('404') || error.message.includes('not found'))) {
+      return null;
+    }
+    
+    // For other errors, still throw
     throw new Error('Failed to fetch N8N workflow');
   }
 }
@@ -207,9 +221,9 @@ export function extractWebhookUrl(workflow: N8nWorkflowResponse): string {
 
 /**
  * Test a webhook by sending a sample request
- * Uses backend proxy to avoid CORS issues
- * @param webhookUrl The webhook URL to test
- * @param workflowId The ID of the workflow (to auto-activate if needed)
+ * First fetches the latest workflow data to ensure it's active and get the correct webhook URL
+ * @param webhookUrl The webhook URL to test (will be refreshed from latest workflow data)
+ * @param workflowId The ID of the workflow
  * @param testData Additional data to include in the payload
  * @param headers Custom headers to send with the request
  */
@@ -219,12 +233,51 @@ export async function testN8nWebhook(
   testData: any = {}, 
   headers?: Record<string, string>
 ) {
+  console.log('Testing webhook - Initial parameters:', { webhookUrl, workflowId });
+  
+  let latestWebhookUrl = webhookUrl;
+  let useWorkflowData = false;
+  
   try {
+    // Attempt to fetch the latest workflow data
+    console.log('Attempting to fetch workflow data for ID:', workflowId);
+    
+    try {
+      const workflow = await getN8nWorkflow(workflowId);
+      console.log('Workflow data fetch result:', workflow ? 'Found' : 'Not found');
+      
+      if (workflow) {
+        console.log('Workflow active status:', workflow.active);
+        useWorkflowData = true;
+        
+        if (!workflow.active) {
+          console.warn('Warning: Workflow is not active, but continuing with test');
+        }
+        
+        // Extract the latest webhook URL if possible
+        const extractedUrl = extractWebhookUrl(workflow);
+        if (extractedUrl) {
+          latestWebhookUrl = extractedUrl;
+          console.log('Using extracted webhook URL:', latestWebhookUrl);
+        } else {
+          console.log('No webhook URL found in workflow, using provided URL:', webhookUrl);
+        }
+      } else {
+        console.warn('Warning: Workflow not found, but continuing with provided webhook URL');
+      }
+    } catch (fetchError) {
+      console.error('Error fetching workflow:', fetchError);
+      console.warn('Continuing with provided webhook URL despite fetch error');
+    }
+    
+    // Always attempt to make the test request, even if workflow fetch fails
+    console.log('Making webhook test request to backend with URL:', latestWebhookUrl);
+    
     // Call backend endpoint instead of directly accessing the webhook URL
     const response = await fetchAPI('/v1/n8n/test-webhook', {
       method: 'POST',
       body: JSON.stringify({
-        webhookUrl,
+        webhookUrl: latestWebhookUrl,
         workflowId,
         testData: {
           sessionId: `test-session-${Date.now()}`,
@@ -236,9 +289,33 @@ export async function testN8nWebhook(
       }),
     });
     
+    console.log('Webhook test response received:', response);
     return response;
   } catch (error) {
     console.error('Error testing N8N webhook:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
     throw new Error('Failed to test N8N webhook');
+  }
+}
+
+/**
+ * Calls the backend to poll and finalize the webhook setup for a given workflow.
+ * This ensures the webhook is fully registered and ready before allowing tests.
+ * @param workflowId The ID of the workflow to finalize.
+ */
+export async function finalizeN8nWebhookSetup(workflowId: string): Promise<{ status: string; message: string }> {
+  try {
+    const response = await fetchAPI(`/v1/n8n/workflows/${workflowId}/finalize-setup`, {
+      method: 'POST',
+    });
+    return response;
+  } catch (error) {
+    console.error('Error finalizing N8N webhook setup:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to finalize N8N webhook setup');
   }
 }

@@ -66,6 +66,12 @@ export class N8nController {
     return this.n8nService.updateAgentPrompt(id, data.prompt);
   }
   
+  @Post('workflows/:id/finalize-setup')
+  @ApiOperation({ summary: 'Polls the webhook until it is fully registered and ready' })
+  async finalizeWebhookSetup(@Param('id') id: string) {
+    return this.n8nService.finalizeWebhookSetup(id);
+  }
+
   @Post('test-webhook')
   @ApiOperation({ summary: 'Test a webhook by sending a request to it' })
   async testWebhook(

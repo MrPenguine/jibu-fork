@@ -1,20 +1,33 @@
 "use client";
 
 import React, { useState } from 'react';
+import { Button } from '../../../../../../libs/shadcn-ui/src/components/ui/button';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from '../../../../../../libs/shadcn-ui/src/components/ui/card';
+import { Separator } from '../../../../../../libs/shadcn-ui/src/components/ui/separator';
+import { useToast } from '../../../../../../libs/shadcn-ui/src/components/ui/use-toast';
 import { CreateWorkflow } from '../../../../../../libs/shadcn-ui/src/components/n8n/create-workflow';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../../../libs/shadcn-ui/src/components/ui/card';
 import { Alert, AlertDescription } from '../../../../../../libs/shadcn-ui/src/components/ui/alert';
 import { Badge } from '../../../../../../libs/shadcn-ui/src/components/ui/badge';
-import { Button } from '../../../../../../libs/shadcn-ui/src/components/ui/button';
-import { CheckCircle, AlertCircle, Trash2, Play, Pause } from 'lucide-react';
+import { AlertCircle, CheckCircle, Trash2, Play, Pause } 
+from 'lucide-react';
 import { 
   checkN8nStatus, 
   getAllN8nWorkflows, 
   deleteN8nWorkflow, 
   activateN8nWorkflow, 
   deactivateN8nWorkflow,
+  updateN8nWorkflowPrompt,
   testN8nWebhook,
-  extractWebhookUrl
+  extractWebhookUrl,
+  finalizeN8nWebhookSetup,
+  N8nWorkflowResponse
 } from '../../../utils/n8n';
 
 interface WorkflowDetails {
@@ -34,6 +47,9 @@ export default function N8nManagementPage() {
   const [testResult, setTestResult] = useState<any | null>(null);
   const [testLoading, setTestLoading] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
+  const [finalizingWorkflows, setFinalizingWorkflows] = useState<string[]>([]);
+  
+  const { toast } = useToast();
 
   // Check N8N status on component mount
   React.useEffect(() => {
@@ -84,8 +100,57 @@ export default function N8nManagementPage() {
     }
   };
 
-  const handleWorkflowCreated = (workflow: WorkflowDetails) => {
-    setWorkflows(prev => [...prev, workflow]);
+  const handleWorkflowCreated = async (workflow: WorkflowDetails) => {
+    let workflowId: string | undefined;
+    try {
+      workflowId = workflow.id;
+
+      toast({
+        title: "Workflow Created",
+        description: `Workflow '${workflow.name}' created. Starting activation...`,
+      });
+
+      setFinalizingWorkflows(prev => [...prev, workflowId!]);
+      loadWorkflows(); // Refresh list to show the new workflow immediately
+
+      await activateN8nWorkflow(workflowId);
+      toast({
+        title: "Workflow Activated",
+        description: `Re-saving to register webhook...`,
+      });
+
+      // The prompt is part of the workflow object passed from the creation component
+      const setNode = workflow.nodes.find((node: any) => node.name === 'Set');
+      const prompt = setNode?.parameters?.values?.string[0]?.value || 'Default prompt if not found';
+      
+      await updateN8nWorkflowPrompt(workflowId, prompt);
+      toast({
+        title: "Workflow Re-saved",
+        description: `Polling for webhook readiness...`,
+      });
+
+      await finalizeN8nWebhookSetup(workflowId);
+
+      toast({
+        title: "Setup Complete!",
+        description: `Webhook for '${workflow.name}' is now active and ready!`,
+        variant: "success",
+      });
+
+      loadWorkflows(); // Final refresh to get latest status
+
+    } catch (error: any) {
+      console.error('Error during workflow setup:', error);
+      toast({
+        title: "Setup Failed",
+        description: error.response?.data?.message || 'An error occurred during workflow setup.',
+        variant: "destructive",
+      });
+    } finally {
+      if (workflowId) {
+        setFinalizingWorkflows(prev => prev.filter(id => id !== workflowId));
+      }
+    }
   };
 
   const handleDeleteWorkflow = async (id: string) => {
@@ -119,35 +184,103 @@ export default function N8nManagementPage() {
     }
   };
 
-  const handleTestWebhook = async (webhookUrl: string, workflowId: string) => {
-    if (!webhookUrl) {
-      setTestError('No webhook URL available for this workflow');
+  const fetchAndRefreshWorkflows = async () => {
+    setLoading(true);
+    try {
+      console.log('Refreshing workflow list from server...');
+      const freshWorkflows = await getAllN8nWorkflows();
+      console.log('Fetched workflows:', freshWorkflows);
+      // Cast or transform to ensure type compatibility
+      setWorkflows(freshWorkflows?.map((wf: any) => ({
+        ...wf,
+        // Ensure webhookUrl is never undefined
+        webhookUrl: wf.webhookUrl || '',
+      })) || []);
+      toast({
+        title: "Success",
+        description: "Workflow list refreshed",
+      });
+      return freshWorkflows;
+    } catch (error) {
+      console.error('Failed to refresh workflow list:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh workflow list",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTestWebhook = async (workflow: any) => {
+    if (!workflow || !workflow.id) {
+      toast({
+        title: "Error",
+        description: "No workflow ID found",
+        variant: "destructive",
+      });
       return;
     }
 
+    console.log('Testing webhook for workflow from UI:', workflow);
+    
+    // Get the latest workflow data directly from server
     try {
-      setTestLoading(true);
-      setTestResult(null);
-      setTestError(null);
+      // Use existing function to get workflow by ID
+      const allWorkflows = await getAllN8nWorkflows();
+      const freshWorkflow = allWorkflows.find(w => w.id === workflow.id);
+      console.log('Fresh workflow data from server:', freshWorkflow);
       
-      // Use useTestUrl=true flag to allow N8N test mode webhook testing
+      if (!freshWorkflow) {
+        console.warn('Fresh workflow not found on server! Will try with UI data anyway.');
+      } else {
+        console.log('Using fresh workflow data for test with ID:', freshWorkflow.id);
+        // Update UI workflow with fresh data
+        workflow = freshWorkflow;
+      }
+    } catch (freshError) {
+      console.error('Failed to get fresh workflow data:', freshError);
+      console.warn('Continuing with UI workflow data');
+    }
+
+    setTestLoading(true);
+    try {
+      console.log('Testing webhook for workflow ID:', workflow.id, 'with URL:', workflow.webhookUrl);
       const result = await testN8nWebhook(
-        webhookUrl, 
-        workflowId, 
+        workflow.webhookUrl,
+        workflow.id,
         {
-          message: 'Hi there',
-          sessionId: `test-session-${Date.now()}`,
-        },
-        // Add custom headers for webhook test (optional)
-        { 'X-Test-Header': 'test-value' }, 
-        // Use the test URL option for N8N test mode
-        true
+          message: "Hello, can you help me schedule an appointment?",
+        }
       );
-      
+
       setTestResult(result);
-    } catch (err) {
-      console.error('Error testing webhook:', err);
-      setTestError(err instanceof Error ? err.message : 'Unknown error');
+      toast({
+        title: "Success",
+        description: "Webhook test succeeded",
+      });
+      console.log("Webhook test result:", result);
+    } catch (error: any) {
+      console.error("Error testing webhook:", error);
+      setTestError(error.message || "Failed to test webhook");
+      toast({
+        title: "Error",
+        description: error.message || "Failed to test webhook",
+        variant: "destructive",
+      });
+      
+      // If test fails, try refreshing workflows and try again
+      if (confirm('Webhook test failed. Would you like to refresh workflows and try again?')) {
+        const refreshedWorkflows = await fetchAndRefreshWorkflows();
+        if (refreshedWorkflows) {
+          const refreshedWorkflow = refreshedWorkflows.find((w: any) => w.id === workflow.id);
+          if (refreshedWorkflow) {
+            handleTestWebhook(refreshedWorkflow);
+          }
+        }
+      }
     } finally {
       setTestLoading(false);
     }
@@ -251,9 +384,10 @@ export default function N8nManagementPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleTestWebhook(workflow.webhookUrl, workflow.id)}
+                            onClick={() => handleTestWebhook(workflow)}
+                            disabled={finalizingWorkflows.includes(workflow.id) || testLoading}
                           >
-                            Test Webhook
+                            {finalizingWorkflows.includes(workflow.id) ? 'Finalizing...' : 'Test Webhook'}
                           </Button>
                         )}
                         

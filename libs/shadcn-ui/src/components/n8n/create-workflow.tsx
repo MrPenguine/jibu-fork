@@ -49,13 +49,15 @@ export function CreateWorkflow({ onWorkflowCreated }: CreateWorkflowProps) {
 
       const result = await createN8nWorkflow(workflowTemplate);
       
+      // Handle the nested response structure from backend
+      const workflow = result.workflow || result;
       const workflowDetails: WorkflowDetails = {
-        id: result.id,
-        name: result.name,
-        webhookUrl: result.webhookUrl || '',
-        active: result.active,
-        nodes: result.nodes,
-        connections: result.connections,
+        id: workflow.id,
+        name: workflow.name,
+        webhookUrl: result.webhookUrl || workflow.webhookUrl || '',
+        active: workflow.active,
+        nodes: workflow.nodes || [],
+        connections: workflow.connections || {},
       };
 
       setSuccess(workflowDetails);
