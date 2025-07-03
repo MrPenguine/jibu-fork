@@ -201,8 +201,6 @@ model Assistant {
   // n8n integration fields
   n8nWorkflowId              String?         
   n8nWorkflow                N8nWorkflow?     @relation(fields: [n8nWorkflowId], references: [id])
-  oldN8nWorkflowId           String?         // Previous workflow ID from n8n (to be cleaned up)
-  oldWebhookUrl              String?         // Previous webhook URL (to be cleaned up)
   organization               Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   knowledgeBaseId            String?
   knowledgeBase              KnowledgeBase?  @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
