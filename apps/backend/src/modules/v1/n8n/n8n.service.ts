@@ -292,7 +292,7 @@ export class N8nService {
           if (webhookPath) {
             const n8nBaseUrl = process.env.N8N_WEBHOOK_BASE_URL || process.env.N8N_URL;
             // Always use the production URL for programmatic testing
-            targetUrl = `${n8nBaseUrl}/webhook/${webhookPath}`;
+            targetUrl = `${n8nBaseUrl}/webhook/${workflowId}/webhook/${webhookPath}`;
             this.logger.log(`Using PRODUCTION webhook URL from workflow: ${targetUrl}`);
 
             // Poll to verify webhook is registered before testing
