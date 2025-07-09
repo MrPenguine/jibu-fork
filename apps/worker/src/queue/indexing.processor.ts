@@ -221,7 +221,7 @@ export class IndexingProcessor {
       await this.vectorDbService.ensureCollection(collectionName);
       
       // 6. Generate embeddings for each chunk
-      const embeddings = await this.embeddingService.embedTexts(chunks);
+      const embeddings = await this.embeddingService.embedDocuments(chunks.map(chunk => ({ text: chunk })));
       this.logger.debug(`Generated ${embeddings.length} embeddings`);
       
       // Log sample embedding data
