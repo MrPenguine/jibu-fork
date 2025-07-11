@@ -568,26 +568,34 @@ model AgentSession {
   @@index([status])
 }
 
+// Enum for N8nWorkflow type (primary/secondary)
+enum N8nWorkflowType {
+  PRIMARY
+  SECONDARY
+}
+
 // N8nWorkflow model for managing n8n workflow integration
 model N8nWorkflow {
-  id               String   @id @default(uuid())
-  n8nWorkflowId    String   @unique // The ID of the workflow in n8n
-  webhookUrl       String?  // The webhook URL for this workflow
-  workflowJson     Json?    // The complete workflow JSON definition
-  isActive         Boolean  @default(false) // Whether the workflow is active in n8n
-  lastValidatedAt  DateTime @default(now()) // Last time the workflow was validated
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id               String          @id @default(uuid())
+  n8nWorkflowId    String          @unique // The ID of the workflow in n8n
+  webhookUrl       String?         // The webhook URL for this workflow
+  workflowJson     Json?           // The complete workflow JSON definition
+  isActive         Boolean         @default(false) // Whether the workflow is active in n8n
+  workflowType     N8nWorkflowType @default(PRIMARY) // Type of workflow (primary/secondary)
+  lastValidatedAt  DateTime        @default(now()) // Last time the workflow was validated
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   
   // Relations
   organizationId   String
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   
   // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
-  assistants       Assistant[] // Assistants that use this workflow
-  agents           Agent[]     // Agents that use this workflow
+  assistants       Assistant[]     // Assistants that use this workflow (always PRIMARY)
+  agents           Agent[]         // Agents that use this workflow (can be PRIMARY or SECONDARY)
   
   @@index([organizationId])
   @@index([n8nWorkflowId])
   @@index([isActive])
+  @@index([workflowType])  // Add index for the new field
 }
