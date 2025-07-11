@@ -1,5 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { Agent as PrismaAgent, WorkflowType } from '@prisma/client';
+
+// Define N8nWorkflowType enum locally until Prisma client is regenerated properly
+enum N8nWorkflowType {
+  PRIMARY = 'PRIMARY',
+  SECONDARY = 'SECONDARY'
+}
 
 // Extended Agent interface with workflow properties - used only to type our functions
 type Agent = {
@@ -8,6 +14,7 @@ type Agent = {
   description: string;
   organizationId: string;
   assistantId?: string;
+  n8nWorkflowId?: string;
   createdAt: Date;
   updatedAt: Date;
   nodes?: any;
@@ -21,15 +28,20 @@ import { PrismaService } from '../../../../core/database/prisma.service';
 import { UpdateAgentDto } from '../dto/update-agent.dto';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import { CreateWorkflowDto } from '../../workflow/dto/create-workflow.dto';
+import { N8nIntegrationService } from '../../../../integrations/n8n/n8n-integration.service';
+import { WebhookWorkflowTemplate } from '../../../../integrations/n8n/n8n-types';
 // Secondary workflow methods have been moved to WorkflowService
 
 @Injectable()
 export class AgentService {
+  private readonly logger = new Logger(AgentService.name);
+  
   constructor(
     private readonly prisma: PrismaService,
-    private readonly workflowService: WorkflowService
+    private readonly workflowService: WorkflowService,
+    private readonly n8nIntegrationService: N8nIntegrationService
   ) {}
-  
+
   /**
    * Helper method to extract assistantId from workflow nodes
    * @param nodes The workflow nodes object
@@ -38,38 +50,39 @@ export class AgentService {
   private extractAssistantIdFromNodes(nodes: any): string | undefined {
     try {
       if (!nodes) return undefined;
-      
+
       // Parse the nodes if they're a string
       const parsedNodes = typeof nodes === 'string' ? JSON.parse(nodes) : nodes;
-      
+
       // Find assistant nodes that have an assistantId
       const assistantNodes = Object.values(parsedNodes).filter(
         (node: any) => node.type === 'ASSISTANT' && node.data?.assistantId
       );
-      
+
       // Return the first assistantId found
       if (assistantNodes.length > 0) {
         const assistantId = (assistantNodes[0] as any).data?.assistantId;
         if (assistantId) {
-          console.log(`Found assistantId ${assistantId} in workflow nodes`);
+          this.logger.log(`Found assistantId ${assistantId} in workflow nodes`);
           return assistantId;
         }
       }
-      
+
       return undefined;
     } catch (error) {
-      console.warn(`Error extracting assistantId from nodes: ${error.message}`);
+      this.logger.warn(`Error extracting assistantId from nodes: ${error.message}`);
       return undefined;
     }
   }
 
   async create(createAgentDto: CreateAgentDto, organizationId: string): Promise<Agent> {
-    console.log('Creating agent with organization ID:', organizationId);
-    console.log('Agent data:', createAgentDto);
+    this.logger.log(`Creating agent with organization ID: ${organizationId}`);
+    this.logger.debug(`Agent data: ${JSON.stringify(createAgentDto)}`);
+
     
     // Validate organizationId
     if (!organizationId) {
-      console.error('Organization ID is missing in agent creation');
+      this.logger.error('Organization ID is missing in agent creation');
       throw new BadRequestException('Organization ID is required');
     }
 
@@ -80,7 +93,7 @@ export class AgentService {
       });
 
       if (!organization) {
-        console.error(`Organization with ID ${organizationId} not found`);
+        this.logger.error(`Organization with ID ${organizationId} not found`);
         throw new BadRequestException(`Organization with ID ${organizationId} not found`);
       }
 
@@ -94,12 +107,12 @@ export class AgentService {
         });
 
         if (!assistant) {
-          console.error(`Assistant with ID ${createAgentDto.assistantId} not found in organization ${organizationId}`);
+          this.logger.error(`Assistant with ID ${createAgentDto.assistantId} not found in organization ${organizationId}`);
           throw new BadRequestException(`Assistant with ID ${createAgentDto.assistantId} not found in this organization`);
         }
       } else {
         // If no assistantId provided, that's okay - we'll create the agent without an assistant
-        console.log('No assistantId provided, creating agent without an assistant');
+        this.logger.log('No assistantId provided, creating agent without an assistant');
         // Agent can be linked to assistant later
       }
 
@@ -119,7 +132,7 @@ export class AgentService {
         };
       }
 
-      console.log('Creating agent with data:', JSON.stringify(createData, null, 2));
+      this.logger.debug(`Creating agent with data: ${JSON.stringify(createData, null, 2)}`);
       
       // Create the agent
       const newAgent = await this.prisma.agent.create({
@@ -134,7 +147,7 @@ export class AgentService {
       try {
         // Use type assertion to make TypeScript recognize the properties
         const agentData = newAgent as unknown as { id: string; name: string };
-        console.log('Creating master workflow for agent:', agentData.id);
+        this.logger.log(`Creating master workflow for agent: ${agentData.id}`);
         
         // Extract nodes and edges from the DTO if provided
         const nodes = createAgentDto.nodes || {};
@@ -144,7 +157,7 @@ export class AgentService {
         if (!createAgentDto.assistantId) {
           const extractedAssistantId = this.extractAssistantIdFromNodes(nodes);
           if (extractedAssistantId) {
-            console.log(`Extracted assistantId ${extractedAssistantId} from workflow nodes`);
+            this.logger.log(`Extracted assistantId ${extractedAssistantId} from workflow nodes`);
             // Update the agent with the extracted assistantId
             await this.prisma.agent.update({
               where: { id: newAgent.id },
@@ -167,17 +180,81 @@ export class AgentService {
           organizationId: organizationId
         };
         
-        await this.workflowService.createMasterWorkflow(agentData.id, workflowData);
-        console.log('Master workflow created successfully');
+        // Create the workflow entity for the agent
+        const workflow = await this.workflowService.createMasterWorkflow(agentData.id, workflowData);
+        this.logger.log(`Master workflow created successfully: ${workflow.id}`);
+        
+        // Create an N8N workflow for the agent
+        try {
+          // Create a webhook workflow template
+          const workflowTemplate: WebhookWorkflowTemplate = {
+            name: `primary workflow for agent ${agentData.name} - ${organizationId}`,
+            webhookPath: `agent-${agentData.id}`,
+            webhookMethod: 'POST', // Default to POST method
+            memoryEnabled: true, // Enable memory by default
+          };
+          
+          this.logger.log(`Creating N8N workflow for agent: ${agentData.id}`);
+          
+          // Create the N8N workflow
+          const { workflow: n8nWorkflow, webhookUrl } = await this.n8nIntegrationService.createWebhookWorkflow(workflowTemplate);
+          
+          this.logger.log(`N8N workflow created successfully: ${n8nWorkflow.id}`);
+          this.logger.log(`N8N webhook URL: ${webhookUrl}`);
+          
+          // Store the N8N workflow in the database with PRIMARY type (default)
+          const createdN8nWorkflow = await this.prisma.n8nWorkflow.create({
+            data: {
+              n8nWorkflowId: n8nWorkflow.id,
+              webhookUrl,
+              // workflowType defaults to PRIMARY in the schema
+              organizationId: organizationId, // Use direct assignment for organizationId
+              agents: {
+                connect: { id: agentData.id }
+              },
+              // Save the workflowJson directly (it's already a JSON object)
+              workflowJson: n8nWorkflow
+              // The workflow will be linked in the next step
+            }
+          });
+          
+          this.logger.log(`N8N workflow stored in database: ${createdN8nWorkflow.id}`);
+          
+          // Update the workflow with the N8N workflow ID
+          const updatedWorkflow = await this.prisma.workflow.update({
+            where: { id: workflow.id },
+            data: {
+              n8nWorkflowId: createdN8nWorkflow.id
+            }
+          });
+          
+          this.logger.log(`Workflow updated with N8N workflow ID: ${createdN8nWorkflow.id}`);
+          
+          // No need to update the agent with a reference to the N8N workflow 
+          // since we already established the connection through the N8nWorkflow creation
+          // The bidirectional relationship is handled by Prisma
+          this.logger.log(`Agent already linked to N8N workflow through the N8nWorkflow creation`);
+          
+          this.logger.log(`Agent updated with N8N workflow reference: ${createdN8nWorkflow.id}`);
+          
+          // Update our local agent instance with the N8N workflow ID
+          newAgent.n8nWorkflowId = createdN8nWorkflow.id;
+          
+        } catch (n8nWorkflowError) {
+          this.logger.error(`Error creating N8N workflow: ${n8nWorkflowError.message}`);
+          // We don't want to fail the agent creation if N8N workflow creation fails
+          // Just log the error and continue
+        }
+        
       } catch (workflowError) {
-        console.error('Error creating master workflow:', workflowError);
+        this.logger.error(`Error creating master workflow: ${workflowError.message}`);
         // We don't want to fail the agent creation if workflow creation fails
         // Just log the error and continue
       }
       
       return newAgent;
     } catch (error) {
-      console.error('Error creating agent:', error);
+      this.logger.error(`Error creating agent: ${error.message}`);
       throw new BadRequestException(`Failed to create agent: ${error.message}`);
     }
   }

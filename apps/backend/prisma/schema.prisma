@@ -200,7 +200,7 @@ model Assistant {
   organizationId             String
   // n8n integration fields
   n8nWorkflowId              String?         
-  n8nWorkflow                N8nWorkflow?     @relation(fields: [n8nWorkflowId], references: [id])
+  n8nWorkflow                N8nWorkflow?     @relation(fields: [n8nWorkflowId], references: [id], onDelete: Cascade)
   organization               Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   knowledgeBaseId            String?
   knowledgeBase              KnowledgeBase?  @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
@@ -399,7 +399,7 @@ model Agent {
   
   // n8n integration reference
   n8nWorkflowId String?
-  n8nWorkflow   N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id])
+  n8nWorkflow   N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: Cascade)
 
   // Link to an Assistant (optional - assistants can be specified at the node level)
   assistantId String?
@@ -455,7 +455,8 @@ model Workflow {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // n8n integration fields
-  n8nWorkflowId  String?      // ID of the corresponding workflow in n8n
+  n8nWorkflowId  String?      // ID of the corresponding n8n workflow
+  n8nWorkflow    N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: Cascade)
   webhookUrl     String?      // URL of the webhook for this workflow in n8n
   agentPrompt    String?      // Agent prompt to use for this workflow
 
@@ -593,6 +594,7 @@ model N8nWorkflow {
   // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
   assistants       Assistant[]     // Assistants that use this workflow (always PRIMARY)
   agents           Agent[]         // Agents that use this workflow (can be PRIMARY or SECONDARY)
+  workflows        Workflow[]      // Workflows linked to this n8n workflow
   
   @@index([organizationId])
   @@index([n8nWorkflowId])
