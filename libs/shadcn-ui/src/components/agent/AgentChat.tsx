@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 // API clients
 import * as chatApi from '../../../../../apps/frontend/src/utils/chatApi';
 import * as agentApi from '../../../../../apps/frontend/src/utils/AgentApi';
+import { getAgentWebhookUrl, sendStreamingWebhookMessage } from '../../../../../apps/frontend/src/utils/agentWebhookUtils';
 
 // TTS utilities
 import { playTextToSpeech, stopTextToSpeech, isTtsPlaying } from '../../../../../apps/frontend/src/utils/ttsUtils';
@@ -133,31 +134,28 @@ export default function AgentChat({
   onClose,
   chatId: initialChatId,
   children
-}: AgentChatProps) {
-  // --- Hooks ---
-  const orgContext = useOrganization();
-  // Get organization ID from the active organization
-  const activeOrganizationId = orgContext.activeOrganization?.id || '';
+}: AgentChatProps) => {
+  // Organization context
+  const { activeOrganizationId } = useOrganization();
   const { toast } = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const agentResponseRef = useRef<string>('');
-  const [assistantId, setAssistantId] = useState<string | null>(null);
 
-  // --- State ---
-  const [messages, setMessages] = useState<Message[]>([]);
+  // State
   const [userInput, setUserInput] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [isTyping, setIsTyping] = useState<boolean>(false);
-  const [ttsEnabled, setTtsEnabled] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [userChats, setUserChats] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(initialChatId || null);
-  const [isLoadingChats, setIsLoadingChats] = useState<boolean>(true);
+  const [agentName, setAgentName] = useState<string>(initialAgentName || '');
+  const [isLoadingChats, setIsLoadingChats] = useState<boolean>(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(false);
-  const [showingChatList, setShowingChatList] = useState<boolean>(initialChatId ? false : true);
+  const [assistantId, setAssistantId] = useState<string | null>(null);
   const [agentDetails, setAgentDetails] = useState<AgentDetails | null>(null);
-  const [agentName, setAgentName] = useState<string>(initialAgentName || 'Agent');
-  const [isAgentPublished, setIsAgentPublished] = useState<boolean>(!checkPublishStatus);
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [isAgentPublished, setIsAgentPublished] = useState<boolean>(true);
+  const [showingChatList, setShowingChatList] = useState<boolean>(initialChatId === null);
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(false);
+  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
 
   // --- Utility Functions ---
   const scrollToBottom = () => {
@@ -171,28 +169,40 @@ export default function AgentChat({
       return;
     }
     try {
-      console.log(`Fetching agent definition for agent ID: ${agentId} in org: ${activeOrganizationId}`);
-      const details = await agentApi.agentApiClient.getAgent(agentId, activeOrganizationId);
-      console.log('Agent definition fetched:', details);
-      setAgentDetails(details);
-      setAgentName(details.name || initialAgentName || 'Agent');
-      setIsAgentPublished(details.isPublished || false);
+      setIsInitialized(false);
+      const agent = await agentApi.agentApiClient.getAgent(agentId, activeOrganizationId);
+      setAgentDetails(agent);
       
-      if (details.assistantId) {
-        console.log(`Setting assistant ID to: ${details.assistantId}`);
-        setAssistantId(details.assistantId);
-      } else {
-        console.warn(`No assistantId found in agent definition for agent: ${agentId}`);
-        setAssistantId(null);
+      // Set agent name if not provided in props
+      if (!initialAgentName) {
+        setAgentName(agent.name);
       }
+      
+      // Check if agent is published if required
+      if (checkPublishStatus) {
+        setIsAgentPublished(!!agent.isPublished);
+      }
+      
+      // Check if agent has an associated assistant
+      if (agent.assistantId) {
+        setAssistantId(agent.assistantId);
+      }
+      
+      // Fetch the webhook URL for this agent
+      const webhookUrlResult = await getAgentWebhookUrl(agentId, activeOrganizationId);
+      if (webhookUrlResult) {
+        setWebhookUrl(webhookUrlResult);
+        console.log('Agent webhook URL found:', webhookUrlResult);
+      } else {
+        console.warn('No webhook URL found for agent', agentId);
+      }
+      
+      setIsInitialized(true);
     } catch (error) {
       console.error('Error fetching agent details:', error);
-      toast({ title: 'Error', description: 'Could not fetch agent details.', variant: 'destructive' });
-      setIsAgentPublished(false);
-    } finally {
-      setIsInitialized(true);
+      toast({ title: 'Error', description: 'Failed to load agent details', variant: 'destructive' });
     }
-  }, [agentId, activeOrganizationId, checkPublishStatus, initialAgentName, toast]);
+  }, [isOpen, agentId, activeOrganizationId, initialAgentName, checkPublishStatus, toast]);
 
   const fetchUserChats = useCallback(async () => {
     if (!agentId) return;
@@ -297,71 +307,108 @@ export default function AgentChat({
         isLoading: true,
       };
       setMessages((prev) => [...prev, assistantMessage]);
-
-      // Format request according to the AgentRequest interface
-      // Log agent details for debugging
-      console.log(`Agent details:`, agentDetails);
       
-      // Check if agent might be a workflow agent based on its metadata
+      // Get agent metadata
       const agentMetadata = agentDetails?.metadata as Record<string, any> || {};
-      const isWorkflowAgent = agentMetadata?.isWorkflow || agentMetadata?.workflow;
       
-      // Initialize the request
-      const request: agentApi.AgentRequest = {
-        input: currentInput,
-        sessionId: chatId,
-        config: {
-          // Default value that will be overridden based on agent type
-          assistantId: '',
-          knowledgeBaseId: knowledgeBaseId || undefined,
-          stream: true
-        }
-      };
-      
-      if (isWorkflowAgent) {
-        // For workflow agents, don't send assistantId at all - backend will extract it from workflow
-        // This will force backend to use the assistantId from the workflow node
-        console.log('Sending workflow agent request - backend will extract assistantId from workflow nodes');
-        // Required for backend to identify this as a workflow agent
-        (request.config as any).workflowAgent = true;
-        // Not setting assistantId for workflow agents - backend will handle it
-      } else if (assistantId) {
-        // For direct assistant agents, use the assistantId from the agent definition
-        console.log(`Using assistant ID for streaming request: ${assistantId}`);
-        request.config.assistantId = assistantId;
+      // Check if we have a webhook URL and should use N8N webhook streaming
+      if (webhookUrl) {
+        console.log('Using N8N webhook URL for streaming:', webhookUrl);
+        
+        // Use the streaming webhook endpoint
+        await sendStreamingWebhookMessage(
+          webhookUrl,
+          currentInput,
+          chatId,
+          {
+            onStart: () => {
+              console.log('Webhook streaming started');
+            },
+            onToken: (token) => {
+              agentResponseRef.current += token;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessageId ? { ...msg, text: agentResponseRef.current, isLoading: true } : msg
+                )
+              );
+            },
+            onError: (error) => {
+              console.error('Error in webhook streaming:', error);
+              toast({ title: 'Error', description: `Webhook streaming error: ${error.message}`, variant: 'destructive' });
+            },
+            onComplete: () => {
+              console.log('Webhook streaming completed');
+            }
+          },
+          {
+            // Optional parameters
+            systemPrompt: agentMetadata?.systemPrompt,
+            contextLength: 10 // Use larger context length for better conversation flow
+          }
+        );
       } else {
-        // Only use agentId as assistantId for non-workflow agents as a last resort
-        console.warn('Assistant ID not found in agent definition, using agent ID as fallback. This might cause errors!');
-        request.config.assistantId = agentId;
-      }
-      
-      console.log(`Final request config:`, request.config);
-      
-      await agentApi.sendStreamingAgentRequest(request, {
-        headers: { 'X-Organization-ID': activeOrganizationId },
-        onToken: (token) => {
-          agentResponseRef.current += token;
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessageId ? { ...msg, text: agentResponseRef.current, isLoading: true } : msg
-            )
-          );
-        },
-        onError: (error) => {
-          console.error('Error in streaming response:', error);
-        },
-        onComplete: () => {
-          // Handle completion if needed
+        // Fallback to regular agent API if no webhook URL is available
+        console.log('No webhook URL available, falling back to regular agent API');
+        
+        // Initialize the request
+        const request: agentApi.AgentRequest = {
+          input: currentInput,
+          sessionId: chatId,
+          config: {
+            // Default value that will be overridden based on agent type
+            assistantId: '',
+            knowledgeBaseId: knowledgeBaseId || undefined,
+            stream: true
+          }
+        };
+        
+        // Check if agent might be a workflow agent based on its metadata
+        const isWorkflowAgent = agentMetadata?.isWorkflow || agentMetadata?.workflow;
+        
+        if (isWorkflowAgent) {
+          // For workflow agents, don't send assistantId at all - backend will extract it from workflow
+          console.log('Sending workflow agent request - backend will extract assistantId from workflow nodes');
+          // Required for backend to identify this as a workflow agent
+          (request.config as any).workflowAgent = true;
+          // Not setting assistantId for workflow agents - backend will handle it
+        } else if (assistantId) {
+          // For direct assistant agents, use the assistantId from the agent definition
+          console.log(`Using assistant ID for streaming request: ${assistantId}`);
+          request.config.assistantId = assistantId;
+        } else {
+          // Only use agentId as assistantId for non-workflow agents as a last resort
+          console.warn('Assistant ID not found in agent definition, using agent ID as fallback. This might cause errors!');
+          request.config.assistantId = agentId;
         }
-      });
-      
-      if (ttsEnabled && agentResponseRef.current) {
-        // Pass required parameters to TTS function
-        playTextToSpeech(agentResponseRef.current, {
-          voiceId: 'en-US'
+        
+        console.log(`Final request config:`, request.config);
+        
+        await agentApi.sendStreamingAgentRequest(request, {
+          headers: { 'X-Organization-ID': activeOrganizationId },
+          onToken: (token) => {
+            agentResponseRef.current += token;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId ? { ...msg, text: agentResponseRef.current, isLoading: true } : msg
+              )
+            );
+          },
+          onError: (error) => {
+            console.error('Error in streaming response:', error);
+          },
+          onComplete: () => {
+            // Handle completion if needed
+          }
         });
+        
+        // Handle TTS for the response if enabled
+        if (ttsEnabled && agentResponseRef.current) {
+          // Pass required parameters to TTS function
+          playTextToSpeech(agentResponseRef.current, {
+            voiceId: 'en-US'
+          });
+        }
       }
-
     } catch (error) {
       console.error('Error sending message:', error);
       toast({ title: 'Error', description: 'Failed to send message.', variant: 'destructive' });

@@ -4,6 +4,7 @@ import { N8nIntegrationService } from '../../../integrations/n8n/n8n-integration
 import { N8nOrchestratorService } from '../../../core/n8n-orchestrator/n8n-orchestrator.service';
 import { WebhookWorkflowTemplate } from '../../../integrations/n8n/n8n-types';
 import axios from 'axios';
+import { Observable, Subject } from 'rxjs';
 
 // Service for handling N8N workflow logic
 @Injectable()
@@ -203,12 +204,177 @@ export class N8nService {
   }
   
   /**
+   * Stream data from a webhook response using RxJS Observable
+   * @param webhookUrl The webhook URL to call
+   * @param workflowId Optional workflow ID to check activation status
+   * @param payload Data payload to send to the webhook
+   * @param headers Custom headers to send with the request
+   * @returns Observable that emits chunks of the webhook response
+   */
+  async streamWebhook(
+    webhookUrl: string,
+    workflowId?: string,
+    payload: Record<string, any> = {},
+    headers: Record<string, string> = {},
+  ): Promise<Observable<any>> {
+    this.logger.log(`Setting up stream for webhook: ${webhookUrl}`);
+    
+    // Create a subject to emit streaming results
+    const streamSubject = new Subject<any>();
+    
+    try {
+      // If workflowId is provided, fetch the latest workflow info to ensure it's active
+      let targetUrl = webhookUrl;
+      
+      if (workflowId) {
+        try {
+          const workflow = await this.getWorkflow(workflowId);
+          
+          // Check if workflow exists and is active
+          if (workflow) {
+            this.logger.log(`Found workflow ${workflowId}, active: ${workflow.active}`);
+            
+            if (!workflow.active) {
+              this.logger.warn(`Warning: Workflow ${workflowId} is not active`);
+              // Attempt to activate workflow if it's not active
+              await this.activateWorkflow(workflowId);
+              this.logger.log(`Activated workflow ${workflowId}`);
+            }
+            
+            // Extract webhook node to get latest webhook URL
+            const webhookNode = workflow.nodes.find(
+              (node) => node.type === 'n8n-nodes-base.webhook'
+            );
+            
+            if (webhookNode?.parameters?.path) {
+              // Update target URL with latest webhook path from workflow
+              const webhookId = webhookNode.parameters.path;
+              const baseUrl = this.configService.get<string>('N8N_WEBHOOK_BASE_URL') || 'http://localhost:5678/webhook';
+              targetUrl = `${baseUrl}/${webhookId}`;
+              this.logger.log(`Using webhook URL from workflow: ${targetUrl}`);
+            }
+          }
+        } catch (error) {
+          this.logger.error(`Error fetching workflow ${workflowId}: ${error.message}`);
+          this.logger.warn(`Continuing with provided webhook URL: ${webhookUrl}`);
+        }
+      }
+      
+      // Prepare the request payload
+      const requestPayload = {
+        message: payload.message || 'This is a test message from Jibu.',
+        sessionId: payload.sessionId || `test-session-${Date.now()}`,
+        systemPrompt: payload.systemPrompt || 'You are a helpful assistant.',
+        contextLength: payload.contextLength || 5,
+      };
+      
+      // Request config with N8N API key
+      const requestConfig = {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-N8N-API-KEY': this.configService.get('N8N_API_KEY'),
+          ...headers,
+        },
+        responseType: 'stream' as const,
+      };
+      
+      this.logger.log(`Making streaming webhook request to: ${targetUrl}`);
+      
+      // Make the request with streaming response
+      const response = await axios.post(targetUrl, requestPayload, requestConfig);
+      
+      // Handle the streaming response
+      response.data.on('data', (chunk) => {
+        try {
+          // Parse each chunk as it comes in
+          const textChunk = chunk.toString().trim();
+          
+          // Some webhooks might return large JSONs or multiple JSONs per chunk
+          // Try to parse each possible JSON in the chunk
+          this.processStreamChunk(textChunk, streamSubject);
+        } catch (err) {
+          this.logger.error(`Error processing chunk: ${err.message}`);
+          // Still send the raw chunk in case it's useful
+          streamSubject.next({ raw: chunk.toString() });
+        }
+      });
+      
+      response.data.on('end', () => {
+        this.logger.log('Webhook stream ended');
+        streamSubject.complete();
+      });
+      
+      response.data.on('error', (err) => {
+        this.logger.error(`Webhook stream error: ${err.message}`);
+        streamSubject.error(err);
+      });
+      
+    } catch (error) {
+      this.logger.error(`Error setting up webhook stream: ${error.message}`);
+      // Handle common error cases
+      if (error.response) {
+        const status = error.response.status;
+        streamSubject.error(new Error(`HTTP error ${status}: ${error.message}`));
+      } else if (error.code === 'ECONNREFUSED') {
+        streamSubject.error(new Error('Connection refused. Check if N8N server is running.'));
+      } else if (error.code === 'ETIMEDOUT') {
+        streamSubject.error(new Error('Request timed out. N8N server may be overloaded.'));
+      } else {
+        streamSubject.error(error);
+      }
+      
+      // Ensure subject is completed even in error case
+      streamSubject.complete();
+    }
+    
+    return streamSubject.asObservable();
+  }
+  
+  /**
+   * Process a chunk from the webhook stream
+   * Handles different response formats including JSON lines and SSE
+   */
+  private processStreamChunk(chunk: string, subject: Subject<any>): void {
+    if (!chunk || chunk === '') return;
+    
+    // Check if chunk contains multiple lines
+    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+    
+    for (const line of lines) {
+      try {
+        // Handle Server-Sent Events format
+        if (line.startsWith('data: ')) {
+          const data = line.substring(6).trim();
+          try {
+            // Parse data as JSON
+            const jsonData = JSON.parse(data);
+            subject.next(jsonData);
+          } catch (e) {
+            // If not valid JSON, send as raw text
+            subject.next({ text: data });
+          }
+          continue;
+        }
+        
+        // Try parsing as JSON
+        const jsonData = JSON.parse(line);
+        subject.next(jsonData);
+      } catch (e) {
+        // If all parsing attempts fail, send raw line
+        if (line.trim() !== '') {
+          subject.next({ text: line });
+        }
+      }
+    }
+  }
+
+  /**
    * Test a webhook by calling it with data
    * @param webhookUrl The webhook URL to test
    * @param workflowId Optional workflow ID to check activation status
    * @param testData Additional data to send with the request
-   * @param headers Optional custom headers for the request
-   * @param useTestUrl Whether to use the test URL (deprecated, kept for compatibility)
+   * @param headers Custom headers to send with the request
+   * @param useTestUrl Whether to use the test endpoint (deprecated)
    */
   async testWebhook(
     webhookUrl: string,

@@ -56,9 +56,9 @@ model Organization {
   assistants           Assistant[] // Assistants belonging to this organization
   chats                Chat[] // All chats in this organization
   tools                Tool[] // Tools belonging to this organization
-  agents            Agent[]      // Agents belonging to this organization
-  agentSessions     AgentSession[] // Agent sessions belonging to this organization
-  n8nWorkflows       N8nWorkflow[]  // N8n workflows for this organization
+  agents               Agent[] // Agents belonging to this organization
+  agentSessions        AgentSession[] // Agent sessions belonging to this organization
+  n8nWorkflows         N8nWorkflow[] // N8n workflows for this organization
 }
 
 model OrganizationMembership {
@@ -198,9 +198,8 @@ model Assistant {
   id                         String          @id @default(uuid())
   name                       String
   organizationId             String
-  // n8n integration fields
-  n8nWorkflowId              String?         
-  n8nWorkflow                N8nWorkflow?     @relation(fields: [n8nWorkflowId], references: [id], onDelete: Cascade)
+  n8nWorkflowId              String? // n8n integration fields
+  n8nWorkflow                N8nWorkflow?    @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
   organization               Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   knowledgeBaseId            String?
   knowledgeBase              KnowledgeBase?  @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
@@ -221,10 +220,11 @@ model Assistant {
   updatedAt                  DateTime        @updatedAt
   chats                      Chat[]
   tools                      AssistantTool[] // Tools assigned to this assistant
-  agents                  Agent[]      // Agents associated with this assistant
+  agents                     Agent[] // Agents associated with this assistant
 
   @@index([organizationId])
   @@index([knowledgeBaseId])
+  @@index([n8nWorkflowId])
 }
 
 model ChunkMetadata {
@@ -250,22 +250,22 @@ model Chat {
   id             String         @id @default(uuid())
   name           String? // Optional name for the chat
   organizationId String
-  assistantId    String?       // Optional: Can be null for agent-based chats
-  agentId        String?       // Optional: For agent-based chats
-  workflowId     String?       // Optional: For associating chats with workflows
-  sessionId      String        // Required: For calls: phone number, For chats: user identifier or anonymous session
+  assistantId    String? // Optional: Can be null for agent-based chats
+  agentId        String? // Optional: For agent-based chats
+  workflowId     String? // Optional: For associating chats with workflows
+  sessionId      String // Required: For calls: phone number, For chats: user identifier or anonymous session
   sessionType    String         @default("chat") // "chat" or "call"
   nodeType       AgentNodeType? // Store the current node type for agent workflows
-  metadata       Json?          // Additional metadata for the chat/call session
+  metadata       Json? // Additional metadata for the chat/call session
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assistant       Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
-  agent           Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  workflow        Workflow?      @relation(fields: [workflowId], references: [id], onDelete: SetNull)
-  messages        Message[]
-  agentSessions   AgentSession[] // Agent sessions associated with this chat
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assistant     Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
+  agent         Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  workflow      Workflow?      @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  messages      Message[]
+  agentSessions AgentSession[] // Agent sessions associated with this chat
 
   // Updated constraints to ensure a chat is uniquely identified by either assistant+session or agent+session
   @@unique([assistantId, sessionId])
@@ -362,9 +362,6 @@ model AssistantTool {
   @@index([toolId])
 }
 
-// Model for storing n8n workflow configurations
-
-
 // --- Enums for Agent ---
 enum AgentNodeType {
   START
@@ -390,159 +387,110 @@ enum WorkflowType {
 
 // --- Agent Definition ---
 model Agent {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  name        String
-  description String?
-  
-  // n8n integration reference
-  n8nWorkflowId String?
-  n8nWorkflow   N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: Cascade)
-
-  // Link to an Assistant (optional - assistants can be specified at the node level)
-  assistantId String?
-  assistant   Assistant? @relation(fields: [assistantId], references: [id], onDelete: SetNull)
-
-  // Link to Organization for ownership/scoping
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  // Relation to workflows
-  workflows      Workflow[]
-
-  sessions AgentSession[] // Active and past execution sessions for this agent
-  chats    Chat[]        // Direct relation to chats for this agent
-
-  @@index([assistantId])
-  @@index([organizationId])
-}
-
-// --- Workflow Definition ---
-model Workflow {
-  id             String       @id @default(uuid())
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   name           String
   description    String?
-  
-  // The actual flow structure
-  nodes          Json         // Array of FlowNode objects (defined in TypeScript, stored as JSON)
-  edges          Json         // Array of FlowEdge objects (defined in TypeScript, stored as JSON)
-  startNodeId    String?      // ID of the node where execution begins
-
-  // For versioning
-  version        Int          @default(1)
-  isPublished    Boolean      @default(false)
-  publishedAt    DateTime?
-
-  // Workflow type and relationships
-  workflowType   WorkflowType @default(MASTER)
-  
-  // Master-Secondary relationship
-  masterWorkflowId String?
-  masterWorkflow   Workflow?   @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
-  secondaryWorkflows Workflow[] @relation("SecondaryWorkflows")
-  
-  // Link to Agent (owner)
-  agentId        String
-  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  
-  // Link to Organization for ownership/scoping
+  metadata       Json?
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assistantId    String?
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assistant      Assistant?     @relation(fields: [assistantId], references: [id], onDelete:SetNull)
+  workflows      Workflow[]
+  chats          Chat[]
+  agentSessions  AgentSession[]
 
-  // n8n integration fields
-  n8nWorkflowId  String?      // ID of the corresponding n8n workflow
-  n8nWorkflow    N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: Cascade)
-  webhookUrl     String?      // URL of the webhook for this workflow in n8n
-  agentPrompt    String?      // Agent prompt to use for this workflow
-
-  // Chat sessions associated with this workflow
-  chats          Chat[]       // Chat sessions using this workflow
-  
-  // Structured workflow nodes and connections
-  workflowNodes       WorkflowNode[]       // Detailed node information
-  workflowConnections  WorkflowConnection[] // Detailed connection information
-
-  @@index([agentId])
   @@index([organizationId])
-  @@index([workflowType])
-  @@index([masterWorkflowId])
-  @@index([n8nWorkflowId])
-}
-
-// --- Agent Execution State (Session) ---
-// WorkflowNode contains the detailed information about a node in a workflow
-model WorkflowNode {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  workflowId    String
-  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  
-  // Node details
-  nodeType      String   // Type of the node (e.g. "webhook", "ai-agent", "http-request")
-  name          String
-  parameters    String?  // JSON string of parameters
-  positionX     Float    @default(0)
-  positionY     Float    @default(0)
-  
-  // n8n integration fields
-  n8nNodeId     String?  // ID of the corresponding node in n8n
-  
-  // Tool reference (if this node represents a tool)
-  toolId        String?
-  tool          Tool?    @relation("ToolToWorkflowNode", fields: [toolId], references: [id])
-  
-  // Relationships
-  sourceConnections WorkflowConnection[] @relation("SourceNode")
-  targetConnections WorkflowConnection[] @relation("TargetNode")
-  
-  @@index([workflowId])
-  @@index([toolId])
-  @@index([n8nNodeId])
-}
-
-// WorkflowConnection represents a connection between two nodes in a workflow
-model WorkflowConnection {
-  id            String   @id @default(uuid())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  workflowId    String
-  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  
-  sourceNodeId  String
-  sourceNode    WorkflowNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
-  
-  targetNodeId  String
-  targetNode    WorkflowNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
-  
-  // Connection details
-  label         String?
-  condition     String?  // Optional condition for the connection
-  
-  // n8n integration fields
-  n8nSourceOutput String?  // The output of the source node in n8n
-  n8nTargetInput  String?  // The input of the target node in n8n
-  
-  @@unique([sourceNodeId, targetNodeId])
-  @@index([workflowId])
-  @@index([sourceNodeId])
-  @@index([targetNodeId])
+  @@index([assistantId])
 }
 
 model AgentSession {
-  id        String   @id @default(uuid()) // The unique session ID
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  agentId        String
+  agent          Agent    @relation(fields: [agentId], references: [id], onDelete:Cascade)
+  chatId         String
+  chat           Chat     @relation(fields: [chatId], references: [id], onDelete:Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete:Cascade)
+  status         String       @default("active") // e.g., active, completed, failed
+  currentNodeId  String?
+  variables      Json?
+  callSid        String? // For voice: SID from the provider
 
-  agentId String
-  agent   Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  @@index([agentId])
+  @@index([chatId])
+  @@index([organizationId])
+}
+
+model Workflow {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  name           String
+  description    String?
+  nodes          Json // Array of FlowNode objects
+  edges          Json // Array of FlowEdge objects
+  isPrimary      Boolean  @default(false)
+  agentId        String
+  organizationId String
+  startNodeId    String?      // ID of the node where execution begins
+  version        Int          @default(1)
+  isPublished    Boolean      @default(false)
+  publishedAt    DateTime?
+  workflowType   WorkflowType @default("MASTER")
+  masterWorkflowId String?
+  masterWorkflow   Workflow?   @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
+  secondaryWorkflows Workflow[] @relation("SecondaryWorkflows")
+
+  agent        Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  chats        Chat[]
+  workflowNodes WorkflowNode[]
+
+  @@index([agentId])
+  @@index([organizationId])
+}
+
+model WorkflowNode {
+  id         String  @id @default(uuid())
+  workflowId String
+  type       AgentNodeType
+  data       Json
+  position   Json
+  toolId     String?
+  incomingChoiceId String?
+
+  workflow    Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tool        Tool?          @relation("ToolToWorkflowNode", fields: [toolId], references: [id], onDelete:SetNull)
+  sourceEdges WorkflowEdge[] @relation("SourceNode")
+  targetEdges WorkflowEdge[] @relation("TargetNode")
+
+  @@index([workflowId])
+  @@index([toolId])
+}
+
+model WorkflowEdge {
+  id         String @id @default(uuid())
+  workflowId String
+  sourceId   String
+  targetId   String
+  sourceHandle String?
+  targetHandle String?
+  n8nSourceOutput String?  // The output of the source node in n8n
+  n8nTargetInput  String?  // The input of the target node in n8n
+
+  workflow     Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  source       WorkflowNode @relation("SourceNode", fields: [sourceId], references: [id], onDelete: NoAction)
+  target       WorkflowNode @relation("TargetNode", fields: [targetId], references: [id], onDelete: NoAction)
+
+  @@unique([sourceId, targetId])
+  @@index([workflowId])
+  @@index([sourceId])
+  @@index([targetId])
+}
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

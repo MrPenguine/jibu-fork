@@ -8,15 +8,21 @@ import { N8nClient } from '../../../core/n8n-orchestrator/n8n-client';
 import { N8nWorkflowService } from '../../../core/n8n-orchestrator/n8n-workflow.service';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
-import { Assistant, Chat, Prisma } from '@prisma/client';
+import { Agent, Assistant, Chat, Message, Prisma } from '@prisma/client';
 
 // Custom type for Assistant with n8n fields
-type AssistantWithN8n = {
-  id: string;
-  name: string;
+type AssistantWithN8n = Assistant & {
   n8nWorkflowId?: string | null;
   webhookUrl?: string | null;
-  [key: string]: any; // Allow other properties
+};
+
+// Custom type for Agent with n8n fields
+type AgentWithN8n = Agent & {
+  metadata?: {
+    n8nWorkflowId?: string | null;
+    webhookUrl?: string | null;
+    [key: string]: any;
+  };
 };
 
 // Define expected response from N8n webhook validation
@@ -57,7 +63,6 @@ export class ChatsService {
   ) {}
 
   async createChat(createChatDto: CreateChatDto & { organizationId: string }) {
-    // Log creation with appropriate entity (assistant or agent)
     if (createChatDto.assistantId) {
       this.logger.log(`Creating chat for assistant ${createChatDto.assistantId} in organization ${createChatDto.organizationId}`);
     } else if (createChatDto.agentId) {
@@ -66,7 +71,6 @@ export class ChatsService {
     
     this.logger.log(`Session ID: ${createChatDto.sessionId}, Session Type: ${createChatDto.sessionType || 'chat'}`);
     
-    // Check if assistant exists if assistantId is provided
     if (createChatDto.assistantId) {
       const assistant = await this.prisma.assistant.findFirst({
         where: {
@@ -81,7 +85,6 @@ export class ChatsService {
       }
     }
 
-    // Check if agent exists if agentId is provided
     if (createChatDto.agentId) {
       const agent = await this.prisma.agent.findFirst({
         where: {
@@ -96,7 +99,6 @@ export class ChatsService {
       }
     }
 
-    // Check if workflow exists if workflowId is provided
     if (createChatDto.workflowId) {
       const workflow = await this.prisma.workflow.findFirst({
         where: {
@@ -111,41 +113,23 @@ export class ChatsService {
       }
     }
 
-    // Build data object conditionally to avoid sending undefined fields to Prisma
-    const chatData: any = {
+    const chatData: Prisma.ChatCreateInput = {
       name: createChatDto.name || 'New Chat',
-      organization: { connect: { id: createChatDto.organizationId } }, // Use relation connection
+      organization: { connect: { id: createChatDto.organizationId } },
       sessionId: createChatDto.sessionId,
       sessionType: createChatDto.sessionType || 'chat',
-      metadata: createChatDto.metadata || {}
+      metadata: createChatDto.metadata || {},
+      ...(createChatDto.assistantId && { assistant: { connect: { id: createChatDto.assistantId } } }),
+      ...(createChatDto.agentId && { agent: { connect: { id: createChatDto.agentId } } }),
+      ...(createChatDto.workflowId && { workflow: { connect: { id: createChatDto.workflowId } } }),
+      ...(createChatDto.nodeType && { nodeType: createChatDto.nodeType }),
     };
     
-    // Only include fields if they're defined
-    if (createChatDto.assistantId) {
-      chatData.assistant = { connect: { id: createChatDto.assistantId } }; // Use relation connection
-    }
-    
-    if (createChatDto.agentId) {
-      chatData.agent = { connect: { id: createChatDto.agentId } }; // Use relation connection
-    }
-    
-    if (createChatDto.workflowId) {
-      chatData.workflow = { connect: { id: createChatDto.workflowId } }; // Use relation connection
-    }
-    
-    if (createChatDto.nodeType) {
-      chatData.nodeType = createChatDto.nodeType;
-    }
-
-    // Create the chat with properly formed data object
-    const chat = await this.prisma.chat.create({
-      data: chatData
-    });
+    const chat = await this.prisma.chat.create({ data: chatData });
 
     this.logger.log(`Successfully created chat with ID: ${chat.id}`);
 
-    // Initialize Redis chat history if Redis is available
-    await this.initChatInRedis(chat.id, chat.assistantId || null, chat.sessionId, chat.agentId || null);
+    await this.initChatInRedis(chat);
 
     return chat;
   }
@@ -153,17 +137,15 @@ export class ChatsService {
   async updateChat(id: string, updateChatDto: UpdateChatDto, organizationId: string) {
     this.logger.log(`Updating chat ${id} in organization ${organizationId}`);
     
-    // Verify chat exists and belongs to the organization
-    const chat = await this.getChat(id, organizationId);
+    await this.getChat(id, organizationId);
 
-    // Update the chat
     const updatedChat = await this.prisma.chat.update({
       where: { id },
       data: {
         ...(updateChatDto.name && { name: updateChatDto.name }),
         ...(updateChatDto.sessionType && { sessionType: updateChatDto.sessionType }),
         ...(updateChatDto.metadata && { metadata: updateChatDto.metadata }),
-        updatedAt: new Date() // Ensure updatedAt is refreshed
+        updatedAt: new Date()
       }
     });
 
@@ -177,12 +159,8 @@ export class ChatsService {
       this.logger.log(`Filters: ${JSON.stringify(filters)}`);
     }
     
-    // Validate that assistant exists in this organization
     const assistant = await this.prisma.assistant.findFirst({
-      where: {
-        id: assistantId,
-        organizationId
-      }
+      where: { id: assistantId, organizationId }
     });
 
     if (!assistant) {
@@ -190,59 +168,30 @@ export class ChatsService {
       throw new NotFoundException(`Assistant not found or not accessible in this organization`);
     }
 
-    // Build the query
-    const where: any = {
+    const where: Prisma.ChatWhereInput = {
       organizationId,
-      assistantId
+      assistantId,
+      ...(filters?.sessionType && { sessionType: filters.sessionType }),
+      ...(filters?.sessionId && { sessionId: filters.sessionId }),
+      ...(filters?.agentId && { agentId: filters.agentId }),
+      ...(filters?.workflowId && { workflowId: filters.workflowId }),
     };
 
-    // Add filters if provided
-    if (filters?.sessionType) {
-      where.sessionType = filters.sessionType;
-    }
-
-    if (filters?.sessionId) {
-      where.sessionId = filters.sessionId;
-    }
-    
-    if (filters?.agentId) {
-      where.agentId = filters.agentId;
-    }
-    
-    if (filters?.workflowId) {
-      where.workflowId = filters.workflowId;
-    }
-
-    // Get the chats
     const chats = await this.prisma.chat.findMany({
       where,
-      orderBy: {
-        updatedAt: 'desc'
-      },
+      orderBy: { updatedAt: 'desc' },
       include: {
         messages: {
-          orderBy: {
-            sequenceId: 'desc'
-          },
-          take: 1, // Get only the last message for preview
+          orderBy: { sequenceId: 'desc' },
+          take: 1,
         }
       }
     });
 
     this.logger.log(`Found ${chats.length} chats for assistant ${assistantId}`);
 
-    // Format the response to include the last message content as lastMessage
     return chats.map(chat => ({
-      id: chat.id,
-      name: chat.name,
-      assistantId: chat.assistantId,
-      agentId: chat.agentId,
-      workflowId: chat.workflowId,
-      nodeType: chat.nodeType,
-      sessionId: chat.sessionId,
-      sessionType: chat.sessionType,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
+      ...chat,
       lastMessage: chat.messages[0]?.content || null
     }));
   }
@@ -253,12 +202,8 @@ export class ChatsService {
       this.logger.log(`Filters: ${JSON.stringify(filters)}`);
     }
     
-    // Validate that agent exists in this organization
     const agent = await this.prisma.agent.findFirst({
-      where: {
-        id: agentId,
-        organizationId
-      }
+      where: { id: agentId, organizationId }
     });
 
     if (!agent) {
@@ -266,55 +211,29 @@ export class ChatsService {
       throw new NotFoundException(`Agent not found or not accessible in this organization`);
     }
 
-    // Build the query
-    const where: any = {
+    const where: Prisma.ChatWhereInput = {
       organizationId,
-      agentId
+      agentId,
+      ...(filters?.sessionType && { sessionType: filters.sessionType }),
+      ...(filters?.sessionId && { sessionId: filters.sessionId }),
+      ...(filters?.workflowId && { workflowId: filters.workflowId }),
     };
 
-    // Add filters if provided
-    if (filters?.sessionType) {
-      where.sessionType = filters.sessionType;
-    }
-
-    if (filters?.sessionId) {
-      where.sessionId = filters.sessionId;
-    }
-    
-    if (filters?.workflowId) {
-      where.workflowId = filters.workflowId;
-    }
-
-    // Get the chats
     const chats = await this.prisma.chat.findMany({
       where,
-      orderBy: {
-        updatedAt: 'desc'
-      },
+      orderBy: { updatedAt: 'desc' },
       include: {
         messages: {
-          orderBy: {
-            sequenceId: 'desc'
-          },
-          take: 1, // Get only the last message for preview
+          orderBy: { sequenceId: 'desc' },
+          take: 1,
         }
       }
     });
 
     this.logger.log(`Found ${chats.length} chats for agent ${agentId}`);
 
-    // Format the response to include the last message content as lastMessage
     return chats.map(chat => ({
-      id: chat.id,
-      name: chat.name,
-      assistantId: chat.assistantId,
-      agentId: chat.agentId,
-      workflowId: chat.workflowId,
-      nodeType: chat.nodeType,
-      sessionId: chat.sessionId,
-      sessionType: chat.sessionType,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
+      ...chat,
       lastMessage: chat.messages[0]?.content || null
     }));
   }
@@ -325,12 +244,8 @@ export class ChatsService {
       this.logger.log(`Filters: ${JSON.stringify(filters)}`);
     }
     
-    // Validate that workflow exists in this organization
     const workflow = await this.prisma.workflow.findFirst({
-      where: {
-        id: workflowId,
-        organizationId
-      }
+      where: { id: workflowId, organizationId }
     });
 
     if (!workflow) {
@@ -338,55 +253,29 @@ export class ChatsService {
       throw new NotFoundException(`Workflow not found or not accessible in this organization`);
     }
 
-    // Build the query
-    const where: any = {
+    const where: Prisma.ChatWhereInput = {
       organizationId,
-      workflowId
+      workflowId,
+      ...(filters?.sessionType && { sessionType: filters.sessionType }),
+      ...(filters?.sessionId && { sessionId: filters.sessionId }),
+      ...(filters?.agentId && { agentId: filters.agentId }),
     };
 
-    // Add filters if provided
-    if (filters?.sessionType) {
-      where.sessionType = filters.sessionType;
-    }
-
-    if (filters?.sessionId) {
-      where.sessionId = filters.sessionId;
-    }
-    
-    if (filters?.agentId) {
-      where.agentId = filters.agentId;
-    }
-
-    // Get the chats
     const chats = await this.prisma.chat.findMany({
       where,
-      orderBy: {
-        updatedAt: 'desc'
-      },
+      orderBy: { updatedAt: 'desc' },
       include: {
         messages: {
-          orderBy: {
-            sequenceId: 'desc'
-          },
-          take: 1, // Get only the last message for preview
+          orderBy: { sequenceId: 'desc' },
+          take: 1,
         }
       }
     });
 
     this.logger.log(`Found ${chats.length} chats for workflow ${workflowId}`);
 
-    // Format the response to include the last message content as lastMessage
     return chats.map(chat => ({
-      id: chat.id,
-      name: chat.name,
-      assistantId: chat.assistantId,
-      agentId: chat.agentId,
-      workflowId: chat.workflowId,
-      nodeType: chat.nodeType,
-      sessionId: chat.sessionId,
-      sessionType: chat.sessionType,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
+      ...chat,
       lastMessage: chat.messages[0]?.content || null
     }));
   }
@@ -396,9 +285,7 @@ export class ChatsService {
     
     const chat = await this.prisma.chat.findUnique({
       where: { id },
-      include: {
-        assistant: true
-      }
+      include: { assistant: true }
     });
 
     if (!chat) {
@@ -418,18 +305,13 @@ export class ChatsService {
   async deleteChat(id: string, organizationId: string) {
     this.logger.log(`Deleting chat ${id} from organization ${organizationId}`);
     
-    // Verify chat exists and belongs to the organization
     const chat = await this.getChat(id, organizationId);
 
-    // Delete the chat
-    await this.prisma.chat.delete({
-      where: { id }
-    });
+    await this.prisma.chat.delete({ where: { id } });
 
     this.logger.log(`Successfully deleted chat ${id}`);
 
-    // Remove from Redis if available
-    await this.removeChatFromRedis(id, chat.assistantId, chat.sessionId);
+    await this.removeChatFromRedis(chat);
 
     return { success: true };
   }
@@ -437,10 +319,8 @@ export class ChatsService {
   async getChatMessages(chatId: string, organizationId: string) {
     this.logger.log(`Getting messages for chat ${chatId} in organization ${organizationId}`);
     
-    // Verify chat exists and belongs to the organization
     await this.getChat(chatId, organizationId);
 
-    // Get all messages for the chat
     const messages = await this.prisma.message.findMany({
       where: { chatId },
       orderBy: { sequenceId: 'asc' }
@@ -450,21 +330,11 @@ export class ChatsService {
     return messages;
   }
 
-  /**
-   * Creates a new message in a chat and processes it through n8n if it's a user message
-   * @param chatId The chat ID to create the message in
-   * @param createMessageDto The message data
-   * @param organizationId The organization ID for access control
-   * @returns The created user message and assistant response (if applicable)
-   */
   async createMessage(chatId: string, createMessageDto: CreateMessageDto, organizationId: string) {
     this.logger.log(`Creating new message for chat ${chatId}`);
-    this.logger.log(`Message content: ${createMessageDto.content.substring(0, 50)}... (role: ${createMessageDto.role})`);
     
-    // Verify chat exists and belongs to the organization
     const chat = await this.getChat(chatId, organizationId);
 
-    // Create the message from user
     const userMessage = await this.prisma.message.create({
       data: {
         chatId,
@@ -472,192 +342,115 @@ export class ChatsService {
         role: createMessageDto.role,
         type: createMessageDto.type || 'text',
         sequenceId: createMessageDto.sequenceId,
-        metadata: createMessageDto.metadata || {}
+        metadata: createMessageDto.metadata || {},
       }
     });
 
     this.logger.log(`Successfully created user message ${userMessage.id} for chat ${chatId}`);
 
-    // Update the chat's updatedAt timestamp
+    await this.updateChatInRedis(chat, userMessage);
+
     await this.prisma.chat.update({
       where: { id: chatId },
       data: { updatedAt: new Date() }
     });
 
-    // Update Redis chat history
-    await this.updateChatInRedis(chatId, chat.assistantId, chat.sessionId, userMessage);
+    let systemPrompt: string | undefined = undefined;
+    const temperature = this.configService.get<number>('N8N_DEFAULT_TEMPERATURE') || 0.7;
 
-    // Only if this is a user message, process it through n8n
     if (createMessageDto.role === 'user') {
-      try {
-        // Get the associated assistant if this chat has one
-        let systemPrompt = '';
-        let temperature = 0.7;
-        
-        if (chat.assistantId) {
-          // Get assistant properties (system prompt, temperature)
-          const assistant = await this.prisma.assistant.findUnique({
-            where: { id: chat.assistantId },
-            select: { model: true, organizationId: true }
-          });
-          
-          if (assistant) {
-            // Try to get system prompt from the assistant model
-            if (assistant.model && typeof assistant.model === 'object') {
-              const model = assistant.model as Record<string, any>;
-              if (typeof model.systemPrompt === 'string') {
-                systemPrompt = model.systemPrompt;
-              }
-              if (typeof model.temperature === 'number') {
-                temperature = model.temperature;
-              }
-            }
-            
-            // Make sure the N8nWorkflow exists for this assistant - this will ensure
-            // it's created and activated if it doesn't exist yet
-            try {
-              await this.n8nWorkflowService.getOrCreateAssistantWorkflow(
-                chat.assistantId,
-                assistant.organizationId
-              );
-              this.logger.log(`Verified n8n workflow exists for assistant ${chat.assistantId}`);
-            } catch (e) {
-              this.logger.warn(`Error verifying n8n workflow for assistant ${chat.assistantId}: ${e.message}`);
-              // Continue anyway, the callN8nWebhook will try to get/create the workflow again
-            }
+      if (chat.assistantId) {
+        const assistant = await this.prisma.assistant.findUnique({ where: { id: chat.assistantId } }) as AssistantWithN8n;
+        if (assistant?.webhookUrl) {
+          try {
+            await this.n8nWorkflowService.getOrCreateAssistantWorkflow(chat.assistantId, assistant.organizationId);
+            this.logger.log(`Verified n8n workflow exists for assistant ${chat.assistantId}`);
+          } catch (e) {
+            this.logger.warn(`Error verifying n8n workflow for assistant ${chat.assistantId}: ${e.message}`);
           }
         }
-        
-        // If no system prompt was found, use a default or the chat's system prompt
-        if (!systemPrompt) {
-          // Cast chat to extended type that includes systemPrompt
-          const chatWithPrompt = chat as ChatWithSystemPrompt;
-          systemPrompt = chatWithPrompt.systemPrompt || 'You are a helpful assistant.';
-        }
-        
-        this.logger.log(`Processing message through n8n for chat ${chatId}`);
-        
-        // Call the n8n webhook with message content
-        // If this chat has an assistant, use its dedicated workflow
-        const n8nResponse = await this.callN8nWebhook({
-          sessionId: chatId, // Using chatId as the session ID for continuity
-          systemPrompt,
-          temperature, // Use the configured temperature
-          chatInput: createMessageDto.content
-        }, chat.assistantId); // Pass the assistantId to use its dedicated workflow
-        
-        if (n8nResponse) {
-          const assistantContent = n8nResponse.output;
-          const assistantMetadata = n8nResponse.metadata;
-
-          // Create a new message for the assistant's response
-          const assistantMessage = await this.prisma.message.create({
-            data: {
-              chat: { connect: { id: chatId } },
-              content: assistantContent,
-              role: 'assistant',
-              type: 'text',
-              sequenceId: createMessageDto.sequenceId + 1,
-              metadata: assistantMetadata
-            }
+      } else if (chat.agentId) {
+        try {
+          const primaryWorkflow = await this.prisma.workflow.findFirst({
+            where: { agentId: chat.agentId },
+            include: { workflowNodes: true },
           });
-
-          this.logger.log(`Created n8n response message ${assistantMessage.id} for chat ${chatId}`);
-
-          // Update Redis chat history with assistant response
-          await this.updateChatInRedis(chatId, chat.assistantId, chat.sessionId, assistantMessage);
-
-          // Return both messages
-          return {
-            userMessage,
-            assistantMessage
-          };
-        } else {
-          // If n8n response is null, log error and return user message only
-          this.logger.error(`n8n webhook returned null response for chat ${chatId}`);
           
-          // Return only the user message since n8n failed to respond
-          return { userMessage };
+          if (primaryWorkflow) {
+            const assistantNode = primaryWorkflow.workflowNodes.find(node => node.nodeType === 'ASSISTANT');
+            if (assistantNode && assistantNode.parameters) {
+              try {
+                const nodeData = JSON.parse(assistantNode.parameters);
+                if (nodeData.systemPrompt) {
+                  systemPrompt = nodeData.systemPrompt;
+                  this.logger.log(`Using system prompt from agent workflow: ${systemPrompt?.substring(0, 50)}...`);
+                }
+              } catch (error) {
+                this.logger.error('Failed to parse workflow node parameters', error);
+              }
+            }
+          }
+        } catch (e) {
+          this.logger.warn(`Error extracting system prompt from agent ${chat.agentId}: ${e.message}`);
         }
-      } catch (error) {
-        this.logger.error(`Error processing message through n8n: ${error.message}`);
-        if (error.stack) {
-          this.logger.error(`Stack trace: ${error.stack}`);
-        }
-        
-        // If there's an error with n8n, log it and return user message only
-        if (error.response) {
-          this.logger.error(`n8n webhook error (${error.response.status}): ${error.response.data}`);
-        } else {
-          this.logger.error(`n8n webhook error: ${error.message}`);
-        }
-        
-        // Return only the user message since n8n failed
-        return { userMessage };
+      }
+
+      if (!systemPrompt) {
+        const chatWithPrompt = chat as ChatWithSystemPrompt;
+        systemPrompt = chatWithPrompt.systemPrompt || 'You are a helpful assistant.';
+      }
+      
+      this.logger.log(`Processing message through n8n for chat ${chatId}`);
+      
+      const n8nResponse = await this.callN8nWebhook(
+        {
+          sessionId: chatId,
+          systemPrompt,
+          temperature,
+          chatInput: createMessageDto.content
+        },
+        chat.assistantId,
+        chat.agentId
+      );
+      
+      if (n8nResponse) {
+        const assistantMessage = await this.prisma.message.create({
+          data: {
+            chat: { connect: { id: chatId } },
+            content: n8nResponse.output,
+            role: 'assistant',
+            type: 'text',
+            sequenceId: createMessageDto.sequenceId + 1,
+            metadata: n8nResponse.metadata
+          }
+        });
+        await this.updateChatInRedis(chat, assistantMessage);
+        return { userMessage, assistantMessage };
       }
     }
-    
-    // If we reach here, it wasn't a user message that requires response (e.g., system message)
-    return { userMessage };
-  } // End of createMessage method
 
-  /**
-   * Call the n8n webhook with message data
-   * @param data The data to send to the webhook including sessionId, systemPrompt, temperature, and chatInput
-   * @param assistantId Optional assistant ID to use its dedicated workflow
-   * @returns The response from n8n or null if error
-   */
-  private async callN8nWebhook(data: {
-    sessionId: string;
-    systemPrompt: string;
-    temperature: number;
-    chatInput: string;
-  }, assistantId?: string): Promise<N8nWebhookResponse | null> {
+    return { userMessage, assistantMessage: null };
+  }
+
+  private async callN8nWebhook(data: { sessionId: string; systemPrompt: string; temperature: number; chatInput: string }, assistantId?: string | null, agentId?: string | null): Promise<N8nWebhookResponse | null> {
+    let webhookUrl: string | null | undefined;
+
+    if (assistantId) {
+      const assistant = await this.prisma.assistant.findUnique({ where: { id: assistantId } }) as AssistantWithN8n;
+      webhookUrl = assistant?.webhookUrl;
+    } else if (agentId) {
+      const agent = await this.prisma.agent.findUnique({ where: { id: agentId } }) as AgentWithN8n;
+      webhookUrl = agent?.metadata?.webhookUrl;
+    }
+
+    if (!webhookUrl) {
+      this.logger.warn(`No webhook URL found for assistant ${assistantId} or agent ${agentId}`);
+      return null;
+    }
+
     try {
-      let webhookUrl: string | undefined;
-      let organizationId: string | undefined;
+      this.logger.log(`Calling n8n webhook: ${webhookUrl.replace(/\/\/[^:]+:[^@]+@/, '\/\/***:***@')}`);
       
-      // If assistant ID is provided, get its organization ID and use its dedicated workflow
-      if (assistantId) {
-        // Get the organization ID for the assistant
-        const assistant = await this.prisma.assistant.findUnique({
-          where: { id: assistantId },
-          select: { organizationId: true }
-        });
-        
-        organizationId = assistant?.organizationId;
-        
-        if (!organizationId) {
-          this.logger.error(`Could not find organization ID for assistant ${assistantId}`);
-          return null;
-        }
-        
-        // Use the N8nWorkflowService to get or create a workflow for this assistant
-        const workflow = await this.n8nWorkflowService.getOrCreateAssistantWorkflow(
-          assistantId,
-          organizationId
-        );
-        
-        if (!workflow) {
-          this.logger.error(`Could not get or create workflow for assistant ${assistantId}`);
-          return null;
-        }
-        
-        webhookUrl = workflow.webhookUrl;
-      } else {
-        // Fall back to default webhook
-        webhookUrl = this.configService.get<string>('N8N_WEBHOOK_URL');
-      }
-      
-      if (!webhookUrl) {
-        this.logger.error('No webhook URL available for assistant or in environment');
-        return null;
-      }
-      
-      this.logger.log(`Calling n8n webhook: ${webhookUrl.replace(/\/\/[^:]+:[^@]+@/, '\/\/***:***@')}`); // Log URL with masked auth if present
-      
-      // Prepare the payload with top-level properties (not nested in body)
-      // Send directly in the request body format expected by n8n webhook
       const response = await axios.post(webhookUrl, {
         sessionId: data.sessionId,
         systemPrompt: data.systemPrompt,
@@ -665,7 +458,6 @@ export class ChatsService {
         chatInput: data.chatInput
       });
       
-      // Check if response is in expected format
       this.logger.log(`Received response from n8n webhook with status ${response.status}`);
       
       return {
@@ -675,74 +467,42 @@ export class ChatsService {
     } catch (error) {
       this.logger.error(`Error calling n8n webhook: ${(error as Error).message}`);
       
-      // Log more details about the error if available
       if ((error as any).response) {
         this.logger.error(`n8n webhook response status: ${(error as any).response.status}`);
         this.logger.error(`n8n webhook response data: ${JSON.stringify((error as any).response.data)}`);
       }
       
-      // Return null instead of throwing to allow fallback to LangChain Agent
       return null;
     }
   }
 
-  /**
-   * Initialize a new chat history in Redis
-   * @param chatId The chat ID
-   * @param assistantId The associated assistant ID, if any
-   * @param sessionId The session ID for the chat
-   * @param agentId The associated agent ID, if any
-   */
-  private async initChatInRedis(chatId: string, assistantId: string | null, sessionId: string, agentId: string | null = null): Promise<void> {
+  private getRedisKey(chat: Chat): string {
+    const { id: chatId, assistantId, agentId, sessionId } = chat;
+    if (assistantId) return `chat:assistant:${assistantId}:${sessionId}`;
+    if (agentId) return `chat:agent:${agentId}:${sessionId}`;
+    return `chat:${chatId}:${sessionId}`;
+  }
+
+  private async initChatInRedis(chat: Chat): Promise<void> {
+    const redisKey = this.getRedisKey(chat);
     try {
-      // Create an appropriate Redis key based on available IDs
-      let redisKey: string;
-      if (assistantId) {
-        redisKey = `chat:assistant:${assistantId}:${sessionId}`;
-      } else if (agentId) {
-        redisKey = `chat:agent:${agentId}:${sessionId}`;
-      } else {
-        redisKey = `chat:${chatId}:${sessionId}`;
-      }
-      
       await this.redis.set(redisKey, JSON.stringify([]));
       this.logger.log(`Initialized Redis chat history for ${redisKey}`);
     } catch (error) {
-      this.logger.error(`Failed to initialize Redis chat history: ${(error as Error).message}`);
-      // Continue even if Redis fails - the chat will still work with database storage
+      this.logger.error(`Failed to initialize Redis chat history for ${redisKey}: ${(error as Error).message}`);
     }
   }
 
-  /**
-   * Update chat history in Redis with a new message
-   * @param chatId The chat ID
-   * @param assistantId The associated assistant ID, if any
-   * @param sessionId The session ID for the chat
-   * @param message The message to add to history
-   */
-  private async updateChatInRedis(chatId: string, assistantId: string | null, sessionId: string, message: { role: string; content: string; id: string; createdAt: Date }): Promise<void> {
+  private async updateChatInRedis(chat: Chat, message: Message): Promise<void> {
+    const redisKey = this.getRedisKey(chat);
     try {
-      // Determine the correct Redis key based on the chat type
-      let redisKey: string;
-      const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
-      
-      if (chat?.assistantId) {
-        redisKey = `chat:assistant:${chat.assistantId}:${sessionId}`;
-      } else if (chat?.agentId) {
-        redisKey = `chat:agent:${chat.agentId}:${sessionId}`;
-      } else {
-        redisKey = `chat:${chatId}:${sessionId}`;
-      }
-      
-      // Get existing chat history from Redis
       const existingChatHistory = await this.redis.get(redisKey);
-      let chatHistory: Array<{ role: string; content: string; id: string; timestamp: Date }> = [];
+      let chatHistory: ChatHistoryMessage[] = [];
       
       if (existingChatHistory) {
         chatHistory = JSON.parse(existingChatHistory);
       }
       
-      // Add the new message
       chatHistory.push({
         role: message.role,
         content: message.content,
@@ -750,45 +510,24 @@ export class ChatsService {
         timestamp: message.createdAt
       });
       
-      // Limit history to 2000 messages as per requirements
       if (chatHistory.length > 2000) {
         chatHistory = chatHistory.slice(-2000);
       }
       
-      // Save back to Redis
       await this.redis.set(redisKey, JSON.stringify(chatHistory));
       this.logger.log(`Updated Redis chat history for ${redisKey}`);
     } catch (error) {
-      this.logger.error(`Failed to update Redis chat history: ${(error as Error).message}`);
-      // Continue even if Redis fails
+      this.logger.error(`Failed to update Redis chat history for ${redisKey}: ${(error as Error).message}`);
     }
   }
 
-  /**
-   * Remove a chat history from Redis
-   * @param chatId The chat ID to remove
-   * @param assistantId The associated assistant ID, if any
-   * @param sessionId The session ID for the chat
-   */
-  private async removeChatFromRedis(chatId: string, assistantId: string | null, sessionId: string): Promise<void> {
+  private async removeChatFromRedis(chat: Chat): Promise<void> {
+    const redisKey = this.getRedisKey(chat);
     try {
-      // Determine the correct Redis key based on the chat type
-      let redisKey: string;
-      const chat = await this.prisma.chat.findUnique({ where: { id: chatId } });
-      
-      if (chat?.assistantId) {
-        redisKey = `chat:assistant:${chat.assistantId}:${sessionId}`;
-      } else if (chat?.agentId) {
-        redisKey = `chat:agent:${chat.agentId}:${sessionId}`;
-      } else {
-        redisKey = `chat:${chatId}:${sessionId}`;
-      }
-      
       await this.redis.del(redisKey);
       this.logger.log(`Removed Redis chat history for ${redisKey}`);
     } catch (error) {
-      this.logger.error(`Failed to remove Redis chat history: ${(error as Error).message}`);
-      // Continue even if Redis fails
+      this.logger.error(`Failed to remove Redis chat history for ${redisKey}: ${(error as Error).message}`);
     }
   }
 }

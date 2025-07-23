@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, Logger, Res, Header } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { N8nService } from './n8n.service';
 import { WebhookWorkflowTemplate } from './n8n.types';
+import { Response } from 'express';
+import { Observable } from 'rxjs';
 
 interface TestWebhookDto {
   webhookUrl: string;
@@ -90,5 +92,67 @@ export class N8nController {
       body.headers,
       body.useTestUrl,
     );
+  }
+
+  @Post('stream-webhook')
+  @ApiOperation({ summary: 'Send a request to a webhook and stream the response back as SSE' })
+  @Header('Content-Type', 'text/event-stream')
+  @Header('Cache-Control', 'no-cache')
+  @Header('Connection', 'keep-alive')
+  async streamWebhook(
+    @Body() body: { 
+      webhookUrl: string; 
+      workflowId?: string; 
+      message: string;
+      sessionId: string;
+      systemPrompt?: string;
+      contextLength?: number;
+      headers?: Record<string, string>;
+    },
+    @Res() response: Response,
+  ) {
+    this.logger.log(`Streaming webhook request to ${body.webhookUrl}`);  
+    
+    try {
+      const stream = await this.n8nService.streamWebhook(
+        body.webhookUrl,
+        body.workflowId,
+        {
+          message: body.message,
+          sessionId: body.sessionId,
+          systemPrompt: body.systemPrompt,
+          contextLength: body.contextLength || 5,
+        },
+        body.headers,
+      );
+
+      // Setup error handling for the response
+      response.on('close', () => {
+        this.logger.log('Client closed connection');
+        response.end();
+      });
+      
+      // Handle the stream
+      stream.subscribe({
+        next: (chunk) => {
+          // Format as SSE
+          response.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        },
+        error: (err) => {
+          this.logger.error(`Stream error: ${err.message}`);
+          response.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+          response.end();
+        },
+        complete: () => {
+          this.logger.log('Stream completed');
+          response.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+          response.end();
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Error in streamWebhook: ${error.message}`);
+      response.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      response.end();
+    }
   }
 }
