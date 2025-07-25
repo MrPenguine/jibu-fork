@@ -44,12 +44,11 @@ export class AgentController {
   @Post()
   @ApiOperation({ summary: 'Create a new agent' })
   @ApiResponse({ status: 201, description: 'The agent has been successfully created.' })
-  create(@Req() req, @Body() createAgentDto: CreateAgentDto): Promise<Agent> {
-    const organizationId = (req.user as User).lastOrgId;
-    if (!organizationId) {
-      throw new BadRequestException('No organization selected. Please select an organization first.');
+  create(@Body() createAgentDto: CreateAgentDto): Promise<Agent> {
+    if (!createAgentDto.organizationId) {
+      throw new BadRequestException('Organization ID is required');
     }
-    return this.agentService.create(createAgentDto, organizationId);
+    return this.agentService.create(createAgentDto, createAgentDto.organizationId);
   }
 
   @Get()

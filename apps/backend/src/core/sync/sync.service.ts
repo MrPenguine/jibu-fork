@@ -15,24 +15,30 @@ export class UserSyncService {
    * Sync a user from Supabase to our database
    */
   async syncUserFromSupabase(userData: any): Promise<any> {
-    try {
-      this.logger.log(`Syncing user: ${userData.id}`);
+    this.logger.log(`Syncing user: ${userData.id}`);
 
-      // Check if user exists
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userData.id },
-      });
+    // Check if user exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: userData.id },
+    });
 
-      if (existingUser) {
-        // Update existing user
-        return this.updateUser(userData);
-      } else {
-        // Create new user
-        return this.createUser(userData);
+    if (existingUser) {
+      // Update existing user
+      return this.updateUser(userData);
+    } else {
+      // Create new user
+      try {
+        return await this.createUser(userData);
+      } catch (error) {
+        // Handle race condition where user was created by another process
+        if (error.code === 'P2002') {
+          this.logger.warn(`User already created by another process, fetching existing user: ${userData.id}`);
+          return this.prisma.user.findUnique({ where: { id: userData.id } });
+        } else {
+          this.logger.error(`Error creating user: ${error.message}`, error.stack);
+          throw error;
+        }
       }
-    } catch (error) {
-      this.logger.error(`Error syncing user: ${error.message}`, error.stack);
-      throw error;
     }
   }
 
@@ -44,7 +50,8 @@ export class UserSyncService {
     const appMetadata = supabaseUser.app_metadata || {};
 
     // Use a transaction to ensure all related data is created atomically
-    const result = await this.prisma.$transaction(async (tx) => {
+    // Use a transaction to ensure user and organization are created atomically
+    const { user, organization } = await this.prisma.$transaction(async (tx) => {
       // 1. Create the user
       const user = await tx.user.create({
         data: {
@@ -85,14 +92,15 @@ export class UserSyncService {
         data: { lastOrgId: organization.id },
       });
 
-      // 4. Create default API keys
-      await this.apiKeyService.ensureDefaultKeysForUser(organization.id, user.id);
-
-      this.logger.log(`Created new user, organization, and API keys: ${user.id}, ${organization.id}`);
+      this.logger.log(`Created new user and organization: ${user.id}, ${organization.id}`);
       return { user: updatedUser, organization };
     });
 
-    return result;
+    // 4. Create default API keys, now outside of the transaction
+    await this.apiKeyService.ensureDefaultKeysForUser(organization.id, user.id);
+    this.logger.log(`Created default API keys for user: ${user.id}`);
+
+    return { user, organization };
   }
 
   /**

@@ -332,6 +332,7 @@ interface CreateAgentDefinitionRequest {
   edges: FlowEdge[];
   startNodeId?: string;
   assistantId?: string;
+  organizationId: string;
 }
 
 // Interface for agent definition update
@@ -473,6 +474,8 @@ export const agentApiClient = {
       if (!orgId) {
         throw new Error('No organization ID available');
       }
+
+      data.organizationId = orgId;
       
       const headers = await getAuthHeaders(orgId);
       
