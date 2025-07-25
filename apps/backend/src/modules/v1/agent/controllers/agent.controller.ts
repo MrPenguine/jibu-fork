@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req, BadReq
 import { AgentService } from '../services/agent.service';
 import { AgentService as IntegrationsAgentService } from '../../../../integrations/agent/agent.service';
 import { CreateAgentDto, UpdateAgentDto } from '../dto';
+import { User } from '@prisma/client';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
 import { OrgRoleGuard } from '../../../../core/auth/guards/org-role.guard';
 import { Public } from '../../../../core/auth/decorators/public.decorator';
@@ -43,34 +44,32 @@ export class AgentController {
   @Post()
   @ApiOperation({ summary: 'Create a new agent' })
   @ApiResponse({ status: 201, description: 'The agent has been successfully created.' })
-  create(@Body() createAgentDto: CreateAgentDto, @Req() req): Promise<Agent> {
-    // Get organization ID from req.user.orgId (set by JWT strategy)
-    const organizationId = req.user.orgId;
-    
+  create(@Req() req, @Body() createAgentDto: CreateAgentDto): Promise<Agent> {
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected. Please select an organization first.');
     }
-    
-    console.log('Controller received organization ID:', organizationId);
     return this.agentService.create(createAgentDto, organizationId);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all agents for the organization' })
-  @ApiResponse({ status: 200, description: 'Return all agents for the organization.' })
-  findAll(@Req() req): Promise<Agent[]> {
-    const organizationId = req.user.orgId;
-    if (!organizationId) {
-      throw new BadRequestException('No organization selected');
+  @ApiOperation({ summary: 'List all agents for the authenticated user or a specific organization' })
+  @ApiResponse({ status: 200, description: 'Return all agents.' })
+  findAll(@Req() req, @Query('organizationId') organizationId?: string) {
+    // Use the organizationId from the query if provided, otherwise fall back to the user's last active organization.
+    const orgId = organizationId || req.user.lastOrgId;
+    if (!orgId) {
+      throw new BadRequestException('Organization ID must be provided.');
     }
-    return this.agentService.findAll(organizationId);
+    // TODO: Add a check to ensure the user has access to the requested organizationId
+    return this.agentService.findAll(orgId);
   }
 
   @Get('assistant/:assistantId')
   @ApiOperation({ summary: 'Get all agents for a specific assistant' })
   @ApiResponse({ status: 200, description: 'Return all agents for the assistant.' })
   findAllByAssistant(@Param('assistantId') assistantId: string, @Req() req): Promise<Agent[]> {
-    const organizationId = req.user.orgId;
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }
@@ -82,7 +81,7 @@ export class AgentController {
   @ApiResponse({ status: 200, description: 'Return the agent.' })
   @ApiResponse({ status: 404, description: 'Agent not found.' })
   async findOne(@Param('id') id: string, @Req() req): Promise<any> {
-    const organizationId = req.user.orgId;
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }
@@ -191,7 +190,7 @@ export class AgentController {
     @Body() updateAgentDto: UpdateAgentDto,
     @Req() req,
   ): Promise<Agent> {
-    const organizationId = req.user.orgId;
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }
@@ -203,7 +202,7 @@ export class AgentController {
   @ApiResponse({ status: 200, description: 'The agent has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'Agent not found.' })
   remove(@Param('id') id: string, @Req() req): Promise<Agent> {
-    const organizationId = req.user.orgId;
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }
@@ -215,7 +214,7 @@ export class AgentController {
   @ApiResponse({ status: 200, description: 'The agent has been successfully published.' })
   @ApiResponse({ status: 404, description: 'Agent not found.' })
   publish(@Param('id') id: string, @Req() req): Promise<Agent> {
-    const organizationId = req.user.orgId;
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }
@@ -227,7 +226,7 @@ export class AgentController {
   @ApiResponse({ status: 200, description: 'The agent has been successfully unpublished.' })
   @ApiResponse({ status: 404, description: 'Agent not found.' })
   unpublish(@Param('id') id: string, @Req() req): Promise<Agent> {
-    const organizationId = req.user.orgId;
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }
@@ -247,7 +246,7 @@ export class AgentController {
     if (request.config?.assistantId) {
       try {
         this.logger.log(`[AGENT_ASSISTANT_DEBUG] Checking if assistantId ${request.config.assistantId} is actually an agentId...`);
-        const organizationId = req.headers['x-organization-id'] as string;
+        const organizationId = (req.user as User)?.lastOrgId || (req.headers['x-organization-id'] as string);
         
         // Try to find an agent with this ID
         try {
@@ -278,7 +277,7 @@ export class AgentController {
     // Save the messages to the database if we have a valid chat ID
     if (request.sessionId && !request.sessionId.startsWith('chat-')) {
       try {
-        const organizationId = req.headers['x-organization-id'] as string;
+        const organizationId = (req.user as User)?.lastOrgId || (req.headers['x-organization-id'] as string);
         
         // Save user message
         await this.saveMessageToDatabase(request.sessionId, request.input, 'user', organizationId);
@@ -307,7 +306,7 @@ export class AgentController {
     if (request.config?.assistantId) {
       try {
         this.logger.log(`[AGENT_ASSISTANT_DEBUG] Checking if assistantId ${request.config.assistantId} is actually an agentId...`);
-        const organizationId = req.headers['x-organization-id'] as string;
+        const organizationId = (req.user as User)?.lastOrgId || (req.headers['x-organization-id'] as string);
         
         // Try to find an agent with this ID
         try {
@@ -336,7 +335,7 @@ export class AgentController {
     // Save the user message to the database if we have a valid chat ID
     if (request.sessionId && !request.sessionId.startsWith('chat-')) {
       try {
-        const organizationId = req.headers['x-organization-id'] as string;
+        const organizationId = (req.user as User)?.lastOrgId || (req.headers['x-organization-id'] as string);
         await this.saveMessageToDatabase(request.sessionId, request.input, 'user', organizationId);
       } catch (error) {
         this.logger.error(`Error saving user message to database: ${error.message}`);
@@ -391,7 +390,7 @@ export class AgentController {
         // Save the complete assistant response to the database
         if (request.sessionId && !request.sessionId.startsWith('chat-')) {
           try {
-            const organizationId = req.headers['x-organization-id'] as string;
+            const organizationId = (req.user as User)?.lastOrgId || (req.headers['x-organization-id'] as string);
             await this.saveMessageToDatabase(
               request.sessionId,
               completeAssistantResponse,
@@ -440,7 +439,7 @@ export class AgentController {
   @ApiOperation({ summary: 'Get all workflows for an agent' })
   @ApiResponse({ status: 200, description: 'Return all workflows for the agent.' })
   async getAgentWorkflows(@Param('id') id: string, @Req() req): Promise<any[]> {
-    const organizationId = req.user.orgId;
+    const organizationId = (req.user as User).lastOrgId;
     if (!organizationId) {
       throw new BadRequestException('No organization selected');
     }

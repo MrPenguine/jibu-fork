@@ -378,6 +378,7 @@ enum AgentNodeType {
   RECORD // For voice: record audio
   PLAY_AUDIO // For voice: play a pre-recorded audio URL
   WORKFLOW_CALL // Execute a secondary workflow
+  ASSISTANT // Use an Assistant for chat/voice interaction
 }
 
 enum WorkflowType {
@@ -395,8 +396,10 @@ model Agent {
   metadata       Json?
   organizationId String
   assistantId    String?
+  n8nWorkflowId  String?
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assistant      Assistant?     @relation(fields: [assistantId], references: [id], onDelete:SetNull)
+  n8nWorkflow    N8nWorkflow?  @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
   workflows      Workflow[]
   chats          Chat[]
   agentSessions  AgentSession[]
@@ -411,13 +414,14 @@ model AgentSession {
   updatedAt      DateTime @updatedAt
   agentId        String
   agent          Agent    @relation(fields: [agentId], references: [id], onDelete:Cascade)
-  chatId         String
-  chat           Chat     @relation(fields: [chatId], references: [id], onDelete:Cascade)
+  chatId         String?
+  chat           Chat?    @relation(fields: [chatId], references: [id], onDelete:Cascade)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete:Cascade)
   status         String       @default("active") // e.g., active, completed, failed
   currentNodeId  String?
   variables      Json?
+  history        Json? // Log of executed nodes and I/O: Array<{ nodeId: string, input?: any, output?: any, timestamp: Date }>
   callSid        String? // For voice: SID from the provider
 
   @@index([agentId])
@@ -440,15 +444,18 @@ model Workflow {
   version        Int          @default(1)
   isPublished    Boolean      @default(false)
   publishedAt    DateTime?
-  workflowType   WorkflowType @default("MASTER")
+  workflowType   WorkflowType @default(MASTER)
   masterWorkflowId String?
   masterWorkflow   Workflow?   @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
   secondaryWorkflows Workflow[] @relation("SecondaryWorkflows")
+  n8nWorkflowId   String?
+  n8nWorkflow     N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
 
-  agent        Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  chats        Chat[]
+  agent         Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  chats         Chat[]
   workflowNodes WorkflowNode[]
+  workflowEdges WorkflowEdge[]
 
   @@index([agentId])
   @@index([organizationId])
@@ -458,8 +465,10 @@ model WorkflowNode {
   id         String  @id @default(uuid())
   workflowId String
   type       AgentNodeType
+  nodeType   AgentNodeType? // Legacy field for compatibility
   data       Json
   position   Json
+  parameters String? // Node parameters as JSON string
   toolId     String?
   incomingChoiceId String?
 
@@ -490,31 +499,6 @@ model WorkflowEdge {
   @@index([workflowId])
   @@index([sourceId])
   @@index([targetId])
-}
-
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  currentNodeId String?  // The ID of the node the flow is currently at (if paused waiting for input)
-  variables     Json     // Conversation variables: Record<string, any>
-  history       Json?    // Log of executed nodes and I/O: Array<{ nodeId: string, input?: any, output?: any, timestamp: Date }>
-
-  status        String   @default("ACTIVE") // e.g., ACTIVE, PAUSED, COMPLETED, ERROR, CANCELLED
-  endedAt       DateTime?
-
-  // For voice-specific state
-  callSid       String?  @unique // SID from your voice provider (e.g., Twilio, or your own)
-  phoneNumber   String?  // User's phone number (if applicable)
-
-  // If this agent session is part of a larger Chat
-  chatId        String?
-  chat          Chat?    @relation(fields: [chatId], references: [id])
-
-  @@index([agentId])
-  @@index([organizationId])
-  @@index([callSid])
-  @@index([chatId])
-  @@index([status])
 }
 
 // Enum for N8nWorkflow type (primary/secondary)

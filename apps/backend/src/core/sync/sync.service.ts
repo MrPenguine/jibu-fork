@@ -43,51 +43,56 @@ export class UserSyncService {
     const userMetadata = supabaseUser.user_metadata || {};
     const appMetadata = supabaseUser.app_metadata || {};
 
-    // Create the user
-    const user = await this.prisma.user.create({
-      data: {
-        id: supabaseUser.id,
-        email: supabaseUser.email,
-        emailConfirmed: !!supabaseUser.email_confirmed_at,
-        firstName: userMetadata.first_name,
-        lastName: userMetadata.last_name,
-        fullName: userMetadata.full_name,
-        imageUrl: userMetadata.avatar_url || userMetadata.picture, // Handle different possible fields
-        provider: appMetadata.provider,
-        providerIds: appMetadata.providers || [], // Ensure it's an array
-        lastSignInAt: supabaseUser.last_sign_in_at ? new Date(supabaseUser.last_sign_in_at) : null,
-        phoneNumber: supabaseUser.phone,
-        phoneConfirmed: !!supabaseUser.phone_confirmed_at,
-        isAnonymous: supabaseUser.is_anonymous || false,
-        metadata: userMetadata, // Store the raw metadata
-      },
-    });
+    // Use a transaction to ensure all related data is created atomically
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Create the user
+      const user = await tx.user.create({
+        data: {
+          id: supabaseUser.id,
+          email: supabaseUser.email,
+          emailConfirmed: !!supabaseUser.email_confirmed_at,
+          firstName: userMetadata.first_name,
+          lastName: userMetadata.last_name,
+          fullName: userMetadata.full_name,
+          imageUrl: userMetadata.avatar_url || userMetadata.picture,
+          provider: appMetadata.provider,
+          providerIds: appMetadata.providers || [],
+          lastSignInAt: supabaseUser.last_sign_in_at ? new Date(supabaseUser.last_sign_in_at) : null,
+          phoneNumber: supabaseUser.phone,
+          phoneConfirmed: !!supabaseUser.phone_confirmed_at,
+          isAnonymous: supabaseUser.is_anonymous || false,
+          metadata: userMetadata,
+        },
+      });
 
-    // Create a default organization for the user
-    const organization = await this.prisma.organization.create({
-      data: {
-        name: `${user.firstName || user.email}'s Organization`,
-        memberships: {
-          create: {
-            userId: user.id,
-            role: 'owner', // Default role is owner for created org
-            status: 'active', // Ensure the membership is active
+      // 2. Create the default organization
+      const organization = await tx.organization.create({
+        data: {
+          name: `${user.firstName || user.email}'s Organization`,
+          memberships: {
+            create: {
+              userId: user.id,
+              role: 'owner',
+              status: 'active',
+            },
           },
         },
-      },
+      });
+
+      // 3. Update the user with the new organization ID
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: { lastOrgId: organization.id },
+      });
+
+      // 4. Create default API keys
+      await this.apiKeyService.ensureDefaultKeysForUser(organization.id, user.id);
+
+      this.logger.log(`Created new user, organization, and API keys: ${user.id}, ${organization.id}`);
+      return { user: updatedUser, organization };
     });
 
-    // Update the user's lastOrgId to point to this organization
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastOrgId: organization.id }
-    });
-
-    // Create default API keys for the user
-    await this.apiKeyService.ensureDefaultKeysForUser(organization.id, user.id);
-
-    this.logger.log(`Created new user, organization, and default API keys: ${user.id}, ${organization.id}`);
-    return { user, organization };
+    return result;
   }
 
   /**

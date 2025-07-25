@@ -69,9 +69,11 @@ export class UserService {
       include: { lastOrg: true },
     });
 
-    return {
-      organization: updatedUser.lastOrg,
-    };
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { lastOrgId: organizationId },
+      include: { lastOrg: true },
+    });
   }
 
   /**

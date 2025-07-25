@@ -261,14 +261,26 @@ export class AgentService {
   }
 
   async findAll(organizationId: string): Promise<Agent[]> {
-    return this.prisma.agent.findMany({
+    this.logger.log(`Finding all agents for organization ID: ${organizationId}`);
+    
+    // Find all agents and their associated workflows for the given organization
+    const agents = await this.prisma.agent.findMany({
       where: {
-        organizationId,
+        organizationId: organizationId,
+      },
+      include: {
+        workflows: true, // Include workflows to check for publication status
       },
       orderBy: {
         updatedAt: 'desc',
       },
-    }) as unknown as Agent[];
+    });
+
+    // Map the result to include the isPublished status
+    return agents.map(agent => ({
+      ...agent,
+      isPublished: agent.workflows?.some(w => w.isPublished) ?? false,
+    })) as unknown as Agent[];
   }
 
   async findAllByAssistant(assistantId: string, organizationId: string): Promise<Agent[]> {
@@ -375,7 +387,7 @@ export class AgentService {
 
     try {
       return this.prisma.agent.update({
-        where: { id },
+        where: { id, organizationId },
         data: updateData,
       }) as unknown as Agent;
     } catch (error) {
@@ -391,6 +403,7 @@ export class AgentService {
     return this.prisma.agent.delete({
       where: {
         id,
+        organizationId,
       },
     }) as unknown as Agent;
   }

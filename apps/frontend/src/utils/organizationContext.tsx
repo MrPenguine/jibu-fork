@@ -328,7 +328,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       });
     } catch (apiError) {
       console.warn('Could not update organization on backend:', apiError);
-      // Continue even if API fails
+      // The context is updated, and components relying on it should reactively update.
     }
   };
 

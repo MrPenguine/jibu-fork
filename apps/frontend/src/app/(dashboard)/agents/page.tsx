@@ -12,8 +12,11 @@ import { Textarea } from '@libs/shadcn-ui/components/ui/textarea';
 import { Label } from '@libs/shadcn-ui/components/ui/label';
 import { PlusCircle, Edit, Play, Trash2, Pencil } from 'lucide-react';
 import { agentApiClient } from '../../../utils/AgentApi';
+import { fetchAPI } from "../../../utils/api";
+import { useOrganization } from '../../../utils/organizationContext';
 
 export default function AgentsPage() {
+  const { activeOrganization } = useOrganization();
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -27,8 +30,14 @@ export default function AgentsPage() {
 
   useEffect(() => {
     const fetchAgents = async () => {
+      if (!activeOrganization) {
+        setAgents([]);
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
       try {
-        const fetchedAgents = await agentApiClient.getAgentDefinitions();
+        const fetchedAgents = await fetchAPI(`/v1/agents?organizationId=${activeOrganization.id}`);
         setAgents(fetchedAgents as any[]);
       } catch (error) {
         console.error("Failed to fetch agents:", error);
@@ -38,7 +47,7 @@ export default function AgentsPage() {
     };
     
     fetchAgents();
-  }, []);
+  }, [activeOrganization]);
 
   const handleCreateAgent = async () => {
     if (!newAgentName.trim()) {

@@ -134,7 +134,7 @@ export default function AgentChat({
   onClose,
   chatId: initialChatId,
   children
-}: AgentChatProps) => {
+}: AgentChatProps) {
   // Organization context
   const { activeOrganizationId } = useOrganization();
   const { toast } = useToast();
