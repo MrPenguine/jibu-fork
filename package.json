@@ -6,12 +6,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "worker:start": "nx run worker:worker",
-    "worker:build": "nx build worker"
+    "worker:build": "nx build worker",
+    "db:migrate:dev": "pnpm dlx dotenv-cli -e apps/backend/.env -- prisma migrate dev --schema=./apps/backend/prisma/schema.prisma"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.9.0",
+  "packageManager": "pnpm@10.13.1",
   "devDependencies": {
     "@babel/core": "^7.27.1",
     "@babel/preset-react": "^7.14.5",
