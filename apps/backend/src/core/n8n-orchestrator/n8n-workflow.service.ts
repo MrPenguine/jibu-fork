@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpException } from '@nestjs/common';
+import { N8nTemplateService } from './n8n-template.service';
+import { GoogleGeminiChatModelTemplate } from './templates/google-gemini.template';
+import { AiAgentTemplate } from './templates/ai-agent.template';
+import { WebhookTemplate } from './templates/webhook.template';
+import { RespondToWebhookTemplate } from './templates/respond-to-webhook.template';
 import { N8nClient } from './n8n-client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/database/prisma.service';
@@ -13,9 +18,21 @@ export class N8nWorkflowService {
 
   constructor(
     private readonly n8nClient: N8nClient,
+    private readonly n8nTemplateService: N8nTemplateService,
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {}
+
+  /**
+   * Generate a unique ID for N8N nodes and webhooks
+   */
+  private generateUniqueId(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
 
   /**
    * Create a new workflow in n8n
@@ -143,101 +160,55 @@ export class N8nWorkflowService {
     
     this.logger.log(`Creating agent chat workflow: ${workflowName} with chat trigger node`);
     
+        const geminiNode = this.n8nTemplateService.parseTemplate(GoogleGeminiChatModelTemplate, {
+      MODEL_NAME: 'models/gemini-1.5-flash',
+      CREDENTIAL_ID: 'STy8vguknZjfysYZ', // This should ideally come from a config service
+      CREDENTIAL_NAME: 'GEMINI',
+    });
+
+    const agentNode = this.n8nTemplateService.parseTemplate(AiAgentTemplate, {
+      MESSAGE: '={{ $json.body.message }}',
+      SYSTEM_PROMPT: '={{ $json.body.systemPrompt || "You are a helpful AI assistant. Respond to user queries in a friendly and informative manner." }}',
+    });
+
+    const webhookNode = this.n8nTemplateService.parseTemplate(WebhookTemplate, {
+      WEBHOOK_PATH: `{{$json.body.assistantId}}`,
+      WEBHOOK_ID: webhookId,
+    });
+
+    const respondNode = this.n8nTemplateService.parseTemplate(RespondToWebhookTemplate, {});
+
+    // Assign static IDs to nodes for predictable connections
+    const webhookNodeId = crypto.randomUUID();
+    const agentNodeId = crypto.randomUUID();
+    const geminiNodeId = crypto.randomUUID();
+    const respondNodeId = crypto.randomUUID();
+
     const workflowData = {
       name: workflowName,
       nodes: [
-        {
-          parameters: {
-            modelName: 'models/gemini-2.5-flash',
-            options: {}
-          },
-          id: crypto.randomUUID(),
-          name: 'Google Gemini Chat Model',
-          type: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini',
-          position: [40, 80],
-          typeVersion: 1,
-          credentials: {
-            googlePalmApi: {
-              id: 'STy8vguknZjfysYZ',
-              name: 'GEMINI'
-            }
-          }
-        },
-        {
-          parameters: {
-            promptType: 'define',
-            text: '={{ $json.body.message }}',
-            options: {
-              systemMessage: '={{ $json.body.systemPrompt || "You are a helpful AI assistant. Respond to user queries in a friendly and informative manner." }}'
-            }
-          },
-          id: crypto.randomUUID(),
-          name: 'AI Agent',
-          type: '@n8n/n8n-nodes-langchain.agent',
-          position: [100, -160],
-          typeVersion: 2
-        },
-        {
-          parameters: {
-            sessionIdType: 'customKey',
-            sessionKey: '={{ $("Webhook").item.json.body.sessionId }}',
-            contextWindowLength: '={{ $("Webhook").item.json.body.contextLength || 5 }}'
-          },
-          id: crypto.randomUUID(),
-          name: 'Simple Memory',
-          type: '@n8n/n8n-nodes-langchain.memoryBufferWindow',
-          position: [180, 80],
-          typeVersion: 1.3
-        },
-        {
-          parameters: {
-            public: true,
-            options: {
-              responseMode: 'lastNode'
-            }
-          },
-          type: '@n8n/n8n-nodes-langchain.chatTrigger',
-          typeVersion: 1.1,
-          position: [-200, -140],
-          id: crypto.randomUUID(),
-          name: 'When chat message received',
-          webhookId: webhookId
-        }
+        { ...geminiNode, id: geminiNodeId, position: [260, 240] },
+        { ...agentNode, id: agentNodeId, position: [500, 0] },
+        { ...webhookNode, id: webhookNodeId, position: [260, 0] },
+        { ...respondNode, id: respondNodeId, position: [740, 0] },
       ],
       pinData: {},
       connections: {
+        'Webhook': {
+          main: [
+            [{ node: 'AI Agent', type: 'main', index: 0 }]
+          ]
+        },
         'AI Agent': {
           main: [
-            []
+            [{ node: 'Respond to Webhook', type: 'main', index: 0 }]
           ]
         },
         'Google Gemini Chat Model': {
           ai_languageModel: [
-            [{
-              node: 'AI Agent',
-              type: 'ai_languageModel',
-              index: 0
-            }]
+            [{ node: 'AI Agent', type: 'ai_languageModel', index: 0 }]
           ]
         },
-        'Simple Memory': {
-          ai_memory: [
-            [{
-              node: 'AI Agent',
-              type: 'ai_memory',
-              index: 0
-            }]
-          ]
-        },
-        'When chat message received': {
-          main: [
-            [{
-              node: 'AI Agent',
-              type: 'main',
-              index: 0
-            }]
-          ]
-        }
       },
       settings: {
         executionOrder: 'v1'
@@ -356,6 +327,69 @@ export class N8nWorkflowService {
 
     // If no workflow exists, create a new one
     return this.createAgentChatWorkflow(assistantId, organizationId);
+  }
+
+  async createEmptyWorkflow(workflowName: string, organizationId: string) {
+    this.logger.log(`Creating empty workflow: ${workflowName}`);
+    
+    // First, test N8N connectivity
+    try {
+      this.logger.log('Testing N8N connectivity before creating workflow...');
+      const isHealthy = await this.n8nClient.ping();
+      if (!isHealthy) {
+        this.logger.error('N8N health check failed - server may not be running');
+        throw new HttpException('N8N server is not accessible', 503);
+      }
+      this.logger.log('N8N connectivity test passed');
+    } catch (healthError) {
+      this.logger.error(`N8N health check error: ${healthError.message}`);
+      throw new HttpException('N8N server connectivity failed', 503);
+    }
+    
+    // Create a minimal workflow with just a Manual Trigger node
+    // This is the simplest possible workflow that n8n will accept
+    const nodeId = this.generateUniqueId();
+    
+    const workflowData = {
+      name: workflowName,
+      nodes: [
+        {
+          id: nodeId,
+          name: 'Manual Trigger',
+          type: 'n8n-nodes-base.manualTrigger',
+          typeVersion: 1,
+          position: [240, 300],
+          parameters: {}
+        }
+      ],
+      connections: {},
+      settings: {
+        executionOrder: 'v1'
+      }
+    };
+
+    try {
+      const newWorkflow = await this.n8nClient.createWorkflow(workflowData);
+      this.logger.log(`Successfully created empty N8N workflow with ID: ${newWorkflow.id}`);
+      
+      // Create the corresponding database record in N8nWorkflow table
+      const n8nWorkflowRecord = await this.prisma.n8nWorkflow.create({
+        data: {
+          n8nWorkflowId: newWorkflow.id,
+          workflowJson: workflowData,
+          isActive: false, // Will be activated separately if needed
+          organizationId: organizationId
+        }
+      });
+      
+      this.logger.log(`Created N8nWorkflow database record with ID: ${n8nWorkflowRecord.id}`);
+      
+      // Return the database record (which includes the n8n workflow ID)
+      return n8nWorkflowRecord;
+    } catch (error) {
+      this.logger.error(`Failed to create empty N8N workflow: ${workflowName}`, error.stack);
+      throw new HttpException('Failed to create empty N8N workflow', 500);
+    }
   }
 
   /**

@@ -134,6 +134,7 @@
     "joi": "^17.13.3",
     "livekit-client": "^2.13.6",
     "livekit-server-sdk": "^2.13.0",
+    "lodash": "^4.17.21",
     "microsoft-cognitiveservices-speech-sdk": "^1.44.1",
     "next": "~15.2.4",
     "next-themes": "^0.4.6",

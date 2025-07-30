@@ -150,11 +150,35 @@ export class N8nClient {
    */
   async createWorkflow(workflowData: any): Promise<any> {
     try {
+      this.logger.debug(`Creating workflow with data: ${JSON.stringify(workflowData, null, 2)}`);
+      this.logger.debug(`Using N8N URL: ${this.n8nUrl}`);
+      this.logger.debug(`API Key present: ${this.n8nApiKey ? 'Yes' : 'No'}`);
+      
       const response = await this.httpClient.post('/api/v1/workflows', workflowData);
       this.logger.log(`Successfully created workflow with ID: ${response.data.id}`);
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to create workflow: ${error.message}`);
+      
+      // Enhanced error logging for debugging
+      if (error.response) {
+        this.logger.error(`HTTP Status: ${error.response.status}`);
+        this.logger.error(`Response Headers: ${JSON.stringify(error.response.headers, null, 2)}`);
+        this.logger.error(`Response Data: ${JSON.stringify(error.response.data, null, 2)}`);
+        
+        if (error.response.status === 401) {
+          this.logger.error('Authentication failed - checking N8N configuration:');
+          this.logger.error(`N8N URL: ${this.n8nUrl}`);
+          this.logger.error(`API Key length: ${this.n8nApiKey?.length || 0}`);
+          this.logger.error(`API Key starts with: ${this.n8nApiKey?.substring(0, 10)}...`);
+        }
+      } else if (error.request) {
+        this.logger.error('No response received from N8N server');
+        this.logger.error(`Request config: ${JSON.stringify(error.config, null, 2)}`);
+      } else {
+        this.logger.error(`Request setup error: ${error.message}`);
+      }
+      
       throw error;
     }
   }

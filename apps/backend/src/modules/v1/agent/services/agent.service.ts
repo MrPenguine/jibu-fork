@@ -30,6 +30,7 @@ import { UpdateAgentDto } from '../dto/update-agent.dto';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import { CreateWorkflowDto } from '../../workflow/dto/create-workflow.dto';
 import { N8nIntegrationService } from '../../../../integrations/n8n/n8n-integration.service';
+import { N8nWorkflowService } from '../../../../core/n8n-orchestrator/n8n-workflow.service';
 import { WebhookWorkflowTemplate } from '../../../../integrations/n8n/n8n-types';
 // Secondary workflow methods have been moved to WorkflowService
 
@@ -40,7 +41,8 @@ export class AgentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly workflowService: WorkflowService,
-    private readonly n8nIntegrationService: N8nIntegrationService
+    private readonly n8nIntegrationService: N8nIntegrationService,
+    private readonly n8nWorkflowService: N8nWorkflowService
   ) {}
 
   /**
@@ -185,61 +187,40 @@ export class AgentService {
         const workflow = await this.workflowService.createMasterWorkflow(agentData.id, workflowData);
         this.logger.log(`Master workflow created successfully: ${workflow.id}`);
         
-        // Create an N8N workflow for the agent
+        // Create an empty N8N workflow for the agent
         try {
-          // Create a webhook workflow template
-          const workflowTemplate: WebhookWorkflowTemplate = {
-            name: `primary workflow for agent ${agentData.name} - ${organizationId}`,
-            webhookPath: `agent-${agentData.id}`,
-            webhookMethod: 'POST', // Default to POST method
-            memoryEnabled: true, // Enable memory by default
-          };
-          
-          this.logger.log(`Creating N8N workflow for agent: ${agentData.id}`);
-          
-          // Create the N8N workflow
-          const { workflow: n8nWorkflow, webhookUrl } = await this.n8nIntegrationService.createWebhookWorkflow(workflowTemplate);
-          
-          this.logger.log(`N8N workflow created successfully: ${n8nWorkflow.id}`);
-          this.logger.log(`N8N webhook URL: ${webhookUrl}`);
-          
-          // Store the N8N workflow in the database with PRIMARY type (default)
-          const createdN8nWorkflow = await this.prisma.n8nWorkflow.create({
-            data: {
-              n8nWorkflowId: n8nWorkflow.id,
-              webhookUrl,
-              // workflowType defaults to PRIMARY in the schema
-              organizationId: organizationId, // Use direct assignment for organizationId
-              agents: {
-                connect: { id: agentData.id }
-              },
-              // Save the workflowJson directly (it's already a JSON object)
-              workflowJson: n8nWorkflow
-              // The workflow will be linked in the next step
-            }
+          const workflowName = `Agent - ${agentData.name}`;
+          this.logger.log(`Creating empty N8N workflow for agent: ${agentData.id}`);
+          const n8nWorkflow = await this.n8nWorkflowService.createEmptyWorkflow(workflowName, organizationId);
+          this.logger.log(`Empty N8N workflow created successfully: ${n8nWorkflow.id}`);
+
+          // Update the agent with the new N8N workflow ID
+          await this.prisma.agent.update({
+            where: { id: newAgent.id },
+            data: { n8nWorkflowId: n8nWorkflow.id },
           });
-          
-          this.logger.log(`N8N workflow stored in database: ${createdN8nWorkflow.id}`);
-          
-          // Update the workflow with the N8N workflow ID
-          const updatedWorkflow = await this.prisma.workflow.update({
+
+          this.logger.log(`Agent record updated with N8N workflow ID: ${n8nWorkflow.id}`);
+
+          // Update the master workflow with the N8N workflow ID
+          await this.prisma.workflow.update({
             where: { id: workflow.id },
             data: {
-              n8nWorkflowId: createdN8nWorkflow.id
-            }
+              n8nWorkflowId: n8nWorkflow.id,
+            },
           });
-          
-          this.logger.log(`Workflow updated with N8N workflow ID: ${createdN8nWorkflow.id}`);
+
+          this.logger.log(`Master workflow record updated with N8N workflow ID: ${n8nWorkflow.id}`);
           
           // No need to update the agent with a reference to the N8N workflow 
           // since we already established the connection through the N8nWorkflow creation
           // The bidirectional relationship is handled by Prisma
           this.logger.log(`Agent already linked to N8N workflow through the N8nWorkflow creation`);
           
-          this.logger.log(`Agent updated with N8N workflow reference: ${createdN8nWorkflow.id}`);
+          this.logger.log(`Agent updated with N8N workflow reference: ${n8nWorkflow.id}`);
           
           // Update our local agent instance with the N8N workflow ID
-          newAgent.n8nWorkflowId = createdN8nWorkflow.id;
+          newAgent.n8nWorkflowId = n8nWorkflow.id;
           
         } catch (n8nWorkflowError) {
           this.logger.error(`Error creating N8N workflow: ${n8nWorkflowError.message}`);

@@ -12,7 +12,8 @@ async function bootstrap() {
   console.log(`Starting application in ${process.env.NODE_ENV} mode`);
   
   // Create app WITHOUT built-in body parser
-  const app = await NestFactory.create(AppModule, { 
+  const app = await NestFactory.create(AppModule, {
+    logger: process.env.NODE_ENV === 'development' ? ['log', 'fatal', 'error', 'warn', 'debug', 'verbose'] : ['log', 'fatal', 'error', 'warn'],
     bodyParser: false // Disable NestJS built-in body parser
   });
   

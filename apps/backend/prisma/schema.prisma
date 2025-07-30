@@ -388,9 +388,9 @@ enum WorkflowType {
 
 // --- Agent Definition ---
 model Agent {
-  id             String   @id @default(uuid())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id             String         @id @default(uuid())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   name           String
   description    String?
   metadata       Json?
@@ -398,8 +398,8 @@ model Agent {
   assistantId    String?
   n8nWorkflowId  String?
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assistant      Assistant?     @relation(fields: [assistantId], references: [id], onDelete:SetNull)
-  n8nWorkflow    N8nWorkflow?  @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
+  assistant      Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
+  n8nWorkflow    N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
   workflows      Workflow[]
   chats          Chat[]
   agentSessions  AgentSession[]
@@ -409,15 +409,15 @@ model Agent {
 }
 
 model AgentSession {
-  id             String   @id @default(uuid())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id             String       @id @default(uuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   agentId        String
-  agent          Agent    @relation(fields: [agentId], references: [id], onDelete:Cascade)
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
   chatId         String?
-  chat           Chat?    @relation(fields: [chatId], references: [id], onDelete:Cascade)
+  chat           Chat?        @relation(fields: [chatId], references: [id], onDelete: Cascade)
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete:Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   status         String       @default("active") // e.g., active, completed, failed
   currentNodeId  String?
   variables      Json?
@@ -430,29 +430,29 @@ model AgentSession {
 }
 
 model Workflow {
-  id             String   @id @default(uuid())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  name           String
-  description    String?
-  nodes          Json // Array of FlowNode objects
-  edges          Json // Array of FlowEdge objects
-  isPrimary      Boolean  @default(false)
-  agentId        String
-  organizationId String
-  startNodeId    String?      // ID of the node where execution begins
-  version        Int          @default(1)
-  isPublished    Boolean      @default(false)
-  publishedAt    DateTime?
-  workflowType   WorkflowType @default(MASTER)
-  masterWorkflowId String?
-  masterWorkflow   Workflow?   @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
-  secondaryWorkflows Workflow[] @relation("SecondaryWorkflows")
-  n8nWorkflowId   String?
-  n8nWorkflow     N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
+  id                 String       @id @default(uuid())
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  name               String
+  description        String?
+  nodes              Json // Array of FlowNode objects
+  edges              Json // Array of FlowEdge objects
+  isPrimary          Boolean      @default(false)
+  agentId            String
+  organizationId     String
+  startNodeId        String? // ID of the node where execution begins
+  version            Int          @default(1)
+  isPublished        Boolean      @default(false)
+  publishedAt        DateTime?
+  workflowType       WorkflowType @default(MASTER)
+  masterWorkflowId   String?
+  masterWorkflow     Workflow?    @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
+  secondaryWorkflows Workflow[]   @relation("SecondaryWorkflows")
+  n8nWorkflowId      String?
+  n8nWorkflow        N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
 
-  agent         Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agent         Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   chats         Chat[]
   workflowNodes WorkflowNode[]
   workflowEdges WorkflowEdge[]
@@ -462,18 +462,18 @@ model Workflow {
 }
 
 model WorkflowNode {
-  id         String  @id @default(uuid())
-  workflowId String
-  type       AgentNodeType
-  nodeType   AgentNodeType? // Legacy field for compatibility
-  data       Json
-  position   Json
-  parameters String? // Node parameters as JSON string
-  toolId     String?
+  id               String         @id @default(uuid())
+  workflowId       String
+  type             AgentNodeType
+  nodeType         AgentNodeType? // Legacy field for compatibility
+  data             Json
+  position         Json
+  parameters       String? // Node parameters as JSON string
+  toolId           String?
   incomingChoiceId String?
 
   workflow    Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  tool        Tool?          @relation("ToolToWorkflowNode", fields: [toolId], references: [id], onDelete:SetNull)
+  tool        Tool?          @relation("ToolToWorkflowNode", fields: [toolId], references: [id], onDelete: SetNull)
   sourceEdges WorkflowEdge[] @relation("SourceNode")
   targetEdges WorkflowEdge[] @relation("TargetNode")
 
@@ -482,18 +482,18 @@ model WorkflowNode {
 }
 
 model WorkflowEdge {
-  id         String @id @default(uuid())
-  workflowId String
-  sourceId   String
-  targetId   String
-  sourceHandle String?
-  targetHandle String?
-  n8nSourceOutput String?  // The output of the source node in n8n
-  n8nTargetInput  String?  // The input of the target node in n8n
+  id              String  @id @default(uuid())
+  workflowId      String
+  sourceId        String
+  targetId        String
+  sourceHandle    String?
+  targetHandle    String?
+  n8nSourceOutput String? // The output of the source node in n8n
+  n8nTargetInput  String? // The input of the target node in n8n
 
-  workflow     Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  source       WorkflowNode @relation("SourceNode", fields: [sourceId], references: [id], onDelete: NoAction)
-  target       WorkflowNode @relation("TargetNode", fields: [targetId], references: [id], onDelete: NoAction)
+  workflow Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  source   WorkflowNode @relation("SourceNode", fields: [sourceId], references: [id], onDelete: NoAction)
+  target   WorkflowNode @relation("TargetNode", fields: [targetId], references: [id], onDelete: NoAction)
 
   @@unique([sourceId, targetId])
   @@index([workflowId])
@@ -509,27 +509,27 @@ enum N8nWorkflowType {
 
 // N8nWorkflow model for managing n8n workflow integration
 model N8nWorkflow {
-  id               String          @id @default(uuid())
-  n8nWorkflowId    String          @unique // The ID of the workflow in n8n
-  webhookUrl       String?         // The webhook URL for this workflow
-  workflowJson     Json?           // The complete workflow JSON definition
-  isActive         Boolean         @default(false) // Whether the workflow is active in n8n
-  workflowType     N8nWorkflowType @default(PRIMARY) // Type of workflow (primary/secondary)
-  lastValidatedAt  DateTime        @default(now()) // Last time the workflow was validated
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  
+  id              String          @id @default(uuid())
+  n8nWorkflowId   String          @unique // The ID of the workflow in n8n
+  webhookUrl      String? // The webhook URL for this workflow
+  workflowJson    Json? // The complete workflow JSON definition
+  isActive        Boolean         @default(false) // Whether the workflow is active in n8n
+  workflowType    N8nWorkflowType @default(PRIMARY) // Type of workflow (primary/secondary)
+  lastValidatedAt DateTime        @default(now()) // Last time the workflow was validated
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
   // Relations
-  organizationId   String
-  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
-  assistants       Assistant[]     // Assistants that use this workflow (always PRIMARY)
-  agents           Agent[]         // Agents that use this workflow (can be PRIMARY or SECONDARY)
-  workflows        Workflow[]      // Workflows linked to this n8n workflow
-  
+  assistants Assistant[] // Assistants that use this workflow (always PRIMARY)
+  agents     Agent[] // Agents that use this workflow (can be PRIMARY or SECONDARY)
+  workflows  Workflow[] // Workflows linked to this n8n workflow
+
   @@index([organizationId])
   @@index([n8nWorkflowId])
   @@index([isActive])
-  @@index([workflowType])  // Add index for the new field
+  @@index([workflowType]) // Add index for the new field
 }
