@@ -260,6 +260,216 @@ export class N8nIntegrationService {
    * @param webhookId The webhook ID
    * @returns The webhook URL
    */
+  async updateWebhookWorkflow(workflowId: string, template: WebhookWorkflowTemplate) {
+    try {
+      this.logger.log(`Updating webhook workflow ${workflowId}`);
+
+      // Fetch the existing workflow to preserve webhook IDs
+      const existingWorkflow = await this.n8nClient.getWorkflow(workflowId);
+      this.logger.debug(`Retrieved existing workflow: ${JSON.stringify(existingWorkflow)}`);
+      
+      // Find the existing webhook node to preserve its ID
+      const existingWebhookNode = existingWorkflow.nodes.find(node => node.type === N8nWebhookType.STANDARD);
+      
+      // Use existing webhook ID if available, otherwise generate a new one
+      let webhookId;
+      if (existingWebhookNode && existingWebhookNode.parameters && existingWebhookNode.parameters.webhookId) {
+        webhookId = existingWebhookNode.parameters.webhookId;
+        this.logger.log(`Preserving existing webhook ID: ${webhookId}`);
+      } else {
+        webhookId = uuidv4();
+        this.logger.log(`No existing webhook ID found, generating new one: ${webhookId}`);
+      }
+
+      const webhookPosition: [number, number] = [-120, -160];
+      const agentPosition: [number, number] = [100, -160];
+      const responsePosition: [number, number] = [500, -160];
+      const modelPosition: [number, number] = [40, 80];
+      const memoryPosition: [number, number] = [180, 80];
+
+      const nodes: N8nNode[] = [];
+
+      const webhookNode: N8nNode = {
+        id: uuidv4(),
+        name: 'Webhook',
+        type: N8nWebhookType.STANDARD,
+        parameters: {
+          path: webhookId,
+          responseMode: 'responseNode',
+          httpMethod: template.webhookMethod || 'POST',
+          options: {},
+          webhookId: webhookId,
+        },
+        position: webhookPosition,
+        typeVersion: 2,
+      };
+      nodes.push(webhookNode);
+
+      const modelNode: N8nNode = {
+        id: uuidv4(),
+        name: 'Google Gemini Chat Model',
+        type: N8nAiNodeType.GEMINI_CHAT,
+        parameters: {
+          modelName: 'models/gemini-1.5-flash',
+          options: {},
+        },
+        position: modelPosition,
+        typeVersion: 1,
+        credentials: {
+          googlePalmApi: {
+            id: 'STy8vguknZjfysYZ',
+            name: 'GEMINI'
+          }
+        },
+      };
+      nodes.push(modelNode);
+
+      const agentNode: N8nNode = {
+        id: uuidv4(),
+        name: 'AI Agent',
+        type: N8nAiNodeType.LANGCHAIN_AGENT,
+        parameters: {
+          promptType: 'define',
+          text: '={{ $json.body.message }}',
+          options: {
+            systemMessage: '={{ $json.body.systemPrompt || "' + (template.agentPrompt || 'You are an AI assistant.') + '" }}',
+          },
+        },
+        position: agentPosition,
+        typeVersion: 2,
+      };
+      nodes.push(agentNode);
+
+      const responseNode: N8nNode = {
+        id: uuidv4(),
+        name: 'Respond to Webhook',
+        type: N8nWebhookType.RESPONSE,
+        parameters: {
+          respondWith: 'allIncomingItems',
+          options: {},
+        },
+        position: responsePosition,
+        typeVersion: 1.4,
+      };
+      nodes.push(responseNode);
+
+      if (template.memoryEnabled) {
+        const memoryNode: N8nNode = {
+          id: uuidv4(),
+          name: 'Simple Memory',
+          type: N8nAiNodeType.MEMORY_BUFFER,
+          parameters: {
+            sessionIdType: 'customKey',
+            sessionKey: '={{ $("Webhook").item.json.body.sessionId }}',
+            contextWindowLength: '={{ $("Webhook").item.json.body.contextLength || ' + (template.contextWindowLength || 5) + ' }}',
+          },
+          position: memoryPosition,
+          typeVersion: 1.3,
+        };
+        nodes.push(memoryNode);
+      }
+
+      if (template.integrationNodes && template.integrationNodes.length > 0) {
+        template.integrationNodes.forEach((integrationNode, index) => {
+          const node: N8nNode = {
+            id: uuidv4(),
+            name: `Integration Node ${index + 1}`,
+            type: integrationNode.type,
+            parameters: integrationNode.parameters,
+            position: [integrationNode.position.x, integrationNode.position.y],
+            typeVersion: 1,
+          };
+          nodes.push(node);
+        });
+      }
+
+      const connections: Record<string, Record<string, Array<Array<{node: string; type: string; index: number}>>>> = {};
+
+      connections[webhookNode.name] = {
+        main: [
+          [
+            {
+              node: agentNode.name,
+              type: 'main',
+              index: 0
+            }
+          ]
+        ]
+      };
+
+      connections[agentNode.name] = {
+        main: [
+          [
+            {
+              node: responseNode.name,
+              type: 'main',
+              index: 0
+            }
+          ]
+        ]
+      };
+
+      connections[modelNode.name] = {
+        [N8nConnectionType.AI_LANGUAGE_MODEL]: [
+          [
+            {
+              node: agentNode.name,
+              type: N8nConnectionType.AI_LANGUAGE_MODEL,
+              index: 0
+            }
+          ]
+        ]
+      };
+
+      if (template.memoryEnabled) {
+        const memoryNode = nodes.find(node => node.type === N8nAiNodeType.MEMORY_BUFFER);
+        if (memoryNode) {
+          connections[memoryNode.name] = {
+            'ai_memory': [
+              [
+                {
+                  node: agentNode.name,
+                  type: 'ai_memory',
+                  index: 0
+                }
+              ]
+            ]
+          };
+        }
+      }
+
+      const workflowData = {
+        name: template.name || `Webhook Workflow ${new Date().toISOString().split('T')[0]}`,
+        nodes,
+        connections,
+        settings: {
+          executionOrder: 'v1',
+        },
+      };
+
+      const workflow = await this.n8nClient.updateWorkflow(workflowId, workflowData);
+
+      await this.n8nClient.activateWorkflow(workflow.id);
+
+      let webhookUrl = '';
+      if (this.webhookBaseUrl) {
+        webhookUrl = `${this.webhookBaseUrl}/webhook/${webhookId}`;
+      } else {
+        webhookUrl = `${this.configService.get<string>('N8N_URL')}/webhook/${webhookId}`;
+      }
+
+      return {
+        workflow,
+        webhookUrl,
+        webhookId,
+      };
+
+    } catch (error) {
+      this.logger.error(`Error updating webhook workflow: ${error.message}`);
+      throw error;
+    }
+  }
+
   getWebhookUrl(webhookId: string): string {
     if (this.webhookBaseUrl) {
       return `${this.webhookBaseUrl}/webhook/${webhookId}`;

@@ -419,7 +419,6 @@ export class AgentService {
       const workflow = await this.prisma.workflow.findFirst({
         where: {
           agentId: id,
-
           organizationId
         }
       });
@@ -441,17 +440,42 @@ export class AgentService {
       // Map internal workflow to N8N webhook workflow format
       const n8nTemplate = this.mapAgentWorkflowToN8n(agent as Agent, nodes, edges);
       
-      // Check if agent already has an N8N workflow ID
+      // First check if agent already has an N8N workflow ID
       let n8nWorkflowResponse;
-      if (agent.n8nWorkflowId) {
+      let existingN8nWorkflowId = agent.n8nWorkflowId;
+      
+      // If agent doesn't have an N8nWorkflow ID, check if there's an existing one in the database
+      if (!existingN8nWorkflowId) {
+        this.logger.log(`Agent ${id} has no n8nWorkflowId, checking for existing N8nWorkflow records`);
+        
+        // Check if there's any N8nWorkflow linked to this agent
+        const existingN8nWorkflows = await this.prisma.n8nWorkflow.findMany({
+          where: {
+            agents: {
+              some: {
+                id
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'asc' // Get the oldest workflow first
+          },
+          take: 1
+        });
+        
+        if (existingN8nWorkflows.length > 0) {
+          existingN8nWorkflowId = existingN8nWorkflows[0].n8nWorkflowId;
+          this.logger.log(`Found existing N8nWorkflow with ID ${existingN8nWorkflowId} for agent ${id}`);
+        }
+      }
+      
+      if (existingN8nWorkflowId) {
         // Update existing workflow
-        this.logger.log(`Updating existing N8N workflow ${agent.n8nWorkflowId} for agent ${id}`);
-        // Currently createWebhookWorkflow always creates a new workflow, so we'll use that for now
-        // In the future, consider adding an updateWebhookWorkflow method to N8nIntegrationService
-        n8nWorkflowResponse = await this.n8nIntegrationService.createWebhookWorkflow(n8nTemplate);
+        this.logger.log(`Updating existing N8N workflow ${existingN8nWorkflowId} for agent ${id}`);
+        n8nWorkflowResponse = await this.n8nIntegrationService.updateWebhookWorkflow(existingN8nWorkflowId, n8nTemplate);
       } else {
-        // Create new workflow
-        this.logger.log(`Creating new N8N workflow for agent ${id}`);
+        // Only create a new workflow if absolutely none exists
+        this.logger.log(`No existing N8N workflow found, creating new workflow for agent ${id}`);
         n8nWorkflowResponse = await this.n8nIntegrationService.createWebhookWorkflow(n8nTemplate);
       }
       
