@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../core/database/prisma.service';
-import { WorkflowSynchronizerService } from '../workflow-synchronizer.service';
 
 // Define WorkflowType locally until Prisma client is regenerated properly
 export enum WorkflowType {
@@ -16,8 +15,7 @@ export class WorkflowService {
   private readonly logger = new Logger(WorkflowService.name);
   
   constructor(
-    private prisma: PrismaService,
-    private workflowSynchronizer: WorkflowSynchronizerService
+    private prisma: PrismaService
   ) {}
 
   /**
@@ -177,17 +175,7 @@ export class WorkflowService {
       },
     });
 
-    try {
-      // Sync the workflow with n8n if it has an associated n8n workflow
-      if (workflow.n8nWorkflowId || (workflow.n8nWorkflow && workflow.n8nWorkflow.n8nWorkflowId)) {
-        this.logger.log(`Syncing workflow ${id} with n8n`);
-        await this.workflowSynchronizer.syncWorkflowUpdate(id);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to sync workflow ${id} with n8n: ${error.message}`);
-      // We don't throw the error here to avoid blocking the workflow update
-      // The workflow update in the database should succeed even if the n8n sync fails
-    }
+    // N8N synchronization has been removed
 
     return updatedWorkflow;
   }
@@ -201,22 +189,10 @@ export class WorkflowService {
       data: {
         isPublished: true,
         publishedAt: new Date(),
-      },
-      include: {
-        n8nWorkflow: true
       }
     });
 
-    try {
-      // Sync the workflow with n8n if it has an associated n8n workflow
-      if (publishedWorkflow.n8nWorkflowId || (publishedWorkflow.n8nWorkflow && publishedWorkflow.n8nWorkflow.n8nWorkflowId)) {
-        this.logger.log(`Syncing published workflow ${id} with n8n`);
-        await this.workflowSynchronizer.syncWorkflowUpdate(id);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to sync published workflow ${id} with n8n: ${error.message}`);
-      // We don't throw the error here to avoid blocking the workflow publish
-    }
+    // N8N synchronization has been removed
 
     return publishedWorkflow;
   }
@@ -249,16 +225,7 @@ export class WorkflowService {
       throw new Error('Workflow not found');
     }
 
-    try {
-      // Delete the n8n workflow if it exists
-      if (workflow.n8nWorkflowId || (workflow.n8nWorkflow && workflow.n8nWorkflow.n8nWorkflowId)) {
-        this.logger.log(`Deleting n8n workflow for workflow ${id}`);
-        await this.workflowSynchronizer.syncWorkflowDeletion(id);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to delete n8n workflow for workflow ${id}: ${error.message}`);
-      // We don't throw the error here to avoid blocking the workflow deletion
-    }
+    // N8N workflow deletion has been removed
 
     return this.prisma.workflow.delete({
       where: { id },

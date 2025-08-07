@@ -2,8 +2,7 @@ import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateAssistantDto } from './dto/create-assistant.dto';
 import { UpdateAssistantDto, ModelConfigDto } from './dto/update-assistant.dto';
-import { N8nIntegrationService } from '../../../integrations/n8n/n8n-integration.service';
-import { WebhookWorkflowTemplate } from '../../../integrations/n8n/n8n-types';
+// N8N imports removed
 
 // Interface for model configuration
 interface ModelConfig {
@@ -21,8 +20,8 @@ export class AssistantService {
   private readonly logger = new Logger(AssistantService.name);
   
   constructor(
-    private prisma: PrismaService,
-    private n8nIntegrationService: N8nIntegrationService
+    private prisma: PrismaService
+    // N8N service dependency removed
   ) {}
 
   /**
@@ -86,45 +85,11 @@ export class AssistantService {
     this.logger.log(`Creating assistant with model config: ${JSON.stringify(modelConfig)}`);
     
     try {
-      // First create an N8N workflow for this assistant
-      this.logger.log(`Creating N8N workflow for assistant: ${name}`);
-      
-      // Create workflow template
-      const workflowTemplate: WebhookWorkflowTemplate = {
-        name: `Assistant - ${name} workflow`,
-        webhookPath: `assistant-${Date.now()}`, // Use timestamp to ensure uniqueness
-        webhookMethod: 'POST',
-        agentPrompt: systemPrompt || defaultSystemPrompt,
-        memoryEnabled: true,
-        contextWindowLength: 10 // Default context window length
-      };
-      
-      // Create the N8N workflow
-      const workflowResult = await this.n8nIntegrationService.createWebhookWorkflow(workflowTemplate);
-      
-      // Get the webhook URL from the workflow
-      const webhookUrl = this.n8nIntegrationService.getWebhookUrl(workflowResult.webhookId);
-      
-      this.logger.log(`N8N workflow created with ID: ${workflowResult.workflow.id} and webhook URL: ${webhookUrl}`);
-      
-      // Store the N8N workflow in the database
-      const n8nWorkflow = await this.prisma.n8nWorkflow.create({
-        data: {
-          n8nWorkflowId: workflowResult.workflow.id,
-          webhookUrl,
-          workflowJson: workflowResult,
-          isActive: false, // Workflows are created inactive by default
-          organizationId
-        }
-      });
-      
-      // Create the assistant with fields that match the schema and link to the N8N workflow
+      // Create the assistant without N8N workflow
       const assistant = await this.prisma.assistant.create({
         data: {
           name,
           organizationId,
-          // Link to the N8N workflow
-          n8nWorkflowId: n8nWorkflow.id,
           // Optional fields
           ...(knowledgeBaseId && { knowledgeBaseId }),
           ...(modelConfig && { model: modelConfig }),
@@ -141,7 +106,7 @@ export class AssistantService {
       
       return assistant;
     } catch (error) {
-      this.logger.error(`Failed to create assistant with N8N workflow: ${error.message}`);
+      this.logger.error(`Failed to create assistant: ${error.message}`);
       throw new HttpException(
         `Failed to create assistant: ${error.message}`, 
         HttpStatus.INTERNAL_SERVER_ERROR

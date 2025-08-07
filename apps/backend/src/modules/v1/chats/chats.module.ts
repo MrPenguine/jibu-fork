@@ -3,10 +3,10 @@ import { ChatsController } from './chats.controller';
 import { ChatsService } from './chats.service';
 import { DatabaseModule } from '../../../core/database/database.module';
 import { RedisModule } from '../../../core/redis/redis.module';
-import { N8nOrchestratorModule } from '../../../core/n8n-orchestrator/n8n-orchestrator.module';
+// N8N orchestrator import removed
 
 @Module({
-  imports: [DatabaseModule, RedisModule, N8nOrchestratorModule],
+  imports: [DatabaseModule, RedisModule], // N8N orchestrator module removed
   controllers: [ChatsController],
   providers: [ChatsService],
   exports: [ChatsService]

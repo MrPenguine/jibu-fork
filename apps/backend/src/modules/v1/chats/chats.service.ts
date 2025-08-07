@@ -4,32 +4,8 @@ import { RedisService } from '../../../core/redis/redis.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
-import { N8nClient } from '../../../core/n8n-orchestrator/n8n-client';
-import { N8nWorkflowService } from '../../../core/n8n-orchestrator/n8n-workflow.service';
-import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { Agent, Assistant, Chat, Message, Prisma } from '@prisma/client';
-
-// Custom type for Assistant with n8n fields
-type AssistantWithN8n = Assistant & {
-  n8nWorkflowId?: string | null;
-  webhookUrl?: string | null;
-};
-
-// Custom type for Agent with n8n fields
-type AgentWithN8n = Agent & {
-  metadata?: {
-    n8nWorkflowId?: string | null;
-    webhookUrl?: string | null;
-    [key: string]: any;
-  };
-};
-
-// Define expected response from N8n webhook validation
-interface WebhookValidationResponse {
-  valid: boolean;
-  message?: string;
-}
 
 // Extended chat type to include system prompt
 interface ChatWithSystemPrompt extends Chat {
@@ -44,12 +20,6 @@ interface ChatHistoryMessage {
   timestamp: Date;
 }
 
-// Type for webhook response from n8n
-interface N8nWebhookResponse {
-  output: string;
-  metadata: any;
-}
-
 @Injectable()
 export class ChatsService {
   private readonly logger = new Logger(ChatsService.name);
@@ -57,9 +27,8 @@ export class ChatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
-    private readonly n8nClient: N8nClient,
-    private readonly n8nWorkflowService: N8nWorkflowService,
     private readonly configService: ConfigService
+    // N8N services removed
   ) {}
 
   async createChat(createChatDto: CreateChatDto & { organizationId: string }) {
@@ -356,38 +325,26 @@ export class ChatsService {
     });
 
     let systemPrompt: string | undefined = undefined;
-    const temperature = this.configService.get<number>('N8N_DEFAULT_TEMPERATURE') || 0.7;
+    const temperature = 0.7; // Default temperature
 
     if (createMessageDto.role === 'user') {
       if (chat.assistantId) {
-        const assistant = await this.prisma.assistant.findUnique({ where: { id: chat.assistantId } }) as AssistantWithN8n;
-        if (assistant?.webhookUrl) {
-          try {
-            await this.n8nWorkflowService.getOrCreateAssistantWorkflow(chat.assistantId, assistant.organizationId);
-            this.logger.log(`Verified n8n workflow exists for assistant ${chat.assistantId}`);
-          } catch (e) {
-            this.logger.warn(`Error verifying n8n workflow for assistant ${chat.assistantId}: ${e.message}`);
-          }
-        }
+        const assistant = await this.prisma.assistant.findUnique({ where: { id: chat.assistantId } });
+        // N8N workflow verification removed
       } else if (chat.agentId) {
+        // Simplified agent handling without N8N integration
         try {
-          const primaryWorkflow = await this.prisma.workflow.findFirst({
-            where: { agentId: chat.agentId },
-            include: { workflowNodes: true },
-          });
-          
-          if (primaryWorkflow) {
-            const assistantNode = primaryWorkflow.workflowNodes.find(node => node.nodeType === 'ASSISTANT');
-            if (assistantNode && assistantNode.parameters) {
-              try {
-                const nodeData = JSON.parse(assistantNode.parameters);
-                if (nodeData.systemPrompt) {
-                  systemPrompt = nodeData.systemPrompt;
-                  this.logger.log(`Using system prompt from agent workflow: ${systemPrompt?.substring(0, 50)}...`);
-                }
-              } catch (error) {
-                this.logger.error('Failed to parse workflow node parameters', error);
+          // Attempt to get system prompt from agent metadata if needed
+          const agent = await this.prisma.agent.findUnique({ where: { id: chat.agentId } });
+          if (agent && agent.metadata) {
+            try {
+              const metadata = agent.metadata as Record<string, any>;
+              if (metadata.systemPrompt) {
+                systemPrompt = metadata.systemPrompt;
+                this.logger.log(`Using system prompt from agent metadata: ${systemPrompt?.substring(0, 50)}...`);
               }
+            } catch (error) {
+              this.logger.error('Failed to parse agent metadata parameters', error);
             }
           }
         } catch (e) {
@@ -400,81 +357,26 @@ export class ChatsService {
         systemPrompt = chatWithPrompt.systemPrompt || 'You are a helpful assistant.';
       }
       
-      this.logger.log(`Processing message through n8n for chat ${chatId}`);
-      
-      const n8nResponse = await this.callN8nWebhook(
-        {
-          sessionId: chatId,
-          systemPrompt,
-          temperature,
-          chatInput: createMessageDto.content
-        },
-        chat.assistantId,
-        chat.agentId
-      );
-      
-      if (n8nResponse) {
-        const assistantMessage = await this.prisma.message.create({
-          data: {
-            chat: { connect: { id: chatId } },
-            content: n8nResponse.output,
-            role: 'assistant',
-            type: 'text',
-            sequenceId: createMessageDto.sequenceId + 1,
-            metadata: n8nResponse.metadata
-          }
-        });
-        await this.updateChatInRedis(chat, assistantMessage);
-        return { userMessage, assistantMessage };
-      }
+      // Create assistant message directly
+      const assistantMessage = await this.prisma.message.create({
+        data: {
+          chat: { connect: { id: chatId } },
+          role: 'assistant',
+          content: 'This message would normally be processed by an external service. Service integration has been removed.',
+          type: 'text',
+          sequenceId: createMessageDto.sequenceId + 1,
+          metadata: {}
+        }
+      });
+
+      await this.updateChatInRedis(chat, assistantMessage);
+      return { userMessage, assistantMessage };
     }
 
     return { userMessage, assistantMessage: null };
   }
 
-  private async callN8nWebhook(data: { sessionId: string; systemPrompt: string; temperature: number; chatInput: string }, assistantId?: string | null, agentId?: string | null): Promise<N8nWebhookResponse | null> {
-    let webhookUrl: string | null | undefined;
-
-    if (assistantId) {
-      const assistant = await this.prisma.assistant.findUnique({ where: { id: assistantId } }) as AssistantWithN8n;
-      webhookUrl = assistant?.webhookUrl;
-    } else if (agentId) {
-      const agent = await this.prisma.agent.findUnique({ where: { id: agentId } }) as AgentWithN8n;
-      webhookUrl = agent?.metadata?.webhookUrl;
-    }
-
-    if (!webhookUrl) {
-      this.logger.warn(`No webhook URL found for assistant ${assistantId} or agent ${agentId}`);
-      return null;
-    }
-
-    try {
-      this.logger.log(`Calling n8n webhook: ${webhookUrl.replace(/\/\/[^:]+:[^@]+@/, '\/\/***:***@')}`);
-      
-      const response = await axios.post(webhookUrl, {
-        sessionId: data.sessionId,
-        systemPrompt: data.systemPrompt,
-        temperature: data.temperature,
-        chatInput: data.chatInput
-      });
-      
-      this.logger.log(`Received response from n8n webhook with status ${response.status}`);
-      
-      return {
-        output: response.data?.data?.[0]?.json?.output || response.data,
-        metadata: response.data
-      };
-    } catch (error) {
-      this.logger.error(`Error calling n8n webhook: ${(error as Error).message}`);
-      
-      if ((error as any).response) {
-        this.logger.error(`n8n webhook response status: ${(error as any).response.status}`);
-        this.logger.error(`n8n webhook response data: ${JSON.stringify((error as any).response.data)}`);
-      }
-      
-      return null;
-    }
-  }
+  // N8N webhook method has been removed
 
   private getRedisKey(chat: Chat): string {
     const { id: chatId, assistantId, agentId, sessionId } = chat;

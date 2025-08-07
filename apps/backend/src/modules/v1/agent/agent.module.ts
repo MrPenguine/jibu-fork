@@ -6,8 +6,7 @@ import { ToolsModule } from '../tools/tools.module';
 import { AssistantsModule } from '../assistants/assistants.module';
 import { ChatsModule } from '../chats/chats.module';
 import { WorkflowModule } from '../workflow/workflow.module';
-import { N8nIntegrationModule } from '../../../integrations/n8n/n8n-integration.module';
-import { N8nOrchestratorModule } from '../../../core/n8n-orchestrator/n8n-orchestrator.module';
+
 import { AgentController } from './controllers/agent.controller';
 import { AgentService as ModuleAgentService } from './services/agent.service';
 import { AgentExecutionService } from './execution/agent-execution.service';
@@ -24,8 +23,6 @@ import { RagService } from '../../../integrations/agent/providers/langchain/rag.
     forwardRef(() => ToolsModule),
     forwardRef(() => AssistantsModule),
     WorkflowModule,
-    N8nIntegrationModule,
-    N8nOrchestratorModule,
   ],
   controllers: [AgentController],
   providers: [
