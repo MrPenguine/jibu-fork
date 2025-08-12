@@ -77,8 +77,8 @@ export function OrganizationSwitcher() {
 
   const handleOrgSettings = (e: React.MouseEvent, orgId: string) => {
     e.stopPropagation();
-    // Navigate to organization settings page
-    router.push(`/organizations/${orgId}/settings`);
+    // Navigate to workspace settings page
+    router.push(`/workspace/${orgId}/settings`);
   };
 
   // Find organizations with pending status first

@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 // Fix import to avoid esModuleInterop error
 const vaultFactory = require('node-vault');
 
@@ -24,7 +25,25 @@ export class VaultService implements OnModuleInit {
     private readonly logger = new Logger(VaultService.name);
     private client: VaultClient;
 
-    constructor(private configService: ConfigService) {}
+    private readonly masterKey: Buffer;
+
+constructor(private readonly configService: ConfigService) {
+    const masterKeyString = this.configService.get<string>('ENCRYPTION_MASTER_KEY');
+    if (!masterKeyString) {
+        throw new Error('FATAL: ENCRYPTION_MASTER_KEY not configured!');
+    }
+    
+    // Convert the hex string to a Buffer for cryptographic operations
+    try {
+        this.masterKey = Buffer.from(masterKeyString, 'hex');
+        // Validate key length (32 bytes = 256 bits for AES-256)
+        if (this.masterKey.length !== 32) {
+            throw new Error(`FATAL: ENCRYPTION_MASTER_KEY must be 64 hex characters (32 bytes) for AES-256, got ${this.masterKey.length} bytes`);
+        }
+    } catch (error) {
+        throw new Error(`FATAL: Invalid ENCRYPTION_MASTER_KEY format: ${error.message}`);
+    }
+}
 
     async onModuleInit() {
         const vaultAddr = this.configService.get<string>('VAULT_ADDR');
@@ -74,6 +93,43 @@ export class VaultService implements OnModuleInit {
             throw new Error('Vault client is not available.');
         }
         return this.client;
+    }
+    
+    /**
+     * Encrypts data using the master key
+     * @param data The data to encrypt
+     * @returns The encrypted data and IV as a hex string
+     */
+    encrypt(data: string): string {
+        const iv = crypto.randomBytes(16); // 16 bytes IV for AES
+        const cipher = crypto.createCipheriv('aes-256-cbc', this.masterKey, iv);
+        
+        let encrypted = cipher.update(data, 'utf8', 'hex');
+        encrypted += cipher.final('hex');
+        
+        // Return IV + encrypted data (IV is needed for decryption)
+        return iv.toString('hex') + ':' + encrypted;
+    }
+    
+    /**
+     * Decrypts data using the master key
+     * @param encryptedData The encrypted data (IV + encrypted content)
+     * @returns The decrypted data
+     */
+    decrypt(encryptedData: string): string {
+        const [ivHex, encryptedHex] = encryptedData.split(':');
+        
+        if (!ivHex || !encryptedHex) {
+            throw new Error('Invalid encrypted data format');
+        }
+        
+        const iv = Buffer.from(ivHex, 'hex');
+        const decipher = crypto.createDecipheriv('aes-256-cbc', this.masterKey, iv);
+        
+        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        
+        return decrypted;
     }
 
     private buildSecretPath(basePath: string, orgId: string, pathSuffix: string, userId?: string | null, metadataPath: boolean = false): string {

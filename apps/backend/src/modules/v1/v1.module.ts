@@ -9,7 +9,9 @@ import { ChatsModule } from './chats/chats.module';
 import { ConsoleModule } from './console/console.module';
 import { ToolsModule } from './tools/tools.module';
 import { VoicesModule } from './voices/voices.module';
-import { LivekitModule } from './livekit/livekit.module';
+import { FolderModule } from './folder/folder.module';
+import { OnboardingStatusModule } from './onboarding-status/onboarding-status.module';
+import { InvitationModule } from './invitation/invitation.module';
 
 
 @Module({
@@ -24,7 +26,9 @@ import { LivekitModule } from './livekit/livekit.module';
     ConsoleModule,
     ToolsModule,
     VoicesModule,
-    LivekitModule,
+    FolderModule,
+    OnboardingStatusModule,
+    InvitationModule,
   ],
   exports: [
     FileModule,
@@ -37,7 +41,9 @@ import { LivekitModule } from './livekit/livekit.module';
     ConsoleModule,
     ToolsModule,
     VoicesModule,
-    LivekitModule,
+    FolderModule,
+    OnboardingStatusModule,
+    InvitationModule,
   ],
 })
 export class V1Module {}

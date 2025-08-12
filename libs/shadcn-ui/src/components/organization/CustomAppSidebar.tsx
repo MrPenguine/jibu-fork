@@ -2,23 +2,16 @@
 
 import * as React from "react"
 import {
-  Building2,
   CreditCard,
   FileCog,
   Files,
-  Home,
-  Key,
   LayoutDashboard,
   LayoutGrid,
   MessageSquare,
-  PieChart,
   Settings,
-  UserCircle,
   Users,
-  Wrench,
 } from "lucide-react"
 
-import { NavPlayground } from "@libs/shadcn-ui/components/nav/nav-playground"
 import { NavUser } from "@libs/shadcn-ui/components/nav/nav-user"
 import {
   Sidebar,
@@ -42,214 +35,143 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@libs/shadcn-ui/components/ui/tooltip"
+import { Separator } from "@libs/shadcn-ui/components/ui/separator"
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@libs/shadcn-ui/components/ui/accordion"
+import { useTranslations } from "@libs/shadcn-ui/lib/i18n"
+import { useOrganization } from "../../../../../apps/frontend/src/utils/organizationContext"
+import { fetchAPI } from "../../../../../apps/frontend/src/utils/api"
 
-// Custom NavPlayground component with active state styling and tooltip
-function CustomNavPlayground({ 
-  items, 
-  title 
-}: { 
-  items: { title: string; url: string; icon?: React.ReactNode }[]; 
-  title: string;
+function NavItem({ 
+  href, 
+  icon, 
+  children 
+}: {
+  href: string;
+  icon: React.ReactElement<{ className?: string }>;
+  children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
-  
+  const isActive = pathname === href;
+
+  const itemClassName = cn(
+    "rounded-xl transition-colors",
+    isActive
+      ? "bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300"
+      : "hover:bg-gray-100 dark:hover:bg-gray-800"
+  );
+
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{title}</SidebarGroupLabel>
-      <SidebarMenu>
-        {items.map((item) => {
-          const isActive = pathname === item.url;
-          const itemClassName = cn(
-            "rounded-xl transition-colors",
-            isActive 
-              ? "bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300" 
-              : "hover:bg-gray-100 dark:hover:bg-gray-800"
-          );
-          
-          return (
-            <SidebarMenuItem key={item.title}>
-              {isCollapsed ? (
-                <TooltipProvider>
-                  <Tooltip delayDuration={0}>
-                    <TooltipTrigger asChild>
-                      <SidebarMenuButton 
-                        asChild 
-                        className={cn(
-                          itemClassName,
-                          "group/nav-item transition-all hover:scale-110"
-                        )}
-                      >
-                        <a href={item.url}>
-                          {item.icon || <LayoutGrid className={cn(
-                            "size-4 transition-transform group-hover/nav-item:scale-110",
-                            isActive ? "text-violet-700 dark:text-violet-300" : ""
-                          )} />}
-                          <span>{item.title}</span>
-                        </a>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent 
-                      side="right" 
-                      align="center"
-                      className={cn(
-                        "rounded-xl border-0 text-md px-3 py-2 font-medium",
-                        isActive 
-                          ? "bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300" 
-                          : "bg-gray-100 dark:bg-gray-800"
-                      )}
-                    >
-                      {item.title}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : (
-                <SidebarMenuButton 
-                  asChild 
-                  className={itemClassName}
-                >
-                  <a href={item.url}>
-                    {item.icon || <LayoutGrid className={cn(
-                      "size-4",
+    <SidebarMenuItem>
+      {isCollapsed ? (
+        <TooltipProvider>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <SidebarMenuButton
+                asChild
+                className={cn(
+                  itemClassName,
+                  "group/nav-item transition-all hover:scale-110"
+                )}
+              >
+                <a href={href}>
+                  {React.cloneElement(icon, {
+                    className: cn(
+                      "size-4 transition-transform group-hover/nav-item:scale-110",
                       isActive ? "text-violet-700 dark:text-violet-300" : ""
-                    )} />}
-                    <span>{item.title}</span>
-                  </a>
-                </SidebarMenuButton>
+                    ),
+                  })}
+                  <span>{children}</span>
+                </a>
+              </SidebarMenuButton>
+            </TooltipTrigger>
+            <TooltipContent
+              side="right"
+              align="center"
+              className={cn(
+                "rounded-xl border-0 text-md px-3 py-2 font-medium",
+                isActive
+                  ? "bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300"
+                  : "bg-gray-100 dark:bg-gray-800"
               )}
-            </SidebarMenuItem>
-          );
-        })}
-      </SidebarMenu>
-    </SidebarGroup>
+            >
+              {children}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        <SidebarMenuButton asChild className={itemClassName}>
+          <a href={href}>
+            {React.cloneElement(icon, {
+              className: cn(
+                "size-4",
+                isActive ? "text-violet-700 dark:text-violet-300" : ""
+              ),
+            })}
+            <span>{children}</span>
+          </a>
+        </SidebarMenuButton>
+      )}
+    </SidebarMenuItem>
   );
 }
 
-export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps }: React.ComponentProps<typeof Sidebar> & { navUserProps?: any }) {
+export function CustomAppSidebar({
+  className,
+  navUserProps = {},
+  ...sidebarProps
+}: React.ComponentProps<typeof Sidebar> & { navUserProps?: any }) {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
-  
-  // Updated navigation data with appropriate icons
-  const navData = {
-    user: {
-      name: "User",
-      email: "user@example.com",
-      avatar: "/avatars/default.jpg",
-    },
-    overview: [
-      {
-        title: "Dashboard",
-        url: "/",
-        icon: <LayoutDashboard className="size-4" />
+  const t = useTranslations("Sidebar");
+  const { activeOrganization } = useOrganization();
+  const wsBase = activeOrganization ? `/workspace/${activeOrganization.id}` : null;
+
+  const [userInfo, setUserInfo] = React.useState<{ name: string; email: string; avatar: string } | null>(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const loadUser = async () => {
+      try {
+        const data = await fetchAPI('/users/me');
+        if (!mounted) return;
+        const name =
+          data?.fullName ||
+          (data?.firstName && data?.lastName ? `${data.firstName} ${data.lastName}` : data?.firstName) ||
+          data?.email ||
+          'User';
+        const avatar = data?.imageUrl || '';
+        const email = data?.email || '';
+        setUserInfo({ name, email, avatar });
+      } catch (e) {
+        if (mounted) setUserInfo({ name: 'User', email: '', avatar: '' });
       }
-    ],
-    build: [
-      {
-        title: "Assistants",
-        url: "/assistants",
-        icon: <MessageSquare className="size-4" />
-      },
-      {
-        title: "Agents",
-        url: "/agents",
-        icon: <FileCog className="size-4" />
-      },
-      {
-        title: "Phone Numbers",
-        url: "#",
-        icon: <CreditCard className="size-4" />
-      },
-      {
-        title: "Tools",
-        url: "/tools",
-        icon: <Wrench className="size-4" />
-      },
-      {
-        title: "Files",
-        url: "/organizations/file",
-        icon: <Files className="size-4" />
-      },
-      {
-        title: "Squads",
-        url: "#",
-        icon: <Users className="size-4" />
-      },
-      {
-        title: "Provider Keys",
-        url: "/organizations/keys",
-        icon: <Key className="size-4" />
-      },
-    ],
-    test: [
-      {
-        title: "Voice Test Suites",
-        url: "#",
-        icon: <PieChart className="size-4" />
-      },
-    ],
-    observe: [
-      {
-        title: "Call Logs",
-        url: "#",
-        icon: <FileCog className="size-4" />
-      },
-      {
-        title: "API Logs",
-        url: "#",
-        icon: <FileCog className="size-4" />
-      },
-      {
-        title: "Webhook Logs",
-        url: "#",
-        icon: <FileCog className="size-4" />
-      },
-    ],
-    community: [
-      {
-        title: "Voice Library",
-        url: "/voices",
-        icon: <LayoutGrid className="size-4" />
-      },
-    ],
-    orgSettings: [
-      {
-        title: "Billing & Addons",
-        url: "#",
-        icon: <CreditCard className="size-4" />
-      },
-      {
-        title: "Members",
-        url: "/organizations/members",
-        icon: <Users className="size-4" />
-      },
-      {
-        title: "Org Settings",
-        url: "/organizations/settings",
-        icon: <Settings className="size-4" />
-      },
-      {
-        title: "API Keys",
-        url: "/api-keys",
-        icon: <Key className="size-4" />
-      },
-    ],
-  };
+    };
+    loadUser();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
-    <Sidebar 
-      collapsible="icon" 
+    <Sidebar
+      collapsible="icon"
       className={cn("!border-0 !bg-gray-50/80 dark:!bg-gray-900/95", className)}
       {...sidebarProps}
     >
       <SidebarHeader className="border-0 flex-col !p-0">
-        <div className={cn(
-          "w-full flex items-center",
-          isCollapsed ? "justify-center h-10 py-1" : "justify-start h-14 px-4 pt-4 pb-1"
-        )}>
-          <img 
-            src="/logo.svg" 
-            alt="Jibu.ai Logo" 
+        <div
+          className={cn(
+            "w-full flex items-center",
+            isCollapsed
+              ? "justify-center h-10 py-1"
+              : "justify-start h-14 px-4 pt-4 pb-1"
+          )}
+        >
+          <img
+            src="/logo.svg"
+            alt="Jibu.ai Logo"
             className={cn(
               "transition-all duration-200 ease-in-out",
               isCollapsed ? "w-8 h-8" : "w-24 h-auto"
@@ -265,17 +187,68 @@ export function CustomAppSidebar({ className, navUserProps = {}, ...sidebarProps
         )}
       </SidebarHeader>
       <SidebarContent className="border-0 pt-0">
-        <CustomNavPlayground items={navData.overview} title="Overview" />
-        <CustomNavPlayground items={navData.build} title="Build" />
-        <CustomNavPlayground items={navData.test} title="Test" />
-        <CustomNavPlayground items={navData.observe} title="Observe" />
-        <CustomNavPlayground items={navData.community} title="Community" />
-        <CustomNavPlayground items={navData.orgSettings} title="Org Settings" />
+        {wsBase && (
+          <>
+            {/* Group 1: Workspace */}
+            <SidebarGroup>
+              <SidebarGroupLabel>{t("Workspace")}</SidebarGroupLabel>
+              <SidebarMenu>
+                <NavItem href={`${wsBase}`} icon={<LayoutDashboard />}>
+                  {t("Home")}
+                </NavItem>
+                <NavItem href={`${wsBase}/assistants`} icon={<MessageSquare />}>
+                  {t("Assistants")}
+                </NavItem>
+                <NavItem href={`${wsBase}/files`} icon={<Files />}>
+                  {t("Files")}
+                </NavItem>
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <Separator className="my-2" />
+
+            {/* Group 2: Management & Settings */}
+            <SidebarGroup>
+              <SidebarGroupLabel>{t("Management")}</SidebarGroupLabel>
+              <SidebarMenu>
+                <NavItem href={`${wsBase}/settings`} icon={<Settings />}>
+                  {t("Settings")}
+                </NavItem>
+                <NavItem href={`${wsBase}/settings/members`} icon={<Users />}>
+                  {t("Members")}
+                </NavItem>
+                <NavItem href={`${wsBase}/settings/billing`} icon={<CreditCard />}>
+                  {t("Billing")}
+                </NavItem>
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <Separator className="my-2" />
+
+            {/* Group 3: Help & Community */}
+            <SidebarGroup>
+              <SidebarGroupLabel>{t("Support")}</SidebarGroupLabel>
+              <SidebarMenu>
+                <NavItem href="/docs" icon={<FileCog />}>
+                  {t("Documentation")}
+                </NavItem>
+                <NavItem href="/support" icon={<LayoutGrid />}>
+                  {t("Help")}
+                </NavItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
+
       <SidebarFooter className="border-0">
-        <NavUser user={navData.user} {...navUserProps} />
+        <NavUser 
+          user={userInfo ?? { name: 'User', email: '', avatar: '' }} 
+          profileHref={wsBase ? `${wsBase}/settings` : "/organizations"}
+          {...navUserProps} 
+        />
       </SidebarFooter>
       <SidebarRail className="!hidden" />
     </Sidebar>
-  )
-} 
+  );
+}

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { VaultService } from '../../../core/encryption/vault.service';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
@@ -6,6 +6,8 @@ import { randomUUID, randomBytes } from 'crypto';
 
 @Injectable()
 export class ApiKeyService {
+  private readonly logger = new Logger(ApiKeyService.name);
+  
   constructor(
     private readonly vaultService: VaultService,
     private readonly prisma: PrismaService,
@@ -78,31 +80,83 @@ export class ApiKeyService {
   }
 
   async getApiKey(id: string, orgId: string, userId: string) {
-    // 1. Get metadata from DB
-    const meta = await this.prisma.apiKey.findUnique({ where: { id } });
-    if (!meta) return null;
-    // 2. Get secret from Vault
-    const secret = await this.vaultService.readSecret('apiKeys', orgId, id, orgId);
-    return { ...meta, secret };
+    try {
+      // 1. Get metadata from DB
+      const meta = await this.prisma.apiKey.findUnique({ where: { id } });
+      if (!meta) {
+        this.logger.warn(`API key with ID ${id} not found in database`);
+        return null;
+      }
+      
+      // 2. Get secret from Vault
+      try {
+        const secret = await this.vaultService.readSecret('apiKeys', orgId, id, orgId);
+        return { ...meta, secret };
+      } catch (vaultError) {
+        this.logger.error(`Failed to retrieve API key secret from vault: ${vaultError.message}`, vaultError.stack);
+        // Return metadata without the secret
+        return { 
+          ...meta, 
+          secret: null,
+          error: 'Secret retrieval failed. The key exists but the secret could not be accessed.'
+        };
+      }
+    } catch (error) {
+      this.logger.error(`Error retrieving API key: ${error.message}`, error.stack);
+      throw new Error(`Failed to retrieve API key: ${error.message}`);
+    }
   }
 
   async deleteApiKey(id: string, orgId: string, userId: string) {
-    // 1. Get metadata from DB
-    const meta = await this.prisma.apiKey.findUnique({ where: { id } });
-    if (!meta) return null;
-    // 2. Delete from Vault
-    await this.vaultService.deleteSecret('apiKeys', orgId, id, orgId);
-    // 3. Delete metadata from DB
-    await this.prisma.apiKey.delete({ where: { id } });
-    return { id };
+    try {
+      // 1. Get metadata from DB
+      const meta = await this.prisma.apiKey.findUnique({ where: { id } });
+      if (!meta) {
+        this.logger.warn(`API key with ID ${id} not found in database`);
+        return null;
+      }
+      
+      // 2. Delete from Vault
+      try {
+        await this.vaultService.deleteSecret('apiKeys', orgId, id, orgId);
+      } catch (vaultError) {
+        this.logger.error(`Failed to delete API key secret from vault: ${vaultError.message}`, vaultError.stack);
+        // Continue with DB deletion even if vault deletion fails
+        this.logger.warn('Proceeding with database deletion despite vault error');
+      }
+      
+      // 3. Delete metadata from DB
+      await this.prisma.apiKey.delete({ where: { id } });
+      this.logger.log(`Successfully deleted API key with ID ${id}`);
+      return { id };
+    } catch (error) {
+      this.logger.error(`Error deleting API key: ${error.message}`, error.stack);
+      throw new Error(`Failed to delete API key: ${error.message}`);
+    }
   }
 
   async revokeApiKey(id: string, orgId: string, userId: string) {
-    // Mark as revoked in DB
-    return this.prisma.apiKey.update({
-      where: { id },
-      data: { revoked: true },
-    });
+    try {
+      // Check if API key exists
+      const apiKey = await this.prisma.apiKey.findUnique({ where: { id } });
+      if (!apiKey) {
+        this.logger.warn(`API key with ID ${id} not found in database`);
+        return null;
+      }
+      
+      // Mark as revoked in DB
+      const result = await this.prisma.apiKey.update({
+        where: { id },
+        data: { revoked: true },
+      });
+      
+      this.logger.log(`Successfully revoked API key with ID ${id}`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error revoking API key: ${error.message}`, error.stack);
+      throw new Error(`Failed to revoke API key: ${error.message}`);
+    }
+    // Note: We're not deleting from vault as per the original comment
     // Optionally: await this.vaultService.deleteSecret('apiKeys', orgId, id, orgId);
   }
 

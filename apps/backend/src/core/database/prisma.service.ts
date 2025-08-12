@@ -17,6 +17,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         return this.credential;
       }
     });
+    
+    Object.defineProperty(this, 'Folder', {
+      get: function() {
+        return this.folder;
+      }
+    });
   }
 
   async onModuleInit() {

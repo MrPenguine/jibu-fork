@@ -21,5 +21,5 @@ export async function GET(request: NextRequest) {
   }
   
   // Redirect the user to an error page with some instructions
-  return NextResponse.redirect(new URL('/auth/error', request.url))
-} 
+  return NextResponse.redirect(new URL('/login/error', request.url))
+}

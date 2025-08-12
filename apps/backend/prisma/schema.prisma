@@ -30,9 +30,10 @@ model User {
   files           File[] // Reverse relation
   lastOrg         Organization?            @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
   sentInvitations Invitation[] // Invitations sent by this user
-  apiKeys         ApiKey[] // API keys created by this user
   createdTools    Tool[] // Tools created by this user
   toolExecutions  ToolExecution[] // Tool executions performed by this user
+  onboardingStatus OnboardingStatus? // Relation to onboarding status
+  apiKeys          ApiKey[]
 
   @@index([lastOrgId])
 }
@@ -59,6 +60,7 @@ model Organization {
   agents               Agent[] // Agents belonging to this organization
   agentSessions        AgentSession[] // Agent sessions belonging to this organization
   n8nWorkflows         N8nWorkflow[] // N8n workflows for this organization
+  folders              Folder[] // Folders belonging to this organization
 }
 
 model OrganizationMembership {
@@ -85,7 +87,7 @@ model Invitation {
   organizationId String
   role           String
   token          String   @unique
-  status         String   @default("pending") // Status: "pending", "accepted", "revoked", "expired"
+  status         String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
   invitedById    String
   message        String? // Optional message to include with invitation
   createdAt      DateTime @default(now())
@@ -140,24 +142,48 @@ model File {
   @@index([userId])
 }
 
-model ApiKey {
-  id             String    @id @default(uuid())
-  organizationId String
-  userId         String
+model Folder {
+  id             String        @id @default(cuid())
   name           String
-  prefix         String
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agents         Agent[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  name           String
+  prefix         String    @unique
   scopes         String[]
-  createdAt      DateTime  @default(now())
-  lastUsedAt     DateTime?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId        String?
+  agent          Agent?    @relation(fields: [agentId], references: [id], onDelete: Cascade)
   revoked        Boolean   @default(false)
-  isDefault      Boolean   @default(false)
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, name])
   @@index([organizationId])
   @@index([userId])
+  @@index([agentId])
+}
+
+model OnboardingStatus {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version          Int       @default(1)
+  createdAgent     Boolean   @default(false)
+  addedTool        Boolean   @default(false)
+  addedPhoneNumber Boolean   @default(false)
+  ranTest          Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model KnowledgeBase {
@@ -400,12 +426,16 @@ model Agent {
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assistant      Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   n8nWorkflow    N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
-  workflows      Workflow[]
   chats          Chat[]
-  agentSessions  AgentSession[]
+  sessions       AgentSession[]
+  folderId       String?
+  folder         Folder?        @relation(fields: [folderId], references: [id])
+  apiKeys        ApiKey[]
+  workflows      Workflow[]
 
   @@index([organizationId])
   @@index([assistantId])
+  @@index([n8nWorkflowId])
 }
 
 model AgentSession {

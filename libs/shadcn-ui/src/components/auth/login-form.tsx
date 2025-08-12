@@ -18,9 +18,10 @@ type FormMode = "login" | "signup" | "forgot-password"
 
 export function LoginForm({
   className,
+  defaultMode,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
-  const [mode, setMode] = useState<FormMode>("login")
+}: React.ComponentPropsWithoutRef<"div"> & { defaultMode?: FormMode }) {
+  const [mode, setMode] = useState<FormMode>(defaultMode ?? "login")
   const [isPending, startTransition] = useTransition()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -134,13 +135,50 @@ export function LoginForm({
           }
         }
         
-        // If login is successful, show loading state while fetching last organization
+        // If login is successful, resolve workspace and redirect
         if (mode === "login") {
           setIsLoggingIn(true)
-          // We'll let the middleware/navigation handle the redirect
-          // This gives time for the lastOrg processing to happen
-          router.push("/")
-          router.refresh()
+          try {
+            // 1) Try to get workspace from storage first (fast path)
+            let workspaceId: string | null = null
+            try {
+              workspaceId =
+                localStorage.getItem("activeOrganizationId") ||
+                sessionStorage.getItem("activeOrganizationId")
+            } catch (_) {
+              // ignore storage errors (e.g., disabled storage)
+            }
+
+            // 2) If not found, fetch last organization from server
+            if (!workspaceId) {
+              const orgRes = await fetch("/api/auth/get-user-org", { method: "GET" })
+              if (orgRes.ok) {
+                const orgData = await orgRes.json()
+                workspaceId = orgData?.organization?.id ?? null
+                if (workspaceId) {
+                  try {
+                    localStorage.setItem("activeOrganizationId", workspaceId)
+                    sessionStorage.setItem("activeOrganizationId", workspaceId)
+                  } catch (_) {
+                    // ignore storage errors
+                  }
+                }
+              }
+            }
+
+            // 3) Navigate
+            if (workspaceId) {
+              router.push(`/workspace/${workspaceId}`)
+            } else {
+              // Fallback if no organization found
+              router.push("/")
+            }
+          } catch (e) {
+            console.error("Post-login redirect failed:", e)
+            router.push("/")
+          } finally {
+            router.refresh()
+          }
         }
       } catch (err) {
         setError("An unexpected error occurred")
@@ -273,7 +311,7 @@ export function LoginForm({
                       Don&apos;t have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => setMode("signup")}
+                        onClick={() => router.push("/signup")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -285,7 +323,7 @@ export function LoginForm({
                       Already have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => setMode("login")}
+                        onClick={() => router.push("/login")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -300,7 +338,7 @@ export function LoginForm({
                 <div className="text-center text-sm">
                   <button
                     type="button"
-                    onClick={() => setMode("login")}
+                    onClick={() => router.push("/login")}
                     className="text-primary underline underline-offset-4"
                     disabled={isLoading}
                   >

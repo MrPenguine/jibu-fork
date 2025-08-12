@@ -1,6 +1,7 @@
 import './global.css';
 import { SidebarProvider } from "@libs/shadcn-ui/components/ui/sidebar"
 import { ApiProvider } from "../utils/apiContext"
+import MswLoader from "./MswLoader";
 
 export const metadata = {
   title: 'Jibu AI Console',
@@ -18,6 +19,7 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased" suppressHydrationWarning>
+        <MswLoader />
         <SidebarProvider>
           <ApiProvider>
             {children}

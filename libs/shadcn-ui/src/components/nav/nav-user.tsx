@@ -34,6 +34,7 @@ import Link from "next/link"
 export function NavUser({
   user,
   onLogout,
+  profileHref,
 }: {
   user: {
     name: string
@@ -41,6 +42,7 @@ export function NavUser({
     avatar: string
   },
   onLogout?: () => void
+  profileHref?: string
 }) {
   const { isMobile } = useSidebar()
 
@@ -85,7 +87,7 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link href="/settings/profile">
+                <Link href={profileHref ?? "/settings/profile"}>
                   <BadgeCheck />
                   Account
                 </Link>

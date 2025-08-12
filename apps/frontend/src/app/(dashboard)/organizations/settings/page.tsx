@@ -17,9 +17,18 @@ import { RoleGuard } from "@libs/shadcn-ui/components/organization/RoleGuard";
 import { useOrganization } from "../../../../utils/organizationContext";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@libs/shadcn-ui/components/ui/alert";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function OrganizationSettingsPage() {
   const { activeOrganization, loading } = useOrganization();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && activeOrganization?.id) {
+      router.replace(`/workspace/${activeOrganization.id}/settings`);
+    }
+  }, [loading, activeOrganization?.id, router]);
 
   if (loading || !activeOrganization) {
     return (

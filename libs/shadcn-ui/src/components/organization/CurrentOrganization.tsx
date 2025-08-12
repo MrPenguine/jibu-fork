@@ -11,7 +11,11 @@ export default function CurrentOrganization() {
   const { activeOrganization, loading, error } = useOrganization();
 
   const handleSettings = () => {
-    router.push(`/organizations/settings`);
+    if (activeOrganization?.id) {
+      router.push(`/workspace/${activeOrganization.id}/settings`);
+    } else {
+      router.push(`/`);
+    }
   };
 
   if (loading) {

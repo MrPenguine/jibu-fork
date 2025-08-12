@@ -46,6 +46,23 @@ export async function updateSession(request: NextRequest) {
   // Get the pathname from the URL
   const path = request.nextUrl.pathname
 
+  // Legacy redirects for removed /auth routes
+  if (path === '/auth' || path === '/auth/') {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/login'
+    return NextResponse.redirect(redirectUrl)
+  }
+  if (path.startsWith('/auth/error')) {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/login/error'
+    return NextResponse.redirect(redirectUrl)
+  }
+  if (path.startsWith('/auth/logout')) {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/logout'
+    return NextResponse.redirect(redirectUrl)
+  }
+
   // If no user is signed in and the request is not for a public route, redirect
   if (
     !user &&
@@ -54,9 +71,9 @@ export async function updateSession(request: NextRequest) {
     // Allow access to static assets and Next.js routes
     !path.startsWith('/_next') &&
     !path.startsWith('/_vercel') &&
-    // Allow access to login and auth routes
+    // Allow access to login and signup routes
     !path.startsWith('/login') &&
-    !path.startsWith('/auth') &&
+    !path.startsWith('/signup') &&
     // Check if it's a protected path - either root or any path not explicitly public
     (path === '/' || (!path.includes('.') && path !== '/'))
   ) {
@@ -66,14 +83,31 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // If user is signed in and they're trying to access the login page, redirect to dashboard
+  // If user is signed in and they're trying to access the login or signup page, redirect to workspace
   if (
     user &&
-    (path === '/login' || path === '/auth')
+    (path === '/' || path === '/login' || path === '/signup')
   ) {
-    // Redirect to dashboard
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/'
+    try {
+      const apiUrl = new URL('/api/auth/get-user-org', request.nextUrl)
+      const orgResp = await fetch(apiUrl.toString(), {
+        // Forward cookies so the internal API sees the session
+        headers: { cookie: request.headers.get('cookie') ?? '' },
+      })
+      if (orgResp.ok) {
+        const data = await orgResp.json()
+        const workspaceId = data?.organization?.id
+        if (workspaceId) {
+          redirectUrl.pathname = `/workspace/${workspaceId}`
+          return NextResponse.redirect(redirectUrl)
+        }
+      }
+    } catch (_) {
+      // ignore and fallback below
+    }
+    // Fallback if we can't resolve a workspace
+    redirectUrl.pathname = '/organizations'
     return NextResponse.redirect(redirectUrl)
   }
 

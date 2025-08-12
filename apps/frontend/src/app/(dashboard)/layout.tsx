@@ -14,7 +14,7 @@ import {
   BreadcrumbSeparator,
 } from "@libs/shadcn-ui/components/ui/breadcrumb"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
-import { logout } from "../auth/actions"
+import { logout } from "../../utils/auth/actions"
 import { Toaster } from "@libs/shadcn-ui/components/ui/toaster"
 import { OrganizationProvider } from "../../utils/organizationContext"
 import { usePathname } from "next/navigation"
