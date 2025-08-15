@@ -9,29 +9,29 @@ datasource db {
 }
 
 model User {
-  id              String                   @id // Supabase User ID
-  email           String                   @unique
-  emailConfirmed  Boolean                  @default(false)
-  firstName       String?
-  lastName        String?
-  fullName        String? // Added from user_metadata.full_name
-  imageUrl        String? // This will store the avatar_url/picture from Supabase
-  provider        String? // Authentication provider (e.g., "google")
-  providerIds     String[] // Array of provider IDs
-  lastSignInAt    DateTime?
-  phoneNumber     String? // From Supabase phone field
-  phoneConfirmed  Boolean                  @default(false)
-  isAnonymous     Boolean                  @default(false)
-  metadata        Json? // For storing additional user_metadata
-  lastOrgId       String? // Store the ID of the last organization the user accessed
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  memberships     OrganizationMembership[] // Relation field
-  files           File[] // Reverse relation
-  lastOrg         Organization?            @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
-  sentInvitations Invitation[] // Invitations sent by this user
-  createdTools    Tool[] // Tools created by this user
-  toolExecutions  ToolExecution[] // Tool executions performed by this user
+  id               String                   @id // Supabase User ID
+  email            String                   @unique
+  emailConfirmed   Boolean                  @default(false)
+  firstName        String?
+  lastName         String?
+  fullName         String? // Added from user_metadata.full_name
+  imageUrl         String? // This will store the avatar_url/picture from Supabase
+  provider         String? // Authentication provider (e.g., "google")
+  providerIds      String[] // Array of provider IDs
+  lastSignInAt     DateTime?
+  phoneNumber      String? // From Supabase phone field
+  phoneConfirmed   Boolean                  @default(false)
+  isAnonymous      Boolean                  @default(false)
+  metadata         Json? // For storing additional user_metadata
+  lastOrgId        String? // Store the ID of the last organization the user accessed
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  memberships      OrganizationMembership[] // Relation field
+  files            File[] // Reverse relation
+  lastOrg          Organization?            @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
+  sentInvitations  Invitation[] // Invitations sent by this user
+  createdTools     Tool[] // Tools created by this user
+  toolExecutions   ToolExecution[] // Tool executions performed by this user
   onboardingStatus OnboardingStatus? // Relation to onboarding status
   apiKeys          ApiKey[]
 
@@ -143,30 +143,30 @@ model File {
 }
 
 model Folder {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   name           String
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   agents         Agent[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 model ApiKey {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   name           String
-  prefix         String    @unique
+  prefix         String       @unique
   scopes         String[]
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId         String
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   agentId        String?
-  agent          Agent?    @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  revoked        Boolean   @default(false)
+  agent          Agent?       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  revoked        Boolean      @default(false)
   lastUsedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now())
 
   @@index([organizationId])
   @@index([userId])
@@ -174,16 +174,16 @@ model ApiKey {
 }
 
 model OnboardingStatus {
-  id               String    @id @default(cuid())
-  userId           String    @unique
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  version          Int       @default(1)
-  createdAgent     Boolean   @default(false)
-  addedTool        Boolean   @default(false)
-  addedPhoneNumber Boolean   @default(false)
-  ranTest          Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version          Int      @default(1)
+  createdAgent     Boolean  @default(false)
+  addedTool        Boolean  @default(false)
+  addedPhoneNumber Boolean  @default(false)
+  ranTest          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 model KnowledgeBase {

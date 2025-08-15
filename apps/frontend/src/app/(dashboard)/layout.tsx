@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { SidebarProvider } from "@libs/shadcn-ui/components/ui/sidebar"
-import { CustomAppSidebar } from "../../../../../libs/shadcn-ui/src/components/organization/CustomAppSidebar"
+import { CustomAppSidebar } from "../../../../../libs/shadcn-ui/src/components/workspace/CustomAppSidebar"
 import { SidebarInset, SidebarTrigger } from "@libs/shadcn-ui/components/ui/sidebar"
 import { Separator } from "@libs/shadcn-ui/components/ui/separator"
 import {
@@ -103,19 +103,23 @@ export default function DashboardLayout({
   const handleLogout = () => {
     logout(new FormData());
   };
+  
+  const pathname = usePathname();
+  const isAgentPage = pathname.includes('/agent/');
+  
   return (
     <div className="relative flex min-h-screen w-full flex-col">
       <SidebarProvider>
         <OrganizationProvider>
-            <CustomAppSidebar navUserProps={{ onLogout: handleLogout }} />
+            {!isAgentPage && <CustomAppSidebar navUserProps={{ onLogout: handleLogout }} />}
             <SidebarInset className="flex flex-col w-full">
-              <header className="flex h-16 w-full shrink-0 items-center gap-2 px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-                <div className="flex items-center gap-2">
-                  <SidebarTrigger className="-ml-1" />
-                  <Separator orientation="vertical" className="mr-2 h-4" />
-                  <DynamicBreadcrumbs />
-                </div>
-              </header>
+              {!isAgentPage && (
+                <header className="flex h-16 w-full shrink-0 items-center gap-2 px-4">
+                  <div className="flex items-center gap-2">
+                    {/* Removed breadcrumb navigation */}
+                  </div>
+                </header>
+              )}
               <main className="flex-1 w-full">
                 {children}
               </main>

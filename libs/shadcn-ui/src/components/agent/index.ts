@@ -2,7 +2,7 @@ export * from './AgentDesigner';
 export * from './AgentPalette';
 export * from './AgentNodeInspector';
 export * from './AgentExecutionDialog';
-export * from './AgentSidebar';
+export * from './CanvasSidebar';
 export * from './NodeInspectorPanel';
 export * from './WorkflowsList';
 export * from './AssistantList';

@@ -1,0 +1,135 @@
+"use client"
+
+import * as React from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { cn } from "../../lib/utils"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+} from "../ui/sidebar"
+import { Separator } from "../ui/separator"
+import {
+  BarChart,
+  BookOpen,
+  FileText,
+  Info,
+  LayoutDashboard,
+  MessageSquare,
+  Settings,
+  Share2,
+  CreditCard,
+  Database,
+  Layers,
+  FileCode,
+  FileCheck,
+} from "lucide-react"
+
+function NavItem({ 
+  href, 
+  icon, 
+  children,
+  active,
+}: {
+  href: string;
+  icon: React.ReactElement<{ className?: string }>;
+  children: React.ReactNode;
+  active?: boolean;
+}) {
+  const pathname = usePathname();
+  const isActive = active !== undefined ? active : pathname === href || pathname?.startsWith(`${href}/`);
+  
+  return (
+    <SidebarMenuItem>
+      <div className={cn(
+        "w-full flex items-center justify-center group relative px-3 py-2 rounded-md transition-colors",
+        isActive ? "bg-gray-800 text-white" : "text-gray-300 hover:bg-gray-800 hover:text-white"
+      )}>
+        <Link href={href} className="w-full flex items-center justify-center">
+          {React.cloneElement(icon, {
+            className: cn("h-5 w-5", icon.props.className),
+          })}
+          <span className="absolute left-12 ml-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+            {children}
+          </span>
+        </Link>
+      </div>
+    </SidebarMenuItem>
+  );
+}
+
+export interface AgentNavSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  agentId: string;
+}
+
+export function AgentNavSidebar({
+  className,
+  agentId,
+  ...props
+}: AgentNavSidebarProps) {
+  return (
+    <Sidebar
+      collapsible="none"
+      className={cn("!border-0 !bg-gray-900 text-white w-16 h-screen fixed left-0 top-0 z-50", className)}
+      {...props}
+    >
+      <SidebarHeader className="border-0 flex-col !p-0">
+        <div className="w-full flex items-center justify-center h-14 pt-4 pb-1">
+          <img
+            src="/logo.svg"
+            alt="Jibu.ai Logo"
+            className="w-8 h-8"
+          />
+        </div>
+      </SidebarHeader>
+      
+      <SidebarContent className="border-0 pt-0">
+        <SidebarGroup>
+          <SidebarMenu>
+            <NavItem href={`/agent/${agentId}/workflows`} icon={<LayoutDashboard />}>
+              Workflows
+            </NavItem>
+            <NavItem href={`/agent/${agentId}/knowledge-base`} icon={<Database />}>
+              Knowledge base
+            </NavItem>
+            <NavItem href={`/agent/${agentId}/interfaces`} icon={<Layers />}>
+              Interfaces
+            </NavItem>
+            <NavItem href={`/agent/${agentId}/publish`} icon={<Share2 />}>
+              Publish
+            </NavItem>
+            <NavItem href={`/agent/${agentId}/transcripts`} icon={<FileCheck />}>
+              Transcripts & Evals
+            </NavItem>
+            <NavItem href={`/agent/${agentId}/analytics`} icon={<BarChart />}>
+              Analytics
+            </NavItem>
+            <NavItem href={`/agent/${agentId}/settings`} icon={<Settings />}>
+              Settings
+            </NavItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="border-0 flex-col gap-2 mt-auto">
+        <Separator className="my-2" />
+        <NavItem href={`/agent/${agentId}/usage`} icon={<CreditCard />}>
+          Credit Usage
+        </NavItem>
+        <NavItem href={`/agent/${agentId}/content`} icon={<FileText />}>
+          Content
+        </NavItem>
+        <NavItem href={`/agent/${agentId}/info`} icon={<Info />}>
+          Info
+        </NavItem>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+export default AgentNavSidebar;

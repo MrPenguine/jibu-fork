@@ -18,7 +18,7 @@ import {
 import { NavMain } from "@libs/shadcn-ui/components/nav/nav-main"
 import { NavProjects } from "@libs/shadcn-ui/components/nav/nav-projects"
 import { NavUser } from "@libs/shadcn-ui/components/nav/nav-user"
-import { TeamSwitcher } from "@libs/shadcn-ui/components/organization/team-switcher"
+import { TeamSwitcher } from "@libs/shadcn-ui/components/workspace/team-switcher"
 import {
   Sidebar,
   SidebarContent,

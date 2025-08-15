@@ -106,7 +106,7 @@ export async function updateSession(request: NextRequest) {
     } catch (_) {
       // ignore and fallback below
     }
-    // Fallback if we can't resolve a workspace
+    // Standard fallback if we can't resolve a workspace
     redirectUrl.pathname = '/organizations'
     return NextResponse.redirect(redirectUrl)
   }

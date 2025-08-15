@@ -10,7 +10,6 @@ import { ConsoleModule } from './console/console.module';
 import { ToolsModule } from './tools/tools.module';
 import { VoicesModule } from './voices/voices.module';
 import { FolderModule } from './folder/folder.module';
-import { OnboardingStatusModule } from './onboarding-status/onboarding-status.module';
 import { InvitationModule } from './invitation/invitation.module';
 
 
@@ -27,7 +26,6 @@ import { InvitationModule } from './invitation/invitation.module';
     ToolsModule,
     VoicesModule,
     FolderModule,
-    OnboardingStatusModule,
     InvitationModule,
   ],
   exports: [
@@ -42,7 +40,6 @@ import { InvitationModule } from './invitation/invitation.module';
     ToolsModule,
     VoicesModule,
     FolderModule,
-    OnboardingStatusModule,
     InvitationModule,
   ],
 })

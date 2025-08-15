@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "public"."ApiKey" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
