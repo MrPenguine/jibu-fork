@@ -17,7 +17,15 @@ export enum AgentNodeType {
   PLAY_AUDIO = 'PLAY_AUDIO',
   KNOWLEDGE_BASE_SEARCH = 'knowledgeBaseSearchNode',
   CUSTOM = 'CUSTOM',
-  N8N_INTEGRATION = 'N8N_INTEGRATION'
+  N8N_INTEGRATION = 'N8N_INTEGRATION',
+  // Added to support new sidebar taxonomy
+  PROMPT = 'PROMPT',
+  BUTTONS = 'BUTTONS',
+  CAPTURE = 'CAPTURE',
+  FUNCTION = 'FUNCTION',
+  COMPONENT = 'COMPONENT',
+  CALL_FORWARD = 'CALL_FORWARD',
+  CUSTOM_ACTION = 'CUSTOM_ACTION'
 }
 
 // Base node data interface

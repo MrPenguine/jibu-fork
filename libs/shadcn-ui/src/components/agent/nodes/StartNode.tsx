@@ -2,48 +2,26 @@
 
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Activity } from 'lucide-react';
+import { Flag } from 'lucide-react';
 
 export const StartNode = memo(({ id, data, selected }: NodeProps) => {
-  const handleTestClick = (event: React.MouseEvent) => {
-    // Stop propagation to prevent node selection
-    event.stopPropagation();
-    
-    // Call the onTest callback if provided
-    if (data.onTest) {
-      data.onTest(data.id);
-    }
-  };
-  
   return (
-    <div className="shadow-sm rounded-lg bg-slate-50 min-w-[200px] overflow-hidden">
-      {/* Block title with play button */}
-      <div className="px-4 py-2 text-sm font-medium text-slate-700 flex justify-between items-center bg-slate-100">
-        <div>New Block {data.blockNumber || 1}</div>
-        <button 
-          onClick={handleTestClick}
-          className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors"
-          title="Test this node"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-        </button>
-      </div>
-      
-      {/* Block content */}
-      <div className="p-3">
-        <div className="bg-white rounded-md p-3 flex items-center space-x-2 border border-slate-200">
-          <Activity className="h-5 w-5 text-slate-500" />
-          <div className="text-sm text-slate-500">Agent starts here</div>
-        </div>
-      </div>
+    <div
+      className={`inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-full text-white font-medium text-sm cursor-pointer transition-colors group ${selected ? 'ring-2 ring-green-400/60' : ''}`}
+    >
+      {/* Hidden right-side handle (source), vertically centered */}
       <Handle
+        id="out"
         type="source"
-        position={Position.Bottom}
-        className="w-3 h-3 rounded-full bg-slate-500 border-2 border-white"
-        isValidConnection={(connection) => connection.target !== id} // Prevent connecting to itself
+        position={Position.Right}
+        className="w-2 h-2 opacity-0 bg-transparent"
+        style={{ right: -6, top: '50%', transform: 'translateY(-50%)' }}
+        isValidConnection={(connection) => connection.target !== id}
       />
+
+      <Flag className="w-4 h-4" />
+      <span>Start</span>
+      <div className="w-2 h-2 bg-white rounded-full ml-1" />
     </div>
   );
 });

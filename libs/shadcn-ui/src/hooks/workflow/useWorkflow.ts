@@ -54,32 +54,45 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
 
   // Fetch workflow data
   const fetchWorkflow = useCallback(async () => {
-    if (!workflowId || workflowId === 'create') return;
-    
+    if (!workflowId) return;
+
     try {
       setIsLoading(true);
       setSaveError(null);
-      const data = await workflowApi.getWorkflow(workflowId, orgId);
-      
-      if (data) {
-        setWorkflow(data);
-        setWorkflowName(data.name || 'Untitled Workflow');
-        setIsPublished(data.isPublished || false);
-        
-        // Initialize nodes and edges from workflow data
-        const sanitizedData = sanitizeWorkflowData(data);
-        setNodes(sanitizedData.nodes);
-        setEdges(sanitizedData.edges);
-        
-        // Set viewport if it exists in the data
-        if (data.viewport) {
-          try {
-            const viewportData = typeof data.viewport === 'string' 
-              ? JSON.parse(data.viewport) 
-              : data.viewport;
-            setViewport(viewportData);
-          } catch (err) {
-            console.error('Error parsing viewport data:', err);
+
+      // Initialize a brand new canvas when creating
+      if (workflowId === 'create') {
+        const sanitized = sanitizeWorkflowData({ nodes: [], edges: [] });
+        setWorkflow(null);
+        setWorkflowName('Untitled Workflow');
+        setIsPublished(false);
+        setNodes(sanitized.nodes);
+        setEdges(sanitized.edges);
+        console.log('[Workflow] Initialized new workflow with nodes:', sanitized.nodes);
+      } else {
+        const data = await workflowApi.getWorkflow(workflowId, orgId);
+
+        if (data) {
+          setWorkflow(data);
+          setWorkflowName(data.name || 'Untitled Workflow');
+          setIsPublished(data.isPublished || false);
+
+          // Initialize nodes and edges from workflow data
+          const sanitizedData = sanitizeWorkflowData(data);
+          setNodes(sanitizedData.nodes);
+          setEdges(sanitizedData.edges);
+          console.log('[Workflow] Loaded workflow, nodes after sanitize:', sanitizedData.nodes);
+
+          // Set viewport if it exists in the data
+          if (data.viewport) {
+            try {
+              const viewportData = typeof data.viewport === 'string'
+                ? JSON.parse(data.viewport)
+                : data.viewport;
+              setViewport(viewportData);
+            } catch (err) {
+              console.error('Error parsing viewport data:', err);
+            }
           }
         }
       }
@@ -149,6 +162,28 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       console.warn(`[Workflow] Found and removed ${rawEdges.length - uniqueEdges.length} duplicate edges during workflow data sanitization`);
     }
 
+    // 1) Ensure a Start node exists; if not, add one with a stable id and position
+    const hasStart = nodes.some((n) => n.type === AgentNodeType.START);
+    if (!hasStart) {
+      const startNode: FlowNode = {
+        id: 'start',
+        type: AgentNodeType.START,
+        position: { x: 100, y: 100 },
+        data: {
+          id: 'start',
+          nodeTitle: 'Start',
+          blockNumber: 1,
+        } as any,
+      };
+      nodes = [startNode, ...nodes];
+    }
+
+    // 2) Enforce non-deletable flag on any Start node present in persisted data
+    nodes = nodes.map((n, idx) => ({
+      ...n,
+      data: { ...n.data, blockNumber: (n.data as any)?.blockNumber ?? idx + 1 },
+    }));
+
     return { nodes, edges: uniqueEdges };
   };
 
@@ -217,8 +252,15 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
 
   // Node changes handler
   const onNodesChange = useCallback(async (changes: NodeChange[]) => {
+    // Prevent removal of the Start node
+    const filteredChanges = changes.filter((change) => {
+      if (change.type !== 'remove') return true;
+      const target = nodes.find((n) => n.id === change.id);
+      return target?.type !== AgentNodeType.START;
+    });
+
     // Special handling for node removal (to handle API cleanup for KB nodes)
-    for (const change of changes) {
+    for (const change of filteredChanges) {
       if (change.type === 'remove') {
         const nodeIdToRemove = change.id;
         // Find the node from the current state *before* it's removed by applyNodeChanges
@@ -257,7 +299,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       }
     }
 
-    setNodes((nds) => applyNodeChanges(changes, nds) as FlowNode[]);
+    setNodes((nds) => applyNodeChanges(filteredChanges, nds) as FlowNode[]);
     scheduleAutoSave();
   }, [nodes, scheduleAutoSave, removeKnowledgeBaseFromAssistant, setEdges]);
 

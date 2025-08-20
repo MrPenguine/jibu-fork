@@ -1,74 +1,28 @@
 "use client";
 
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { NodeProps } from 'reactflow';
 import { Puzzle } from 'lucide-react';
+import { PillNodeShell } from './PillNodeShell';
 
 export const CustomActionNode = memo(({ data, selected }: NodeProps) => {
-  const handleTestClick = (event: React.MouseEvent) => {
-    // Stop propagation to prevent node selection
-    event.stopPropagation();
-    
-    // Call the onTest callback if provided
-    if (data.onTest) {
-      data.onTest(data.id);
-    }
-  };
-  
+  const summaryParts: string[] = [];
+  if (data.actionName) summaryParts.push(`Action: ${data.actionName}`);
+  if (data.parameters) summaryParts.push('with params');
+  if (data.outputVariableName) summaryParts.push(`→ ${data.outputVariableName}`);
+  const summary = summaryParts.join(' • ') || 'Custom Action';
   return (
-    <div className="shadow-sm rounded-lg bg-orange-50 min-w-[200px] overflow-hidden">
-      {/* Block title with play button */}
-      <div className="px-4 py-2 text-sm font-medium text-orange-700 flex justify-between items-center bg-orange-100">
-        <div>New Block {data.blockNumber || 15}</div>
-        <button 
-          onClick={handleTestClick}
-          className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-orange-200 transition-colors"
-          title="Test this node"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-600">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-        </button>
-      </div>
-      
-      {/* Block content */}
-      <div className="p-3">
-        <div className="bg-white rounded-md p-3 flex items-center space-x-2 border border-orange-200">
-          <Puzzle className="h-5 w-5 text-orange-500" />
-          <div className="text-sm text-orange-700">Custom Action</div>
-        </div>
-        
-        {data.actionName && (
-          <div className="mt-2 px-1 text-xs text-orange-700">
-            <div className="font-medium">Action: {data.actionName}</div>
-            {data.parameters && (
-              <div className="mt-1">
-                <div className="font-medium">Parameters:</div>
-                <div className="truncate max-w-[250px] font-mono">
-                  {typeof data.parameters === 'object' 
-                    ? JSON.stringify(data.parameters).substring(0, 50) + (JSON.stringify(data.parameters).length > 50 ? '...' : '')
-                    : String(data.parameters)}
-                </div>
-              </div>
-            )}
-            {data.outputVariableName && (
-              <div className="mt-1">
-                Store in: <span className="font-mono">{data.outputVariableName}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="w-2 h-2 bg-orange-500"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="w-2 h-2 bg-orange-500"
-      />
-    </div>
+    <PillNodeShell
+      id={data.id}
+      selected={selected}
+      nodeTitle={data.nodeTitle}
+      roleTitle={data.role || 'Custom Action'}
+      description={summary}
+      Icon={Puzzle}
+      blockNumber={data.blockNumber}
+      onTest={data.onTest}
+      onDoubleClick={data.onNodeDoubleClick}
+      includeRightHandle
+    />
   );
 });

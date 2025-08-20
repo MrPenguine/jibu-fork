@@ -9,7 +9,6 @@ import { ChatsModule } from './chats/chats.module';
 import { ConsoleModule } from './console/console.module';
 import { VoicesModule } from './voices/voices.module';
 import { FolderModule } from './folder/folder.module';
-import { N8nModule } from './n8n/n8n.module';
 import { InvitationModule } from './invitation/invitation.module';
 
 
@@ -25,7 +24,6 @@ import { InvitationModule } from './invitation/invitation.module';
     ConsoleModule,
     VoicesModule,
     FolderModule,
-    N8nModule,
     InvitationModule,
   ],
   exports: [

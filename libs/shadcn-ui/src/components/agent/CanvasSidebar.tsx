@@ -15,6 +15,7 @@ import {
   Share,
   Play,
   StopCircle,
+  Zap,
   Puzzle,
   Bot,
   Code,
@@ -62,17 +63,17 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   setActivePopover,
 }) => {
   const nodeCategories = [
+    // Assistant category
     {
-      id: 'agent',
-      label: 'Agent',
+      id: 'assistant',
+      label: 'Assistant',
       icon: Bot,
       color: 'bg-slate-50 text-slate-700',
       nodes: [
-        { type: AgentNodeType.START, label: 'Start', icon: Play },
-        { type: AgentNodeType.END, label: 'End', icon: StopCircle },
         { type: AgentNodeType.ASSISTANT, label: 'Assistant', icon: Bot },
       ],
     },
+    // Talk category
     {
       id: 'talk',
       label: 'Talk',
@@ -80,18 +81,22 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       color: 'bg-blue-50 text-blue-700',
       nodes: [
         { type: AgentNodeType.MESSAGE, label: 'Message', icon: MessageSquare },
+        { type: AgentNodeType.PROMPT, label: 'Prompt', icon: MessageSquare },
       ],
     },
+    // Listen category
     {
       id: 'listen',
       label: 'Listen',
       icon: Mic,
       color: 'bg-green-50 text-green-700',
       nodes: [
-        { type: AgentNodeType.LISTEN, label: 'Listen', icon: Mic },
+        { type: AgentNodeType.BUTTONS, label: 'Buttons', icon: Share },
         { type: AgentNodeType.CHOICE, label: 'Choice', icon: Share },
+        { type: AgentNodeType.CAPTURE, label: 'Capture', icon: Mic },
       ],
     },
+    // Logic category
     {
       id: 'logic',
       label: 'Logic',
@@ -99,20 +104,25 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       color: 'bg-yellow-50 text-yellow-700',
       nodes: [
         { type: AgentNodeType.CONDITION, label: 'Condition', icon: GitBranch },
-        { type: AgentNodeType.SET_VARIABLE, label: 'Set Variable', icon: Variable },
-        { type: AgentNodeType.CUSTOM, label: 'JavaScript', icon: Code },
+        { type: AgentNodeType.SET_VARIABLE, label: 'Set', icon: Variable },
+        { type: AgentNodeType.COMPONENT, label: 'Component', icon: Puzzle },
+        { type: AgentNodeType.END, label: 'End', icon: StopCircle },
       ],
     },
+    // Dev category
     {
-      id: 'integrations',
-      label: 'Integrations',
+      id: 'dev',
+      label: 'Dev',
       icon: Cpu,
-      color: 'bg-indigo-50 text-indigo-700',
+      color: 'bg-slate-50 text-slate-700',
       nodes: [
-        { type: AgentNodeType.TOOL_CALL, label: 'Tool Call', icon: Puzzle },
-        { type: AgentNodeType.API_CALL, label: 'API Call', icon: Share },
+        { type: AgentNodeType.TOOL_CALL, label: 'Tool', icon: Puzzle },
+        { type: AgentNodeType.FUNCTION, label: 'Function', icon: Code },
+        { type: AgentNodeType.API_CALL, label: 'API', icon: Share },
+        { type: AgentNodeType.CUSTOM, label: 'Javascript', icon: Code },
         { type: AgentNodeType.KNOWLEDGE_BASE_SEARCH, label: 'KB Search', icon: Search },
-        { type: AgentNodeType.N8N_INTEGRATION, label: 'n8n Integration', icon: Cpu },
+        { type: AgentNodeType.CALL_FORWARD, label: 'Call Forward', icon: ArrowRight },
+        { type: AgentNodeType.CUSTOM_ACTION, label: 'Custom Action', icon: Zap },
       ],
     },
   ];
@@ -123,14 +133,16 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
         {nodeCategories.map((category) => (
           <Popover key={category.id} onOpenChange={(isOpen) => setActivePopover(isOpen ? category.id : null)}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" className="w-full h-12 p-2 flex items-center justify-center" title={category.label}>
+              <Button
+                variant="ghost"
+                className="w-full h-16 p-2 flex flex-col items-center justify-center gap-1"
+                title={category.label}
+              >
                 <category.icon className="h-5 w-5" />
+                <span className="text-[10px] leading-none text-gray-600">{category.label}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent side="right" align="start" className="w-64 p-2">
-              <div className={`p-2 rounded-t-md ${category.color}`}>
-                <h3 className="font-semibold">{category.label}</h3>
-              </div>
               <div className="flex flex-col gap-2 p-2">
                 {category.nodes.map((node) => (
                   <NodePaletteItem

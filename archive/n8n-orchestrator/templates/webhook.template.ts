@@ -1,4 +1,4 @@
-import { N8nWebhookType } from "libs/types/n8n-types";
+import { N8nWebhookType } from "../../../integrations/n8n/n8n-types";
 
 export const WebhookTemplate = {
   parameters: {

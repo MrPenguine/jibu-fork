@@ -5,7 +5,7 @@ import { RedisModule } from '../../../core/redis/redis.module';
 import { AssistantsModule } from '../assistants/assistants.module';
 import { ChatsModule } from '../chats/chats.module';
 import { WorkflowModule } from '../workflow/workflow.module';
-import { N8nModule } from '../n8n/n8n.module';
+
 
 import { AgentController } from './controllers/agent.controller';
 import { AgentService as ModuleAgentService } from './services/agent.service';
@@ -21,8 +21,7 @@ import { RagService } from '../../../integrations/agent/providers/langchain/rag.
     RedisModule,
     ChatsModule,
     forwardRef(() => AssistantsModule),
-    WorkflowModule,
-    N8nModule,
+    WorkflowModule
   ],
   controllers: [AgentController],
   providers: [

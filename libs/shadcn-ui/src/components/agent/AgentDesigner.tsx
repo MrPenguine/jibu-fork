@@ -20,13 +20,14 @@ import {
   Viewport
 } from 'reactflow';
 
-import { toast } from '../../components/ui/use-toast';
+import { toast, useToast } from '../../components/ui/use-toast';
 import { useWorkflow } from '../../hooks/workflow';
 import { AgentNodeType, AssistantNodeData, BaseNodeData, FlowNode, FlowEdge } from '../../types';
 import { FlowNode as InspectorFlowNode } from '../../../../src'; // Import for Inspector compatibility
 import { Button } from '../ui/button';
 import { AgentPalette } from './AgentPalette';
 import { AgentNodeInspector } from './AgentNodeInspector';
+import { AssistantInspector } from './AssistantInspector';
 import { AssistantConfigModal } from './AssistantConfigModal'; 
 import { AssistantNodeData as NodeAssistantNodeData } from './nodes/AssistantNode'; 
 
@@ -34,7 +35,6 @@ import { AssistantNodeData as NodeAssistantNodeData } from './nodes/AssistantNod
 import { StartNode } from './nodes/StartNode';
 import { EndNode } from './nodes/EndNode';
 import { MessageNode } from './nodes/MessageNode';
-import { ListenNode } from './nodes/ListenNode';
 import { ChoiceNode } from './nodes/ChoiceNode';
 import { ConditionNode } from './nodes/ConditionNode';
 import { SetVariableNode } from './nodes/SetVariableNode';
@@ -48,7 +48,6 @@ const nodeTypes: any = {
   [AgentNodeType.START]: StartNode,
   [AgentNodeType.END]: EndNode,
   [AgentNodeType.MESSAGE]: MessageNode,
-  [AgentNodeType.LISTEN]: ListenNode,
   [AgentNodeType.CHOICE]: ChoiceNode,
   [AgentNodeType.CONDITION]: ConditionNode,
   [AgentNodeType.SET_VARIABLE]: SetVariableNode,
@@ -108,6 +107,9 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
   // State for Assistant Configuration Modal
   const [isAssistantConfigModalOpen, setIsAssistantConfigModalOpen] = useState(false);
   const [editingAssistantNodeData, setEditingAssistantNodeData] = useState<AssistantNodeData | null>(null);
+  
+  // State for Assistant Inspector sidebar
+  const [inspectingAssistantNode, setInspectingAssistantNode] = useState<FlowNode | null>(null);
 
   // Use the workflow hook for state management
   const {
@@ -127,12 +129,12 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
     scheduleAutoSave,
     viewport,
     updateViewport
-  } = useWorkflow(workflowId, apiClient, organizationId);
+  } = useWorkflow(workflowId || '', apiClient, organizationId);
 
   // Track dirty state
   const [isDirty, setIsDirty] = useState(false);
   const [isNodeInspectorOpen, setIsNodeInspectorOpen] = useState(false);
-  const { toast } = useToast();
+  const { toast: toastFn } = useToast();
 
   // Storage keys for workspace data - ONLY use localStorage for existing workflows with IDs
   const workspaceStorageKey = useMemo(() => {
@@ -176,6 +178,21 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
       setSelectedNode(node as FlowNode);
     },
     [setSelectedNode]
+  );
+  
+  // Direct handler for node double-click
+  const onNodeDoubleClick = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.stopPropagation();
+      console.log("[AgentDesigner] Node double-clicked:", node);
+      
+      if (node.type === AgentNodeType.ASSISTANT) {
+        console.log("[AgentDesigner] Opening Assistant Inspector for node:", node.id);
+        setInspectingAssistantNode(node as FlowNode);
+        setSelectedNode(null);
+      }
+    },
+    [setInspectingAssistantNode, setSelectedNode]
   );
   
   // Function to save workflow with current viewport data
@@ -230,7 +247,7 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
       setIsDirty(true);
       
       // Show toast notification
-      toast({
+      toastFn({
         title: "Node Deleted",
         description: "The selected node has been removed.",
         duration: 2000,
@@ -259,11 +276,14 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
   
   // Viewport change handler
   const onViewportChange = useCallback(
-    (viewport: Viewport) => {
-      updateViewport(viewport);
-      scheduleAutoSave();
+    (event: any) => {
+      if (reactFlowInstance.current) {
+        const viewport = reactFlowInstance.current.getViewport();
+        updateViewport(viewport);
+        scheduleAutoSave();
+      }
     },
-    [updateViewport, scheduleAutoSave]
+    [reactFlowInstance, updateViewport, scheduleAutoSave]
   );
   
   // Enhanced connect handler for special edge types
@@ -358,21 +378,31 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
     }
   }, []);
   
-  // Add edit handlers to assistant nodes
+  // Add edit handlers and double-click handlers to assistant nodes
   useEffect(() => {
     const needsHandlers = nodes.some(node => 
-      node.type === AgentNodeType.ASSISTANT && 
-      !('onEdit' in node.data)
+      node.type === AgentNodeType.ASSISTANT && (
+        typeof (node.data as any).onEdit !== 'function' ||
+        typeof (node.data as any).onNodeDoubleClick !== 'function'
+      )
     );
     
     if (needsHandlers) {
       const nodesWithHandlers = nodes.map(node => {
-        if (node.type === AgentNodeType.ASSISTANT && !('onEdit' in node.data)) {
+        if (node.type === AgentNodeType.ASSISTANT) {
+          const currentData: any = node.data || {};
+          const ensureOnEdit = typeof currentData.onEdit === 'function' ? currentData.onEdit : () => handleOpenAssistantConfigModal(node);
+          const ensureOnDbl = typeof currentData.onNodeDoubleClick === 'function' ? currentData.onNodeDoubleClick : (event: React.MouseEvent) => {
+            event.stopPropagation();
+            setInspectingAssistantNode(node);
+            setSelectedNode(null); // Clear regular selection when opening assistant inspector
+          };
           return {
             ...node,
             data: {
-              ...node.data,
-              onEdit: () => handleOpenAssistantConfigModal(node)
+              ...currentData,
+              onEdit: ensureOnEdit,
+              onNodeDoubleClick: ensureOnDbl,
             }
           } as FlowNode;
         }
@@ -381,7 +411,7 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
       
       setNodes(nodesWithHandlers);
     }
-  }, [nodes, handleOpenAssistantConfigModal, setNodes]);
+  }, [nodes, handleOpenAssistantConfigModal, setNodes, setInspectingAssistantNode, setSelectedNode]);
 
   return (
     <div className="flex h-full w-full bg-background text-foreground" ref={reactFlowWrapper}>
@@ -394,12 +424,13 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
           onEdgesChange={onEdgesChangeWithDirty}
           onConnect={onConnectWithSpecialEdges}
           onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
           onDragOver={onDragOver}
           onDrop={onDrop}
-          onViewportChange={onViewportChange}
+          onMove={onViewportChange}
           defaultViewport={viewport || undefined}
           fitView={!viewport}
           className="agent-designer-flow"
@@ -432,13 +463,32 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
       </div>
       
       {/* Inspector Panel */}
-      {selectedNode && !readOnly && (
+      {selectedNode && !isAssistantNode(selectedNode) && !readOnly && (
         <div className="w-80 border-l border-border p-4 overflow-y-auto bg-card">
           <AgentNodeInspector
             node={selectedNode as unknown as InspectorFlowNode}
             onUpdate={onNodeUpdate}
             assistantId={assistantId}
           />
+        </div>
+      )}
+      
+      {/* Assistant Inspector Panel */}
+      {inspectingAssistantNode && !readOnly && (
+        <div className="w-80 border-l border-border bg-white shadow-lg z-10">
+          <div className="relative h-full">
+            <Button 
+              variant="ghost" 
+              className="absolute top-2 right-2 z-20"
+              onClick={() => setInspectingAssistantNode(null)}
+            >
+              ×
+            </Button>
+            <AssistantInspector
+              node={inspectingAssistantNode as unknown as InspectorFlowNode}
+              onUpdate={onNodeUpdate}
+            />
+          </div>
         </div>
       )}
       

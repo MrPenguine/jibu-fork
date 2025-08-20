@@ -1,74 +1,28 @@
 "use client";
 
 import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { NodeProps } from 'reactflow';
 import { Code2 } from 'lucide-react';
+import { PillNodeShell } from './PillNodeShell';
 
 export const FunctionNode = memo(({ data, selected }: NodeProps) => {
-  const handleTestClick = (event: React.MouseEvent) => {
-    // Stop propagation to prevent node selection
-    event.stopPropagation();
-    
-    // Call the onTest callback if provided
-    if (data.onTest) {
-      data.onTest(data.id);
-    }
-  };
-  
+  const summaryParts: string[] = [];
+  if (data.functionName) summaryParts.push(`fn: ${data.functionName}`);
+  if (data.parameters) summaryParts.push('with params');
+  if (data.outputVariableName) summaryParts.push(`→ ${data.outputVariableName}`);
+  const summary = summaryParts.join(' • ') || 'Function';
   return (
-    <div className="shadow-sm rounded-lg bg-slate-50 min-w-[200px] overflow-hidden">
-      {/* Block title with play button */}
-      <div className="px-4 py-2 text-sm font-medium text-slate-700 flex justify-between items-center bg-slate-100">
-        <div>New Block {data.blockNumber || 14}</div>
-        <button 
-          onClick={handleTestClick}
-          className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors"
-          title="Test this node"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-        </button>
-      </div>
-      
-      {/* Block content */}
-      <div className="p-3">
-        <div className="bg-white rounded-md p-3 flex items-center space-x-2 border border-slate-200">
-          <Code2 className="h-5 w-5 text-slate-500" />
-          <div className="text-sm text-slate-700">Function</div>
-        </div>
-        
-        {data.functionName && (
-          <div className="mt-2 px-1 text-xs text-slate-700">
-            <div className="font-medium">Function: {data.functionName}</div>
-            {data.parameters && (
-              <div className="mt-1">
-                <div className="font-medium">Parameters:</div>
-                <div className="truncate max-w-[250px] font-mono text-slate-700">
-                  {typeof data.parameters === 'object' 
-                    ? JSON.stringify(data.parameters).substring(0, 50) + (JSON.stringify(data.parameters).length > 50 ? '...' : '')
-                    : String(data.parameters)}
-                </div>
-              </div>
-            )}
-            {data.outputVariableName && (
-              <div className="mt-1">
-                Store in: <span className="font-mono">{data.outputVariableName}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="w-2 h-2 bg-slate-500"
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="w-2 h-2 bg-slate-500"
-      />
-    </div>
+    <PillNodeShell
+      id={data.id}
+      selected={selected}
+      nodeTitle={data.nodeTitle}
+      roleTitle={data.role || 'Function'}
+      description={summary}
+      Icon={Code2}
+      blockNumber={data.blockNumber}
+      onTest={data.onTest}
+      onDoubleClick={data.onNodeDoubleClick}
+      includeRightHandle
+    />
   );
 });

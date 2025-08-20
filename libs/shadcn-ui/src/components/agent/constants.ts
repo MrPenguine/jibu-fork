@@ -1,27 +1,61 @@
 import { MarkerType } from 'reactflow';
+import { MessageCircle, MousePointer, ListChecks, GitBranch, CodeIcon, Network, FunctionSquare, BrainCircuit, ImageIcon, FileTextIcon, GalleryHorizontal } from 'lucide-react';
 import { AgentNodeType } from '../../types';
 import { StartNode } from './nodes/StartNode';
+import { TriggerNode } from './nodes/TriggerNode';
 import { EndNode } from './nodes/EndNode';
+import { AssistantNode } from './nodes/AssistantNode';
 import { MessageNode } from './nodes/MessageNode';
-import { ListenNode } from './nodes/ListenNode';
+import { PromptNode } from './nodes/PromptNode';
 import { ChoiceNode } from './nodes/ChoiceNode';
+import { ButtonsNode } from './nodes/ButtonsNode';
+import { CaptureNode } from './nodes/CaptureNode';
 import { ConditionNode } from './nodes/ConditionNode';
 import { SetVariableNode } from './nodes/SetVariableNode';
+import { ComponentNode } from './nodes/ComponentNode';
 import { ApiCallNode } from './nodes/ApiCallNode';
 import { ToolCallNode } from './nodes/ToolCallNode';
-import { MessageCircle, MousePointer, ListChecks, GitBranch, CodeIcon, Network, FunctionSquare, BrainCircuit, ImageIcon, FileTextIcon, GalleryHorizontal } from 'lucide-react';
+import { FunctionNode } from './nodes/FunctionNode';
+import { JavaScriptNode } from './nodes/JavaScriptNode';
+import { KnowledgeBaseSearchNode } from './nodes/KnowledgeBaseSearchNode';
+import { CallForwardNode } from './nodes/CallForwardNode';
+import { CustomActionNode } from './nodes/CustomActionNode';
 
 // Define node types for React Flow
 export const nodeTypes = {
+  // Core flow
   [AgentNodeType.START]: StartNode,
   [AgentNodeType.END]: EndNode,
+  [AgentNodeType.TRANSFER]: CallForwardNode, // legacy mapping retained
+
+  // Assistant
+  [AgentNodeType.ASSISTANT]: AssistantNode,
+
+  // Talk
   [AgentNodeType.MESSAGE]: MessageNode,
-  [AgentNodeType.LISTEN]: ListenNode,
+  [AgentNodeType.PROMPT]: PromptNode,
+
+  // Listen
   [AgentNodeType.CHOICE]: ChoiceNode,
+  [AgentNodeType.BUTTONS]: ButtonsNode,
+  [AgentNodeType.CAPTURE]: CaptureNode,
+
+  // Logic
   [AgentNodeType.CONDITION]: ConditionNode,
   [AgentNodeType.SET_VARIABLE]: SetVariableNode,
-  [AgentNodeType.API_CALL]: ApiCallNode,
+  [AgentNodeType.COMPONENT]: ComponentNode,
+
+  // Dev
   [AgentNodeType.TOOL_CALL]: ToolCallNode,
+  [AgentNodeType.FUNCTION]: FunctionNode,
+  [AgentNodeType.API_CALL]: ApiCallNode,
+  [AgentNodeType.CUSTOM]: JavaScriptNode,
+  [AgentNodeType.KNOWLEDGE_BASE_SEARCH]: KnowledgeBaseSearchNode,
+  [AgentNodeType.CALL_FORWARD]: CallForwardNode,
+  [AgentNodeType.CUSTOM_ACTION]: CustomActionNode,
+
+  // Trigger (kept)
+  // If Trigger uses a dedicated type elsewhere, include mapping here when available
 };
 
 // Default edge options

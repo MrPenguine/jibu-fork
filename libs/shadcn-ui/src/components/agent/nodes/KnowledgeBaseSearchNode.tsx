@@ -16,6 +16,7 @@ import {
 } from '../../ui/dialog';
 import { Button } from '../../ui/button';
 import { useAssistants } from '../../../../../../apps/frontend/src/utils/AssistantsApi'; // Added for backend calls
+import { PillNodeShell } from './PillNodeShell';
 
 export interface KnowledgeBaseSearchNodeData {
   id?: string;
@@ -282,124 +283,27 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
     );
   };
   
-  // Render the main component
+  // Render the main component with PillNodeShell for consistent styling
+  const parts: string[] = [];
+  if (data.knowledgeBaseName || data.knowledgeBaseId) parts.push(`${data.knowledgeBaseName || data.knowledgeBaseId}`);
+  if (data.query) parts.push(`Q: ${data.query.length > 40 ? data.query.slice(0, 40) + '…' : data.query}`);
+  if (data.outputVariableName) parts.push(`→ ${data.outputVariableName}`);
+  const summary = parts.join(' • ') || 'Knowledge Base Search';
+
   return (
     <>
-      <div 
-        className="shadow-sm rounded-lg bg-purple-50 min-w-[200px] overflow-hidden" 
-        data-node-type={AgentNodeType.KNOWLEDGE_BASE_SEARCH}
-        data-type="knowledgeBaseSearchNode"
-        data-has-settings="true"
-        style={{
-          boxShadow: data.knowledgeBaseName ? '0 0 0 2px rgba(139, 92, 246, 0.4)' : 'none'
-        }}
-        onDoubleClick={handleDoubleClick}
-      >
-      {/* Block title with play button */}
-      <div className="px-4 py-2 text-sm font-medium text-purple-700 flex justify-between items-center bg-purple-100">
-        <div>{data.knowledgeBaseName || 'Knowledge Base Search'}</div>
-        <button 
-          onClick={handleTestClick}
-          className="h-5 w-5 flex items-center justify-center rounded-full hover:bg-purple-200 transition-colors"
-          title="Test this node"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-600">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-        </button>
-      </div>
-      
-      {/* Block content */}
-      <div className="p-3">
-        <div className="bg-white rounded-md p-3 flex items-center space-x-2 border border-purple-200">
-          <Search className="h-5 w-5 text-purple-500" />
-          <div className="text-sm text-purple-700">Knowledge Base Search</div>
-        </div>
-        
-        {data.knowledgeBaseId && (
-          <div className="mt-2 px-1 text-xs text-purple-700">
-            <div className="font-medium">Knowledge Base:</div>
-            <div className="truncate max-w-[250px] font-mono">{data.knowledgeBaseName || data.knowledgeBaseId}</div>
-            {data.query && (
-              <div className="mt-1">
-                Query: <span className="font-mono">{data.query}</span>
-              </div>
-            )}
-            {data.outputVariableName && (
-              <div className="mt-1">
-                Store in: <span className="font-mono">{data.outputVariableName}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      {/* Only one connection point on the left side - only accepts from AssistantNode */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="w-3 h-3 bg-purple-500 hover:bg-purple-700 transition-colors kb-connection-target"
-        id="kb-connection-target"
-        isValidConnection={(connection) => {
-          // Always allow connections from any source - we'll rely on visual feedback for guidance
-          // but won't prevent valid connections from being made
-          const sourceNode = document.querySelector(`[data-id="${connection.source}"]`);
-          const isFromAssistantNode = sourceNode?.getAttribute('data-type') === 'assistantNode' || 
-                                     sourceNode?.getAttribute('data-node-type') === 'assistantNode';
-          
-          // Only prevent self-connections
-          const isValid = connection.target !== connection.source;
-          
-          // Show a visual feedback for valid connections from Assistant nodes
-          if (isValid && isFromAssistantNode) {
-            console.log('[KnowledgeBaseSearchNode] Valid connection from Assistant node');
-            // If a connection is valid, update the visual appearance of the handle
-            const handle = document.querySelector(`[data-id="${id}"] .kb-connection-target`) as HTMLElement;
-            if (handle) {
-              handle.classList.add('valid-connection-highlight');
-              // Add a pulsing animation effect
-              handle.style.animation = 'pulse-effect 1s';
-              handle.style.border = '2px solid #8b5cf6';
-              handle.style.boxShadow = '0 0 5px #8b5cf6';
-              setTimeout(() => {
-                handle.classList.remove('valid-connection-highlight');
-                handle.style.animation = '';
-                handle.style.border = '';
-                handle.style.boxShadow = '';
-              }, 1000);
-            }
-          }
-          
-          return isValid;
-        }}
-        data-tooltip="Knowledge Base Connection"
-        data-connection-type="kb-connection"
-        data-connection-label="KB Search"
-        style={{ cursor: 'pointer' }}
-        onMouseEnter={(e) => {
-          // Create tooltip element when hovering
-          const tooltip = document.createElement('div');
-          tooltip.textContent = 'Knowledge Base Connection';
-          tooltip.style.position = 'absolute';
-          tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-          tooltip.style.color = 'white';
-          tooltip.style.padding = '5px 10px';
-          tooltip.style.borderRadius = '4px';
-          tooltip.style.fontSize = '12px';
-          tooltip.style.zIndex = '1000';
-          tooltip.style.top = `${e.clientY - 40}px`;
-          tooltip.style.left = `${e.clientX}px`;
-          tooltip.classList.add('kb-connection-tooltip');
-          document.body.appendChild(tooltip);
-        }}
-        onMouseLeave={() => {
-          // Remove tooltip when not hovering
-          const tooltip = document.querySelector('.kb-connection-tooltip');
-          if (tooltip) {
-            document.body.removeChild(tooltip);
-          }
-        }}
+      <PillNodeShell
+        id={id!}
+        selected={selected}
+        nodeTitle={data?.nodeTitle}
+        roleTitle={data?.knowledgeBaseName || 'KB Search'}
+        description={summary}
+        Icon={Search}
+        blockNumber={data?.blockNumber}
+        onTest={data?.onTest}
+        onDoubleClick={(evt) => handleDoubleClick(evt)}
+        includeRightHandle
       />
-      </div>
       {renderConfigModal()}
     </>
   );

@@ -2,21 +2,21 @@
 
 import React, { memo } from 'react';
 import { NodeProps } from 'reactflow';
-import { FileCode2 } from 'lucide-react';
+import { ListChecks } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const JavaScriptNode = memo(({ data, selected }: NodeProps) => {
-  const summary = data.code
-    ? `JS: ${data.code.length > 80 ? data.code.slice(0, 80) + '…' : data.code}${data.outputVariableName ? ` → ${data.outputVariableName}` : ''}`
-    : 'JavaScript';
+export const ButtonsNode = memo(({ data, selected }: NodeProps) => {
+  const summaryParts: string[] = [];
+  if (Array.isArray(data.choices)) summaryParts.push(`${data.choices.length} options`);
+  const summary = summaryParts.join(' • ') || 'Buttons';
   return (
     <PillNodeShell
       id={data.id}
       selected={selected}
       nodeTitle={data.nodeTitle}
-      roleTitle={data.role || 'JavaScript'}
+      roleTitle={data.role || 'Buttons'}
       description={summary}
-      Icon={FileCode2}
+      Icon={ListChecks}
       blockNumber={data.blockNumber}
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}

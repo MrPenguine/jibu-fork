@@ -2,21 +2,22 @@
 
 import React, { memo } from 'react';
 import { NodeProps } from 'reactflow';
-import { FileCode2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const JavaScriptNode = memo(({ data, selected }: NodeProps) => {
-  const summary = data.code
-    ? `JS: ${data.code.length > 80 ? data.code.slice(0, 80) + '…' : data.code}${data.outputVariableName ? ` → ${data.outputVariableName}` : ''}`
-    : 'JavaScript';
+export const CallForwardNode = memo(({ data, selected }: NodeProps) => {
+  const summaryParts: string[] = [];
+  if (data.targetType) summaryParts.push(`${data.targetType}`);
+  if (data.targetAddress) summaryParts.push(`→ ${data.targetAddress}`);
+  const summary = summaryParts.join(' • ') || 'Call Forward';
   return (
     <PillNodeShell
       id={data.id}
       selected={selected}
       nodeTitle={data.nodeTitle}
-      roleTitle={data.role || 'JavaScript'}
+      roleTitle={data.role || 'Call Forward'}
       description={summary}
-      Icon={FileCode2}
+      Icon={ArrowRight}
       blockNumber={data.blockNumber}
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}

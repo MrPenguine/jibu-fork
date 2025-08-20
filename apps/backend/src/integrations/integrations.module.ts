@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-// N8N
-import { N8nIntegrationModule } from './n8n/n8n-integration.module';
-
 // Storage
 import { S3StorageService } from './storage/providers/s3/s3-storage.service';
 import { storageServiceFactory } from './storage/storage.factory';
@@ -36,7 +33,6 @@ export const STT_SERVICE_TOKEN = 'STT_SERVICE_TOKEN';
     AgentModule,
     TtsModule,
     SttModule,
-    N8nIntegrationModule,
   ],
   providers: [
     
@@ -73,7 +69,6 @@ export const STT_SERVICE_TOKEN = 'STT_SERVICE_TOKEN';
     AgentModule,
     TtsModule,
     SttModule,
-    N8nIntegrationModule,
   ],
 })
 export class IntegrationsModule {} 

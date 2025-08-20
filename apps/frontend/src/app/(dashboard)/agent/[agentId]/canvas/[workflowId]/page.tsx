@@ -7,9 +7,9 @@ import {
   ReactFlowProvider,
   NodeMouseHandler,
   Connection,
-  MarkerType,
   Controls,
   Background,
+  BackgroundVariant,
   useReactFlow,
   ReactFlowInstance,
 } from 'reactflow';
@@ -26,44 +26,17 @@ import {
 import {
   AssistantConfigModal,
 } from '@libs/shadcn-ui/components/agent';
+import { AssistantInspector } from '@libs/shadcn-ui/components/agent/AssistantInspector';
 import { AgentNavSidebar } from '@libs/shadcn-ui/components/agent/AgentNavSidebar';
 import {
-  StartNode,
-  EndNode,
-  MessageNode,
-  ListenNode,
-  ChoiceNode,
-  ConditionNode,
-  SetVariableNode,
-  ApiCallNode,
-  ToolCallNode,
-  AssistantNode,
-  KnowledgeBaseSearchNode,
   AgentExecutionDialog,
   AgentNodeInspector,
 } from '@libs/shadcn-ui/components/agent';
-import {
-  Save,
-  Play,
-  ZoomIn,
-  ZoomOut,
-  Rocket,
-  Plus,
-  Trash2,
-  Pencil,
-  Check,
-  X,
-  ArrowLeft,
-  Zap,
-  Undo,
-  Redo,
-  Maximize,
-  Minimize,
-  RotateCcw,
-  Share2,
-  Settings,
-  Loader2
-} from 'lucide-react';
+import { nodeTypes, defaultEdgeOptions } from '@libs/shadcn-ui/components/agent/constants';
+// (icons now encapsulated within TopRightButtons)
+import { TopRightButtons } from '@libs/shadcn-ui/components/agent/canvas/TopRightButtons';
+import { ControlPanel } from '@libs/shadcn-ui/components/agent/canvas/ControlPanel';
+import { TestAgentButton } from '@libs/shadcn-ui/components/agent/canvas/TestAgentButton';
 
 // Import our custom hook and components
 import { getDefaultNodeData } from '@libs/shadcn-ui/hooks/agent';
@@ -80,32 +53,7 @@ import { getAssistant } from '../../../../../../utils/AssistantsApi';
 // Import UI toast component for notifications
 import { toast } from '@libs/shadcn-ui/components/ui/use-toast';
 
-// Define node types for React Flow
-const nodeTypes = {
-  [AgentNodeType.START]: StartNode,
-  [AgentNodeType.END]: EndNode,
-  [AgentNodeType.MESSAGE]: MessageNode,
-  [AgentNodeType.LISTEN]: ListenNode,
-  [AgentNodeType.CHOICE]: ChoiceNode,
-  [AgentNodeType.CONDITION]: ConditionNode,
-  [AgentNodeType.SET_VARIABLE]: SetVariableNode,
-  [AgentNodeType.API_CALL]: ApiCallNode,
-  [AgentNodeType.TOOL_CALL]: ToolCallNode,
-  [AgentNodeType.ASSISTANT]: AssistantNode,
-  // Register the dedicated KB Search node with its string literal value
-  'knowledgeBaseSearchNode': KnowledgeBaseSearchNode,
-};
-
-// Default edge options
-const defaultEdgeOptions = {
-  type: 'smoothstep',
-  markerEnd: {
-    type: MarkerType.ArrowClosed,
-  },
-  style: {
-    strokeWidth: 2,
-  },
-};
+// nodeTypes and defaultEdgeOptions are imported from shared constants
 
 // Main agent editor component
 function AgentCanvasContent() {
@@ -147,6 +95,8 @@ function AgentCanvasContent() {
   } = useWorkflow(workflowId, workflowApi);
 
   // State for React Flow instance and active popover
+  const { zoomIn, zoomOut, fitView: rfFitView, setViewport } = useReactFlow();
+  const [showGrid, setShowGrid] = useState(true);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [activePopover, setActivePopover] = useState<string | null>(null);
   const [isAssistantConfigOpen, setIsAssistantConfigOpen] = useState(false);
@@ -154,6 +104,20 @@ function AgentCanvasContent() {
   const [selectedAssistantNodeId, setSelectedAssistantNodeId] = useState<string | null>(null);
   const [isAgentPublished, setIsAgentPublished] = useState(false);
   const [isPublishingAgent, setIsPublishingAgent] = useState(false);
+  // Assistant inspector sidebar state
+  const [inspectingAssistantNode, setInspectingAssistantNode] = useState<FlowNode | null>(null);
+  
+  // Auto-fit view when nodes load so Start node is visible
+  useEffect(() => {
+    if (!reactFlowInstance) return;
+    if (nodes && nodes.length > 0) {
+      try {
+        rfFitView({ padding: 0.2 });
+      } catch (e) {
+        console.warn('fitView failed:', e);
+      }
+    }
+  }, [nodes, reactFlowInstance, rfFitView]);
 
   // Fetch agent details
   useEffect(() => {
@@ -185,6 +149,15 @@ function AgentCanvasContent() {
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
     setSelectedNode(node as FlowNode);
   }, [setSelectedNode]);
+
+  // ReactFlow-level double-click handler
+  const onNodeDoubleClick: NodeMouseHandler = useCallback((event, node) => {
+    if (node.type === AgentNodeType.ASSISTANT) {
+      event.stopPropagation();
+      setInspectingAssistantNode(node as FlowNode);
+      setSelectedNode(null);
+    }
+  }, [setInspectingAssistantNode, setSelectedNode]);
 
   // Drag over handler for drag and drop
   const onDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
@@ -323,6 +296,29 @@ function AgentCanvasContent() {
     }
   }, [nodes, setSelectedNode, getAssistant]);
 
+  // Ensure Assistant nodes have a working onNodeDoubleClick in their data (for the Configure button inside the node)
+  useEffect(() => {
+    if (!nodes || nodes.length === 0) return;
+    const needsUpdate = nodes.some(n => n.type === AgentNodeType.ASSISTANT && typeof (n.data as any).onNodeDoubleClick !== 'function');
+    if (!needsUpdate) return;
+    const updated = nodes.map(n => {
+      if (n.type !== AgentNodeType.ASSISTANT) return n as FlowNode;
+      const data: any = n.data || {};
+      return {
+        ...n,
+        data: {
+          ...data,
+          onNodeDoubleClick: (evt: React.MouseEvent) => {
+            evt.stopPropagation();
+            setInspectingAssistantNode(n as FlowNode);
+            setSelectedNode(null);
+          },
+        },
+      } as FlowNode;
+    });
+    setNodes(updated as any);
+  }, [nodes, setNodes, setInspectingAssistantNode, setSelectedNode]);
+
   // Handle assistant config save
   const handleAssistantConfigSave = useCallback((assistantData: any) => {
     console.log(`[WorkflowPage] Saving assistant config:`, JSON.stringify(assistantData, null, 2));
@@ -362,6 +358,7 @@ function AgentCanvasContent() {
           defaultEdgeOptions={defaultEdgeOptions}
           onInit={setReactFlowInstance}
           onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
           onDragOver={onDragOver}
           onDrop={(event) => {
             event.preventDefault();
@@ -416,24 +413,36 @@ function AgentCanvasContent() {
           }}
           fitView
         >
-          <Background />
+          {showGrid && (
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={16}
+              size={1}
+              color="#64748b"
+            />
+          )}
           <Controls />
           
-          {/* Floating action buttons */}
-          <div className="absolute top-4 right-4 z-50 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border">
-            <Button variant="outline" size="sm" onClick={() => saveWorkflow()} disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {lastSavedAt ? `Saved` : 'Save'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => publishWorkflow()} disabled={isPublishingAgent || isSaving}>
-              {isPublishingAgent ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
-              {isPublished ? 'Published' : 'Publish'}
-            </Button>
-            <Button variant="default" size="sm" onClick={() => setIsRunDialogOpen(true)}>
-              <Play className="mr-2 h-4 w-4" />
-              Test
-            </Button>
-          </div>
+          {/* Top-right action buttons */}
+          <TopRightButtons
+            onRun={() => setIsRunDialogOpen(true)}
+            onPublish={() => publishWorkflow()}
+            isPublishing={isPublishingAgent}
+            isSaving={isSaving}
+            isPublished={isPublished}
+          />
+
+          {/* Bottom-left control panel */}
+          <ControlPanel
+            onZoomOut={() => zoomOut()}
+            onZoomIn={() => zoomIn()}
+            onFitView={() => rfFitView({ padding: 0.2 })}
+            onReset={() => setViewport({ x: 0, y: 0, zoom: 1 })}
+            onToggleGrid={() => setShowGrid((v) => !v)}
+          />
+
+          {/* Bottom-right test agent button */}
+          <TestAgentButton onClick={() => setIsRunDialogOpen(true)} />
           
           {/* Floating sidebar for node palette */}
           <CanvasSidebar
@@ -464,6 +473,28 @@ function AgentCanvasContent() {
             onTest={() => handleTestNode(selectedNode.id)}
           />
         )}
+
+      {/* Assistant Inspector sidebar */}
+      {inspectingAssistantNode && (
+        <div className="w-80 border-l border-border bg-white shadow-lg z-10" style={{ position: 'absolute', top: 0, right: 0, bottom: 0 }}>
+          <div className="relative h-full">
+            <Button
+              variant="ghost"
+              className="absolute top-2 right-2 z-20"
+              onClick={() => setInspectingAssistantNode(null)}
+            >
+              ×
+            </Button>
+            <AssistantInspector
+              node={inspectingAssistantNode as any}
+              onUpdate={(nodeId: string, data: any) => {
+                updateNodeData(nodeId, data);
+                scheduleAutoSave();
+              }}
+            />
+          </div>
+        </div>
+      )}
       
       {/* Assistant config modal */}
       <AssistantConfigModal
