@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndOrg } from '../../../utils/apiRouteProtection';
+import { withAuthAndWorkspace } from '../../../utils/apiRouteProtection';
 
 export async function GET(request: NextRequest) {
-  return withAuthAndOrg(
+  return withAuthAndWorkspace(
     request,
-    async (session, organizationId, request) => {
+    async (session, workspaceId, request) => {
       // Your protected route logic here
       return NextResponse.json({
         message: 'Hello, from protected API!',
         authenticated: true,
-        organizationId: organizationId || 'No organization specified',
+        workspaceId: workspaceId || 'No workspace specified',
         userEmail: session.user?.email
       });
     },
-    { requireOrg: false } // Organization is not required for this route
+    { requireWorkspace: false } // Workspace is not required for this route
   );
 }

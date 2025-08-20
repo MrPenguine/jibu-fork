@@ -9,7 +9,7 @@ import { useToast } from '@libs/shadcn-ui/components/ui/use-toast'
 import { Card } from '@libs/shadcn-ui/components/ui/card'
 import * as fileApi from '../../../../utils/fileApi'
 import { Progress } from '@libs/shadcn-ui/components/ui/progress'
-import { useOrganization } from '../../../../utils/organizationContext'
+import { useWorkspace } from '../../../../utils/workspaceContext'
 import { createClient } from '../../../../utils/supabase/client'
 
 /**
@@ -23,7 +23,7 @@ function sanitizeUserId(userId: string | undefined): string {
 
 export default function FilePage() {
   const { toast } = useToast()
-  const { activeOrganization } = useOrganization()
+  const { activeWorkspace } = useWorkspace()
   const refreshTimestamp = useRef(Date.now()).current
   
   // State to track if any files have been uploaded
@@ -47,9 +47,9 @@ export default function FilePage() {
   const [forceRefresh, setForceRefresh] = useState(Date.now())
 
   // Define fetchFiles as useCallback to avoid recreating it on each render
-  const fetchFiles = useCallback(async (orgId?: string) => {
-    if (!orgId) {
-      console.log('No organization ID provided for fetchFiles, skipping');
+  const fetchFiles = useCallback(async (workspaceId?: string) => {
+    if (!workspaceId) {
+      console.log('No workspace ID provided for fetchFiles, skipping');
       setIsLoading(false);
       setFiles([]);
       setHasFiles(false);
@@ -59,23 +59,23 @@ export default function FilePage() {
 
     try {
       setIsLoading(true);
-      console.log(`[FETCH_FILES] Fetching files for organization: ${orgId}`);
+      console.log(`[FETCH_FILES] Fetching files for workspace: ${workspaceId}`);
       
       // Force-pass the specific organization ID, bypassing any cached values
-      const filesList = await fileApi.listFiles(1, 50, orgId);
-      console.log(`[FETCH_FILES] Files fetched for org ${orgId}:`, filesList);
+      const filesList = await fileApi.listFiles(1, 50, workspaceId);
+      console.log(`[FETCH_FILES] Files fetched for workspace ${workspaceId}:`, filesList);
       
       // Add additional validation to ensure organization IDs match
       const matchingFiles = filesList.filter(file => {
-        const fileOrgId = file.metadata?.organizationId;
-        const matches = fileOrgId === orgId;
+        const fileWorkspaceId = file.metadata?.workspaceId;
+        const matches = fileWorkspaceId === workspaceId;
         if (!matches) {
-          console.warn(`[FETCH_FILES] Found file with mismatched organization ID: ${file.id}, belongs to ${fileOrgId} but current org is ${orgId}`);
+          console.warn(`[FETCH_FILES] Found file with mismatched workspace ID: ${file.id}, belongs to ${fileWorkspaceId} but current workspace is ${workspaceId}`);
         }
         return matches;
       });
       
-      console.log(`[FETCH_FILES] After filtering: ${matchingFiles.length} of ${filesList.length} files belong to org ${orgId}`);
+      console.log(`[FETCH_FILES] After filtering: ${matchingFiles.length} of ${filesList.length} files belong to workspace ${workspaceId}`);
       
       // Only set files that match the current organization
       setFiles(matchingFiles);
@@ -86,11 +86,11 @@ export default function FilePage() {
         console.log('[FETCH_FILES] Setting selected file to first file');
         setSelectedFile(matchingFiles[0]);
       } else {
-        console.log('[FETCH_FILES] No files found for this organization');
+        console.log('[FETCH_FILES] No files found for this workspace');
         setSelectedFile(null);
       }
     } catch (error) {
-      console.error(`[FETCH_FILES] Error fetching files for org ${orgId}:`, error);
+      console.error(`[FETCH_FILES] Error fetching files for workspace ${workspaceId}:`, error);
       toast({
         title: "Error",
         description: "Failed to load files. Please try again.",
@@ -107,14 +107,14 @@ export default function FilePage() {
 
   // Force a rerender whenever the organization changes
   useEffect(() => {
-    console.log(`[COMPONENT] FilePage fully remounting for organization: ${activeOrganization?.id}`);
+    console.log(`[COMPONENT] FilePage fully remounting for workspace: ${activeWorkspace?.id}`);
     setForceRefresh(Date.now());
-  }, [activeOrganization?.id]);
+  }, [activeWorkspace?.id]);
 
   // Effect to watch for organization changes - this will be triggered by forceRefresh updates now
   useEffect(() => {
-    if (!activeOrganization?.id) {
-      console.log('[ORG_CHANGE] No active organization, clearing files');
+    if (!activeWorkspace?.id) {
+      console.log('[WORKSPACE_CHANGE] No active workspace, clearing files');
       setFiles([]);
       setSelectedFile(null);
       setHasFiles(false);
@@ -122,31 +122,31 @@ export default function FilePage() {
       return;
     }
     
-    console.log(`[ORG_CHANGE] Active organization changed: ${activeOrganization.name} (${activeOrganization.id})`);
+    console.log(`[WORKSPACE_CHANGE] Active workspace changed: ${activeWorkspace.name} (${activeWorkspace.id})`);
     
     // Reset states
     setSelectedFile(null);
     setFiles([]);
     setHasFiles(false);
     
-    // Fetch files for the new organization
-    fetchFiles(activeOrganization.id);
+    // Fetch files for the new workspace
+    fetchFiles(activeWorkspace.id);
     
-  }, [activeOrganization?.id, fetchFiles, forceRefresh]);
+  }, [activeWorkspace?.id, fetchFiles, forceRefresh]);
 
   // Function to handle file upload
   const handleFileUpload = async (file: File) => {
-    if (!activeOrganization?.id) {
+    if (!activeWorkspace?.id) {
       toast({
         title: "Error",
-        description: "Please select an organization before uploading files.",
+        description: "Please select a workspace before uploading files.",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      console.log(`[UPLOAD] Uploading file: ${file.name} to organization: ${activeOrganization.id} (${activeOrganization.name})`);
+      console.log(`[UPLOAD] Uploading file: ${file.name} to workspace: ${activeWorkspace.id} (${activeWorkspace.name})`);
       setIsUploading(true);
       setUploadProgress(0);
       
@@ -154,10 +154,10 @@ export default function FilePage() {
       const uploadedFile = await fileApi.uploadFile(file, (progress: number) => {
         console.log(`[UPLOAD] Upload progress: ${progress}%`);
         setUploadProgress(progress);
-      }, activeOrganization.id);
+      }, activeWorkspace.id);
       
       console.log('[UPLOAD] File uploaded successfully:', uploadedFile);
-      console.log('[UPLOAD] File organization ID:', uploadedFile.metadata?.organizationId);
+      console.log('[UPLOAD] File workspace ID:', uploadedFile.metadata?.workspaceId);
       
       setFiles(prevFiles => [uploadedFile, ...prevFiles]);
       setSelectedFile(uploadedFile);
@@ -165,11 +165,11 @@ export default function FilePage() {
       
       toast({
         title: "Success",
-        description: `${file.name} has been uploaded successfully to ${activeOrganization.name}.`,
+        description: `${file.name} has been uploaded successfully to ${activeWorkspace.name}.`,
       });
       
       // Refresh the file list to ensure consistency
-      fetchFiles(activeOrganization.id);
+      fetchFiles(activeWorkspace.id);
     } catch (error: any) {
       console.error('[UPLOAD] Error uploading file:', error);
       toast({
@@ -184,10 +184,10 @@ export default function FilePage() {
 
   // Function to handle file deletion
   const handleDeleteFile = async () => {
-    if (!selectedFile || !activeOrganization?.id) return;
+    if (!selectedFile || !activeWorkspace?.id) return;
     
     try {
-      console.log(`[DELETE] Deleting file: ${selectedFile.id} from organization: ${activeOrganization.id}`);
+      console.log(`[DELETE] Deleting file: ${selectedFile.id} from workspace: ${activeWorkspace.id}`);
       setIsDeleting(true);
       
       // Get current user ID from Supabase session
@@ -210,7 +210,7 @@ export default function FilePage() {
         console.log(`[DELETE] Using user ID: ${userId}`);
         
         // Explicitly pass the organization ID and user ID
-        await fileApi.deleteFile(selectedFile.id, activeOrganization.id, sanitizeUserId(userId));
+        await fileApi.deleteFile(selectedFile.id, activeWorkspace.id, sanitizeUserId(userId));
       } catch (authError) {
         console.error('[DELETE] Error getting user:', authError);
         toast({
@@ -252,13 +252,13 @@ export default function FilePage() {
 
   // Function to get and copy download URL
   const copyUrlToClipboard = async () => {
-    if (!selectedFile || !activeOrganization?.id) return;
+    if (!selectedFile || !activeWorkspace?.id) return;
     
     try {
-      console.log(`[COPY_URL] Getting download URL for file: ${selectedFile.id} from organization: ${activeOrganization.id}`);
+      console.log(`[COPY_URL] Getting download URL for file: ${selectedFile.id} from workspace: ${activeWorkspace.id}`);
       
-      // Explicitly pass the organization ID
-      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id, activeOrganization.id);
+      // Explicitly pass the workspace ID
+      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id, activeWorkspace.id);
       
       console.log('[COPY_URL] Download URL:', downloadUrl);
       
@@ -279,13 +279,13 @@ export default function FilePage() {
 
   // Function to handle download
   const handleDownload = async () => {
-    if (!selectedFile || !activeOrganization?.id) return;
+    if (!selectedFile || !activeWorkspace?.id) return;
     
     try {
-      console.log(`[DOWNLOAD] Downloading file: ${selectedFile.id} from organization: ${activeOrganization.id}`);
+      console.log(`[DOWNLOAD] Downloading file: ${selectedFile.id} from workspace: ${activeWorkspace.id}`);
       
-      // Explicitly pass the organization ID
-      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id, activeOrganization.id);
+      // Explicitly pass the workspace ID
+      const downloadUrl = await fileApi.getDownloadUrl(selectedFile.id, activeWorkspace.id);
       
       console.log('[DOWNLOAD] Opening download URL:', downloadUrl);
       window.open(downloadUrl, '_blank');
@@ -300,13 +300,13 @@ export default function FilePage() {
   };
 
   // If no organization is selected
-  if (!activeOrganization) {
+  if (!activeWorkspace) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="max-w-md text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
-          <h2 className="text-xl font-semibold mb-2">No Organization Selected</h2>
+          <h2 className="text-xl font-semibold mb-2">No Workspace Selected</h2>
           <p className="text-gray-600 mb-4">
-            Please select an organization from the organization switcher to view and manage files.
+            Please select a workspace from the workspace switcher to view and manage files.
           </p>
         </div>
       </div>
@@ -333,8 +333,8 @@ export default function FilePage() {
                 handleFileUpload(file);
               }
             }}
-            organizationName={activeOrganization?.name}
-            organizationId={activeOrganization?.id}
+            workspaceName={activeWorkspace?.name}
+            workspaceId={activeWorkspace?.id}
           />
           
           {isUploading && (
@@ -349,7 +349,7 @@ export default function FilePage() {
   }
 
   return (
-    <div className="h-screen flex flex-col p-0" key={`file-page-container-${activeOrganization?.id}-${forceRefresh}`}>
+    <div className="h-screen flex flex-col p-0" key={`file-page-container-${activeWorkspace?.id}-${forceRefresh}`}>
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar - Files section with upload button */}
         <div className="w-[350px] border-r border-gray-200 flex flex-col p-4">
@@ -363,7 +363,7 @@ export default function FilePage() {
                 onClick={() => {
                   console.log('[MANUAL_REFRESH] User triggered manual refresh');
                   setForceRefresh(Date.now());
-                  fetchFiles(activeOrganization?.id);
+                  fetchFiles(activeWorkspace?.id);
                 }}
                 disabled={isLoading}
               >
@@ -379,7 +379,7 @@ export default function FilePage() {
                 variant="outline"
                 size="sm"
                 className="bg-primary/10 hover:bg-primary/20 text-primary flex items-center gap-1.5"
-                onClick={() => document.getElementById(`file-upload-${activeOrganization?.id || 'default'}`)?.click()}
+                onClick={() => document.getElementById(`file-upload-${activeWorkspace?.id || 'default'}`)?.click()}
                 disabled={isUploading}
               >
                 <Upload className="h-3.5 w-3.5" />
@@ -387,7 +387,7 @@ export default function FilePage() {
               </Button>
             </div>
             <input
-              id={`file-upload-${activeOrganization?.id || 'default'}`}
+              id={`file-upload-${activeWorkspace?.id || 'default'}`}
               type="file"
               className="hidden"
               onChange={(e) => {
@@ -411,14 +411,14 @@ export default function FilePage() {
               id: file.id,
               name: file.name,
               type: file.type,
-              organizationId: file.metadata?.organizationId || activeOrganization?.id
+              workspaceId: file.metadata?.workspaceId || activeWorkspace?.id
             }))}
             selectedFileId={selectedFile?.id}
             onSelectFile={(fileId) => {
               const file = files.find(f => f.id === fileId);
               setSelectedFile(file || null);
             }}
-            organizationId={activeOrganization?.id}
+            workspaceId={activeWorkspace?.id}
           />
         </div>
         
@@ -491,9 +491,9 @@ export default function FilePage() {
           </div>
 
           <div className="mb-6">
-            <h3 className="text-xs text-gray-500 mb-2">Organization</h3>
+            <h3 className="text-xs text-gray-500 mb-2">Workspace</h3>
             <div className="text-sm text-gray-700 p-2 rounded bg-white border border-gray-200">
-              {activeOrganization.name} ({activeOrganization.id.substring(0, 8)}...)
+              {activeWorkspace.name} ({activeWorkspace.id.substring(0, 8)}...)
             </div>
           </div>
           

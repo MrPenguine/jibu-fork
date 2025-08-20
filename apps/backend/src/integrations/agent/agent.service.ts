@@ -19,30 +19,30 @@ export class AgentService {
   ) {}
   
   /**
-   * Helper function to extract organization ID from a session ID if possible
-   * Session IDs often follow a pattern that includes the organization ID
+   * Helper function to extract workspace ID from a session ID if possible
+   * Session IDs often follow a pattern that includes the workspace ID
    */
-  private extractOrgIdFromSessionId(sessionId: string): string | null {
+  private extractWorkspaceIdFromSessionId(sessionId: string): string | null {
     if (!sessionId) {
       return null;
     }
     
-    // Common session ID format: agent:agentId:orgId-userId-timestamp
-    // or chat:agent:agentId:orgId-...
+    // Common session ID format: agent:agentId:workspaceId-userId-timestamp
+    // or chat:agent:agentId:workspaceId-...
     try {
       // Attempt to extract from chat session ID
       if (sessionId.includes('-')) {
         const parts = sessionId.split('-');
         if (parts.length >= 2) {
           const possibleOrgId = parts[0].includes(':') ? parts[0].split(':').pop() : parts[0];
-          this.logger.log(`[AGENT_ASSISTANT_DEBUG] Extracted org ID from session: ${possibleOrgId}`);
+          this.logger.log(`[AGENT_ASSISTANT_DEBUG] Extracted workspace ID from session: ${possibleOrgId}`);
           return possibleOrgId;
         }
       }
       
       return null;
     } catch (error) {
-      this.logger.error(`[AGENT_ASSISTANT_DEBUG] Error extracting org ID from session: ${error.message}`);
+      this.logger.error(`[AGENT_ASSISTANT_DEBUG] Error extracting workspace ID from session: ${error.message}`);
       return null;
     }
   }
@@ -60,7 +60,7 @@ export class AgentService {
     }
   }
 
-  async *processStreamingRequest(request: AgentRequest & { organizationId?: string }): AsyncIterable<AgentResponse> {
+  async *processStreamingRequest(request: AgentRequest & { workspaceId?: string }): AsyncIterable<AgentResponse> {
     try {
       this.logger.log(`[AGENT_ASSISTANT_DEBUG] Processing streaming request with input: ${request.input?.substring(0, 50)}...`);
       this.logger.log(`[AGENT_ASSISTANT_DEBUG] Full request config: ${JSON.stringify(request.config)}`);
@@ -79,13 +79,13 @@ export class AgentService {
           const agentId = request.config.assistantId;
           this.logger.log(`[AGENT_ASSISTANT_DEBUG] Extracting correct assistantId for agent: ${agentId}`);
           
-          // Use the extractOrgIdFromSessionId if organizationId is not provided directly
-          const organizationId = request.organizationId || this.extractOrgIdFromSessionId(request.sessionId);
-          if (!organizationId) {
-            throw new Error('Organization ID not available');
+          // Use the extractWorkspaceIdFromSessionId if workspaceId is not provided directly
+          const workspaceId = request.workspaceId || this.extractWorkspaceIdFromSessionId(request.sessionId);
+          if (!workspaceId) {
+            throw new Error('Workspace ID not available');
           }
           
-          this.logger.log(`[AGENT_ASSISTANT_DEBUG] Looking for agent workflow data for agent ${agentId} in org ${organizationId}`);
+          this.logger.log(`[AGENT_ASSISTANT_DEBUG] Looking for agent workflow data for agent ${agentId} in workspace ${workspaceId}`);
           
           // Use the directly injected prisma service to find the agent data
           
@@ -93,7 +93,7 @@ export class AgentService {
           const agent = await this.prisma.agent.findFirst({
             where: {
               id: agentId,
-              organizationId
+              workspaceId
             }
           });
           
@@ -107,7 +107,7 @@ export class AgentService {
           try {
             const workflowService = this.modulesRef.get('WorkflowService', { strict: false });
             if (workflowService) {
-              const workflows = await workflowService.getAgentWorkflows(agentId, organizationId);
+              const workflows = await workflowService.getAgentWorkflows(agentId, workspaceId);
               if (workflows && workflows.length > 0) {
                 workflowId = workflows[0].id;
                 this.logger.log(`[AGENT_ASSISTANT_DEBUG] Found workflow ${workflowId} for agent ${agentId}`);
@@ -132,7 +132,8 @@ export class AgentService {
               const publishedWorkflow = await this.prisma.workflow.findFirst({
                 where: {
                   agentId,
-                  isPublished: true
+                  isPublished: true,
+                  workspaceId
                 }
               });
               

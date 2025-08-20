@@ -8,10 +8,10 @@ export class CreateAssistantDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: 'The ID of the organization this assistant belongs to' })
+  @ApiProperty({ description: 'The ID of the workspace this assistant belongs to' })
   @IsUUID()
   @IsNotEmpty()
-  organizationId: string;
+  workspaceId: string;
   
   @ApiProperty({ description: 'Optional description of the assistant (stored in firstMessage)', required: false })
   @IsString()

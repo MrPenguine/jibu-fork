@@ -1,303 +1,429 @@
-Of course. Here is a highly detailed, developer-centric action plan for **Phase 1: Backend Foundation & Hardening**.
+## 1. Backend Implementation (NestJS)
 
-This plan breaks down each strategic task into concrete, actionable steps with specified file locations, code snippets, and clear acceptance criteria. It is designed to be handed directly to a backend developer or team to execute.
+### Current Implementation Status
 
----
+The n8n integration has been implemented with several key components:
 
-### **Phase 1 Detailed Action Plan: Backend Foundation & Hardening**
+1. **N8n Module Structure**:
+   - `N8nService`: Core service for interacting with the n8n API
+   - `N8nConfigService`: Manages configuration and API keys
+   - `N8nNodeService`: Handles node discovery and caching
+   - `N8nWorkflowService`: Compiles workflows to n8n format
+   - `ExecutionService`: Manages workflow execution and callbacks
+   - `N8nController` & `N8nApiController`: Expose endpoints for n8n integration
 
-**Objective:** To build a secure, scalable, and well-defined backend foundation by implementing all critical architectural patterns, security measures, and data models before any significant UI work begins.
+2. **Workflow Integration**:
+   - `WorkflowN8nBridgeService`: Connects internal workflows with n8n
+   - Redis is used for storing execution contexts and workflow mappings
+   - Proper authentication and organization context handling
 
----
+### Recommended Improvements
 
-#### **Task 1.1: Evolve the Prisma Schema**
+#### 1. Service Layer Enhancements
 
-**Goal:** Update the database schema to support all new workspace features.
+The current implementation has a good foundation with specialized services. The following improvements are recommended:
 
-*   **Action Item 1.1.1: Modify the Schema File**
-    *   **File to Modify:** `apps/backend/prisma/schema.prisma`
-    *   **Implementation:** Add or update the following models. Copy and paste this code into your schema file.
-        ```prisma
-        // In schema.prisma
+1. **N8nService Improvements**:
+   - Add comprehensive error handling with specific error types
+   - Implement retry mechanisms for API calls
+   - Add detailed logging for all API interactions
+   - Enhance webhook trigger functionality with better context management
 
-        model Folder {
-          id             String        @id @default(cuid())
-          name           String
-          organizationId String
-          organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-          agents         Agent[]
-          createdAt      DateTime      @default(now())
-          updatedAt      DateTime      @updatedAt
-        }
+2. **N8nConfigService Enhancements**:
+   - Add validation for all required environment variables
+   - Implement configuration caching
+   - Add support for different n8n environments (dev, staging, prod)
 
-        model ApiKey {
-          id                String        @id @default(cuid())
-          name              String
-          serviceType       String        // e.g., 'OPENAI', 'ELEVENLABS'
-          encryptedKeyValue String
-          organizationId    String?       // For Workspace-level keys
-          organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-          agentId           String?       // For Agent-level keys
-          agent             Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
-          createdAt         DateTime      @default(now())
-        }
+3. **N8nNodeService Enhancements**:
+   - Improve caching strategy with TTL for node definitions
+   - Add support for custom node types
+   - Implement node filtering and categorization
 
-        model OnboardingStatus {
-          id               String    @id @default(cuid())
-          userId           String    @unique
-          user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-          version          Int       @default(1)
-          createdAgent     Boolean   @default(false)
-          addedTool        Boolean   @default(false)
-          addedPhoneNumber Boolean   @default(false)
-          ranTest          Boolean   @default(false)
-          createdAt        DateTime  @default(now())
-          updatedAt        DateTime  @updatedAt
-        }
+4. **N8nWorkflowService Improvements**:
+   - Complete the workflow syncing functionality
+   - Add support for workflow versioning
+   - Implement workflow validation before syncing
+   - Add support for workflow templates
 
-        // --- Modifications to existing models ---
+#### 2. Bridge Service Enhancements
 
-        model Agent {
-          // ... existing fields
-          folderId  String?
-          folder    Folder?  @relation(fields: [folderId], references: [id])
-          apiKeys   ApiKey[]
-        }
+The `WorkflowN8nBridgeService` provides a clean integration between internal workflows and n8n. The following improvements are recommended:
 
-        model Invitation {
-          // ... existing fields
-          status String @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
-        }
-        ```
-    *   **Acceptance Criteria:** The `schema.prisma` file is updated with the new models and relations. The `prisma generate` command runs without errors.
+1. **Synchronization Improvements**:
+   - Add bidirectional synchronization (from n8n to internal system)
+   - Implement change detection to avoid unnecessary updates
+   - Add support for partial workflow updates
 
----
+2. **Execution Context Management**:
+   - Enhance execution context with more metadata
+   - Implement timeout handling for long-running workflows
+   - Add support for workflow execution history
 
-#### **Task 1.2: Production Migration & Data Integrity Strategy**
+3. **Error Handling and Recovery**:
+   - Implement comprehensive error handling
+   - Add support for workflow execution recovery
+   - Implement retry mechanisms for failed executions
 
-**Goal:** Establish a safe process for database migrations and handle existing data correctly.
+#### 3. API Controller Improvements
 
-*   **Action Item 1.2.1: Document the Migration Workflow**
-    *   **File to Create/Modify:** A new `DATABASE_MIGRATIONS.md` file in the root `apps/backend` directory.
-    *   **Implementation:** Document the following two-step process for the team:
-        1.  **Development:** Use `npx prisma migrate dev --name <migration_name>` to generate migration files locally.
-        2.  **Staging/Production:**
-            *   Run `npx prisma migrate dev --create-only --name <migration_name>` to generate the SQL file without applying it.
-            *   Manually review the generated `.sql` file for correctness and potential data loss issues.
-            *   Run `npx prisma migrate deploy` in the CI/CD pipeline to apply the approved migration.
-    *   **Acceptance Criteria:** The documentation exists and is part of the project's official process.
+1. **N8nApiController Enhancements**:
+   - Complete the implementation of placeholder methods
+   - Add comprehensive error handling
+   - Implement proper authentication and authorization
+   - Add detailed Swagger documentation
 
-*   **Action Item 1.2.2: Create the Data Backfill Script**
-    *   **File to Create:** `apps/backend/scripts/backfill-default-folders.ts`
-    *   **Implementation:** Write a script to ensure existing agents are not orphaned.
-        ```typescript
-        // In backfill-default-folders.ts
-        import { PrismaClient } from '@prisma/client';
-        const prisma = new PrismaClient();
+2. **N8nController Improvements**:
+   - Enhance callback handling with better error management
+   - Add support for webhook validation
+   - Implement rate limiting for webhook callbacks
 
-        async function main() {
-          const organizations = await prisma.organization.findMany();
-          for (const org of organizations) {
-            const defaultFolder = await prisma.folder.create({
-              data: {
-                name: 'Default Projects',
-                organizationId: org.id,
-              },
-            });
-            await prisma.agent.updateMany({
-              where: {
-                organizationId: org.id,
-                folderId: null,
-              },
-              data: {
-                folderId: defaultFolder.id,
-              },
-            });
-            console.log(`Created default folder for organization ${org.name}`);
-          }
-        }
-        main().catch(e => console.error(e)).finally(async () => await prisma.$disconnect());
-        ```
-    *   **Acceptance Criteria:** The script is written, tested on a staging database, and is ready to be run once immediately after the schema migration is deployed to production.
+#### 4. Testing and Monitoring
 
----
+1. **Unit Testing**:
+   - Add comprehensive unit tests for all services
+   - Implement integration tests for n8n API interactions
+   - Add end-to-end tests for workflow execution
 
-#### **Task 1.3: Define API Contracts (OpenAPI/Swagger)**
+2. **Monitoring and Observability**:
+   - Add metrics for n8n API calls
+   - Implement health checks for n8n connection
+   - Add logging for all critical operations
 
-**Goal:** Decouple backend and frontend development by providing a clear, auto-generated API specification.
+### A. n8n Service Layer - The Critical Abstraction
 
-*   **Action Item 1.3.1: Install and Configure Swagger**
-    *   **File to Modify:** `apps/backend/src/main.ts`
-    *   **Implementation:**
-        1.  Install dependencies: `pnpm add @nestjs/swagger swagger-ui-express`
-        2.  Add the configuration code to your `main.ts` bootstrap function.
-            ```typescript
-            // In main.ts
-            import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+```typescript
+// n8n/n8n.service.ts
+import { HttpService } from '@nestjs/axios';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { catchError, firstValueFrom } from 'rxjs';
+import { v4 as uuidv4 } from 'uuid';
 
-            async function bootstrap() {
-              const app = await NestFactory.create(AppModule);
-              // ... other configurations
-              const config = new DocumentBuilder()
-                .setTitle('Jibu AI API')
-                .setDescription('API documentation for the Jibu AI Platform')
-                .setVersion('1.0')
-                .addBearerAuth()
-                .build();
-              const document = SwaggerModule.createDocument(app, config);
-              SwaggerModule.setup('api', app, document); // Exposes spec at /api
-              await app.listen(3000);
-            }
-            bootstrap();
-            ```
-    *   **Acceptance Criteria:** After running the backend, the Swagger UI is available at `http://localhost:3000/api`.
+@Injectable()
+export class N8nService {
+  private readonly logger = new Logger(N8nService.name);
+  private readonly baseUrl: string;
+  private readonly apiKey: string;
 
-*   **Action Item 1.3.2: Annotate New Controllers**
-    *   **Files to Modify:** All new controllers (`folder.controller.ts`, `api-key.controller.ts`, etc.).
-    *   **Implementation:** Use decorators to describe each endpoint.
-        ```typescript
-        // Example in folder.controller.ts
-        import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
+  ) {
+    this.baseUrl = this.configService.get<string>('N8N_BASE_URL');
+    this.apiKey = this.configService.get<string>('N8N_API_KEY');
+  }
 
-        @ApiTags('Folders')
-        @ApiBearerAuth()
-        @Controller('folders')
-        export class FolderController {
-          @Post()
-          @ApiOperation({ summary: 'Create a new folder' })
-          @ApiResponse({ status: 201, description: 'The folder has been successfully created.'})
-          @ApiResponse({ status: 403, description: 'Forbidden.' })
-          create(@Body() createFolderDto: CreateFolderDto) {
-            // ... implementation
-          }
-        }
-        ```
-    *   **Acceptance Criteria:** All new endpoints defined in this plan appear in the Swagger UI with correct request bodies and response codes.
+  private getHeaders() {
+    return {
+      'X-N8N-API-KEY': this.apiKey,
+      'Content-Type': 'application/json',
+    };
+  }
 
----
+  async getIntegrationNodes(): Promise<any[]> {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService
+          .get(`${this.baseUrl}/nodes`, { headers: this.getHeaders() })
+          .pipe(
+            catchError((error) => {
+              this.logger.error(`Failed to fetch n8n nodes: ${error.message}`);
+              throw error;
+            }),
+          ),
+      );
+      
+      // Filter for integration nodes only (exclude core nodes like Start, End)
+      return data.filter(node => 
+        node.group === 'Apps' || 
+        node.name.includes('Webhook') ||
+        node.name.includes('HTTP')
+      );
+    } catch (error) {
+      this.logger.error(`Network error fetching n8n nodes: ${error.message}`);
+      throw new Error('Failed to communicate with n8n service');
+    }
+  }
 
-#### **Task 1.4: Finalize Secrets Management & Encryption Strategy**
+  async createIntegrationWorkflow(agentId: string, nodes: any[]): Promise<string> {
+    const workflow = {
+      name: `agent-${agentId}-integrations`,
+      nodes: nodes.map((node, index) => ({
+        ...node,
+        position: [index * 300, 0],
+        credentials: node.credentials ? { [node.credentials.type]: node.credentials.id } : undefined
+      })),
+      connections: this.buildWorkflowConnections(nodes),
+      active: true
+    };
 
-**Goal:** Ensure no secrets are hardcoded and that all sensitive data is handled securely.
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.post(`${this.baseUrl}/workflows`, workflow, {
+          headers: this.getHeaders(),
+        }),
+      );
+      return data.id;
+    } catch (error) {
+      this.logger.error('Failed to create n8n workflow', error);
+      throw error;
+    }
+  }
 
-*   **Action Item 1.4.1: Refactor Vault Service**
-    *   **File to Modify:** `apps/backend/src/core/encryption/vault.service.ts`
-    *   **Implementation:** Remove any direct dependency on `process.env`. The master encryption key should be provided via the `ConfigService` (which should be configured to pull from your chosen secrets manager, e.g., AWS Secrets Manager).
-        ```typescript
-        // In vault.service.ts constructor
-        constructor(private readonly configService: ConfigService) {
-          const masterKey = this.configService.get('ENCRYPTION_MASTER_KEY');
-          if (!masterKey) {
-            throw new Error('FATAL: ENCRYPTION_MASTER_KEY not configured!');
-          }
-          // ... initialize encryption library with masterKey
-        }
-        ```    *   **Acceptance Criteria:** The application fails to start if the master key cannot be retrieved from the secure source.
+  private buildWorkflowConnections(nodes: any[]): any {
+    const connections = {};
+    
+    // Connect nodes in sequence
+    for (let i = 0; i < nodes.length - 1; i++) {
+      const sourceNode = nodes[i];
+      const targetNode = nodes[i + 1];
+      
+      connections[sourceNode.name] = {
+        main: [[{ node: targetNode.name, type: 'main', index: 0 }]]
+      };
+    }
+    
+    return connections;
+  }
 
-*   **Action Item 1.4.2: Implement Sensitive Data Redaction in Logs**
-    *   **File to Create:** `apps/backend/src/core/middleware/redaction-logging.middleware.ts`
-    *   **Implementation:** Create a middleware that intercepts logging calls or request bodies and removes sensitive keys.
-        ```typescript
-        // Psuedocode for the middleware logic
-        const sensitiveKeys = ['apiKey', 'token', 'encryptedKeyValue', 'password'];
-        function redact(obj: any) {
-          // Recursively iterate over object and replace values for sensitive keys with '[REDACTED]'
-        }
-        ```
-    *   **Acceptance Criteria:** Test logs show that sensitive fields are redacted correctly.
+  async triggerIntegrationWorkflow(
+    workflowId: string, 
+    inputData: any,
+    callbackUrl: string
+  ): Promise<string> {
+    const executionId = uuidv4();
+    
+    // Store execution context
+    await this.redisService.set(
+      `n8n:execution:${executionId}`,
+      JSON.stringify({
+        workflowId,
+        callbackUrl,
+        startedAt: Date.now(),
+        inputData
+      }),
+      'EX', 3600
+    );
 
----
+    // Trigger n8n webhook
+    try {
+      await firstValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/webhook/${workflowId}`,
+          {
+            ...inputData,
+            executionId,
+            callbackUrl
+          },
+          { headers: this.getHeaders() }
+        )
+      );
+    } catch (error) {
+      // Clean up on failure
+      await this.redisService.del(`n8n:execution:${executionId}`);
+      throw error;
+    }
 
-#### **Task 1.5: Implement Authorization (RBAC) Guards**
+    return executionId;
+  }
 
-**Goal:** Secure every endpoint by default.
+  async handleWorkflowCallback(executionId: string, results: any): Promise<void> {
+    const contextStr = await this.redisService.get(`n8n:execution:${executionId}`);
+    
+    if (!contextStr) {
+      this.logger.warn(`Execution context not found for ${executionId}`);
+      return;
+    }
 
-*   **Action Item 1.5.1: Create Guard Files**
-    *   **Files to Create:** `apps/backend/src/core/auth/guards/workspace-member.guard.ts` and `apps/backend/src/core/auth/guards/role.guard.ts`.
-    *   **Implementation:**
-        ```typescript
-        // In workspace-member.guard.ts
-        @Injectable()
-        export class WorkspaceMemberGuard implements CanActivate {
-          constructor(private prisma: PrismaService) {}
-          async canActivate(context: ExecutionContext): Promise<boolean> {
-            const request = context.switchToHttp().getRequest();
-            const { user } = request;
-            const workspaceId = request.params.workspaceId || request.body.workspaceId;
+    const context = JSON.parse(contextStr);
+    await this.redisService.del(`n8n:execution:${executionId}`);
+    
+    // Forward to conversation service
+    await this.conversationService.resumeConversation(
+      context.conversationId,
+      results
+    );
+  }
+}
+```
 
-            if (!user || !workspaceId) return false;
+### B. Agent Builder Service - The Orchestrator
 
-            const membership = await this.prisma.organizationMember.findUnique({
-              where: { userId_organizationId: { userId: user.id, organizationId: workspaceId } },
-            });
-            return !!membership;
-          }
-        }
-        ```
-    *   **Acceptance Criteria:** The guard files are created and contain the necessary logic to verify user membership and roles against the database.
+```typescript
+// agents/agent-builder.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+import { N8nService } from '../n8n/n8n.service';
+import { AgentService } from './agent.service';
+import { RedisService } from '../redis/redis.service';
 
-*   **Action Item 1.5.2: Apply Guards to Controllers**
-    *   **Files to Modify:** All controllers related to workspace data (e.g., `folder.controller.ts`).
-    *   **Implementation:** Use the `@UseGuards` decorator.
-        ```typescript
-        // At the top of folder.controller.ts
-        @UseGuards(JwtAuthGuard, WorkspaceMemberGuard) // Protects all routes in this controller
-        export class FolderController {
-            @Post()
-            @UseGuards(RoleGuard('ADMIN')) // Protects this specific route for Admins only
-            create(...) { /* ... */ }
-        }
-        ```
-    *   **Acceptance Criteria:** An automated test (or manual Postman test) confirms that an unauthorized user receives a 403 Forbidden error when trying to access a protected resource.
+@Injectable()
+export class AgentBuilderService {
+  private readonly logger = new Logger(AgentBuilderService.name);
 
----
+  constructor(
+    private readonly n8nService: N8nService,
+    private readonly agentService: AgentService,
+    private readonly redisService: RedisService,
+  ) {}
 
-#### **Task 1.6: Refine Backend Service Logic**
+  async processIntegrationNode(
+    agentId: string,
+    nodeId: string,
+    conversationId: string,
+    inputData: any
+  ): Promise<void> {
+    // 1. Immediately send acknowledgment to mask latency
+    await this.agentService.sendTemporaryResponse(
+      conversationId,
+      'Let me check that for you...'
+    );
 
-**Goal:** Integrate security and new business rules directly into the service layer.
+    // 2. Prepare callback URL
+    const callbackUrl = `${process.env.API_BASE_URL}/api/v1/agents/${agentId}/integration-callback`;
 
-*   **Action Item 1.6.1: Add Authorization Checks to Services**
-    *   **Files to Modify:** All service files (`folder.service.ts`, etc.).
-    *   **Implementation:** Every public method in a service should accept `userId` and `workspaceId` as arguments and use them in database queries to scope the results.
-        ```typescript
-        // In folder.service.ts
-        async getFoldersForUser(userId: string, workspaceId: string) {
-          // The guard has already confirmed membership, but we scope the query for safety.
-          return this.prisma.folder.findMany({ where: { organizationId: workspaceId } });
-        }
-        ```
-    *   **Acceptance Criteria:** Code review confirms that no service method can access data outside of the user's authorized scope.
+    // 3. Trigger the n8n workflow
+    const executionId = await this.n8nService.triggerIntegrationWorkflow(
+      agentId,
+      inputData,
+      callbackUrl
+    );
 
-*   **Action Item 1.6.2: Implement Invitation Logic and Expiry Job**
-    *   **File to Modify:** `apps/backend/src/modules/v1/organization/organization.service.ts`
-    *   **Implementation:**
-        1.  In the `revokeInvitation` method, add a check: `if (invitation.status === 'ACCEPTED') throw new BadRequestException('Cannot revoke an accepted invitation. Please remove the member instead.');`
-        2.  Add a new module for scheduled tasks, install `@nestjs/schedule`, and create a cron job.
-            ```typescript
-            // In a new file, e.g., invitation.scheduler.ts
-            import { Cron, CronExpression } from '@nestjs/schedule';
-            @Injectable()
-            export class InvitationScheduler {
-              @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-              async handleExpiredInvitations() {
-                // ... logic to find invitations older than 7 days and update status to 'EXPIRED'
-              }
-            }
-            ```
-    *   **Acceptance Criteria:** The business logic for invitations is robust, and the cron job is implemented.
+    // 4. Store execution context for later
+    await this.redisService.set(
+      `n8n:execution:${executionId}`,
+      JSON.stringify({
+        agentId,
+        nodeId,
+        conversationId,
+        startedAt: Date.now(),
+      }),
+      'EX', 3600
+    );
+  }
 
-*   **Action Item 1.6.3: Implement Graceful Error Handling for Key Retrieval**
-    *   **File to Modify:** `apps/backend/src/modules/v1/agent/execution/agent-execution.service.ts`
-    *   **Implementation:** At the point where you call `getApiKeyForService`, wrap it in a `try/catch`.
-        ```typescript
-        try {
-          const apiKey = await this.keyManagementService.getApiKeyForService(...);
-          // ... proceed with execution
-        } catch (error) {
-          if (error instanceof MissingApiKeyError) {
-            // ... update the execution state to FAILED with a specific error message
-            console.error(`Execution failed: ${error.message}`);
-          }
-        }
-        ```
-    *   **Acceptance Criteria:** Agent execution doesn't crash the application if a key is missing; instead, it correctly logs the failure and updates the agent's state.
+  async syncIntegrationNodes(agentId: string, integrationNodes: any[]): Promise<void> {
+    // 1. Convert our node format to n8n format
+    const n8nNodes = integrationNodes.map(node => this.convertToN8nNode(node));
+    
+    // 2. Create or update the n8n workflow
+    let workflowId = await this.agentService.getN8nWorkflowId(agentId);
+    
+    if (workflowId) {
+      // Update existing workflow (simplified - in reality you'd need to get, modify, and PUT)
+      await this.n8nService.updateWorkflow(workflowId, n8nNodes);
+    } else {
+      workflowId = await this.n8nService.createIntegrationWorkflow(agentId, n8nNodes);
+      await this.agentService.setN8nWorkflowId(agentId, workflowId);
+    }
+  }
+
+  private convertToN8nNode(node: any): any {
+    // Convert our node format to n8n's format
+    return {
+      parameters: node.parameters,
+      name: node.id,
+      type: node.integrationType,
+      typeVersion: 1,
+      credentials: node.credentials ? { 
+        [node.integrationType]: node.credentials.id 
+      } : undefined,
+    };
+  }
+}
+```
+
+### C. Callback Controller - The Bridge
+
+```typescript
+// n8n/n8n.controller.ts
+import { Body, Controller, Post, Param } from '@nestjs/common';
+import { N8nService } from './n8n.service';
+
+@Controller('api/v1/agents')
+export class N8nController {
+  constructor(private readonly n8nService: N8nService) {}
+
+  @Post(':agentId/integration-callback')
+  async handleIntegrationCallback(
+    @Param('agentId') agentId: string,
+    @Body() payload: any,
+  ) {
+    // Extract execution ID from payload
+    const executionId = payload.executionId;
+    const results = payload.results;
+    
+    // Forward to n8n service
+    await this.n8nService.handleWorkflowCallback(executionId, results);
+    
+    return { status: 'success' };
+  }
+}
+```
+
+### D. Critical Redis Schema
+
+```typescript
+// redis/redis.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+import { Redis } from 'ioredis';
+
+@Injectable()
+export class RedisService {
+  private readonly logger = new Logger(RedisService.name);
+  private client: Redis;
+
+  constructor() {
+    this.client = new Redis({
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT),
+      password: process.env.REDIS_PASSWORD,
+    });
+    
+    this.client.on('error', (err) => {
+      this.logger.error('Redis error', err);
+    });
+  }
+
+  // Store for execution contexts
+  // Key: n8n:execution:{executionId}
+  // Value: { workflowId, callbackUrl, conversationId, startedAt, inputData }
+  async setExecutionContext(
+    executionId: string, 
+    context: any,
+    ttl: number = 3600
+  ): Promise<void> {
+    await this.client.set(
+      `n8n:execution:${executionId}`,
+      JSON.stringify(context),
+      'EX', 
+      ttl
+    );
+  }
+
+  // Store for workflow mappings
+  // Key: agent:{agentId}:n8n-workflow
+  // Value: n8nWorkflowId
+  async setAgentWorkflowMapping(
+    agentId: string,
+    workflowId: string
+  ): Promise<void> {
+    await this.client.set(
+      `agent:${agentId}:n8n-workflow`,
+      workflowId
+    );
+  }
+
+  // Store for credential mappings
+  // Key: credential:{credentialId}
+  // Value: { n8nCredentialId, userId, integrationType }
+  async setCredentialMapping(
+    credentialId: string,
+    mapping: any
+  ): Promise<void> {
+    await this.client.set(
+      `credential:${credentialId}`,
+      JSON.stringify(mapping)
+    );
+  }
+}
+```

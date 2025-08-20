@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@libs/shadcn-ui/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@libs/shadcn-ui/components/ui/card';
 import { Badge } from '@libs/shadcn-ui/components/ui/badge';
@@ -13,11 +13,11 @@ import { Label } from '@libs/shadcn-ui/components/ui/label';
 import { PlusCircle, Edit, Play, Trash2, Pencil, Search, FolderPlus, Upload } from 'lucide-react';
 import { agentApiClient } from '../../../../../utils/AgentApi';
 import { fetchAPI } from "../../../../../utils/api";
-import { useOrganization } from '../../../../../utils/organizationContext';
+import { useWorkspace } from '../../../../../utils/workspaceContext';
 import { Skeleton } from '@libs/shadcn-ui/components/ui/skeleton';
 
-export default function AgentsPage({ params }: { params: { workspaceId: string } }) {
-  const { activeOrganization, loading } = useOrganization();
+export default function AgentsPage() {
+  const { activeWorkspace, loading } = useWorkspace();
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -29,17 +29,19 @@ export default function AgentsPage({ params }: { params: { workspaceId: string }
   const [editAgentDescription, setEditAgentDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
+  const routeParams = useParams<{ workspaceId: string }>();
+  const workspaceId = (routeParams?.workspaceId as string) || '';
 
   useEffect(() => {
     const fetchAgents = async () => {
-      if (!params.workspaceId) {
+      if (!workspaceId) {
         setAgents([]);
         setIsLoading(false);
         return;
       }
       setIsLoading(true);
       try {
-        const fetchedAgents = await fetchAPI(`/v1/agents?organizationId=${params.workspaceId}`);
+        const fetchedAgents = await fetchAPI(`/v1/agents?workspaceId=${workspaceId}`);
         setAgents(fetchedAgents as any[]);
       } catch (error) {
         console.error("Failed to fetch agents:", error);
@@ -49,7 +51,7 @@ export default function AgentsPage({ params }: { params: { workspaceId: string }
     };
     
     fetchAgents();
-  }, [params.workspaceId]);
+  }, [workspaceId]);
 
   const handleCreateAgent = async () => {
     if (!newAgentName.trim()) {
@@ -62,7 +64,7 @@ export default function AgentsPage({ params }: { params: { workspaceId: string }
       const newAgent = await agentApiClient.createAgentDefinition({
         name: newAgentName,
         description: newAgentDescription || '',
-        organizationId: params.workspaceId,
+        workspaceId: workspaceId,
         nodes: [], // Empty nodes array to start with
         edges: [], // Empty edges array to start with
         // Note: We're not specifying assistantId to allow for multiple assistants
@@ -132,7 +134,7 @@ export default function AgentsPage({ params }: { params: { workspaceId: string }
       )
     : agents;
 
-  if (loading || !activeOrganization) {
+  if (loading || !activeWorkspace) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
         <Skeleton className="h-10 w-1/3" />

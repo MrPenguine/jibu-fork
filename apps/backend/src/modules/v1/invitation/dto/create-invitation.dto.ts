@@ -11,12 +11,12 @@ export class CreateInvitationDto {
   email: string;
 
   @ApiProperty({
-    description: 'ID of the organization to invite the user to',
+    description: 'ID of the workspace to invite the user to',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsUUID()
   @IsNotEmpty()
-  organizationId: string;
+  workspaceId: string;
 
   @ApiProperty({
     description: 'Role to assign to the invited user',

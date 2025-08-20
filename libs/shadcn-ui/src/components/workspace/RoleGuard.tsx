@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from 'react';
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext';
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext';
 import { AlertCircle } from 'lucide-react';
 
 interface RoleGuardProps {
@@ -13,7 +13,7 @@ interface RoleGuardProps {
 
 /**
  * Renders children only if the current user has one of the allowed roles
- * in the active organization.
+ * in the active workspace.
  */
 export function RoleGuard({ 
   allowedRoles, 
@@ -21,17 +21,17 @@ export function RoleGuard({
   fallback = null,
   showError = true
 }: RoleGuardProps) {
-  const { activeOrganization, loading } = useOrganization();
+  const { activeWorkspace, loading } = useWorkspace();
   
   // Don't render anything if still loading
   if (loading) {
     return null;
   }
   
-  // Check if user has an organization with the required role
+  // Check if user has a workspace with the required role
   const hasPermission = 
-    activeOrganization?.role && 
-    allowedRoles.includes(activeOrganization.role);
+    activeWorkspace?.role && 
+    allowedRoles.includes(activeWorkspace.role);
   
   if (!hasPermission) {
     if (showError) {
@@ -42,8 +42,8 @@ export function RoleGuard({
             <h3 className="font-medium">Access Denied</h3>
             <p className="text-sm">
               You don't have permission to view this content. Required role: {allowedRoles.join(' or ')}.
-              {activeOrganization?.role && 
-                ` Your role: ${activeOrganization.role}.`
+              {activeWorkspace?.role && 
+                ` Your role: ${activeWorkspace.role}.`
               }
             </p>
           </div>

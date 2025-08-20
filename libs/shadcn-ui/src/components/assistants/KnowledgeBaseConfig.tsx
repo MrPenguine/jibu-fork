@@ -8,7 +8,8 @@ import {
   listKnowledgeBaseSources,
   linkFileToKnowledgeBase,
   createKnowledgeBase,
-  unlinkFileFromKnowledgeBase
+  unlinkFileFromKnowledgeBase,
+  linkKnowledgeBaseToAssistant
 } from '../../../../../apps/frontend/src/utils/knowledgebaseApi'
 import { 
   FileResponse, 
@@ -64,7 +65,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@libs/shadcn-ui/components/ui/card"
 import { cn } from "@libs/shadcn-ui/lib/utils"
 import { toast } from "@libs/shadcn-ui/components/ui/use-toast"
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext'
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext'
 import {
   Tooltip,
   TooltipContent,
@@ -76,7 +77,7 @@ import { createClient } from '../../../../../apps/frontend/src/utils/supabase/cl
 interface KnowledgeBaseConfigProps {
   assistantId?: string;
   knowledgeBaseId?: string;
-  organizationId?: string; // Keep for backward compatibility
+  workspaceId?: string; // Optional explicit workspace override
   onKnowledgeBaseChange?: (knowledgeBaseId: string | null, knowledgeBaseName?: string) => void;
   maxFileHeight?: number; // Maximum number of files to show before scrolling
   showEditControls?: boolean; // Whether to show edit controls by default
@@ -100,17 +101,17 @@ type KnowledgeBaseSourceWithFile = KnowledgeBaseSource & {
 export function KnowledgeBaseConfig({
   assistantId,
   knowledgeBaseId,
-  organizationId: propOrgId, // Rename to avoid conflict
+  workspaceId: propWorkspaceId, // optional override
   onKnowledgeBaseChange,
   maxFileHeight = 4, // Default to 4 files before scrolling
   showEditControls = false, // Default to not showing edit controls
   standalone = false // Default to not standalone mode
 }: KnowledgeBaseConfigProps) {
-  // Get organization from context
-  const { activeOrganization } = useOrganization();
+  // Get workspace from context
+  const { activeWorkspace } = useWorkspace();
   
-  // Use organization ID from context if available, fallback to prop
-  const organizationId = activeOrganization?.id || propOrgId;
+  // Use workspace ID from context if available, fallback to prop
+  const workspaceId = activeWorkspace?.id || propWorkspaceId;
   
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -127,7 +128,7 @@ export function KnowledgeBaseConfig({
   const [newKbName, setNewKbName] = useState("")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isCreatingKb, setIsCreatingKb] = useState(false)
-  const [organizationFiles, setOrganizationFiles] = useState<FileResponse[]>([])
+  const [workspaceFiles, setWorkspaceFiles] = useState<FileResponse[]>([])
   const [isLoadingFiles, setIsLoadingFiles] = useState(false)
   const [fileSearchQuery, setFileSearchQuery] = useState("")
   const [isUnlinkingFile, setIsUnlinkingFile] = useState(false)
@@ -140,11 +141,11 @@ export function KnowledgeBaseConfig({
       setIsLoading(true)
       setError(null)
       
-      console.log(`[KnowledgeBaseConfig] Fetching knowledge bases with organizationId: ${organizationId || 'none'}`);
-      console.log(`[KnowledgeBaseConfig] Organization source: ${activeOrganization ? 'context' : 'prop'}`);
+      console.log(`[KnowledgeBaseConfig] Fetching knowledge bases with workspaceId: ${workspaceId || 'none'}`);
+      console.log(`[KnowledgeBaseConfig] Workspace source: ${activeWorkspace ? 'context' : 'prop'}`);
       
-      // Fetch knowledge bases without organization filtering to get all KBs
-      const kbs = await listKnowledgeBases(organizationId);
+      // Fetch knowledge bases for the workspace
+      const kbs = await listKnowledgeBases(workspaceId);
       console.log(`[KnowledgeBaseConfig] Retrieved ${kbs.length} knowledge bases`);
       
       setKnowledgeBases(kbs as KnowledgeBaseInfo[]);
@@ -156,7 +157,7 @@ export function KnowledgeBaseConfig({
     } finally {
       setIsLoading(false);
     }
-  }, [organizationId, activeOrganization]);
+  }, [workspaceId, activeWorkspace]);
   
   // Fetch knowledge base sources
   const fetchKnowledgeBaseSources = useCallback(async (kbId: string) => {
@@ -168,8 +169,8 @@ export function KnowledgeBaseConfig({
       
       console.log(`[KnowledgeBaseConfig] Fetching sources for knowledge base ${kbId}`);
       
-      // Fetch sources with organization ID if available, otherwise without filtering
-      const sources = await listKnowledgeBaseSources(kbId, organizationId);
+      // Fetch sources for the workspace
+      const sources = await listKnowledgeBaseSources(kbId, workspaceId);
       console.log(`[KnowledgeBaseConfig] Retrieved ${sources.length} sources for knowledge base ${kbId}`);
       
       setKnowledgeBaseSources(sources as KnowledgeBaseSourceWithFile[]);
@@ -181,20 +182,20 @@ export function KnowledgeBaseConfig({
     } finally {
       setIsLoadingSources(false);
     }
-  }, [organizationId]);
+  }, [workspaceId]);
   
-  // Load files for the organization using the consistent organization ID
-  const loadOrganizationFiles = useCallback(async () => {
+  // Load files for the workspace using the consistent workspace ID
+  const loadWorkspaceFiles = useCallback(async () => {
     try {
       setIsLoadingFiles(true);
       
-      console.log(`[KnowledgeBaseConfig] Loading files for organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
+      console.log(`[KnowledgeBaseConfig] Loading files for workspace ID: ${workspaceId || 'none'}, source: ${activeWorkspace ? 'context' : 'prop'}`);
       
-      // Load files for the current organization
-      const files = await listFiles(1, 100, organizationId);
-      console.log(`[KnowledgeBaseConfig] Loaded ${files.length} files for organization`);
+      // Load files for the current workspace
+      const files = await listFiles(1, 100, workspaceId);
+      console.log(`[KnowledgeBaseConfig] Loaded ${files.length} files for workspace`);
       
-      setOrganizationFiles(files);
+      setWorkspaceFiles(files);
     } catch (err: any) {
       console.error("[KnowledgeBaseConfig] Error loading files:", err);
       toast({
@@ -205,7 +206,7 @@ export function KnowledgeBaseConfig({
     } finally {
       setIsLoadingFiles(false);
     }
-  }, [organizationId, activeOrganization]);
+  }, [workspaceId, activeWorkspace]);
   
   // Load knowledge bases on mount
   useEffect(() => {
@@ -230,9 +231,9 @@ export function KnowledgeBaseConfig({
   // Load files when edit mode is enabled
   useEffect(() => {
     if (isEditMode) {
-      loadOrganizationFiles();
+      loadWorkspaceFiles();
     }
-  }, [isEditMode, loadOrganizationFiles]);
+  }, [isEditMode, loadWorkspaceFiles]);
 
   // Filter knowledge bases based on search query
   const filteredKnowledgeBases = knowledgeBases
@@ -252,7 +253,7 @@ export function KnowledgeBaseConfig({
     
     setIsUnlinkingFile(true);
     console.log(`[KnowledgeBaseConfig] Removing source ${source.id} from knowledge base ${knowledgeBaseId}`);
-    console.log(`[KnowledgeBaseConfig] Using organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
+    console.log(`[KnowledgeBaseConfig] Using workspace ID: ${workspaceId || 'none'}, source: ${activeWorkspace ? 'context' : 'prop'}`);
     
     try {
       // Update UI immediately for better UX
@@ -263,12 +264,12 @@ export function KnowledgeBaseConfig({
       
       try {
         // Make API call to unlink the file
-        await unlinkFileFromKnowledgeBase(knowledgeBaseId, source.id, organizationId);
+        await unlinkFileFromKnowledgeBase(knowledgeBaseId, source.id, workspaceId);
         console.log(`[KnowledgeBaseConfig] Successfully unlinked source ${source.id}`);
         
         // Refresh knowledge base sources from server to ensure UI is up-to-date
         if (knowledgeBaseId) {
-          const refreshedSources = await listKnowledgeBaseSources(knowledgeBaseId, organizationId);
+          const refreshedSources = await listKnowledgeBaseSources(knowledgeBaseId, workspaceId);
           setKnowledgeBaseSources(refreshedSources);
         }
       } catch (error) {
@@ -292,7 +293,7 @@ export function KnowledgeBaseConfig({
       
       // Restore the original files in UI if API call failed
       if (knowledgeBaseId) {
-        const refreshedSources = await listKnowledgeBaseSources(knowledgeBaseId, organizationId);
+        const refreshedSources = await listKnowledgeBaseSources(knowledgeBaseId, workspaceId);
         setKnowledgeBaseSources(refreshedSources);
       }
     } finally {
@@ -325,7 +326,7 @@ export function KnowledgeBaseConfig({
         
         // Refresh sources for the newly selected knowledge base
         try {
-          const sources = await listKnowledgeBaseSources(knowledgeBaseId, organizationId);
+          const sources = await listKnowledgeBaseSources(knowledgeBaseId, workspaceId);
           setKnowledgeBaseSources(sources);
           setIsEditMode(true);
         } catch (sourceError) {
@@ -338,18 +339,15 @@ export function KnowledgeBaseConfig({
       // If we get here, we're linking a knowledge base to an assistant
       setIsLinkingKnowledgeBase(true);
       
-      // Make API call to link knowledge base to assistant
-      await fetch(`${API_BASE_URL}/assistants/${assistantId}/knowledge-bases/${knowledgeBaseId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-      });
+      // Make API call to link knowledge base to assistant using workspace-aware API
+      await linkKnowledgeBaseToAssistant(knowledgeBaseId, assistantId, workspaceId || undefined);
       
       // Update local state
       setActiveKnowledgeBase(selectedKB || null);
       
       // Load the sources for the newly selected knowledge base
       try {
-        const sources = await listKnowledgeBaseSources(knowledgeBaseId, organizationId);
+        const sources = await listKnowledgeBaseSources(knowledgeBaseId, workspaceId);
         setKnowledgeBaseSources(sources);
       } catch (sourceError) {
         console.error('[KnowledgeBaseConfig] Error fetching sources:', sourceError);
@@ -396,12 +394,13 @@ export function KnowledgeBaseConfig({
     
     setIsUnlinkingKnowledgeBase(true);
     console.log(`[KnowledgeBaseConfig] Unlinking knowledge base ${activeKnowledgeBase.id} from assistant ${assistantId}`);
-    console.log(`[KnowledgeBaseConfig] Using organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
+    console.log(`[KnowledgeBaseConfig] Using workspace ID: ${workspaceId || 'none'}, source: ${activeWorkspace ? 'context' : 'prop'}`);
     
     try {
       // Use PATCH to update knowledgeBaseId to null instead of empty string
       await fetchAPI(`/assistants/${assistantId}`, {
         method: 'PATCH',
+        headers: await getWorkspaceAuthHeaders(workspaceId || ''),
         body: JSON.stringify({
           knowledgeBaseId: null  // Set to null instead of empty string for UUID validation
         })
@@ -441,10 +440,10 @@ export function KnowledgeBaseConfig({
       setIsCreatingKb(true);
       setError(null);
       
-      console.log(`[KnowledgeBaseConfig] Creating knowledge base "${newKbName}" with organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
+      console.log(`[KnowledgeBaseConfig] Creating knowledge base "${newKbName}" with workspace ID: ${workspaceId || 'none'}, source: ${activeWorkspace ? 'context' : 'prop'}`);
       
       // Create the knowledge base with the provided name
-      const newKb = await createKnowledgeBase(newKbName, organizationId);
+      const newKb = await createKnowledgeBase(newKbName, workspaceId);
       
       // Update the local state
       setKnowledgeBases(prev => [...prev, newKb]);
@@ -478,13 +477,13 @@ export function KnowledgeBaseConfig({
     
     try {
       console.log(`[KnowledgeBaseConfig] Linking file ${fileId} to knowledge base ${activeKnowledgeBase.id}`);
-      console.log(`[KnowledgeBaseConfig] Using organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
+      console.log(`[KnowledgeBaseConfig] Using workspace ID: ${workspaceId || 'none'}, source: ${activeWorkspace ? 'context' : 'prop'}`);
       
       // Make API call to link file
       const source = await linkFileToKnowledgeBase(
         activeKnowledgeBase.id,
         fileId,
-        organizationId
+        workspaceId
       );
       
       console.log(`[KnowledgeBaseConfig] Successfully linked file ${fileId} to knowledge base ${activeKnowledgeBase.id}`);
@@ -504,10 +503,10 @@ export function KnowledgeBaseConfig({
   
   // Filter files based on search query
   const filteredFiles = fileSearchQuery 
-    ? organizationFiles.filter(file => 
+    ? workspaceFiles.filter(file => 
         file.name.toLowerCase().includes(fileSearchQuery.toLowerCase())
       )
-    : organizationFiles;
+    : workspaceFiles;
   
   // Check if a file is already linked to the knowledge base
   const isFileLinked = (fileId: string): boolean => {
@@ -519,7 +518,7 @@ export function KnowledgeBaseConfig({
     return knowledgeBaseSources.find(source => source.sourcePointer === fileId);
   };
   
-  // Update toggleFileSelection function to ensure it uses organizationId consistently
+  // Update toggleFileSelection function to ensure it uses workspaceId consistently
   const toggleFileSelection = async (fileId: string) => {
     if (!activeKnowledgeBase) return;
     
@@ -531,14 +530,14 @@ export function KnowledgeBaseConfig({
       const source = getSourceForFile(fileId);
       if (source) {
         console.log(`[KnowledgeBaseConfig] File ${fileId} is already linked, removing it`);
-        console.log(`[KnowledgeBaseConfig] Unlinking using organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
+        console.log(`[KnowledgeBaseConfig] Unlinking using workspace ID: ${workspaceId || 'none'}, source: ${activeWorkspace ? 'context' : 'prop'}`);
         
         try {
-          // Direct API call with explicit organization ID to ensure consistency
+          // Direct API call with explicit workspace ID to ensure consistency
           await unlinkFileFromKnowledgeBase(
             activeKnowledgeBase.id,
             source.id,
-            organizationId
+            workspaceId
           );
           
           // Update UI immediately
@@ -546,7 +545,7 @@ export function KnowledgeBaseConfig({
           console.log(`[KnowledgeBaseConfig] Successfully unlinked source ${source.id}`);
           
           // Refresh knowledge base sources to ensure UI is accurate
-          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
           setKnowledgeBaseSources(refreshedSources);
         } catch (error) {
           console.error(`[KnowledgeBaseConfig] Error unlinking file:`, error);
@@ -562,7 +561,7 @@ export function KnowledgeBaseConfig({
             });
             
             // Refresh sources to ensure UI is accurate
-            const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+            const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
             setKnowledgeBaseSources(refreshedSources);
           }
         }
@@ -570,14 +569,14 @@ export function KnowledgeBaseConfig({
     } else {
       // If not linked, add it
       console.log(`[KnowledgeBaseConfig] File ${fileId} is not linked, adding it`);
-      console.log(`[KnowledgeBaseConfig] Using organization ID: ${organizationId || 'none'}, source: ${activeOrganization ? 'context' : 'prop'}`);
+      console.log(`[KnowledgeBaseConfig] Using workspace ID: ${workspaceId || 'none'}, source: ${activeWorkspace ? 'context' : 'prop'}`);
       
       try {
-        // Direct API call with explicit organization ID to ensure consistency
+        // Direct API call with explicit workspace ID to ensure consistency
         const source = await linkFileToKnowledgeBase(
           activeKnowledgeBase.id,
           fileId,
-          organizationId
+          workspaceId
         );
         
         // Update UI immediately
@@ -667,12 +666,12 @@ export function KnowledgeBaseConfig({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(await getAuthHeaders(organizationId || '')),
+          ...(await getWorkspaceAuthHeaders(workspaceId || '')),
         },
         body: JSON.stringify({
           knowledgeBaseId: activeKnowledgeBase.id,
           sourceId: source.id,
-          organizationId: organizationId
+          workspaceId: workspaceId
         }),
       });
       
@@ -689,7 +688,7 @@ export function KnowledgeBaseConfig({
       // Refresh status after a short delay to see the updated status
       setTimeout(async () => {
         if (activeKnowledgeBase) {
-          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
           setKnowledgeBaseSources(refreshedSources);
         }
       }, 2000);
@@ -703,7 +702,7 @@ export function KnowledgeBaseConfig({
       });
       
       // Reset status on error
-      const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+      const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
       setKnowledgeBaseSources(refreshedSources);
     }
   };
@@ -730,12 +729,12 @@ export function KnowledgeBaseConfig({
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(await getAuthHeaders(organizationId || '')),
+              ...(await getWorkspaceAuthHeaders(workspaceId || '')),
             },
             body: JSON.stringify({
               knowledgeBaseId: activeKnowledgeBase.id,
               sourceId: source.id,
-              organizationId: organizationId
+              workspaceId: workspaceId
             }),
           });
           return true;
@@ -757,7 +756,7 @@ export function KnowledgeBaseConfig({
       // Refresh sources after a short delay to get updated statuses
       setTimeout(async () => {
         if (activeKnowledgeBase) {
-          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+          const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
           setKnowledgeBaseSources(refreshedSources);
         }
         
@@ -774,7 +773,7 @@ export function KnowledgeBaseConfig({
       
       // Reset on error
       if (activeKnowledgeBase) {
-        const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+        const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
         setKnowledgeBaseSources(refreshedSources);
       }
       
@@ -782,9 +781,9 @@ export function KnowledgeBaseConfig({
     }
   };
   
-  // Add a function to get authorization headers with token and organization ID
+  // Add a function to get authorization headers with token and workspace ID
   // We don't have access to this function from the other file, so we'll implement it here
-  async function getAuthHeaders(orgId: string) {
+  async function getWorkspaceAuthHeaders(wsId: string) {
     try {
       const supabase = createClient();
       const session = await supabase.auth.getSession();
@@ -796,11 +795,12 @@ export function KnowledgeBaseConfig({
       
       return {
         'Authorization': `Bearer ${token}`,
-        'X-Organization-ID': orgId,
-        'organization-id': orgId,
+        'X-Workspace-ID': wsId,
+        'workspace-id': wsId,
+        'X-Force-Workspace-ID': wsId,
       };
     } catch (error) {
-      console.error('[getAuthHeaders] Error getting auth headers:', error);
+      console.error('[getWorkspaceAuthHeaders] Error getting auth headers:', error);
       throw error;
     }
   }
@@ -847,7 +847,7 @@ export function KnowledgeBaseConfig({
               <CommandList>
                 <CommandEmpty>No knowledge bases found.</CommandEmpty>
                 <CommandGroup>
-                  {filteredOptions.map((kb) => (
+                  {comboboxOptions.map((kb) => (
                     <CommandItem
                       key={kb.id}
                       value={kb.id}
@@ -919,7 +919,7 @@ export function KnowledgeBaseConfig({
                       if (!activeKnowledgeBase) return;
                       setIsLoadingSources(true);
                       try {
-                        const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+                        const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
                         setKnowledgeBaseSources(refreshedSources);
                         console.log(`[KnowledgeBaseConfig] Refreshed indexing status, found ${refreshedSources.length} sources`);
                         toast({
@@ -997,7 +997,7 @@ export function KnowledgeBaseConfig({
                             if (!activeKnowledgeBase) return;
                             setIsLoadingSources(true);
                             try {
-                              const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, organizationId);
+                              const refreshedSources = await listKnowledgeBaseSources(activeKnowledgeBase.id, workspaceId);
                               setKnowledgeBaseSources(refreshedSources);
                               console.log(`[KnowledgeBaseConfig] Refreshed sources, found ${refreshedSources.length}`);
                             } catch (error) {

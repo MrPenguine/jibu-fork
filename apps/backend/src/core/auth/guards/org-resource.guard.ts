@@ -33,21 +33,21 @@ export class OrgResourceGuard implements CanActivate {
     const resourceId = request.params[resourceConfig.paramName];
 
     // If no resource ID or user, deny access
-    if (!resourceId || !user || !user.lastOrgId) {
-      this.logger.warn(`Access denied: Missing resourceId (${resourceId}), user (${!!user}), or organization ID (${user?.lastOrgId})`);
+    if (!resourceId || !user || !user.lastWorkspaceId) {
+      this.logger.warn(`Access denied: Missing resourceId (${resourceId}), user (${!!user}), or workspace ID (${user?.lastWorkspaceId})`);
       throw new ForbiddenException('You do not have permission to access this resource');
     }
 
     try {
-      // Check if the resource belongs to the user's organization
+      // Check if the resource belongs to the user's workspace
       const resource = await this.prisma[resourceConfig.model].findUnique({
         where: { id: resourceId },
-        select: { organizationId: true }
+        select: { workspaceId: true }
       });
 
-      // If resource doesn't exist or doesn't belong to user's organization, deny access
-      if (!resource || resource.organizationId !== user.lastOrgId) {
-        this.logger.warn(`Access denied: Resource ${resourceId} does not belong to organization ${user.lastOrgId}`);
+      // If resource doesn't exist or doesn't belong to user's workspace, deny access
+      if (!resource || resource.workspaceId !== user.lastWorkspaceId) {
+        this.logger.warn(`Access denied: Resource ${resourceId} does not belong to workspace ${user.lastWorkspaceId}`);
         throw new ForbiddenException('You do not have permission to access this resource');
       }
 
@@ -58,3 +58,4 @@ export class OrgResourceGuard implements CanActivate {
     }
   }
 }
+

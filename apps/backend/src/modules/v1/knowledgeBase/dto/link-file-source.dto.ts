@@ -12,12 +12,12 @@ export class LinkFileSourceDto {
   fileId: string;
   
   @ApiProperty({
-    description: 'Organization ID that owns the knowledge base and file',
+    description: 'Workspace ID that owns the knowledge base and file',
     example: 'f9c21618-9311-441b-a170-36eb41fbcbfa',
     required: false,
   })
   @IsString()
   @IsOptional()
   @IsUUID()
-  organizationId?: string;
+  workspaceId?: string;
 } 

@@ -1,24 +1,39 @@
 import { createClient } from './supabase/client';
-import { getActiveOrgId } from './fileApi';
+import { getActiveWorkspaceId } from './fileApi';
 
 /**
  * Base URL for API requests to the backend
  */
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+export const API_BASE_URL = (() => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  try {
+    const url = new URL(raw);
+    // Ensure the base URL includes the '/api' prefix expected by the Nest global prefix
+    if (url.pathname === '' || url.pathname === '/') {
+      url.pathname = '/api';
+    } else if (!url.pathname.endsWith('/api') && !url.pathname.endsWith('/api/')) {
+      url.pathname = url.pathname.replace(/\/$/, '') + '/api';
+    }
+    // Remove trailing slash for consistent `${API_BASE_URL}${endpoint}` concatenation
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    // If env var is not a valid URL string, fallback to simple concatenation
+    return raw.replace(/\/$/, '') + '/api';
+  }
+})();
 
 /**
- * Get the active organization ID from localStorage (DEPRECATED)
- * Use getActiveOrgId from fileApi.ts instead
+ * Get the active workspace ID from localStorage
  */
-export function getActiveOrganizationId(): string | null {
+export function getActiveWorkspaceIdInternal(): string | null {
   // Use the shared implementation to ensure consistency
-  return getActiveOrgId();
+  return getActiveWorkspaceId();
 }
 
 /**
  * Make an authenticated request to the backend API
  * This automatically adds the Supabase JWT token to the request headers
- * and includes the active organization ID if available
+ * and includes the active workspace ID if available
  */
 export async function fetchAPI(
   endpoint: string,
@@ -33,14 +48,14 @@ export async function fetchAPI(
     throw new Error('No active session. User must be authenticated to make this request.');
   }
   
-  // Get the active organization ID using the consistent helper function
-  const activeOrganizationId = getActiveOrgId();
+  // Get the active workspace ID using the consistent helper function
+  const activeWorkspaceId = getActiveWorkspaceId();
   
-  // Prepare request headers with auth token and org ID if available
+  // Prepare request headers with auth token and workspace ID if available
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${session.access_token}`,
-    ...(activeOrganizationId ? { 'X-Organization-ID': activeOrganizationId } : {}),
+    ...(activeWorkspaceId ? { 'X-Workspace-ID': activeWorkspaceId, 'workspace-id': activeWorkspaceId } : {}),
     ...options.headers,
   };
   

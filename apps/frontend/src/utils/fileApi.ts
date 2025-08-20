@@ -10,7 +10,7 @@ export interface FileMetadata {
   updatedAt: string;
   storageProvider: string;
   storageKey: string;
-  organizationId: string;
+  workspaceId: string;
   userId: string;
 }
 
@@ -49,7 +49,7 @@ export const formatFileResponse = (file: FileMetadata): FileResponse => {
     url: '#', // This will be replaced with a real URL when needed
     createdAt,
     metadata: {
-      organizationId: file.organizationId,
+      workspaceId: file.workspaceId,
       userId: file.userId,
       storageProvider: file.storageProvider
     }
@@ -70,53 +70,53 @@ export const formatFileSize = (bytes: number): string => {
 };
 
 /**
- * Get the currently active organization ID using the most reliable method
- * @param specificOrgId Optional organization ID to override the auto-detection
- * @returns The organization ID or null if none is found
+ * Get the currently active workspace ID using the most reliable method
+ * @param specificWorkspaceId Optional workspace ID to override the auto-detection
+ * @returns The workspace ID or null if none is found
  */
-export function getActiveOrgId(specificOrgId?: string): string | null {
-  // If a specific org ID is provided, use it
-  if (specificOrgId) {
-    console.log('[getActiveOrgId] Using explicitly provided organization ID:', specificOrgId);
-    return specificOrgId;
+export function getActiveWorkspaceId(specificWorkspaceId?: string): string | null {
+  // If a specific workspace ID is provided, use it
+  if (specificWorkspaceId) {
+    console.log('[getActiveWorkspaceId] Using explicitly provided workspace ID:', specificWorkspaceId);
+    return specificWorkspaceId;
   }
   
   try {
-    // First check if we're in the middle of an org switch
+    // First check if we're in the middle of a workspace switch
     if (typeof window !== 'undefined') {
-      const switchInProgress = sessionStorage.getItem('orgSwitchInProgress') === 'true';
-      const orgIdBeforeReload = sessionStorage.getItem('activeOrgIdBeforeReload');
+      const switchInProgress = sessionStorage.getItem('workspaceSwitchInProgress') === 'true';
+      const workspaceIdBeforeReload = sessionStorage.getItem('activeWorkspaceIdBeforeReload');
       
-      if (switchInProgress && orgIdBeforeReload) {
-        console.log('[getActiveOrgId] Using org ID from in-progress switch (sessionStorage):', orgIdBeforeReload);
-        return orgIdBeforeReload;
+      if (switchInProgress && workspaceIdBeforeReload) {
+        console.log('[getActiveWorkspaceId] Using workspace ID from in-progress switch (sessionStorage):', workspaceIdBeforeReload);
+        return workspaceIdBeforeReload;
       }
     }
     
-    // Direct check for organization ID in session storage (for debugging)
+    // Direct check for workspace ID in session storage (for debugging)
     if (typeof window !== 'undefined') {
-      const directOrgId = sessionStorage.getItem('activeOrganizationId');
-      if (directOrgId) {
-        console.log('[getActiveOrgId] Using organization ID from sessionStorage:', directOrgId);
-        return directOrgId;
+      const directWorkspaceId = sessionStorage.getItem('activeWorkspaceId');
+      if (directWorkspaceId) {
+        console.log('[getActiveWorkspaceId] Using workspace ID from sessionStorage:', directWorkspaceId);
+        return directWorkspaceId;
       }
     }
     
     // Then try to get from localStorage
     if (typeof window !== 'undefined') {
-      const storedOrgId = localStorage.getItem('activeOrganizationId');
-      if (storedOrgId) {
-        console.log('[getActiveOrgId] Using organization ID from localStorage:', storedOrgId);
-        return storedOrgId;
+      const storedWorkspaceId = localStorage.getItem('activeWorkspaceId');
+      if (storedWorkspaceId) {
+        console.log('[getActiveWorkspaceId] Using workspace ID from localStorage:', storedWorkspaceId);
+        return storedWorkspaceId;
       }
     }
     
-    // Do not return a default organization ID - force explicit organization selection
-    console.warn('[getActiveOrgId] No active organization ID found in any storage, file operations will likely fail!');
-    console.warn('[getActiveOrgId] To fix this issue, please select an organization or pass an explicit organization ID.');
+    // Do not return a default workspace ID - force explicit workspace selection
+    console.warn('[getActiveWorkspaceId] No active workspace ID found in any storage, file operations will likely fail!');
+    console.warn('[getActiveWorkspaceId] To fix this issue, please select a workspace or pass an explicit workspace ID.');
     return null;
   } catch (error) {
-    console.error('[getActiveOrgId] Error determining active organization ID:', error);
+    console.error('[getActiveWorkspaceId] Error determining active workspace ID:', error);
     return null;
   }
 }
@@ -135,13 +135,13 @@ function sanitizeUserId(userId: string): string {
  * Upload a file to the server
  * @param file The file to upload
  * @param onProgress Optional callback for upload progress
- * @param specificOrgId Optional organization ID to override the current one
+ * @param specificWorkspaceId Optional workspace ID to override the current one
  * @returns The uploaded file metadata
  */
 export async function uploadFile(
   file: File,
   onProgress?: (progress: number) => void,
-  specificOrgId?: string
+  specificWorkspaceId?: string
 ): Promise<FileResponse> {
   console.log(`Uploading file: ${file.name} (${file.size} bytes, type: ${file.type})`);
   
@@ -169,17 +169,17 @@ export async function uploadFile(
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
       
-      // Get the organization ID using our helper function
-      const orgId = getActiveOrgId(specificOrgId);
+      // Get the workspace ID using our helper function
+      const workspaceId = getActiveWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        console.error('[uploadFile] No organization ID available. Upload will fail!');
-        console.error('[uploadFile] specificOrgId provided:', specificOrgId);
-        console.error('[uploadFile] localStorage organization ID:', localStorage.getItem('activeOrganizationId'));
-        throw new Error('No active organization selected. Please select an organization first.');
+      if (!workspaceId) {
+        console.error('[uploadFile] No workspace ID available. Upload will fail!');
+        console.error('[uploadFile] specificWorkspaceId provided:', specificWorkspaceId);
+        console.error('[uploadFile] localStorage workspace ID:', localStorage.getItem('activeWorkspaceId'));
+        throw new Error('No active workspace selected. Please select a workspace first.');
       }
       
-      console.log(`[uploadFile] File will be uploaded to organization ID: ${orgId}`);
+      console.log(`[uploadFile] File will be uploaded to workspace ID: ${workspaceId}`);
       console.log(`[uploadFile] File: ${file.name}, size: ${formatFileSize(file.size)}`);
       
       // Important: Use the field name 'file' as expected by the FileInterceptor in NestJS
@@ -204,9 +204,9 @@ export async function uploadFile(
             
             const response = JSON.parse(xhr.responseText);
             
-            // Verify the organization ID in the response
-            if (response.organizationId && response.organizationId !== orgId) {
-              console.warn(`[uploadFile] Organization ID mismatch! Expected: ${orgId}, Got: ${response.organizationId}`);
+            // Verify the workspace ID in the response
+            if (response.workspaceId && response.workspaceId !== workspaceId) {
+              console.warn(`[uploadFile] Workspace ID mismatch! Expected: ${workspaceId}, Got: ${response.workspaceId}`);
             }
             
             // Create a file object from the response
@@ -220,12 +220,12 @@ export async function uploadFile(
               metadata: {
                 storageProvider: response.storageProvider || 'local',
                 userId: response.userId || userId,
-                organizationId: response.organizationId || orgId,
+                workspaceId: response.workspaceId || workspaceId,
               }
             };
             
             console.log('[uploadFile] Parsed file object:', fileObject);
-            console.log('[uploadFile] File organization ID:', fileObject.metadata?.organizationId);
+            console.log('[uploadFile] File workspace ID:', fileObject.metadata?.workspaceId);
             resolve(fileObject);
           } catch (error) {
             console.error('[uploadFile] Error parsing upload response:', error);
@@ -256,7 +256,7 @@ export async function uploadFile(
       
       // Send the request
       // Add userId directly in the formData as well as query param
-      const uploadUrl = `${API_BASE_URL}/files?orgId=${orgId}&userId=${userId}&organization=${orgId}&_t=${Date.now()}`;
+      const uploadUrl = `${API_BASE_URL}/files?workspaceId=${workspaceId}&userId=${userId}&_t=${Date.now()}`;
       console.log('[uploadFile] Upload URL:', uploadUrl);
       
       xhr.open('POST', uploadUrl);
@@ -265,9 +265,9 @@ export async function uploadFile(
       console.log('[uploadFile] Setting Authorization header with token');
       xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
       
-      // Add organization ID and userId headers
-      xhr.setRequestHeader('X-Organization-ID', orgId);
-      xhr.setRequestHeader('X-Force-Organization-ID', orgId);
+      // Add workspace ID and userId headers
+      xhr.setRequestHeader('X-Workspace-ID', workspaceId);
+      xhr.setRequestHeader('X-Force-Workspace-ID', workspaceId);
       xhr.setRequestHeader('X-User-ID', userId);
       // Don't set Content-Type for FormData - browser will handle this automatically with correct boundary
       
@@ -275,12 +275,12 @@ export async function uploadFile(
       xhr.setRequestHeader('Cache-Control', 'no-cache, no-store');
       xhr.setRequestHeader('Pragma', 'no-cache');
       
-      // Add userId and organizationId to form data - do this only ONCE to avoid duplication
+      // Add userId and workspaceId to form data - do this only ONCE to avoid duplication
       formData.append('userId', userId);
-      formData.append('organizationId', orgId);
-      formData.append('organization', orgId); // Add extra version for compatibility
+      formData.append('workspaceId', workspaceId);
+      // formData.append('organization', workspaceId); // This compatibility layer has been removed
       
-      console.log('[uploadFile] Sending upload request with userId:', userId, 'and organizationId:', orgId);
+      console.log('[uploadFile] Sending upload request with userId:', userId, 'and workspaceId:', workspaceId);
       xhr.send(formData);
     } catch (error) {
       console.error('Error preparing upload:', error);
@@ -290,37 +290,37 @@ export async function uploadFile(
 }
 
 /**
- * List files for the current organization
+ * List files for the current workspace
  * @param page Page number (1-indexed)
  * @param pageSize Number of items per page
- * @param specificOrgId Optional organization ID to override the current one
+ * @param specificWorkspaceId Optional workspace ID to override the current one
  * @returns Array of file metadata
  */
 export async function listFiles(
   page: number = 1,
   pageSize: number = 50,
-  specificOrgId?: string
+  specificWorkspaceId?: string
 ): Promise<FileResponse[]> {
   try {
-    // Get the organization ID using our helper function
-    const orgId = getActiveOrgId(specificOrgId);
+    // Get the workspace ID using our helper function
+    const workspaceId = getActiveWorkspaceId(specificWorkspaceId);
     
-    if (!orgId) {
-      console.warn('[listFiles] No active organization selected. Cannot list files.');
+    if (!workspaceId) {
+      console.warn('[listFiles] No active workspace selected. Cannot list files.');
       return [];
     }
     
     // Add a cache-busting timestamp to ensure fresh data
     const timestamp = Date.now();
-    const fetchUrl = `/files?page=${page}&pageSize=${pageSize}&orgId=${orgId}&_t=${timestamp}`;
+    const fetchUrl = `/files?page=${page}&pageSize=${pageSize}&workspaceId=${workspaceId}&_t=${timestamp}`;
     console.log('[listFiles] Fetching files from:', fetchUrl);
-    console.log('[listFiles] Using organization ID:', orgId);
+    console.log('[listFiles] Using workspace ID:', workspaceId);
     
-    // Add custom headers for extra org ID clarity
+    // Add custom headers for extra workspace ID clarity
     const customOptions = {
       headers: {
-        'X-Organization-ID': orgId,
-        'X-Force-Organization-ID': orgId,
+        'X-Workspace-ID': workspaceId,
+        'X-Force-Workspace-ID': workspaceId,
         'Cache-Control': 'no-cache, no-store',
         'Pragma': 'no-cache'
       }
@@ -334,9 +334,9 @@ export async function listFiles(
     console.log('[listFiles] Parsed files array length:', files.length);
     
     if (files.length === 0) {
-      console.log('[listFiles] No files found for organization:', orgId);
+      console.log('[listFiles] No files found for workspace:', workspaceId);
     } else {
-      console.log('[listFiles] First file organization ID:', files[0]?.organizationId || 'Unknown');
+      console.log('[listFiles] First file workspace ID:', files[0]?.workspaceId || 'Unknown');
     }
     
     return files.map((file: any) => ({
@@ -347,7 +347,7 @@ export async function listFiles(
       url: file.url || '',
       createdAt: file.createdAt || new Date().toISOString(),
       metadata: {
-        organizationId: file.organizationId || orgId,
+        workspaceId: file.workspaceId || workspaceId,
         userId: file.userId,
         storageProvider: file.storageProvider,
         ...(file.metadata || {})
@@ -362,30 +362,30 @@ export async function listFiles(
 /**
  * Get file metadata by ID
  * @param fileId File ID
- * @param specificOrgId Optional organization ID to override the current one
+ * @param specificWorkspaceId Optional workspace ID to override the current one
  * @returns The file metadata
  */
-export async function getFile(fileId: string, specificOrgId?: string): Promise<FileResponse> {
+export async function getFile(fileId: string, specificWorkspaceId?: string): Promise<FileResponse> {
   try {
-    // Get the organization ID using our helper function
-    const orgId = getActiveOrgId(specificOrgId);
+    // Get the workspace ID using our helper function
+    const workspaceId = getActiveWorkspaceId(specificWorkspaceId);
     
-    if (!orgId) {
-      console.warn('[getFile] No active organization selected.');
-      throw new Error("No active organization selected");
+    if (!workspaceId) {
+      console.warn('[getFile] No active workspace selected.');
+      throw new Error("No active workspace selected");
     }
     
     // Add cache busting parameter
     const timestamp = Date.now();
-    const fetchUrl = `/files/${fileId}?orgId=${orgId}&_t=${timestamp}`;
+    const fetchUrl = `/files/${fileId}?workspaceId=${workspaceId}&_t=${timestamp}`;
     console.log('[getFile] Fetching file from:', fetchUrl);
-    console.log('[getFile] Using organization ID:', orgId);
+    console.log('[getFile] Using workspace ID:', workspaceId);
     
     // Add custom headers
     const customOptions = {
       headers: {
-        'X-Organization-ID': orgId,
-        'X-Force-Organization-ID': orgId,
+        'X-Workspace-ID': workspaceId,
+        'X-Force-Workspace-ID': workspaceId,
         'Cache-Control': 'no-cache, no-store',
         'Pragma': 'no-cache'
       }
@@ -402,7 +402,7 @@ export async function getFile(fileId: string, specificOrgId?: string): Promise<F
       url: fileData.url || '',
       createdAt: fileData.createdAt || new Date().toISOString(),
       metadata: {
-        organizationId: fileData.organizationId || orgId,
+        workspaceId: fileData.workspaceId || workspaceId,
         userId: fileData.userId,
         storageProvider: fileData.storageProvider,
         ...(fileData.metadata || {})
@@ -417,30 +417,30 @@ export async function getFile(fileId: string, specificOrgId?: string): Promise<F
 /**
  * Get a download URL for a file
  * @param fileId File ID
- * @param specificOrgId Optional organization ID to override the current one
+ * @param specificWorkspaceId Optional workspace ID to override the current one
  * @returns A download URL for the file
  */
-export async function getDownloadUrl(fileId: string, specificOrgId?: string): Promise<string> {
+export async function getDownloadUrl(fileId: string, specificWorkspaceId?: string): Promise<string> {
   try {
-    // Get the organization ID using our helper function
-    const orgId = getActiveOrgId(specificOrgId);
+    // Get the workspace ID using our helper function
+    const workspaceId = getActiveWorkspaceId(specificWorkspaceId);
     
-    if (!orgId) {
-      console.warn('[getDownloadUrl] No active organization selected.');
-      throw new Error("No active organization selected");
+    if (!workspaceId) {
+      console.warn('[getDownloadUrl] No active workspace selected.');
+      throw new Error("No active workspace selected");
     }
     
     // Add cache busting parameter
     const timestamp = Date.now();
-    const fetchUrl = `/files/${fileId}/download?orgId=${orgId}&_t=${timestamp}`;
+    const fetchUrl = `/files/${fileId}/download?workspaceId=${workspaceId}&_t=${timestamp}`;
     console.log('[getDownloadUrl] Getting download URL from:', fetchUrl);
-    console.log('[getDownloadUrl] Using organization ID:', orgId);
+    console.log('[getDownloadUrl] Using workspace ID:', workspaceId);
     
     // Add custom headers
     const customOptions = {
       headers: {
-        'X-Organization-ID': orgId,
-        'X-Force-Organization-ID': orgId,
+        'X-Workspace-ID': workspaceId,
+        'X-Force-Workspace-ID': workspaceId,
         'Cache-Control': 'no-cache, no-store',
         'Pragma': 'no-cache'
       }
@@ -458,17 +458,17 @@ export async function getDownloadUrl(fileId: string, specificOrgId?: string): Pr
 /**
  * Delete a file
  * @param fileId File ID
- * @param specificOrgId Optional organization ID to override the current one
+ * @param specificWorkspaceId Optional workspace ID to override the current one
  * @param specificUserId Optional user ID to override the current one
  */
-export async function deleteFile(fileId: string, specificOrgId?: string, specificUserId?: string): Promise<void> {
+export async function deleteFile(fileId: string, specificWorkspaceId?: string, specificUserId?: string): Promise<void> {
   try {
-    // Get the organization ID using our helper function
-    const orgId = getActiveOrgId(specificOrgId);
+    // Get the workspace ID using our helper function
+    const workspaceId = getActiveWorkspaceId(specificWorkspaceId);
     
-    if (!orgId) {
-      console.warn('[deleteFile] No active organization selected.');
-      throw new Error("No active organization selected");
+    if (!workspaceId) {
+      console.warn('[deleteFile] No active workspace selected.');
+      throw new Error("No active workspace selected");
     }
     
     // Get the user ID from Supabase session
@@ -490,17 +490,17 @@ export async function deleteFile(fileId: string, specificOrgId?: string, specifi
     
     // Add cache busting parameter and userId
     const timestamp = Date.now();
-    const fetchUrl = `/files/${fileId}?orgId=${orgId}&userId=${userId}&_t=${timestamp}`;
+    const fetchUrl = `/files/${fileId}?workspaceId=${workspaceId}&userId=${userId}&_t=${timestamp}`;
     console.log('[deleteFile] Deleting file at:', fetchUrl);
-    console.log('[deleteFile] Using organization ID:', orgId);
+    console.log('[deleteFile] Using workspace ID:', workspaceId);
     console.log('[deleteFile] Using user ID:', userId);
     
     // Add custom headers
     const customOptions = {
       method: 'DELETE',
       headers: {
-        'X-Organization-ID': orgId,
-        'X-Force-Organization-ID': orgId,
+        'X-Workspace-ID': workspaceId,
+        'X-Force-Workspace-ID': workspaceId,
         'X-User-ID': userId,
         'Cache-Control': 'no-cache, no-store',
         'Pragma': 'no-cache'

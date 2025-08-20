@@ -6,18 +6,18 @@ export class AssistantsService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Basic implementation to resolve the import error
-  async getAssistantById(id: string, organizationId: string) {
+  async getAssistantById(id: string, workspaceId: string) {
     return this.prisma.assistant.findFirst({
       where: {
         id,
-        organizationId,
+        workspaceId,
       },
     });
   }
 
   // Add more methods as needed
-  async generateAssistantResponse(assistantId: string, input: string, organizationId: string) {
-    const assistant = await this.getAssistantById(assistantId, organizationId);
+  async generateAssistantResponse(assistantId: string, input: string, workspaceId: string) {
+    const assistant = await this.getAssistantById(assistantId, workspaceId);
     if (!assistant) {
       throw new Error(`Assistant with ID ${assistantId} not found`);
     }

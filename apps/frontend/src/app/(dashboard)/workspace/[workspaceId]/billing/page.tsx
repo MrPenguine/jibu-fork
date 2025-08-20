@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useOrganization } from "../../../../../utils/organizationContext"
+import { useWorkspace } from "../../../../../utils/workspaceContext"
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@libs/shadcn-ui/components/ui/card"
@@ -9,9 +9,9 @@ import { Badge } from "@libs/shadcn-ui/components/ui/badge"
 import { Check, CreditCard } from "lucide-react"
 
 export default function BillingPage({ params }: { params: { workspaceId: string } }) {
-  const { activeOrganization, loading } = useOrganization();
+  const { activeWorkspace, loading } = useWorkspace();
 
-  if (loading || !activeOrganization) {
+  if (loading || !activeWorkspace) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
         <Skeleton className="h-10 w-1/3" />

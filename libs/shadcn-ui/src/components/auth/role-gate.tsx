@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext';
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext';
 
 interface RoleGateProps {
   children: React.ReactNode;
@@ -10,7 +10,7 @@ interface RoleGateProps {
 }
 
 /**
- * RoleGate component conditionally renders content based on the user's organization role
+ * RoleGate component conditionally renders content based on the user's workspace role
  *
  * @param children - The content to show if the user has the required role
  * @param allowedRoles - Array of roles that are allowed to see the content
@@ -21,19 +21,19 @@ export const RoleGate: React.FC<RoleGateProps> = ({
   allowedRoles,
   fallback = null
 }) => {
-  const { activeOrganization, loading } = useOrganization();
-  const orgRole = activeOrganization?.role;
+  const { activeWorkspace, loading } = useWorkspace();
+  const wsRole = activeWorkspace?.role;
   
   // While loading, don't render anything
   if (loading) {
     return null;
   }
   
-  // Check if the user has an organization role that's included in the allowed roles
-  if (!orgRole || !allowedRoles.includes(orgRole)) {
+  // Check if the user has a workspace role that's included in the allowed roles
+  if (!wsRole || !allowedRoles.includes(wsRole)) {
     return <>{fallback}</>;
   }
   
   // User has the required role, show the content
   return <>{children}</>;
-}; 
+};

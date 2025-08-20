@@ -9,12 +9,12 @@ import {
 } from "@libs/shadcn-ui/components/ui/custom-card";
 import { Separator } from "@libs/shadcn-ui/components/ui/separator";
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton";
-import { useOrganization } from "../../../../../../utils/organizationContext";
+import { useWorkspace } from "../../../../../../utils/workspaceContext";
 
 export default function WorkspaceBillingPage() {
-  const { activeOrganization, loading } = useOrganization();
+  const { activeWorkspace, loading } = useWorkspace();
 
-  if (loading || !activeOrganization) {
+  if (loading || !activeWorkspace) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
         <div className="max-w-[1600px] mx-auto">
@@ -35,7 +35,7 @@ export default function WorkspaceBillingPage() {
         <div className="mt-0">
           <h1 className="text-3xl font-bold tracking-tight">Plans & Billing</h1>
           <p className="text-muted-foreground">
-            Manage plans and billing for {activeOrganization.name}.
+            Manage plans and billing for {activeWorkspace.name}.
           </p>
         </div>
 

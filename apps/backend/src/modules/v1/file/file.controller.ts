@@ -8,9 +8,6 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  ParseFilePipe,
-  MaxFileSizeValidator,
-  FileTypeValidator,
   Req,
   HttpStatus,
   BadRequestException,
@@ -29,8 +26,8 @@ interface AuthenticatedRequest {
   user: {
     userId: string;
     email: string;
-    orgId?: string;
-    orgRole?: string;
+    workspaceId?: string;
+    workspaceRole?: string;
   };
   headers: {
     [key: string]: string | string[];
@@ -56,48 +53,36 @@ export class FileController {
 
   constructor(private readonly fileService: FileService) {}
 
-  // Helper function to get organization ID with consistent priority
-  private getOrganizationId(req: AuthenticatedRequest, queryOrgId?: string): string {
-    // 1. Force header - highest priority for switching organizations
-    let orgId = req.headers['x-force-organization-id'] as string;
+  private getWorkspaceId(req: AuthenticatedRequest, queryWorkspaceId?: string): string {
+    let workspaceId = req.headers['x-force-workspace-id'] as string;
     
-    // 2. Organization ID from query param with 'orgId' key
-    if (!orgId && queryOrgId) {
-      orgId = queryOrgId;
+    if (!workspaceId && queryWorkspaceId) {
+      workspaceId = queryWorkspaceId;
     }
     
-    // 3. Organization from a query param named 'organization' (for compatibility)
-    // Skip this check as the request object doesn't have a query property
-    
-    // 4. Standard organization header
-    if (!orgId && req.headers['x-organization-id']) {
-      orgId = req.headers['x-organization-id'] as string;
+    if (!workspaceId && req.headers['x-workspace-id']) {
+      workspaceId = req.headers['x-workspace-id'] as string;
     }
     
-    // 5. Organization from body (for POST/PUT requests)
-    if (!orgId && req.body?.organizationId) {
-      orgId = req.body.organizationId;
+    if (!workspaceId && req.body?.workspaceId) {
+      workspaceId = req.body.workspaceId;
     }
     
-    // 6. Organization from JWT token (lowest priority since it might be outdated)
-    if (!orgId && req.user?.orgId) {
-      orgId = req.user.orgId;
+    if (!workspaceId && req.user?.workspaceId) {
+      workspaceId = req.user.workspaceId;
     }
     
-    return orgId;
+    return workspaceId;
   }
 
-  // Helper function to sanitize userId
   private sanitizeUserId(userId: string | undefined | string[]): string | null {
     if (!userId) return null;
     
-    // Handle array values
     if (Array.isArray(userId)) {
       this.logger.warn(`Received userId as array: ${userId}, using first value`);
       return userId[0];
     }
     
-    // Handle comma-separated values
     if (typeof userId === 'string' && userId.includes(',')) {
       this.logger.warn(`Received comma-separated userId: ${userId}, using first value`);
       return userId.split(',')[0];
@@ -124,33 +109,27 @@ export class FileController {
   async uploadFile(
     @UploadedFile() file: MulterFile,
     @Body('userId') bodyUserId: string,
-    @Body('organizationId') bodyOrgId: string,
-    @Query('orgId') queryOrgId: string,
-    @Query('organization') queryOrganization: string,
-    @Headers('x-organization-id') headerOrgId: string,
-    @Headers('x-force-organization-id') forceOrgId: string,
+    @Body('workspaceId') bodyWorkspaceId: string,
+    @Query('workspaceId') queryWorkspaceId: string,
+    @Headers('x-workspace-id') headerWorkspaceId: string,
+    @Headers('x-force-workspace-id') forceWorkspaceId: string,
   ): Promise<FileResponseDto> {
-    // Fix duplicate userId issue - if userId contains commas, take first value
     const userId = this.sanitizeUserId(bodyUserId);
 
-    // Log all sources of organization ID to help debug issues
     this.logger.log(`File upload request received from user: ${userId}`);
-    this.logger.log(`Organization IDs from various sources:`);
-    this.logger.log(`- Query param 'orgId': ${queryOrgId || 'not provided'}`);
-    this.logger.log(`- Query param 'organization': ${queryOrganization || 'not provided'}`);
-    this.logger.log(`- Body param 'organizationId': ${bodyOrgId || 'not provided'}`);
-    this.logger.log(`- Header 'x-organization-id': ${headerOrgId || 'not provided'}`);
-    this.logger.log(`- Header 'x-force-organization-id': ${forceOrgId || 'not provided'}`);
+    this.logger.log(`Workspace IDs from various sources:`);
+    this.logger.log(`- Query param 'workspaceId': ${queryWorkspaceId || 'not provided'}`);
+    this.logger.log(`- Body param 'workspaceId': ${bodyWorkspaceId || 'not provided'}`);
+    this.logger.log(`- Header 'x-workspace-id': ${headerWorkspaceId || 'not provided'}`);
+    this.logger.log(`- Header 'x-force-workspace-id': ${forceWorkspaceId || 'not provided'}`);
     
-    // Fix duplicate organizationId issue - if bodyOrgId contains commas, take first value
-    const cleanBodyOrgId = bodyOrgId?.includes(',') ? bodyOrgId.split(',')[0] : bodyOrgId;
+    const cleanBodyWorkspaceId = bodyWorkspaceId?.includes(',') ? bodyWorkspaceId.split(',')[0] : bodyWorkspaceId;
     
-    // Precedence: 1. force header, 2. query param, 3. body param, 4. regular header
-    const orgId = forceOrgId || queryOrgId || queryOrganization || cleanBodyOrgId || headerOrgId;
+    const workspaceId = forceWorkspaceId || queryWorkspaceId || cleanBodyWorkspaceId || headerWorkspaceId;
     
-    if (!orgId) {
-      this.logger.error('No organization ID provided in request');
-      throw new BadRequestException('Organization ID is required');
+    if (!workspaceId) {
+      this.logger.error('No workspace ID provided in request');
+      throw new BadRequestException('Workspace ID is required');
     }
     
     if (!userId) {
@@ -163,15 +142,15 @@ export class FileController {
       throw new BadRequestException('No file uploaded');
     }
     
-    this.logger.log(`Using organization ID: ${orgId} for file upload`);
+    this.logger.log(`Using workspace ID: ${workspaceId} for file upload`);
     this.logger.log(`Using user ID: ${userId} for file upload`);
     this.logger.log(`File details: name=${file.originalname}, size=${file.size}, type=${file.mimetype}`);
     
-    return this.fileService.uploadAndCreateFileMetadata(orgId, userId, file);
+    return this.fileService.uploadAndCreateFileMetadata(workspaceId, userId, file);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List files for organization' })
+  @ApiOperation({ summary: 'List files for workspace' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: 'Files retrieved successfully',
@@ -181,20 +160,18 @@ export class FileController {
     @Req() req: AuthenticatedRequest,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
-    @Query('orgId') queryOrgId?: string,
-    @Query('organization') queryOrganization?: string,
+    @Query('workspaceId') queryWorkspaceId?: string,
   ): Promise<ListFilesDto> {
-    this.logger.log(`List files request received. Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}`);
+    this.logger.log(`List files request received. Query params - workspaceId: ${queryWorkspaceId}`);
     
-    // Get org ID with consistent priority - also consider the organization query param
-    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
+    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
     
-    if (!orgId) {
-      throw new BadRequestException('Organization ID is required');
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
     }
     
-    this.logger.log(`Listing files for orgId: ${orgId}`);
-    return this.fileService.findFilesByOrg(orgId, {
+    this.logger.log(`Listing files for workspaceId: ${workspaceId}`);
+    return this.fileService.findFilesByWorkspace(workspaceId, {
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
     });
@@ -214,27 +191,24 @@ export class FileController {
   async getFileById(
     @Param('id') fileId: string,
     @Req() req: AuthenticatedRequest,
-    @Query('orgId') queryOrgId?: string,
-    @Query('organization') queryOrganization?: string,
+    @Query('workspaceId') queryWorkspaceId?: string,
     @Query('userId') queryUserId?: string,
   ): Promise<FileResponseDto> {
-    this.logger.log(`Get file request received for fileId: ${fileId}. Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}, userId: ${queryUserId}`);
+    this.logger.log(`Get file request received for fileId: ${fileId}. Query params - workspaceId: ${queryWorkspaceId}, userId: ${queryUserId}`);
     
-    // Get org ID with consistent priority - also consider the organization query param
-    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
+    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
     
-    // Sanitize user ID in case it's being passed and used later
     const userId = this.sanitizeUserId(queryUserId || req.user?.userId);
     if (userId) {
       this.logger.log(`Request from user: ${userId}`);
     }
     
-    if (!orgId) {
-      throw new BadRequestException('Organization ID is required');
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
     }
     
-    this.logger.log(`Getting file details for fileId: ${fileId}, orgId: ${orgId}`);
-    return this.fileService.findFileById(fileId, orgId);
+    this.logger.log(`Getting file details for fileId: ${fileId}, workspaceId: ${workspaceId}`);
+    return this.fileService.findFileById(fileId, workspaceId);
   }
 
   @Get(':id/download')
@@ -250,27 +224,24 @@ export class FileController {
   async getDownloadUrl(
     @Param('id') fileId: string,
     @Req() req: AuthenticatedRequest,
-    @Query('orgId') queryOrgId?: string,
-    @Query('organization') queryOrganization?: string,
+    @Query('workspaceId') queryWorkspaceId?: string,
     @Query('userId') queryUserId?: string,
   ): Promise<{ downloadUrl: string }> {
-    this.logger.log(`Get download URL request received for fileId: ${fileId}. Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}, userId: ${queryUserId}`);
+    this.logger.log(`Get download URL request received for fileId: ${fileId}. Query params - workspaceId: ${queryWorkspaceId}, userId: ${queryUserId}`);
     
-    // Get org ID with consistent priority - also consider the organization query param
-    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
+    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
     
-    // Sanitize user ID in case it's being passed and used later
     const userId = this.sanitizeUserId(queryUserId || req.user?.userId);
     if (userId) {
       this.logger.log(`Download URL request from user: ${userId}`);
     }
     
-    if (!orgId) {
-      throw new BadRequestException('Organization ID is required');
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
     }
     
-    this.logger.log(`Getting download URL for fileId: ${fileId}, orgId: ${orgId}`);
-    const url = await this.fileService.getDownloadUrl(fileId, orgId);
+    this.logger.log(`Getting download URL for fileId: ${fileId}, workspaceId: ${workspaceId}`);
+    const url = await this.fileService.getDownloadUrl(fileId, workspaceId);
     return { downloadUrl: url };
   }
 
@@ -287,41 +258,33 @@ export class FileController {
   async deleteFile(
     @Param('id') fileId: string,
     @Req() req: AuthenticatedRequest,
-    @Query('orgId') queryOrgId?: string,
+    @Query('workspaceId') queryWorkspaceId?: string,
     @Query('userId') queryUserId?: string,
-    @Query('organization') queryOrganization?: string,
     @Headers('x-user-id') headerUserId?: string,
   ): Promise<void> {
     this.logger.log(`Delete file request received for fileId: ${fileId}`);
-    this.logger.log(`Query params - orgId: ${queryOrgId}, organization: ${queryOrganization}, userId: ${queryUserId}`);
+    this.logger.log(`Query params - workspaceId: ${queryWorkspaceId}, userId: ${queryUserId}`);
     this.logger.log(`Headers - x-user-id: ${headerUserId || 'not provided'}`);
     
-    // Get org ID with consistent priority - also consider the organization query param
-    const orgId = queryOrganization || this.getOrganizationId(req, queryOrgId);
+    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
     
-    // Try to get user ID from multiple sources with clear priority
-    // Use sanitizeUserId on each source to prevent array/comma issues
-    // 1. Query param (highest priority)
     let userId = this.sanitizeUserId(queryUserId);
     
-    // 2. Header
     if (!userId && headerUserId) {
       userId = this.sanitizeUserId(headerUserId);
     }
     
-    // 3. Request header
     if (!userId && req.headers['x-user-id']) {
       userId = this.sanitizeUserId(req.headers['x-user-id'] as string);
     }
     
-    // 4. JWT token (lowest priority as it might be outdated)
     if (!userId && req.user?.userId) {
       userId = this.sanitizeUserId(req.user.userId);
     }
     
-    if (!orgId) {
-      this.logger.error('No organization ID provided for file deletion');
-      throw new BadRequestException('Organization ID is required');
+    if (!workspaceId) {
+      this.logger.error('No workspace ID provided for file deletion');
+      throw new BadRequestException('Workspace ID is required');
     }
     
     if (!userId) {
@@ -329,10 +292,9 @@ export class FileController {
       throw new BadRequestException('User ID is required for file deletion');
     }
 
-    // Check if user has admin/owner role in the organization
-    const isAdmin = req.user?.orgRole === 'admin' || req.user?.orgRole === 'owner';
+    const isAdmin = req.user?.workspaceRole === 'admin' || req.user?.workspaceRole === 'owner';
     
-    this.logger.log(`Deleting file: ${fileId} for orgId: ${orgId}, userId: ${userId}, isAdmin: ${isAdmin}`);
-    await this.fileService.deleteFile(fileId, orgId, userId, isAdmin);
+    this.logger.log(`Deleting file: ${fileId} for workspaceId: ${workspaceId}, userId: ${userId}, isAdmin: ${isAdmin}`);
+    await this.fileService.deleteFile(fileId, workspaceId, userId, isAdmin);
   }
-} 
+}

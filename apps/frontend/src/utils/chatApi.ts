@@ -1,5 +1,5 @@
 import { createClient } from './supabase/client';
-import { getActiveOrgId } from './fileApi';
+import { getActiveWorkspaceId } from './fileApi';
 import { fetchAPI, API_BASE_URL } from './api';
 
 export interface ChatMessage {
@@ -19,7 +19,7 @@ export interface Chat {
   sessionType: string;
   assistantId: string;
   userId: string;
-  organizationId: string;
+  workspaceId: string;
   createdAt: string;
   updatedAt: string;
   lastMessage?: string;
@@ -28,7 +28,7 @@ export interface Chat {
 /**
  * Get authorization headers with token and organization ID
  */
-async function getAuthHeaders(orgId: string) {
+async function getAuthHeaders(workspaceId: string) {
   const supabase = createClient();
   const session = await supabase.auth.getSession();
   const token = session.data.session?.access_token;
@@ -40,30 +40,30 @@ async function getAuthHeaders(orgId: string) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
-    'X-Organization-Id': orgId
+    'X-Workspace-Id': workspaceId
   };
 }
 
 /**
  * Get the current organization ID or use the provided one
  */
-function getCurrentOrganizationId(specificOrgId?: string): string | null {
-  // Prioritize the specificOrgId if provided
-  if (specificOrgId) {
-    console.log(`[getCurrentOrganizationId] Using provided specific organization ID: ${specificOrgId}`);
-    return specificOrgId;
+function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
+  // Prioritize the specificWorkspaceId if provided
+  if (specificWorkspaceId) {
+    console.log(`[getCurrentWorkspaceId] Using provided specific workspace ID: ${specificWorkspaceId}`);
+    return specificWorkspaceId;
   }
   
-  // Try to get organization ID from local storage or other sources
-  const orgId = getActiveOrgId();
+  // Try to get workspace ID from local storage or other sources
+  const workspaceId = getActiveWorkspaceId();
   
-  if (orgId) {
-    console.log(`[getCurrentOrganizationId] Using organization ID from active context: ${orgId}`);
+  if (workspaceId) {
+    console.log(`[getCurrentWorkspaceId] Using workspace ID from active context: ${workspaceId}`);
   } else {
-    console.warn('[getCurrentOrganizationId] No organization ID available from any source');
+    console.warn('[getCurrentWorkspaceId] No workspace ID available from any source');
   }
   
-  return orgId;
+  return workspaceId;
 }
 
 /**
@@ -77,18 +77,18 @@ export async function listChats(
   id: string, 
   entityType: 'assistant' | 'agent' = 'assistant',
   sessionType: string = 'chat',
-  specificOrgId?: string
+  specificWorkspaceId?: string
 ): Promise<Chat[]> {
   try {
-    // Use the provided specificOrgId or get from getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[listChats] No organization ID available, results may be limited');
+    if (!workspaceId) {
+      console.warn('[listChats] No workspace ID available, results may be limited');
       return [];
     }
     
-    console.log(`[listChats] Fetching chats for ${entityType}: ${id} with organization: ${organizationId}`);
+    console.log(`[listChats] Fetching chats for ${entityType}: ${id} with workspace: ${workspaceId}`);
     
     try {
       // Request based on entity type
@@ -130,7 +130,7 @@ export async function listChats(
  */
 export async function getChatMessages(
   chatId: string,
-  specificOrgId?: string
+  specificWorkspaceId?: string
 ): Promise<ChatMessage[]> {
   try {
     // Don't try to fetch messages for fallback chats
@@ -209,15 +209,15 @@ export async function getChatMessages(
 export async function createChat(
   assistantId: string,
   name?: string,
-  specificOrgId?: string,
+  specificWorkspaceId?: string,
   isAgent: boolean = false
 ): Promise<Chat | null> {
   try {
-    // Use provided orgId, or get the current one consistently
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use provided workspaceId, or get the current one consistently
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.error('[createChat] No organization ID available');
+    if (!workspaceId) {
+      console.error('[createChat] No workspace ID available');
       return null;
     }
     
@@ -232,7 +232,7 @@ export async function createChat(
     
     // Create a consistent sessionId format
     const timestamp = Date.now();
-    const sessionId = `${organizationId}-${userId}-${timestamp}`;
+    const sessionId = `${workspaceId}-${userId}-${timestamp}`;
     console.log(`[createChat] Creating new chat with sessionId: ${sessionId} for assistant: ${assistantId}`);
     
     // Create a name if not provided
@@ -292,7 +292,7 @@ export async function sendChatMessage(
   chatId: string,
   content: string,
   role: 'user' | 'assistant',
-  specificOrgId?: string
+  specificWorkspaceId?: string
 ): Promise<ChatMessage | null> {
   // Skip if using fallback chat ID that starts with 'chat-'
   if (!chatId || (chatId.startsWith('chat-') && !chatId.includes('-'))) {
@@ -331,7 +331,7 @@ export async function sendChatMessage(
     // Get existing messages to determine the next sequence ID
     let sequenceId = 0;
     try {
-      const messages = await getChatMessages(chatId, specificOrgId);
+      const messages = await getChatMessages(chatId, specificWorkspaceId);
       if (messages.length > 0) {
         // Find the highest sequence ID and add 1
         sequenceId = Math.max(...messages.map(m => m.sequenceId || 0)) + 1;
@@ -400,7 +400,7 @@ export async function sendChatMessage(
 export async function updateChatName(
   chatId: string,
   name: string,
-  specificOrgId?: string
+  specificWorkspaceId?: string
 ): Promise<boolean> {
   try {
     // Use fetchAPI instead of direct fetch
@@ -420,17 +420,18 @@ export async function updateChatName(
 /**
  * Delete a chat
  * @param chatId The ID of the chat
- * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
+ * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  */
 export async function deleteChat(
   chatId: string,
-  specificOrgId?: string
+  specificWorkspaceId?: string
 ): Promise<boolean> {
   try {
     // Use fetchAPI instead of direct fetch
     await fetchAPI(`/v1/chats/${chatId}`, {
       method: 'DELETE',
     });
+        
     
     console.log(`[deleteChat] Successfully deleted chat ${chatId}`);
     

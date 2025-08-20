@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { IoArrowBack, IoClose } from "react-icons/io5";
 import { FaRobot } from "react-icons/fa";
 import { Button } from "../ui/button";
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext';
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext';
 import { 
   listChats, 
   createChat,
   getChatMessages,
   updateChatName,
+  deleteChat,
   Chat as ChatType
 } from '../../../../../apps/frontend/src/utils/chatApi';
 import { getAssistant, Assistant } from '../../../../../apps/frontend/src/utils/AssistantsApi';
@@ -47,17 +48,9 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
   // Refs
   const assistantResponseRef = useRef<string>(''); // Store the complete assistant response for TTS
   
-  // Get organization context
-  const { activeOrganization } = useOrganization();
+  // Workspace context - ensure we have an active workspace before proceeding
+  const { activeWorkspace, loading: wsLoading } = useWorkspace();
   
-  // Helper to get organization ID for headers
-  const getOrgIdHeader = () => {
-    if (!activeOrganization?.id) {
-      console.error('No active organization ID available');
-      return null;
-    }
-    return activeOrganization.id;
-  };
   
   // Function to fetch chat messages
   const fetchChatMessages = useCallback(async (chatId: string) => {
@@ -476,6 +469,9 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
     }
   };
   
+  // Wait for workspace context to be ready
+  if (wsLoading) return null;
+  if (!activeWorkspace) return null;
   if (!isOpen) return null;
   
   // If showing chat list view, render the chat list component
@@ -522,16 +518,9 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
             }} 
             onDeleteChat={async (deletedChatId: string) => {
               try {
-                // Delete the chat using the API
-                const response = await fetch(`/api/v1/chats/${deletedChatId}`, {
-                  method: 'DELETE',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  }
-                });
-                
-                if (!response.ok) {
-                  throw new Error(`Failed to delete chat: ${response.status}`);
+                const ok = await deleteChat(deletedChatId);
+                if (!ok) {
+                  throw new Error('Failed to delete chat');
                 }
                 
                 // Refresh the chat list
@@ -572,16 +561,9 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
           onClose={() => setShowingChatHistory(false)}
           onDeleteChat={async (chatId: string) => {
             try {
-              // Delete the chat using the API
-              const response = await fetch(`/api/v1/chats/${chatId}`, {
-                method: 'DELETE',
-                headers: {
-                  'Content-Type': 'application/json'
-                }
-              });
-              
-              if (!response.ok) {
-                throw new Error(`Failed to delete chat: ${response.status}`);
+              const ok = await deleteChat(chatId);
+              if (!ok) {
+                throw new Error('Failed to delete chat');
               }
               
               // Refresh the chat list

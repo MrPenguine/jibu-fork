@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsJSON, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsJSON, IsBoolean, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateWorkflowDto {
@@ -55,4 +55,31 @@ export class UpdateWorkflowDto {
   @IsBoolean()
   @IsOptional()
   isPublished?: boolean;
+
+  @ApiProperty({
+    description: 'ID of the associated n8n workflow',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  n8nWorkflowId?: string;
+
+  @ApiProperty({
+    description: 'ID of the agent this workflow belongs to',
+    example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef',
+    required: false,
+  })
+  @IsUUID()
+  @IsOptional()
+  agentId?: string;
+
+  @ApiProperty({
+    description: 'ID of the workspace this workflow belongs to',
+    example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef',
+    required: false,
+  })
+  @IsUUID()
+  @IsOptional()
+  workspaceId?: string;
 }

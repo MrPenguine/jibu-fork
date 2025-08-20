@@ -7,73 +7,69 @@ export class UserService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Get the user's last organization or a default one if not set
+   * Get the user's last workspace or a default one if not set
    */
-  async getLastOrganization(userId: string) {
-    // Get the user with their last organization
+  async getLastWorkspace(userId: string) {
+    // Get the user with their last workspace
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { lastOrg: true },
+      include: { lastWorkspace: true },
     });
 
-    // If user has a last organization, return it
-    if (user?.lastOrgId && user?.lastOrg) {
+    // If user has a last workspace, return it
+    if (user?.lastWorkspaceId && user?.lastWorkspace) {
       return {
-        organization: user.lastOrg,
+        workspace: user.lastWorkspace,
         isDefault: false,
       };
     }
 
-    // Otherwise, find the first organization the user is a member of
-    const membership = await this.prisma.organizationMembership.findFirst({
+    // Otherwise, find the first workspace the user is a member of
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: { userId },
-      include: { organization: true },
+      include: { workspace: true },
     });
 
     if (!membership) {
-      throw new NotFoundException('User has no organizations');
+      throw new NotFoundException('User has no workspaces');
     }
 
-    // Update the user's lastOrgId
+    // Update the user's lastWorkspaceId
     await this.prisma.user.update({
       where: { id: userId },
-      data: { lastOrgId: membership.organizationId },
+      data: { lastWorkspaceId: membership.workspaceId },
     });
 
     return {
-      organization: membership.organization,
+      workspace: membership.workspace,
       isDefault: true,
     };
   }
 
   /**
-   * Update the user's last organization
+   * Update the user's last workspace
    */
-  async updateLastOrganization(userId: string, organizationId: string) {
-    // Verify that the user is a member of the organization
-    const membership = await this.prisma.organizationMembership.findFirst({
+  async updateLastWorkspace(userId: string, workspaceId: string) {
+    // Verify that the user is a member of the workspace
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId,
-        organizationId,
+        workspaceId,
       },
     });
 
     if (!membership) {
-      throw new NotFoundException('User is not a member of this organization');
+      throw new NotFoundException('User is not a member of this workspace');
     }
 
-    // Update the user's lastOrgId
+    // Update the user's lastWorkspaceId
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: { lastOrgId: organizationId },
-      include: { lastOrg: true },
+      data: { lastWorkspaceId: workspaceId },
+      include: { lastWorkspace: true },
     });
 
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: { lastOrgId: organizationId },
-      include: { lastOrg: true },
-    });
+    return updatedUser;
   }
 
   /**

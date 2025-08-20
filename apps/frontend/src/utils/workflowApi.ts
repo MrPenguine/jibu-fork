@@ -1,32 +1,33 @@
-import { FlowNode, FlowEdge, WorkflowDefinition, WorkflowSessionOutput } from '../../../../libs/src';
+import { FlowNode, FlowEdge, WorkflowDefinition } from '../../../../libs/shadcn-ui/src/types';
+import { AgentSessionOutput as WorkflowSessionOutput } from '../../../../libs/shadcn-ui/src/types';
 import { createClient } from './supabase/client';
-import { getActiveOrgId } from './fileApi';
+import { getActiveWorkspaceId } from './fileApi';
 
 // Base URL for API requests
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-// Get the current organization ID
-function getCurrentOrganizationId(specificOrgId?: string): string | null {
-  // Prioritize the specificOrgId if provided
-  if (specificOrgId) {
-    return specificOrgId;
+// Get the current workspace ID
+function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
+  // Prioritize the specificWorkspaceId if provided
+  if (specificWorkspaceId) {
+    return specificWorkspaceId;
   }
   
-  // Try to get organization ID from local storage or other sources
-  const orgId = getActiveOrgId();
+  // Try to get workspace ID from local storage or other sources
+  let workspaceId = getActiveWorkspaceId();
   
-  if (!orgId) {
-    console.warn('[workflowApi] No organization ID available');
+  if (!workspaceId) {
+    console.warn('[workflowApi] No workspace ID available');
   }
   
-  return orgId;
+  return workspaceId;
 }
 
-// Get authorization headers with token and organization ID
-async function getAuthHeaders(orgId: string) {
+// Get authorization headers with token and workspace ID
+async function getAuthHeaders(workspaceId: string) {
   const supabase = createClient();
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
   
   if (!token) {
     throw new Error('No authentication token available');
@@ -35,8 +36,8 @@ async function getAuthHeaders(orgId: string) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
-    'X-Organization-ID': orgId,
-    'organization-id': orgId
+    'X-Workspace-ID': workspaceId,
+    'workspace-id': workspaceId
   };
 }
 
@@ -77,15 +78,15 @@ interface ContinueWorkflowRequest {
 // Workflow API client
 export const workflowApi = {
   // Fetch all workflows
-  async getWorkflows(specificOrgId?: string): Promise<WorkflowDefinition[]> {
+  async getWorkflows(specificWorkspaceId?: string): Promise<WorkflowDefinition[]> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows`, {
         method: 'GET',
@@ -104,15 +105,15 @@ export const workflowApi = {
   },
 
   // Fetch workflows for a specific assistant
-  async getWorkflowsByAssistant(assistantId: string, specificOrgId?: string): Promise<WorkflowDefinition[]> {
+  async getWorkflowsByAssistant(assistantId: string, specificWorkspaceId?: string): Promise<WorkflowDefinition[]> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/assistant/${assistantId}`, {
         method: 'GET',
@@ -131,15 +132,15 @@ export const workflowApi = {
   },
 
   // Fetch a specific workflow by ID
-  async getWorkflow(workflowId: string, specificOrgId?: string): Promise<WorkflowDefinition> {
+  async getWorkflow(workflowId: string, specificWorkspaceId?: string): Promise<WorkflowDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}`, {
         method: 'GET',
@@ -158,22 +159,22 @@ export const workflowApi = {
   },
 
   // Create a new workflow
-  async createWorkflow(data: CreateWorkflowRequest, specificOrgId?: string): Promise<WorkflowDefinition> {
+  async createWorkflow(data: CreateWorkflowRequest, specificWorkspaceId?: string): Promise<WorkflowDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        console.error('[workflowApi] Organization ID is missing when creating workflow');
-        throw new Error('No organization ID available. Please select an organization first.');
+      if (!workspaceId) {
+        console.error('[workflowApi] Workspace ID is missing when creating workflow');
+        throw new Error('No workspace ID available. Please select a workspace first.');
       }
       
-      console.log('[workflowApi] Creating workflow with organization ID:', orgId);
-      const headers = await getAuthHeaders(orgId);
+      console.log('[workflowApi] Creating workflow with workspace ID:', workspaceId);
+      const headers = await getAuthHeaders(workspaceId);
       
       // Log the request data for debugging
       console.log('[workflowApi] Workflow creation payload:', {
         ...data,
-        organizationId: orgId
+        workspaceId: workspaceId
       });
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows`, {
@@ -197,24 +198,33 @@ export const workflowApi = {
   },
 
   // Update an existing workflow
-  async updateWorkflow(workflowId: string, data: UpdateWorkflowRequest, specificOrgId?: string): Promise<WorkflowDefinition> {
+  async updateWorkflow(workflowId: string, data: UpdateWorkflowRequest, specificWorkspaceId?: string): Promise<WorkflowDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
+      
+      console.log(`[workflowApi] Updating workflow ${workflowId} with data:`, data);
+      console.log(`[workflowApi] Using API URL: ${API_BASE_URL}/v1/workflows/${workflowId}`);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          agentId: data.assistantId, // Pass agentId for upsert
+        }),
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to update workflow: ${response.statusText}`);
+        // Try to get more detailed error information
+        const errorText = await response.text().catch(() => 'No error details available');
+        console.error(`[workflowApi] Server response error (${response.status}):`, errorText);
+        throw new Error(`Failed to update workflow: ${response.statusText}. Details: ${errorText}`);
       }
       
       return response.json();
@@ -225,15 +235,15 @@ export const workflowApi = {
   },
 
   // Delete a workflow
-  async deleteWorkflow(workflowId: string, specificOrgId?: string): Promise<void> {
+  async deleteWorkflow(workflowId: string, specificWorkspaceId?: string): Promise<void> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}`, {
         method: 'DELETE',
@@ -250,15 +260,15 @@ export const workflowApi = {
   },
 
   // Publish a workflow
-  async publishWorkflow(workflowId: string, specificOrgId?: string): Promise<WorkflowDefinition> {
+  async publishWorkflow(workflowId: string, specificWorkspaceId?: string): Promise<WorkflowDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}/publish`, {
         method: 'PUT',
@@ -277,15 +287,15 @@ export const workflowApi = {
   },
 
   // Unpublish a workflow
-  async unpublishWorkflow(workflowId: string, specificOrgId?: string): Promise<WorkflowDefinition> {
+  async unpublishWorkflow(workflowId: string, specificWorkspaceId?: string): Promise<WorkflowDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}/unpublish`, {
         method: 'POST',
@@ -304,15 +314,15 @@ export const workflowApi = {
   },
 
   // Execute a workflow
-  async executeWorkflow(workflowId: string, data: ExecuteWorkflowRequest, specificOrgId?: string): Promise<WorkflowSessionOutput> {
+  async executeWorkflow(workflowId: string, data: ExecuteWorkflowRequest, specificWorkspaceId?: string): Promise<WorkflowSessionOutput> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflow-execution/workflows/${workflowId}/execute`, {
         method: 'POST',
@@ -332,15 +342,15 @@ export const workflowApi = {
   },
 
   // Continue a workflow session
-  async continueWorkflowSession(sessionId: string, data: ContinueWorkflowRequest, specificOrgId?: string): Promise<WorkflowSessionOutput> {
+  async continueWorkflowSession(sessionId: string, data: ContinueWorkflowRequest, specificWorkspaceId?: string): Promise<WorkflowSessionOutput> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflow-execution/sessions/${sessionId}/continue`, {
         method: 'POST',

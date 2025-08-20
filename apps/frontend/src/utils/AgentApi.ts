@@ -1,7 +1,7 @@
 import { fetchAPI } from './api';
 import { FlowNode, FlowEdge, AgentDefinition, AgentSessionOutput } from '../../../../libs/src';
 import { createClient } from './supabase/client';
-import { getActiveOrgId } from './fileApi';
+import { getActiveWorkspaceId } from './fileApi';
 
 // Base URL for API requests
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -166,7 +166,7 @@ export async function sendStreamingAgentRequest(
     // Get auth headers from fetchAPI's internal implementation
     const supabase = await import('./supabase/client').then(m => m.createClient());
     const { data: { session } } = await supabase.auth.getSession();
-    const activeOrgId = await import('./fileApi').then(m => m.getActiveOrgId());
+    const activeWorkspaceId = await import('./fileApi').then(m => m.getActiveWorkspaceId());
     
     if (!session?.access_token) {
       throw new Error('No active session. User must be authenticated to make this request.');
@@ -175,7 +175,7 @@ export async function sendStreamingAgentRequest(
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${session.access_token}`,
-      ...(activeOrgId ? { 'X-Organization-ID': activeOrgId } : {}),
+      ...(activeWorkspaceId ? { 'X-Workspace-ID': activeWorkspaceId, 'workspace-id': activeWorkspaceId } : {}),
       ...(options?.headers || {})
     };
     
@@ -289,25 +289,25 @@ export async function sendStreamingAgentRequest(
   }
 }
 
-// Get the current organization ID
-function getCurrentOrganizationId(specificOrgId?: string): string | null {
-  // Prioritize the specificOrgId if provided
-  if (specificOrgId) {
-    return specificOrgId;
+// Get the current workspace ID
+function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
+  // Prioritize the specificWorkspaceId if provided
+  if (specificWorkspaceId) {
+    return specificWorkspaceId;
   }
   
-  // Try to get organization ID from local storage or other sources
-  const orgId = getActiveOrgId();
+  // Try to get workspace ID from local storage or other sources
+  const workspaceId = getActiveWorkspaceId();
   
-  if (!orgId) {
-    console.warn('[agentApi] No organization ID available');
+  if (!workspaceId) {
+    console.warn('[agentApi] No workspace ID available');
   }
   
-  return orgId;
+  return workspaceId;
 }
 
-// Get authorization headers with token and organization ID
-async function getAuthHeaders(orgId: string) {
+// Get authorization headers with token and workspace ID
+async function getAuthHeaders(workspaceId: string) {
   const supabase = createClient();
   const session = await supabase.auth.getSession();
   const token = session.data.session?.access_token;
@@ -319,8 +319,8 @@ async function getAuthHeaders(orgId: string) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
-    'X-Organization-ID': orgId,
-    'organization-id': orgId
+    'X-Workspace-ID': workspaceId,
+    'workspace-id': workspaceId
   };
 }
 
@@ -332,7 +332,7 @@ interface CreateAgentDefinitionRequest {
   edges: FlowEdge[];
   startNodeId?: string;
   assistantId?: string;
-  organizationId: string;
+  workspaceId: string;
 }
 
 // Interface for agent definition update
@@ -386,15 +386,15 @@ export interface CreateSecondaryWorkflowRequest {
 // Agent API client functions
 export const agentApiClient = {
   // Fetch all agent definitions
-  async getAgentDefinitions(specificOrgId?: string): Promise<AgentDefinition[]> {
+  async getAgentDefinitions(specificWorkspaceId?: string): Promise<AgentDefinition[]> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents`, {
         method: 'GET',
@@ -413,15 +413,15 @@ export const agentApiClient = {
   },
 
   // Fetch agent definitions for a specific assistant
-  async getAgentDefinitionsByAssistant(assistantId: string, specificOrgId?: string): Promise<AgentDefinition[]> {
+  async getAgentDefinitionsByAssistant(assistantId: string, specificWorkspaceId?: string): Promise<AgentDefinition[]> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/assistant/${assistantId}`, {
         method: 'GET',
@@ -440,15 +440,15 @@ export const agentApiClient = {
   },
 
   // Fetch a specific agent definition by ID
-  async getAgentDefinition(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+  async getAgentDefinition(agentId: string, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
         method: 'GET',
@@ -467,17 +467,17 @@ export const agentApiClient = {
   },
 
   // Create a new agent definition
-  async createAgentDefinition(data: CreateAgentDefinitionRequest, specificOrgId?: string): Promise<AgentDefinition> {
+  async createAgentDefinition(data: CreateAgentDefinitionRequest, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
 
-      data.organizationId = orgId;
+      data.workspaceId = workspaceId;
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       // Ensure nodes and edges are serialized if they are arrays
       const requestData = {
@@ -504,15 +504,15 @@ export const agentApiClient = {
   },
 
   // Update an existing agent definition
-  async updateAgentDefinition(agentId: string, data: UpdateAgentDefinitionRequest, specificOrgId?: string): Promise<AgentDefinition> {
+  async updateAgentDefinition(agentId: string, data: UpdateAgentDefinitionRequest, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
         method: 'PATCH',
@@ -532,15 +532,15 @@ export const agentApiClient = {
   },
 
   // Delete an agent definition
-  async deleteAgentDefinition(agentId: string, specificOrgId?: string): Promise<void> {
+  async deleteAgentDefinition(agentId: string, specificWorkspaceId?: string): Promise<void> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
         method: 'DELETE',
@@ -557,15 +557,15 @@ export const agentApiClient = {
   },
 
   // Publish an agent definition
-  async publishAgentDefinition(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+  async publishAgentDefinition(agentId: string, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/publish`, {
         method: 'POST',
@@ -584,15 +584,15 @@ export const agentApiClient = {
   },
 
   // Unpublish an agent definition
-  async unpublishAgentDefinition(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+  async unpublishAgentDefinition(agentId: string, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/unpublish`, {
         method: 'POST',
@@ -611,15 +611,15 @@ export const agentApiClient = {
   },
 
   // Execute an agent
-  async executeAgent(agentId: string, data: ExecuteAgentRequest, specificOrgId?: string): Promise<AgentSessionOutput> {
+  async executeAgent(agentId: string, data: ExecuteAgentRequest, specificWorkspaceId?: string): Promise<AgentSessionOutput> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agent-execution/agents/${agentId}/execute`, {
         method: 'POST',
@@ -639,15 +639,15 @@ export const agentApiClient = {
   },
 
   // Continue an agent session
-  async continueAgentSession(sessionId: string, data: ContinueAgentRequest, specificOrgId?: string): Promise<AgentSessionOutput> {
+  async continueAgentSession(sessionId: string, data: ContinueAgentRequest, specificWorkspaceId?: string): Promise<AgentSessionOutput> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agent-execution/sessions/${sessionId}/continue`, {
         method: 'POST',
@@ -667,15 +667,15 @@ export const agentApiClient = {
   },
 
   // Get an agent definition by ID
-  async getAgent(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+  async getAgent(agentId: string, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
         method: 'GET',
@@ -694,15 +694,15 @@ export const agentApiClient = {
   },
 
   // Get all workflows for an agent
-  async getAgentWorkflows(agentId: string, specificOrgId?: string): Promise<Workflow[]> {
+  async getAgentWorkflows(agentId: string, specificWorkspaceId?: string): Promise<Workflow[]> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/workflows`, {
         method: 'GET',
@@ -721,15 +721,15 @@ export const agentApiClient = {
   },
 
   // Create a secondary workflow for an agent
-  async createSecondaryWorkflow(masterWorkflowId: string, data: CreateSecondaryWorkflowRequest, specificOrgId?: string): Promise<Workflow> {
+  async createSecondaryWorkflow(masterWorkflowId: string, data: CreateSecondaryWorkflowRequest, specificWorkspaceId?: string): Promise<Workflow> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       // Using the correct endpoint URL that matches the backend controller
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${masterWorkflowId}/secondary`, {
@@ -750,15 +750,15 @@ export const agentApiClient = {
   },
 
   // Publish an agent
-  async publishAgent(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+  async publishAgent(agentId: string, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/publish`, {
         method: 'POST',
@@ -777,15 +777,15 @@ export const agentApiClient = {
   },
 
   // Unpublish an agent
-  async unpublishAgent(agentId: string, specificOrgId?: string): Promise<AgentDefinition> {
+  async unpublishAgent(agentId: string, specificWorkspaceId?: string): Promise<AgentDefinition> {
     try {
-      const orgId = getCurrentOrganizationId(specificOrgId);
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId) {
-        throw new Error('No organization ID available');
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
       }
       
-      const headers = await getAuthHeaders(orgId);
+      const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}/unpublish`, {
         method: 'POST',

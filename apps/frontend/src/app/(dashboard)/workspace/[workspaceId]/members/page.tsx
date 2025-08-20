@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { useOrganization } from "../../../../../utils/organizationContext"
+import { useWorkspace } from "../../../../../utils/workspaceContext"
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { Search, Mail, Copy, Check, X, UserPlus } from "lucide-react"
@@ -18,6 +18,7 @@ import { Label } from "@libs/shadcn-ui/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@libs/shadcn-ui/components/ui/tabs"
 import { Card, CardContent } from "@libs/shadcn-ui/components/ui/card"
 import { fetchAPI } from "../../../../../utils/api"
+import { useParams } from "next/navigation"
 
 interface Member {
   id: string;
@@ -36,8 +37,8 @@ interface Invitation {
   createdAt: string;
 }
 
-export default function MembersPage({ params }: { params: { workspaceId: string } }) {
-  const { activeOrganization, loading } = useOrganization();
+export default function MembersPage() {
+  const { activeWorkspace, loading } = useWorkspace();
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,19 +50,21 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
   const [inviteLink, setInviteLink] = useState("");
   const [isLinkCopied, setIsLinkCopied] = useState(false);
   const [activeTab, setActiveTab] = useState("members");
+  const routeParams = useParams<{ workspaceId: string }>();
+  const workspaceId = (routeParams?.workspaceId as string) || "";
 
   useEffect(() => {
     const fetchMembers = async () => {
-      if (!params.workspaceId) return;
+      if (!workspaceId) return;
       
       setIsLoading(true);
       try {
         // Fetch members
-        const fetchedMembers = await fetchAPI(`/v1/organizations/${params.workspaceId}/members`);
+        const fetchedMembers = await fetchAPI(`/workspaces/${workspaceId}/members`);
         setMembers(fetchedMembers || []);
         
         // Fetch invitations
-        const fetchedInvitations = await fetchAPI(`/v1/organizations/${params.workspaceId}/invitations`);
+        const fetchedInvitations = await fetchAPI(`/v1/invitations/workspace/${workspaceId}`);
         setInvitations(fetchedInvitations || []);
       } catch (error) {
         console.error("Failed to fetch members or invitations:", error);
@@ -80,7 +83,7 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
     };
     
     fetchMembers();
-  }, [params.workspaceId]);
+  }, [workspaceId]);
 
   const handleSendInvite = async () => {
     if (!inviteEmail.trim() || !inviteRole) {
@@ -90,7 +93,7 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
     
     setIsSending(true);
     try {
-      const response = await fetchAPI(`/v1/organizations/${params.workspaceId}/invitations`, {
+      const response = await fetchAPI(`/workspaces/${workspaceId}/invitations`, {
         method: "POST",
         body: JSON.stringify({
           email: inviteEmail,
@@ -131,8 +134,8 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
   const handleCancelInvitation = async (invitationId: string) => {
     if (window.confirm("Are you sure you want to cancel this invitation?")) {
       try {
-        await fetchAPI(`/v1/organizations/${params.workspaceId}/invitations/${invitationId}`, {
-          method: "DELETE"
+        await fetchAPI(`/workspaces/invitations/${invitationId}/revoke`, {
+          method: "POST"
         });
         
         // Remove the invitation from the list
@@ -145,10 +148,12 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
   };
 
   const filteredMembers = searchQuery
-    ? members.filter(member => 
-        member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        member.email.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    ? members.filter(member => {
+        const name = (member.name || '').toLowerCase();
+        const email = (member.email || '').toLowerCase();
+        const q = searchQuery.toLowerCase();
+        return name.includes(q) || email.includes(q);
+      })
     : members;
 
   const filteredInvitations = searchQuery
@@ -157,7 +162,7 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
       )
     : invitations;
 
-  if (loading || !activeOrganization) {
+  if (loading || !activeWorkspace) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
         <Skeleton className="h-10 w-1/3" />
@@ -316,10 +321,10 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={member.avatarUrl || ""} />
                         <AvatarFallback className="bg-primary text-white">
-                          {member.name.substring(0, 2).toUpperCase()}
+                          {(member.name || member.email || '?').slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span>{member.name} {member.isCurrentUser && "(You)"}</span>
+                      <span>{member.name || member.email || "Member"} {member.isCurrentUser && "(You)"}</span>
                     </div>
                     <div>
                       <span>{member.email}</span>

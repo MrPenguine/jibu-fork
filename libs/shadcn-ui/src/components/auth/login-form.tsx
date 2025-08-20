@@ -143,22 +143,44 @@ export function LoginForm({
             let workspaceId: string | null = null
             try {
               workspaceId =
-                localStorage.getItem("activeOrganizationId") ||
-                sessionStorage.getItem("activeOrganizationId")
+                localStorage.getItem("activeWorkspaceId") ||
+                sessionStorage.getItem("activeWorkspaceId")
+              // Back-compat: migrate old organization keys if present
+              if (!workspaceId) {
+                workspaceId =
+                  localStorage.getItem("activeOrganizationId") ||
+                  sessionStorage.getItem("activeOrganizationId") ||
+                  localStorage.getItem("activeOrgId") ||
+                  sessionStorage.getItem("activeOrgId")
+                if (workspaceId) {
+                  try {
+                    localStorage.setItem("activeWorkspaceId", workspaceId)
+                    sessionStorage.setItem("activeWorkspaceId", workspaceId)
+                  } catch (_) {
+                    // ignore storage errors
+                  }
+                }
+              }
             } catch (_) {
               // ignore storage errors (e.g., disabled storage)
             }
 
-            // 2) If not found, fetch last organization from server
+            // 2) If not found, fetch user context from server to resolve workspace
             if (!workspaceId) {
-              const orgRes = await fetch("/api/auth/get-user-org", { method: "GET" })
-              if (orgRes.ok) {
-                const orgData = await orgRes.json()
-                workspaceId = orgData?.organization?.id ?? null
+              const ctxRes = await fetch("/api/auth/get-user-context", { method: "GET", credentials: "include" })
+              if (ctxRes.ok) {
+                const ctxData = await ctxRes.json()
+                const resolvedId =
+                  ctxData?.workspace?.id ||
+                  ctxData?.activeWorkspace?.id ||
+                  ctxData?.lastWorkspace?.id ||
+                  ctxData?.workspaceId ||
+                  null
+                workspaceId = resolvedId
                 if (workspaceId) {
                   try {
-                    localStorage.setItem("activeOrganizationId", workspaceId)
-                    sessionStorage.setItem("activeOrganizationId", workspaceId)
+                    localStorage.setItem("activeWorkspaceId", workspaceId)
+                    sessionStorage.setItem("activeWorkspaceId", workspaceId)
                   } catch (_) {
                     // ignore storage errors
                   }
@@ -170,12 +192,12 @@ export function LoginForm({
             if (workspaceId) {
               router.push(`/workspace/${workspaceId}`)
             } else {
-              // Fallback if no organization found
-              router.push("/")
+              // Fallback if no workspace found
+              router.push("/workspaces")
             }
           } catch (e) {
             console.error("Post-login redirect failed:", e)
-            router.push("/")
+            router.push("/workspaces")
           } finally {
             router.refresh()
           }
@@ -194,7 +216,7 @@ export function LoginForm({
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-2xl">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="mt-4 text-center text-sm font-medium">Logging in...</p>
-          <p className="text-center text-xs text-muted-foreground mt-1">Fetching your organization</p>
+          <p className="text-center text-xs text-muted-foreground mt-1">Fetching your workspace</p>
         </div>
       )}
       

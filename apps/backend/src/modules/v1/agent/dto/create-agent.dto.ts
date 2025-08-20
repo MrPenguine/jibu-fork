@@ -28,6 +28,4 @@ export class CreateAgentDto {
   @IsOptional()
   assistantId?: string;
 
-  @IsUUID()
-  organizationId: string;
 }

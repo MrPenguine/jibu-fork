@@ -12,7 +12,7 @@ import {
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { InviteMembers } from "./InviteMembers"
 import { fetchAPI } from '../../../../../apps/frontend/src/utils/api'
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext'
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,18 +57,18 @@ interface Member {
 }
 
 interface MembersListProps {
-  organizationId?: string;
+  workspaceId?: string;
 }
 
 export interface MembersListHandle {
   refreshMembers: () => void;
 }
 
-export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>(({ organizationId }, ref) => {
+export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>(({ workspaceId }, ref) => {
   const {
-    activeOrganization,
-    refreshOrganizations,
-  } = useOrganization()
+    activeWorkspace,
+    refreshWorkspaces,
+  } = useWorkspace()
   const [isInviteModalOpen, setIsInviteModalOpen] = React.useState(false)
   const [members, setMembers] = React.useState<Member[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -82,9 +82,9 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
   const [isTransferring, setIsTransferring] = React.useState(false)
   const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null)
 
-  const targetOrgId = organizationId || activeOrganization?.id
+  const targetWorkspaceId = workspaceId || activeWorkspace?.id
 
-  const userRole = activeOrganization?.role
+  const userRole = activeWorkspace?.role
   const isOwner = userRole === 'owner'
   const canInviteMembers = isOwner || userRole === 'admin'
 
@@ -157,7 +157,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
     return false;
   }
 
-  const canLeaveOrganization = () => {
+  const canLeaveWorkspace = () => {
     return userRole !== 'owner';
   }
   
@@ -182,14 +182,14 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
   }, [currentUserEmail]);
 
   const fetchMembers = React.useCallback(async () => {
-    if (!targetOrgId) {
+    if (!targetWorkspaceId) {
       setIsLoading(false);
       return;
     }
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchAPI(`/organizations/${targetOrgId}/members`);
+      const data = await fetchAPI(`/workspaces/${targetWorkspaceId}/members`);
       setMembers(sortMembersWithCurrentUserFirst(data));
     } catch (err) {
       console.error('Error fetching members:', err);
@@ -197,7 +197,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
     } finally {
       setIsLoading(false);
     }
-  }, [targetOrgId, sortMembersWithCurrentUserFirst]);
+  }, [targetWorkspaceId, sortMembersWithCurrentUserFirst]);
 
   React.useEffect(() => {
     if (currentUserEmail) {
@@ -218,12 +218,12 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
 
     try {
       setIsDeleting(true);
-      await fetchAPI(`/organizations/${targetOrgId}/members/${memberToDelete.id}`, { method: 'DELETE' });
+      await fetchAPI(`/workspaces/${targetWorkspaceId}/members/${memberToDelete.id}`, { method: 'DELETE' });
 
       toast({ title: "Member removed", description: `${memberToDelete.email} has been removed.` });
 
       refreshMembers();
-      if (refreshOrganizations) refreshOrganizations();
+      if (refreshWorkspaces) refreshWorkspaces();
     } catch (err) {
       console.error('Error deleting member:', err);
       toast({ title: "Error", description: "Failed to remove member.", variant: "destructive" });
@@ -234,28 +234,28 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
     }
   }
 
-  const leaveOrganization = async () => {
+  const leaveWorkspace = async () => {
       if (!currentUserEmail) return;
       const currentUserMember = members.find(m => m.email === currentUserEmail);
       if (!currentUserMember) return;
 
     try {
       setIsDeleting(true);
-      await fetchAPI(`/organizations/${targetOrgId}/members/${currentUserMember.id}`, { method: 'DELETE' });
+      await fetchAPI(`/workspaces/${targetWorkspaceId}/members/${currentUserMember.id}`, { method: 'DELETE' });
 
-      toast({ title: "Left organization", description: "You have left the organization." });
+      toast({ title: "Left workspace", description: "You have left the workspace." });
 
-      if (refreshOrganizations) await refreshOrganizations();
+      if (refreshWorkspaces) await refreshWorkspaces();
       
       // Redirect logic
       if (typeof window !== 'undefined') {
-          localStorage.removeItem('activeOrganizationId');
+          localStorage.removeItem('activeWorkspaceId');
           window.location.href = '/';
       }
 
     } catch (err) {
-      console.error('Error leaving organization:', err);
-      toast({ title: "Error", description: "Failed to leave organization.", variant: "destructive" });
+      console.error('Error leaving workspace:', err);
+      toast({ title: "Error", description: "Failed to leave workspace.", variant: "destructive" });
     } finally {
       setIsDeleting(false);
       setIsLeaveDialogOpen(false);
@@ -264,7 +264,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
 
   const changeMemberRole = async (memberId: string, newRole: string) => {
     try {
-      await fetchAPI(`/organizations/${targetOrgId}/members/${memberId}`, {
+      await fetchAPI(`/workspaces/${targetWorkspaceId}/members/${memberId}`, {
         method: 'PATCH',
         body: JSON.stringify({ role: newRole }),
       });
@@ -281,12 +281,12 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
 
     try {
       setIsTransferring(true);
-      await fetchAPI(`/organizations/${targetOrgId}/transfer-ownership`, {
+      await fetchAPI(`/workspaces/${targetWorkspaceId}/transfer-ownership`, {
         method: 'POST',
         body: JSON.stringify({ newOwnerId }),
       });
       toast({ title: 'Ownership Transferred', description: 'You are no longer the owner.' });
-      if (refreshOrganizations) await refreshOrganizations();
+      if (refreshWorkspaces) await refreshWorkspaces();
       setIsTransferDialogOpen(false);
       refreshMembers();
     } catch (err) {
@@ -310,7 +310,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
       <CustomCard>
         <CustomCardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Organization Members</CardTitle>
+            <CardTitle>Workspace Members</CardTitle>
             <CardDescription>Manage members and their roles.</CardDescription>
           </div>
           {canInviteMembers && (
@@ -377,10 +377,10 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
                             Remove Member
                           </DropdownMenuItem>
                         )}
-                        {isCurrentUser && canLeaveOrganization() && (
-                          <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setIsLeaveDialogOpen(true)}>
+                        {isCurrentUser && canLeaveWorkspace() && (
+                          <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setIsLeaveDialogOpen(true)} >
                             <LogOut className="mr-2 h-4 w-4" />
-                            Leave Organization
+                            Leave Workspace
                           </DropdownMenuItem>
                         )}
                         {isCurrentUser && isOwner && (
@@ -405,14 +405,14 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
           setIsInviteModalOpen(false);
           refreshMembers();
         }}
-        organizationId={targetOrgId}
+        workspaceId={targetWorkspaceId}
       />
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Are you sure?</DialogTitle>
-            <DialogDescription>This will permanently remove <strong>{memberToDelete?.email}</strong> from the organization.</DialogDescription>
+            <DialogDescription>This will permanently remove <strong>{memberToDelete?.email}</strong> from the workspace.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
@@ -427,12 +427,12 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
       <Dialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Leave Organization?</DialogTitle>
+            <DialogTitle>Leave Workspace?</DialogTitle>
             <DialogDescription>Are you sure you want to leave? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsLeaveDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={leaveOrganization} disabled={isDeleting}>
+            <Button variant="destructive" onClick={leaveWorkspace} disabled={isDeleting}>
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Leave
             </Button>

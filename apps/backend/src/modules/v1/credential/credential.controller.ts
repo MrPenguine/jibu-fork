@@ -7,7 +7,7 @@ import { Request } from 'express';
 interface AuthenticatedRequest extends Request {
   user: {
     userId: string;
-    orgId: string;
+    workspaceId: string;
   };
 }
 
@@ -19,26 +19,26 @@ export class CredentialController {
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async createCredential(@Body() body: CreateCredentialDto, @Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.credentialService.createCredential(body, orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.credentialService.createCredential(body, workspaceId, userId);
   }
 
   @Get()
   async listCredentials(@Req() req: AuthenticatedRequest) {
-    const { orgId } = req.user;
-    return this.credentialService.listCredentials(orgId);
+    const { workspaceId } = req.user;
+    return this.credentialService.listCredentials(workspaceId);
   }
 
   @Get(':id')
   async getCredential(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.credentialService.getCredential(id, orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.credentialService.getCredential(id, workspaceId, userId);
   }
 
   @Delete(':id')
   async deleteCredential(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.credentialService.deleteCredential(id, orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.credentialService.deleteCredential(id, workspaceId, userId);
   }
 
   @Patch(':id')
@@ -47,7 +47,7 @@ export class CredentialController {
     @Body() body: { name?: string; type?: string },
     @Req() req: AuthenticatedRequest
   ) {
-    const { orgId, userId } = req.user;
-    return this.credentialService.updateCredential(id, orgId, userId, body);
+    const { workspaceId, userId } = req.user;
+    return this.credentialService.updateCredential(id, workspaceId, userId, body);
   }
-} 
+}

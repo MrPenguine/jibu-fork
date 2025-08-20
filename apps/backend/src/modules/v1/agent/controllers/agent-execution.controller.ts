@@ -1,14 +1,14 @@
-import { Controller, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, Req, BadRequestException } from '@nestjs/common';
 import { AgentExecutionService } from '../execution/agent-execution.service';
 import { ExecuteAgentDto, ContinueAgentDto } from '../dto';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
-import { OrgRoleGuard } from '../../../../core/auth/guards/org-role.guard';
+import { WorkspaceMemberGuard } from '../../../../core/auth/guards/workspace-member.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AgentSessionOutput } from '../../../../../../../libs/src';
 
 @ApiTags('agent-execution')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, OrgRoleGuard)
+@UseGuards(JwtAuthGuard, WorkspaceMemberGuard)
 @Controller('v1/agent-execution')
 export class AgentExecutionController {
   constructor(private readonly agentExecutionService: AgentExecutionService) {}
@@ -22,10 +22,13 @@ export class AgentExecutionController {
     @Body() executeAgentDto: ExecuteAgentDto,
     @Req() req,
   ): Promise<AgentSessionOutput> {
-    const organizationId = req.user.organizationId;
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
     return this.agentExecutionService.initiate(
       agentId,
-      organizationId,
+      workspaceId,
       executeAgentDto.initialVariables,
       executeAgentDto.chatId,
       executeAgentDto.callSid,
@@ -41,7 +44,6 @@ export class AgentExecutionController {
     @Body() continueAgentDto: ContinueAgentDto,
     @Req() req,
   ): Promise<AgentSessionOutput> {
-    const organizationId = req.user.organizationId;
     return this.agentExecutionService.continue(
       sessionId,
       continueAgentDto.userInput

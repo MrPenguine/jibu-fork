@@ -56,11 +56,11 @@ export class CreateWorkflowDto {
   isPublished?: boolean;
 
   @ApiProperty({
-    description: 'Organization ID that the workflow belongs to',
+    description: 'Workspace ID that the workflow belongs to',
     example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     required: false,
   })
   @IsUUID()
   @IsOptional()
-  organizationId?: string;
+  workspaceId?: string;
 }

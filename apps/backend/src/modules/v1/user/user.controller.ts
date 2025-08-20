@@ -3,15 +3,15 @@ import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { UserService } from './user.service';
 import { PrismaService } from '../../../core/database/prisma.service';
 
-class UpdateLastOrgDto {
-  organizationId: string;
+class UpdateLastWorkspaceDto {
+  workspaceId: string;
 }
 
 @Controller('users')
 export class UserController {
   constructor(
     private readonly userService: UserService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -26,14 +26,14 @@ export class UserController {
   }
 
   /**
-   * Get user context including organization information
+   * Get user context including workspace information
    */
   @UseGuards(JwtAuthGuard)
   @Get('context')
   async getUserContext(@Request() req: any) {
     const user = req.user; // User object from JwtStrategy
 
-    if (!user.lastOrgId) {
+    if (!user.lastWorkspaceId) {
       return {
         user: {
           id: user.id,
@@ -41,25 +41,25 @@ export class UserController {
           firstName: user.firstName,
           lastName: user.lastName,
         },
-        orgId: null,
-        orgName: null,
-        orgRole: null,
+        workspaceId: null,
+        workspaceName: null,
+        workspaceRole: null,
         membershipStatus: null,
       };
     }
 
-    const membership = await this.prisma.organizationMembership.findFirst({
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId: user.id,
-        organizationId: user.lastOrgId,
+        workspaceId: user.lastWorkspaceId,
       },
       include: {
-        organization: true,
+        workspace: true,
       },
     });
 
     if (!membership) {
-      throw new NotFoundException(`Membership not found for organization ${user.lastOrgId}`);
+      throw new NotFoundException(`Membership not found for workspace ${user.lastWorkspaceId}`);
     }
 
     return {
@@ -69,29 +69,29 @@ export class UserController {
         firstName: user.firstName,
         lastName: user.lastName,
       },
-      orgId: membership.organizationId,
-      orgName: membership.organization.name,
-      orgRole: membership.role,
+      workspaceId: membership.workspaceId,
+      workspaceName: membership.workspace.name,
+      workspaceRole: membership.role,
       membershipStatus: membership.status,
     };
   }
 
   /**
-   * Get the user's last organization or a default one if not set
+   * Get the user's last workspace or a default one if not set
    */
   @UseGuards(JwtAuthGuard)
-  @Get('last-organization')
-  async getLastOrganization(@Request() req: any) {
-    return this.userService.getLastOrganization(req.user.id);
+  @Get('last-workspace')
+  async getLastWorkspace(@Request() req: any) {
+    return this.userService.getLastWorkspace(req.user.id);
   }
 
   /**
-   * Update the user's last organization
+   * Update the user's last workspace
    */
   @UseGuards(JwtAuthGuard)
-  @Post('last-organization')
-  async updateLastOrganization(@Request() req: any, @Body() body: UpdateLastOrgDto) {
-    return this.userService.updateLastOrganization(req.user.id, body.organizationId);
+  @Post('last-workspace')
+  async updateLastWorkspace(@Request() req: any, @Body() body: UpdateLastWorkspaceDto) {
+    return this.userService.updateLastWorkspace(req.user.id, body.workspaceId);
   }
 
   /**
@@ -103,4 +103,4 @@ export class UserController {
     await this.userService.deleteUserAccount(req.user.id);
     return { message: 'Account deleted successfully' };
   }
-} 
+}

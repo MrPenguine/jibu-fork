@@ -1,16 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { useOrganization } from "../../../../../utils/organizationContext"
+import { useWorkspace } from "../../../../../utils/workspaceContext"
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@libs/shadcn-ui/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@libs/shadcn-ui/components/ui/tabs"
 import { BarChart, LineChart } from "lucide-react"
 
 export default function UsagePage({ params }: { params: { workspaceId: string } }) {
-  const { activeOrganization, loading } = useOrganization();
+  const { activeWorkspace, loading } = useWorkspace();
 
-  if (loading || !activeOrganization) {
+  if (loading || !activeWorkspace) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
         <Skeleton className="h-10 w-1/3" />

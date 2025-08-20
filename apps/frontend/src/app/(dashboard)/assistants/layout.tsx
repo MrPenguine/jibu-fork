@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react"
 import { CreateAssistantModal } from "@libs/shadcn-ui/components/assistants/CreateAssistantModal"
 import { useRouter, usePathname } from "next/navigation"
-import { useOrganization } from "../../../utils/organizationContext"
+import { useWorkspace } from "../../../utils/workspaceContext"
 import { Assistant, getAssistants } from "../../../utils/AssistantsApi"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { Plus, FolderPlus } from "lucide-react"
@@ -17,18 +17,18 @@ export default function AssistantsLayout({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [assistants, setAssistants] = useState<Assistant[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { activeOrganization } = useOrganization()
+  const { activeWorkspace } = useWorkspace()
   const router = useRouter()
   const pathname = usePathname()
 
-  // Fetch assistants when active organization changes
+  // Fetch assistants when active workspace changes
   useEffect(() => {
     const fetchAssistants = async () => {
-      if (!activeOrganization) return
+      if (!activeWorkspace) return
 
       try {
         setIsLoading(true)
-        const data = await getAssistants(activeOrganization.id)
+        const data = await getAssistants(activeWorkspace.id)
         setAssistants(data)
       } catch (error) {
         console.error("Error fetching assistants:", error)
@@ -38,7 +38,7 @@ export default function AssistantsLayout({
     }
 
     fetchAssistants()
-  }, [activeOrganization])
+  }, [activeWorkspace])
 
   const handleAssistantSelect = (id: string) => {
     router.push(`/assistants/${id}`)
@@ -47,8 +47,8 @@ export default function AssistantsLayout({
   const handleCreateAssistant = (name: string, templateId: string) => {
     // This will be called after successfully creating an assistant
     // Refresh the assistants list
-    if (activeOrganization) {
-      getAssistants(activeOrganization.id)
+    if (activeWorkspace) {
+      getAssistants(activeWorkspace.id)
         .then(data => setAssistants(data))
         .catch(error => console.error("Error refreshing assistants:", error))
     }

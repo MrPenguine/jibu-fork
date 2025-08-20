@@ -25,29 +25,16 @@ export async function GET(request: NextRequest) {
     
     try {
       console.log('Sending authorization code to backend for token exchange');
-      
-      // Get organization ID from local storage if available
-      let organizationId = '';
-      if (typeof localStorage !== 'undefined') {
-        const orgData = localStorage.getItem('activeOrganization');
-        if (orgData) {
-          try {
-            const parsedOrgData = JSON.parse(orgData);
-            organizationId = parsedOrgData.id || '';
-            console.log(`Using organization ID from local storage: ${organizationId}`);
-          } catch (e) {
-            console.error('Failed to parse organization data from localStorage', e);
-          }
-        }
-      }
+      // Get workspace ID from request headers if provided
+      const workspaceId =
+        request.headers.get('x-workspace-id') || request.headers.get('X-Workspace-ID') || '';
       
       // Try to send the code to the backend to exchange it for tokens
       const response = await fetch(`${backendUrl}/api/v1/tools/google-calendar/callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Organization-ID': organizationId,
-          'organization-id': organizationId,
+          ...(workspaceId ? { 'X-Workspace-ID': workspaceId } : {}),
         },
         body: JSON.stringify({ code }),
       });

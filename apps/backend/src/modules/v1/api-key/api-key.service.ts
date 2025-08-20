@@ -13,7 +13,7 @@ export class ApiKeyService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async createApiKey(body: CreateApiKeyDto, orgId: string, userId: string) {
+  async createApiKey(body: CreateApiKeyDto, workspaceId: string, userId: string) {
     const { name, scopes } = body;
     const apiKeyId = randomUUID();
     // 1. Generate secure API key
@@ -21,13 +21,13 @@ export class ApiKeyService {
     const prefix = apiKey.slice(0, 10);
 
     // 2. Store full key in Vault
-    await this.vaultService.writeSecret('apiKeys', orgId, apiKeyId, { apiKey }, orgId);
+    await this.vaultService.writeSecret('apiKeys', workspaceId, apiKeyId, { apiKey }, workspaceId);
 
     // 3. Store metadata in DB
     const created = await this.prisma.apiKey.create({
       data: {
         id: apiKeyId,
-        organizationId: orgId,
+        workspaceId: workspaceId,
         userId,
         name,
         prefix,
@@ -38,39 +38,39 @@ export class ApiKeyService {
     return { id: created.id, name: created.name, prefix: created.prefix, apiKey };
   }
 
-  async listApiKeys(orgId: string, userId: string) {
+  async listApiKeys(workspaceId: string, userId: string) {
     // 1. Check for default private key
     const defaultPrivate = await this.prisma.apiKey.findFirst({
-      where: { organizationId: orgId, name: "Default Private Key" },
+      where: { workspaceId: workspaceId, name: "Default Private Key" },
     });
     if (!defaultPrivate) {
-      await this.createDefaultKey(orgId, userId, "private");
+      await this.createDefaultKey(workspaceId, userId, "private");
     }
     // 2. Check for default public key
     const defaultPublic = await this.prisma.apiKey.findFirst({
-      where: { organizationId: orgId, name: "Default Public Key" },
+      where: { workspaceId: workspaceId, name: "Default Public Key" },
     });
     if (!defaultPublic) {
-      await this.createDefaultKey(orgId, userId, "public");
+      await this.createDefaultKey(workspaceId, userId, "public");
     }
-    // 3. Return all keys for the organization
+    // 3. Return all keys for the workspace
     return this.prisma.apiKey.findMany({
-      where: { organizationId: orgId },
+      where: { workspaceId: workspaceId },
       select: { id: true, name: true, prefix: true, scopes: true, createdAt: true, revoked: true, lastUsedAt: true },
     });
   }
 
   // Helper to create a default key
-  private async createDefaultKey(orgId: string, userId: string, type: "private" | "public") {
+  private async createDefaultKey(workspaceId: string, userId: string, type: "private" | "public") {
     const apiKeyId = randomUUID();
     const apiKey = 'sk_' + randomBytes(32).toString('hex');
     const prefix = apiKey.slice(0, 10);
     const name = type === "private" ? "Default Private Key" : "Default Public Key";
-    await this.vaultService.writeSecret('apiKeys', orgId, apiKeyId, { apiKey }, orgId);
+    await this.vaultService.writeSecret('apiKeys', workspaceId, apiKeyId, { apiKey }, workspaceId);
     await this.prisma.apiKey.create({
       data: {
         id: apiKeyId,
-        organizationId: orgId,
+        workspaceId: workspaceId,
         userId, // Keep userId for audit purposes only
         name,
         prefix,
@@ -79,7 +79,7 @@ export class ApiKeyService {
     });
   }
 
-  async getApiKey(id: string, orgId: string, userId: string) {
+  async getApiKey(id: string, workspaceId: string, userId: string) {
     try {
       // 1. Get metadata from DB
       const meta = await this.prisma.apiKey.findUnique({ where: { id } });
@@ -90,7 +90,7 @@ export class ApiKeyService {
       
       // 2. Get secret from Vault
       try {
-        const secret = await this.vaultService.readSecret('apiKeys', orgId, id, orgId);
+        const secret = await this.vaultService.readSecret('apiKeys', workspaceId, id, workspaceId);
         return { ...meta, secret };
       } catch (vaultError) {
         this.logger.error(`Failed to retrieve API key secret from vault: ${vaultError.message}`, vaultError.stack);
@@ -107,7 +107,7 @@ export class ApiKeyService {
     }
   }
 
-  async deleteApiKey(id: string, orgId: string, userId: string) {
+  async deleteApiKey(id: string, workspaceId: string, userId: string) {
     try {
       // 1. Get metadata from DB
       const meta = await this.prisma.apiKey.findUnique({ where: { id } });
@@ -118,7 +118,7 @@ export class ApiKeyService {
       
       // 2. Delete from Vault
       try {
-        await this.vaultService.deleteSecret('apiKeys', orgId, id, orgId);
+        await this.vaultService.deleteSecret('apiKeys', workspaceId, id, workspaceId);
       } catch (vaultError) {
         this.logger.error(`Failed to delete API key secret from vault: ${vaultError.message}`, vaultError.stack);
         // Continue with DB deletion even if vault deletion fails
@@ -135,7 +135,7 @@ export class ApiKeyService {
     }
   }
 
-  async revokeApiKey(id: string, orgId: string, userId: string) {
+  async revokeApiKey(id: string, workspaceId: string, userId: string) {
     try {
       // Check if API key exists
       const apiKey = await this.prisma.apiKey.findUnique({ where: { id } });
@@ -157,23 +157,23 @@ export class ApiKeyService {
       throw new Error(`Failed to revoke API key: ${error.message}`);
     }
     // Note: We're not deleting from vault as per the original comment
-    // Optionally: await this.vaultService.deleteSecret('apiKeys', orgId, id, orgId);
+    // Optionally: await this.vaultService.deleteSecret('apiKeys', workspaceId, id, workspaceId);
   }
 
-  async ensureDefaultKeysForUser(orgId: string, userId: string) {
+  async ensureDefaultKeysForUser(workspaceId: string, userId: string) {
     // Check for default private key
     const defaultPrivate = await this.prisma.apiKey.findFirst({
-      where: { organizationId: orgId, name: "Default Private Key" },
+      where: { workspaceId: workspaceId, name: "Default Private Key" },
     });
     if (!defaultPrivate) {
-      await this.createDefaultKey(orgId, userId, "private");
+      await this.createDefaultKey(workspaceId, userId, "private");
     }
     // Check for default public key
     const defaultPublic = await this.prisma.apiKey.findFirst({
-      where: { organizationId: orgId, name: "Default Public Key" },
+      where: { workspaceId: workspaceId, name: "Default Public Key" },
     });
     if (!defaultPublic) {
-      await this.createDefaultKey(orgId, userId, "public");
+      await this.createDefaultKey(workspaceId, userId, "public");
     }
   }
-} 
+}

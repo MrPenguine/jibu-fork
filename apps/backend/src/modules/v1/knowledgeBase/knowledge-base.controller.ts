@@ -41,14 +41,14 @@ export class KnowledgeBaseController {
       
       // PRIORITY ORDER FOR ORGANIZATION ID:
       // 1. First use organization ID from the request body (if provided)
-      // 2. Then from x-organization-id or organization-id header 
+      // 2. Then from x-workspace-id or organization-id header 
       // 3. Finally from user token
-      let orgId = createKnowledgeBaseDto.organizationId;
+      let orgId = createKnowledgeBaseDto.workspaceId;
       
       // If not in request body, try headers in various formats
       if (!orgId) {
         // Check multiple header formats to be thorough
-        orgId = req.headers['x-organization-id'] || 
+        orgId = req.headers['x-workspace-id'] || 
                 req.headers['organization-id'] || 
                 req.headers['x-force-organization-id'];
         
@@ -87,32 +87,32 @@ export class KnowledgeBaseController {
           createKnowledgeBaseDto
         );
         
-        // Ensure organizationId is included in the response
+        // Ensure workspaceId is included in the response
         if (result) {
-          // Check if the result has the proper organizationId
-          if (!result.organizationId) {
-            this.logger.log(`Adding missing organizationId ${orgId} to KB response`);
-            result.organizationId = orgId;
-          } else if (result.organizationId !== orgId) {
-            this.logger.warn(`KB created with different organizationId: ${result.organizationId} vs expected ${orgId}`);
+          // Check if the result has the proper workspaceId
+          if (!result.workspaceId) {
+            this.logger.log(`Adding missing workspaceId ${orgId} to KB response`);
+            result.workspaceId = orgId;
+          } else if (result.workspaceId !== orgId) {
+            this.logger.warn(`KB created with different workspaceId: ${result.workspaceId} vs expected ${orgId}`);
             // Update the response object to use the correct ID
-            result.organizationId = orgId;
+            result.workspaceId = orgId;
             
             // Also update the database record to fix any discrepancy
             try {
               // @ts-ignore - PrismaClient models are not properly typed
               await this.prisma.knowledgeBase.update({
                 where: { id: result.id },
-                data: { organizationId: orgId }
+                data: { workspaceId: orgId }
               });
-              this.logger.log(`Fixed organizationId mismatch in database for KB ${result.id}`);
+              this.logger.log(`Fixed workspaceId mismatch in database for KB ${result.id}`);
             } catch (updateError) {
-              this.logger.error(`Failed to update KB with correct organizationId: ${updateError.message}`);
+              this.logger.error(`Failed to update KB with correct workspaceId: ${updateError.message}`);
             }
           }
         }
         
-        this.logger.log(`KB created: ${result?.id} with organizationId: ${result?.organizationId}`);
+        this.logger.log(`KB created: ${result?.id} with workspaceId: ${result?.workspaceId}`);
         return result;
       } catch (error) {
         this.logger.error(`Error creating KB: ${error.message}`, error.stack);
@@ -140,7 +140,7 @@ export class KnowledgeBaseController {
   async findAll(@Req() req) {
     try {
       // Get organization ID from headers first, then fall back to JWT token
-      const orgId = req.headers['x-organization-id'] || 
+      const orgId = req.headers['x-workspace-id'] || 
                    req.headers['organization-id'] || 
                    req.headers['x-force-organization-id'] || 
                    req.user.orgId;
@@ -151,7 +151,7 @@ export class KnowledgeBaseController {
       }
       
       this.logger.log(`[findAll] Listing knowledge bases for organization: ${orgId}`);
-      return this.knowledgeBaseService.listKnowledgeBasesForOrg(orgId);
+      return this.knowledgeBaseService.listKnowledgeBasesForWorkspace(orgId);
     } catch (error) {
       this.logger.error(`[findAll] Error listing knowledge bases: ${error.message}`, error.stack);
       throw error;
@@ -180,7 +180,7 @@ export class KnowledgeBaseController {
     @Param('id') id: string,
   ) {
     try {
-      const orgId = req.headers['x-organization-id'] || 
+      const orgId = req.headers['x-workspace-id'] || 
                    req.headers['organization-id'] || 
                    req.headers['x-force-organization-id'] || 
                    req.user.orgId;
@@ -203,7 +203,7 @@ export class KnowledgeBaseController {
     @Param('id') id: string,
   ) {
     try {
-      const orgId = req.headers['x-organization-id'] || 
+      const orgId = req.headers['x-workspace-id'] || 
                    req.headers['organization-id'] || 
                    req.headers['x-force-organization-id'] || 
                    req.user.orgId;
@@ -228,7 +228,7 @@ export class KnowledgeBaseController {
     @Param('sourceId') sourceId: string,
   ) {
     try {
-      const orgId = req.headers['x-organization-id'] || 
+      const orgId = req.headers['x-workspace-id'] || 
                    req.headers['organization-id'] || 
                    req.headers['x-force-organization-id'] || 
                    req.user.orgId;
@@ -283,14 +283,14 @@ export class KnowledgeBaseController {
     try {
       // PRIORITY ORDER:
       // 1. First use organization ID from the request body (if provided)
-      // 2. Then from x-organization-id or organization-id header 
+      // 2. Then from x-workspace-id or organization-id header 
       // 3. Finally from user token
-      let orgId = linkFileSourceDto.organizationId;
+      let orgId = linkFileSourceDto.workspaceId;
       const userId = req.user.userId || req.user.id;
       
       // If not in request body, try headers
       if (!orgId) {
-        orgId = req.headers['x-organization-id'] || req.headers['organization-id'];
+        orgId = req.headers['x-workspace-id'] || req.headers['organization-id'];
         if (orgId) {
           this.logger.log(`Using orgId from header: ${orgId}`);
         }
@@ -327,14 +327,14 @@ export class KnowledgeBaseController {
         
         // If found but belongs to another organization, print a warning but proceed
         // This handles cases where organization IDs might be different across systems
-        if (anyKnowledgeBase.organizationId !== orgId) {
-          this.logger.warn(`Knowledge base ${id} belongs to organization ${anyKnowledgeBase.organizationId}, not ${orgId}. Will proceed anyway but this might indicate a configuration issue.`);
+        if (anyKnowledgeBase.workspaceId !== orgId) {
+          this.logger.warn(`Knowledge base ${id} belongs to organization ${anyKnowledgeBase.workspaceId}, not ${orgId}. Will proceed anyway but this might indicate a configuration issue.`);
           
           // Option 1: Proceed with the request organization ID (current approach)
           // Keep orgId as is from the request
           
           // Option 2: Use the knowledge base's organization ID (alternative approach)
-          // orgId = anyKnowledgeBase.organizationId;
+          // orgId = anyKnowledgeBase.workspaceId;
           // this.logger.log(`Switching to knowledge base's organization ID: ${orgId}`);
         }
       } catch (error) {
@@ -358,18 +358,18 @@ export class KnowledgeBaseController {
       this.logger.log(`Successfully linked file to KB: ${JSON.stringify({
         sourceId: source.id,
         knowledgeBaseId: source.knowledgeBaseId,
-        organizationId: source.organizationId || orgId
+        workspaceId: source.workspaceId || orgId
       })}`);
       
       // Return the source object directly without additional wrapping
       if (source && source.id) {
         // Ensure source has correct organization ID
-        if (!source.organizationId) {
-          source.organizationId = orgId;
-          this.logger.warn(`Added missing organizationId ${orgId} to source response`);
-        } else if (source.organizationId !== orgId) {
-          this.logger.warn(`Source has different organizationId (${source.organizationId}) than requested (${orgId}), correcting...`);
-          source.organizationId = orgId;
+        if (!source.workspaceId) {
+          source.workspaceId = orgId;
+          this.logger.warn(`Added missing workspaceId ${orgId} to source response`);
+        } else if (source.workspaceId !== orgId) {
+          this.logger.warn(`Source has different workspaceId (${source.workspaceId}) than requested (${orgId}), correcting...`);
+          source.workspaceId = orgId;
         }
         
         return source;
@@ -418,9 +418,9 @@ export class KnowledgeBaseController {
     try {
       // PRIORITY ORDER:
       // 1. First use organization ID from the request body (if provided)
-      // 2. Then from x-organization-id or organization-id header 
+      // 2. Then from x-workspace-id or organization-id header 
       // 3. Finally from user token
-      let orgId = req.headers['x-organization-id'] || req.headers['organization-id'];
+      let orgId = req.headers['x-workspace-id'] || req.headers['organization-id'];
       const userId = req.user.userId || req.user.id;
       
       // Final fallback to user token
@@ -445,7 +445,7 @@ export class KnowledgeBaseController {
       const knowledgeBase = await this.prisma.knowledgeBase.findFirst({
         where: {
           id: id,
-          organizationId: orgId,
+          workspaceId: orgId,
         },
       });
 
@@ -481,7 +481,7 @@ export class KnowledgeBaseController {
     @Param('sourceId') sourceId: string,
     @Req() req
   ) {
-    const orgId = req.headers['x-organization-id'];
+    const orgId = req.headers['x-workspace-id'];
     
     // Find the source - use knowledgeBaseService or direct Prisma
     // @ts-ignore - PrismaClient models are not properly typed
@@ -489,7 +489,7 @@ export class KnowledgeBaseController {
       where: {
         id: sourceId,
         knowledgeBaseId: id,
-        organizationId: orgId,
+        workspaceId: orgId,
       },
     });
 
@@ -523,14 +523,14 @@ export class KnowledgeBaseController {
   @ApiParam({ name: 'sourceId', description: 'Source ID' })
   async getSourceStatus(@Param('sourceId') sourceId: string, @Req() req) {
     try {
-      const orgId = req.headers['x-organization-id'];
+      const orgId = req.headers['x-workspace-id'];
       
       // Get the source from database
       // @ts-ignore - PrismaClient models are not properly typed
       const source = await this.prisma.knowledgeBaseSource.findFirst({
         where: {
           id: sourceId,
-          organizationId: orgId,
+          workspaceId: orgId,
         },
       });
 
@@ -559,19 +559,19 @@ export class KnowledgeBaseController {
   @ApiResponse({ status: 400, description: 'Invalid request' })
   @ApiResponse({ status: 500, description: 'Failed to link knowledge base to assistant' })
   async linkToAssistant(
-    @Body() linkData: { knowledgeBaseId: string; assistantId: string; organizationId?: string },
+    @Body() linkData: { knowledgeBaseId: string; assistantId: string; workspaceId?: string },
     @Req() req
   ) {
     try {
       // PRIORITY ORDER:
       // 1. First use organization ID from the request body (if provided)
-      // 2. Then from x-organization-id header
+      // 2. Then from x-workspace-id header
       // 3. Finally from user token
-      let orgId = linkData.organizationId;
+      let orgId = linkData.workspaceId;
       
       // If not in request body, try header
       if (!orgId) {
-        orgId = req.headers['x-organization-id'] || req.headers['organization-id'];
+        orgId = req.headers['x-workspace-id'] || req.headers['organization-id'];
         if (orgId) {
           this.logger.log(`Using orgId from header: ${orgId}`);
         }
@@ -599,7 +599,7 @@ export class KnowledgeBaseController {
       const knowledgeBase = await this.prisma.knowledgeBase.findFirst({
         where: {
           id: linkData.knowledgeBaseId,
-          organizationId: orgId,
+          workspaceId: orgId,
         },
       });
 
@@ -615,7 +615,7 @@ export class KnowledgeBaseController {
       const assistant = await this.prisma.assistant.findFirst({
         where: {
           id: linkData.assistantId,
-          organizationId: orgId,
+          workspaceId: orgId,
         },
       });
 

@@ -11,7 +11,7 @@ import {
 } from "@libs/shadcn-ui/components/ui/custom-card"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { fetchAPI } from '../../../../../apps/frontend/src/utils/api'
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext'
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext'
 import { toast } from "@libs/shadcn-ui/components/ui/use-toast"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@libs/shadcn-ui/components/ui/tooltip"
 
@@ -24,21 +24,21 @@ interface Invitation {
 }
 
 interface PendingInvitationsProps {
-  organizationId: string;
+  workspaceId: string;
   refreshMembers: () => void;
 }
 
-export function PendingInvitations({ organizationId, refreshMembers }: PendingInvitationsProps) {
-  const { activeOrganization } = useOrganization()
+export function PendingInvitations({ workspaceId, refreshMembers }: PendingInvitationsProps) {
+  const { activeWorkspace } = useWorkspace()
   const [invitations, setInvitations] = React.useState<Invitation[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
-  const userRole = activeOrganization?.role
+  const userRole = activeWorkspace?.role
   const canManageInvites = userRole === 'owner' || userRole === 'admin'
 
   const fetchInvitations = React.useCallback(async () => {
-    if (!organizationId) {
+    if (!workspaceId) {
       setIsLoading(false)
       return
     }
@@ -46,7 +46,7 @@ export function PendingInvitations({ organizationId, refreshMembers }: PendingIn
     try {
       setIsLoading(true)
       setError(null)
-      const data = await fetchAPI(`/organizations/${organizationId}/invitations?status=pending`)
+      const data = await fetchAPI(`/v1/invitations/workspace/${workspaceId}`)
       setInvitations(data)
     } catch (err) {
       console.error('Error fetching invitations:', err)
@@ -54,7 +54,7 @@ export function PendingInvitations({ organizationId, refreshMembers }: PendingIn
     } finally {
       setIsLoading(false)
     }
-  }, [organizationId])
+  }, [workspaceId])
 
   React.useEffect(() => {
     fetchInvitations()
@@ -64,8 +64,8 @@ export function PendingInvitations({ organizationId, refreshMembers }: PendingIn
     if (!canManageInvites) return;
 
     try {
-      await fetchAPI(`/organizations/${organizationId}/invitations/${invitationId}`, {
-        method: 'DELETE'
+      await fetchAPI(`/workspaces/invitations/${invitationId}/revoke`, {
+        method: 'POST'
       })
       toast({ title: "Invitation cancelled", description: "The invitation has been successfully cancelled." })
       fetchInvitations() // Refresh the list of invitations
@@ -78,8 +78,17 @@ export function PendingInvitations({ organizationId, refreshMembers }: PendingIn
 
   const resendInvitation = async (invitationId: string) => {
     if (!canManageInvites) return;
-    // Placeholder for resend logic
-    toast({ title: "Invitation resent", description: "The invitation has been sent again." })
+
+    try {
+      await fetchAPI(`/workspaces/invitations/${invitationId}/resend`, {
+        method: 'POST'
+      });
+      toast({ title: "Invitation resent", description: "The invitation has been sent again." });
+      fetchInvitations();
+    } catch (err) {
+      console.error('Error resending invitation:', err);
+      toast({ title: "Error", description: "Failed to resend invitation.", variant: "destructive" });
+    }
   }
 
   if (isLoading) {

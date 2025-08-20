@@ -16,7 +16,8 @@ export enum AgentNodeType {
   RECORD = 'RECORD',
   PLAY_AUDIO = 'PLAY_AUDIO',
   KNOWLEDGE_BASE_SEARCH = 'knowledgeBaseSearchNode',
-  CUSTOM = 'CUSTOM'
+  CUSTOM = 'CUSTOM',
+  N8N_INTEGRATION = 'N8N_INTEGRATION'
 }
 
 // Base node data interface
@@ -144,6 +145,15 @@ export interface PlayAudioNodeData extends BaseNodeData {
   // Optional: volume, loop, etc.
 }
 
+// N8N Integration node data
+export interface IntegrationNodeData extends BaseNodeData {
+  nodeType?: string;
+  parameters?: Record<string, any>;
+  credentials?: Record<string, any>;
+  n8nWorkflowId?: string;
+  outputVariableName?: string;
+}
+
 // Union type for all node data types
 export type FlowNodeData =
   | MessageNodeData
@@ -157,6 +167,7 @@ export type FlowNodeData =
   | TransferNodeData
   | RecordNodeData
   | PlayAudioNodeData
+  | IntegrationNodeData
   | BaseNodeData; // For simple nodes like START, END
 
 // Flow node interface

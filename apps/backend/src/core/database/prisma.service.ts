@@ -3,6 +3,10 @@ import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  // Define properties for webhook models
+  Webhook: any;
+  WebhookInvocation: any;
+
   constructor() {
     super();
     // Add aliases for models with casing issues
@@ -21,6 +25,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     Object.defineProperty(this, 'Folder', {
       get: function() {
         return this.folder;
+      }
+    });
+    
+    // Add aliases for webhook models
+    Object.defineProperty(this, 'Webhook', {
+      get: function() {
+        return this.webhook;
+      }
+    });
+    
+    Object.defineProperty(this, 'WebhookInvocation', {
+      get: function() {
+        return this.webhookInvocation;
       }
     });
   }

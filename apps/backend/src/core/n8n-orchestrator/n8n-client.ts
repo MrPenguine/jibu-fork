@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { N8nWebhookType } from '../../integrations/n8n/n8n-types';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
@@ -326,32 +327,14 @@ export class N8nClient {
       
       for (const workflow of activeWorkflows) {
         if (workflow.nodes) {
-          const webhookNodeTypes = ['n8n-nodes-base.webhook', 'n8n-nodes-base.chatTrigger'];
-          
+          const webhookNodeTypes = [N8nWebhookType.CHAT_TRIGGER];
+
           for (const node of workflow.nodes) {
-            if (webhookNodeTypes.includes(node.type)) {
-              // For webhook nodes, extract the webhook information
-              if (node.type === 'n8n-nodes-base.webhook' && node.parameters?.path) {
-                // Construct webhook URL based on n8n configuration
-                const webhookPath = node.parameters.path;
-                const webhookUrl = `${this.n8nUrl}/webhook/${workflow.id}/${webhookPath}`;
-                
-                webhooks.push({
-                  workflowId: workflow.id,
-                  workflowName: workflow.name,
-                  nodeId: node.id,
-                  nodeName: node.name,
-                  nodeType: node.type,
-                  path: webhookPath,
-                  url: webhookUrl,
-                  active: workflow.active,
-                });
-              }
-              
+            if (webhookNodeTypes.includes(node.type as N8nWebhookType)) {
               // For chat trigger nodes, include the chat trigger URL
-              if (node.type === 'n8n-nodes-base.chatTrigger') {
+              if (node.type === N8nWebhookType.CHAT_TRIGGER) {
                 const chatUrl = `${this.n8nUrl}/chat/${workflow.id}`;
-                
+
                 webhooks.push({
                   workflowId: workflow.id,
                   workflowName: workflow.name,
@@ -407,22 +390,14 @@ export class N8nClient {
       
       // Simple check for nodes with webhook functionality
       if (workflow.nodes) {
-        const webhookNodeTypes = ['n8n-nodes-base.webhook', 'n8n-nodes-base.chatTrigger'];
-        
+        const webhookNodeTypes = [N8nWebhookType.CHAT_TRIGGER];
+
         for (const node of workflow.nodes) {
-          if (webhookNodeTypes.includes(node.type)) {
+          if (webhookNodeTypes.includes(node.type as N8nWebhookType)) {
             hasWebhookNodes = true;
-            
-            // For webhook nodes, try to extract the webhook URL if available
-            if (node.type === 'n8n-nodes-base.webhook' && node.parameters?.path) {
-              // Construct webhook URL based on n8n configuration
-              const webhookPath = node.parameters.path;
-              const webhookUrl = `${this.n8nUrl}/webhook/${workflowId}/${webhookPath}`;
-              webhookUrls.push(webhookUrl);
-            }
-            
+
             // For chat trigger nodes, include the chat trigger URL
-            if (node.type === 'n8n-nodes-base.chatTrigger') {
+            if (node.type === N8nWebhookType.CHAT_TRIGGER) {
               const chatUrl = `${this.n8nUrl}/chat/${workflowId}`;
               webhookUrls.push(chatUrl);
             }

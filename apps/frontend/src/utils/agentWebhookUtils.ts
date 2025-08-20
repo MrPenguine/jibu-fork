@@ -6,13 +6,13 @@ import * as n8nUtils from './n8n';
  * and extracting the webhook URL from the primary workflow
  * 
  * @param agentId The ID of the agent to get the webhook URL for
- * @param organizationId Optional organization ID (will use active org if not provided)
+ * @param workspaceId Optional workspace ID (will use active workspace if not provided)
  * @returns Promise resolving to the webhook URL or null if not found
  */
-export async function getAgentWebhookUrl(agentId: string, organizationId?: string): Promise<string | null> {
+export async function getAgentWebhookUrl(agentId: string, workspaceId?: string): Promise<string | null> {
   try {
     // Fetch the agent's workflows
-    const workflows = await agentApiClient.getAgentWorkflows(agentId, organizationId);
+    const workflows = await agentApiClient.getAgentWorkflows(agentId, workspaceId);
     
     if (!workflows || workflows.length === 0) {
       console.warn('No workflows found for agent', agentId);

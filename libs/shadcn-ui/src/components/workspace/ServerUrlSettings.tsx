@@ -6,7 +6,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext';
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext';
 import { toast } from "../ui/use-toast";
 
 interface HeaderRow {
@@ -20,16 +20,16 @@ export interface ServerUrlSettingsProps {
 }
 
 export default function ServerUrlSettings({ readOnly = false }: ServerUrlSettingsProps) {
-  const { activeOrganization, updateOrganization } = useOrganization();
+  const { activeWorkspace, updateWorkspace } = useWorkspace();
   const [isSaving, setIsSaving] = useState(false);
   
   // Form states
-  const [serverUrl, setServerUrl] = useState(activeOrganization?.settings?.serverUrl || "");
+  const [serverUrl, setServerUrl] = useState(activeWorkspace?.settings?.serverUrl || "");
   const [timeoutSeconds, setTimeoutSeconds] = useState(
-    activeOrganization?.settings?.timeoutSeconds?.toString() || "20"
+    activeWorkspace?.settings?.timeoutSeconds?.toString() || "20"
   );
   const [headers, setHeaders] = useState<HeaderRow[]>(
-    activeOrganization?.settings?.headers?.map((header: any) => ({
+    activeWorkspace?.settings?.headers?.map((header: any) => ({
       ...header,
       id: crypto.randomUUID()
     })) || []
@@ -63,7 +63,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
   };
 
   const saveSettings = async () => {
-    if (!activeOrganization) return;
+    if (!activeWorkspace) return;
     
     try {
       setIsSaving(true);
@@ -71,7 +71,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
       // Prepare data for update
       const updateData = {
         settings: {
-          ...activeOrganization.settings,
+          ...activeWorkspace.settings,
           serverUrl,
           timeoutSeconds: parseInt(timeoutSeconds),
           headers: headers.map(({ name, value }) => ({ name, value })) // Remove id field
@@ -79,7 +79,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
       };
       
       // Call API to update
-      await updateOrganization(activeOrganization.id, updateData);
+      await updateWorkspace(activeWorkspace.id, updateData);
       
       // Show success message
       toast({

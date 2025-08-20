@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../core/database/prisma.service';
 import { HttpService } from '@nestjs/axios';
-import { ToolsService } from '../../tools/tools.service';
 import { AssistantsService } from '../../assistants/assistants.service';
 import { ChatsService } from '../../chats/chats.service';
 import { AgentSessionOutput, AgentNodeType, FlowNode, FlowEdge } from '../../../../../../../libs/src';
@@ -14,7 +13,7 @@ interface Agent extends PrismaAgent {
   edges: any;
   startNodeId?: string;
   isPublished?: boolean;
-  organizationId: string;
+  workspaceId: string;
 }
 
 @Injectable()
@@ -24,32 +23,26 @@ export class AgentExecutionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
-    @Inject(forwardRef(() => ToolsService))
-    private readonly toolsService: ToolsService,
     @Inject(forwardRef(() => AssistantsService))
     private readonly assistantsService: AssistantsService,
     @Inject(forwardRef(() => ChatsService))
     private readonly chatsService: ChatsService,
   ) {}
 
-  async initiate(agentId: string, organizationId: string, initialVariables: Record<string, any> = {}, chatId?: string, callSid?: string): Promise<AgentSessionOutput> {
-    this.logger.log(`[AGENT_EXEC] Initiating agent execution for agent ${agentId} in org ${organizationId}`);
+  async initiate(agentId: string, workspaceId: string, initialVariables: Record<string, any> = {}, chatId?: string, callSid?: string): Promise<AgentSessionOutput> {
+    this.logger.log(`[AGENT_EXEC] Initiating agent execution for agent ${agentId} in workspace ${workspaceId}`);
     
-    // Verify the agent exists, is published, and belongs to the organization
-    // Use a raw query filter to avoid TypeScript errors with isPublished
     const agent = await this.prisma.agent.findFirst({
       where: {
         id: agentId,
-        organizationId,
-        // Remove isPublished condition temporarily as it's moved to workflow
+        workspaceId,
       },
     }) as unknown as Agent;
     
-    // Cast to any to access properties safely in logs
     const agentInfo = agent as any;
     this.logger.log(`[AGENT_EXEC] Agent found: ${JSON.stringify({
       id: agentInfo?.id, 
-      organizationId: agentInfo?.organizationId
+      workspaceId: agentInfo?.workspaceId
     })}`);
     
     // Add the missing properties that would come from Workflow
@@ -65,7 +58,7 @@ export class AgentExecutionService {
     const session = await this.prisma.agentSession.create({
       data: {
         agentId,
-        organizationId,
+        workspaceId,
         variables: initialVariables,
         history: [],
         currentNodeId: agent.startNodeId,
@@ -327,30 +320,20 @@ export class AgentExecutionService {
             return acc;
           }, {});
 
-          try {
-            // Execute the tool
-            // Use session's organizationId instead of agent's (they should be the same)
-            const toolResult = await this.toolsService.executeToolById(
-              toolId,
-              toolInput,
-              session.organizationId // Use session.organizationId which is guaranteed to exist
-            );
+          // Tools module has been removed; record a stub output and continue
+          this.logger.warn(`[AGENT_EXEC] TOOL_CALL encountered for tool ${toolId}, but ToolsService is disabled/removed. Skipping execution.`);
+          output = { skipped: true, reason: 'tool_calls_disabled', toolId, input: toolInput };
 
-            output = toolResult;
-
-            // Store the tool output in a variable if specified
-            if (toolCallNodeData.outputVariableName) {
-              const updatedVariables = { ...((session.variables as unknown) as Record<string, any>), [toolCallNodeData.outputVariableName]: output };
-              await this.prisma.agentSession.update({
-                where: { id: session.id },
-                data: {
-                  variables: updatedVariables,
-                },
-              });
-              session.variables = updatedVariables;
-            }
-          } catch (error) {
-            output = { error: error.message };
+          // Store the tool output in a variable if specified
+          if (toolCallNodeData.outputVariableName) {
+            const updatedVariables = { ...((session.variables as unknown) as Record<string, any>), [toolCallNodeData.outputVariableName]: output };
+            await this.prisma.agentSession.update({
+              where: { id: session.id },
+              data: {
+                variables: updatedVariables,
+              },
+            });
+            session.variables = updatedVariables;
           }
 
           nextNodeId = this.findNextNodeId(currentNodeId, agent, (session.variables as unknown) as Record<string, any>);
@@ -384,20 +367,20 @@ export class AgentExecutionService {
           this.logger.log(`[AGENT_EXEC] Processing ASSISTANT node with assistantId: ${assistantId}`);
           
           // Verify the assistant exists
-          this.logger.log(`[AGENT_EXEC] Verifying assistant with ID ${assistantId} exists for org ${session.organizationId}`);
+          this.logger.log(`[AGENT_EXEC] Verifying assistant with ID ${assistantId} exists for workspace ${session.workspaceId}`);
           
           let assistantDetails: any;
           try {
-            assistantDetails = await this.assistantsService.getAssistantById(assistantId, session.organizationId);
+            assistantDetails = await this.assistantsService.getAssistantById(assistantId, session.workspaceId);
             
             if (!assistantDetails) {
-              this.logger.error(`[AGENT_EXEC] Assistant with ID ${assistantId} not found for org ${session.organizationId}`);
+              this.logger.error(`[AGENT_EXEC] Assistant with ID ${assistantId} not found for workspace ${session.workspaceId}`);
               throw new BadRequestException(`Assistant with ID ${assistantId} not found`);
             }
             
             this.logger.log(`[AGENT_EXEC] Assistant found: ${JSON.stringify({
               id: assistantDetails.id,
-              organizationId: assistantDetails.organizationId,
+              workspaceId: assistantDetails.workspaceId,
               hasKnowledgeBase: !!assistantDetails.knowledgeBaseId
             })}`);
           } catch (error) {
@@ -432,7 +415,7 @@ export class AgentExecutionService {
               where: {
                 sessionId: session.id,
                 assistantId: assistantId,
-                organizationId: session.organizationId,
+                workspaceId: session.workspaceId,
               }
             });
             
@@ -443,7 +426,7 @@ export class AgentExecutionService {
             } else {
               const newChat = await this.chatsService.createChat({
                 assistantId,
-                organizationId: session.organizationId,
+                workspaceId: session.workspaceId,
                 name: `Agent Session ${session.id}`,
                 sessionId: session.id,
                 sessionType: 'chat' // Must be 'chat' or 'call' according to type definition
@@ -475,7 +458,7 @@ export class AgentExecutionService {
                 type: 'text',
                 sequenceId: nextSequenceId 
               },
-              session.organizationId
+              session.workspaceId
             );
             
             this.logger.log(`[AGENT_EXEC] Delegating to assistant service with ID ${assistantId} - all RAG/context handled by assistant service`);
@@ -484,7 +467,7 @@ export class AgentExecutionService {
             const assistantResponse = await this.assistantsService.generateAssistantResponse(
               assistantId,
               userInput,
-              session.organizationId
+              session.workspaceId
             );
             
             // Save the response as output
@@ -541,11 +524,11 @@ export class AgentExecutionService {
             
             this.logger.log(`Query for knowledge base search: ${query}`);
             
-            // First, verify the knowledge base exists and belongs to the organization
+            // First, verify the knowledge base exists and belongs to the workspace
             const knowledgeBase = await this.prisma.knowledgeBase.findFirst({
               where: {
                 id: kbId,
-                organizationId: session.organizationId
+                workspaceId: session.workspaceId
               }
             });
             

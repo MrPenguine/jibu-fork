@@ -17,7 +17,7 @@ import {
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import React from "react"
 import { getAssistant, updateAssistant, Assistant } from "../../../../utils/AssistantsApi"
-import { useOrganization } from "../../../../utils/organizationContext"
+import { useWorkspace } from "../../../../utils/workspaceContext"
 import { format } from "date-fns"
 
 type ProviderType = "web" | "twilio" | "vonage";
@@ -31,7 +31,7 @@ const apiProviders = [
 export default function AssistantDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { activeOrganization, loading: orgLoading } = useOrganization();
+  const { activeWorkspace, loading: workspaceLoading } = useWorkspace();
   
   // Safely extract the ID using React.use() as recommended
   const id = typeof params?.id === 'string' ? params.id : 
@@ -73,7 +73,7 @@ export default function AssistantDetailPage() {
       return;
     }
     
-    if (!id || !activeOrganization) return;
+    if (!id || !activeWorkspace) return;
     
     const fetchAssistant = async () => {
       setIsLoading(true);
@@ -81,9 +81,9 @@ export default function AssistantDetailPage() {
       try {
         const assistantData = await getAssistant(id);
         
-        // Check if the assistant belongs to the current organization
-        if (assistantData.organizationId !== activeOrganization.id) {
-          console.log(`Assistant ${id} does not belong to organization ${activeOrganization.id}, redirecting...`);
+        // Check if the assistant belongs to the current workspace
+        if (assistantData.workspaceId !== activeWorkspace.id) {
+          console.log(`Assistant ${id} does not belong to workspace ${activeWorkspace.id}, redirecting...`);
           // Don't set the error state, silently redirect
           router.push('/assistants');
           return;
@@ -168,14 +168,14 @@ export default function AssistantDetailPage() {
     };
     
     fetchAssistant();
-  }, [id, activeOrganization, router]);
+  }, [id, activeWorkspace, router]);
 
-  // If organization changes, redirect back to assistants
+  // If workspace changes, redirect back to assistants
   useEffect(() => {
-    if (assistant && activeOrganization && assistant.organizationId !== activeOrganization.id) {
+    if (assistant && activeWorkspace && assistant.workspaceId !== activeWorkspace.id) {
       router.push('/assistants');
     }
-  }, [activeOrganization, assistant, router]);
+  }, [activeWorkspace, assistant, router]);
 
   // Indicator config - last item changes based on provider
   const indicatorConfig = {
@@ -566,7 +566,7 @@ export default function AssistantDetailPage() {
                   modelPreference={modelPreference}
                   assistantId={id !== 'new' ? id : undefined}
                   knowledgeBaseId={knowledgeBaseId || undefined}
-                  organizationId={activeOrganization?.id}
+                  workspaceId={activeWorkspace?.id}
                   onFirstMessageChange={handleFirstMessageChange}
                   onSystemPromptChange={handleSystemPromptChange}
                   onProviderChange={handleProviderChange}

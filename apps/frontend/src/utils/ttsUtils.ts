@@ -1,6 +1,6 @@
-import { API_BASE_URL, fetchAPI } from './api';
+import { API_BASE_URL } from './api';
 import { createClient } from './supabase/client';
-import { getActiveOrgId } from './fileApi';
+import { getActiveWorkspaceId } from './fileApi';
 
 // Audio player for TTS
 let audioPlayer: HTMLAudioElement | null = null;
@@ -16,13 +16,13 @@ interface TtsVoiceSettings {
 }
 
 /**
- * Get authorization headers with token and organization ID
+ * Get authorization headers with token and workspace ID
  */
 async function getAuthHeaders() {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  const orgId = getActiveOrgId();
+  const workspaceId = getActiveWorkspaceId();
   
   if (!token) {
     throw new Error('No authentication token available');
@@ -32,7 +32,7 @@ async function getAuthHeaders() {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
     'Accept': 'audio/mpeg',
-    ...(orgId ? { 'X-Organization-ID': orgId } : {})
+    ...(workspaceId ? { 'X-Workspace-ID': workspaceId } : {})
   };
 }
 

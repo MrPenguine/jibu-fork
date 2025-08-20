@@ -1,56 +1,28 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { Agent as PrismaAgent, WorkflowType } from '@prisma/client';
-
-// Extended Agent interface with workflow properties - used only to type our functions
-type Agent = {
-  id: string;
-  name: string;
-  description: string;
-  organizationId: string;
-  assistantId?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  nodes?: any;
-  edges?: any;
-  startNodeId?: string;
-  isPublished?: boolean;
-  workflows?: any[];
-  metadata?: any;
-};
+import { ExtendedAgent } from '../interfaces/agent.interface';
 import { CreateAgentDto } from '../dto/create-agent.dto';
 import { PrismaService } from '../../../../core/database/prisma.service';
 import { UpdateAgentDto } from '../dto/update-agent.dto';
 import { WorkflowService } from '../../workflow/services/workflow.service';
 import { CreateWorkflowDto } from '../../workflow/dto/create-workflow.dto';
-// Secondary workflow methods have been moved to WorkflowService
 
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
-  
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly workflowService: WorkflowService
+    private readonly workflowService: WorkflowService,
   ) {}
 
-  /**
-   * Helper method to extract assistantId from workflow nodes
-   * @param nodes The workflow nodes object
-   * @returns The assistantId if found, otherwise undefined
-   */
   private extractAssistantIdFromNodes(nodes: any): string | undefined {
     try {
       if (!nodes) return undefined;
-
-      // Parse the nodes if they're a string
       const parsedNodes = typeof nodes === 'string' ? JSON.parse(nodes) : nodes;
-
-      // Find assistant nodes that have an assistantId
       const assistantNodes = Object.values(parsedNodes).filter(
-        (node: any) => node.type === 'ASSISTANT' && node.data?.assistantId
+        (node: any) => node.type === 'ASSISTANT' && node.data?.assistantId,
       );
-
-      // Return the first assistantId found
       if (assistantNodes.length > 0) {
         const assistantId = (assistantNodes[0] as any).data?.assistantId;
         if (assistantId) {
@@ -58,7 +30,6 @@ export class AgentService {
           return assistantId;
         }
       }
-
       return undefined;
     } catch (error) {
       this.logger.warn(`Error extracting assistantId from nodes: ${error.message}`);
@@ -66,121 +37,98 @@ export class AgentService {
     }
   }
 
-  async create(createAgentDto: CreateAgentDto, organizationId: string): Promise<Agent> {
-    this.logger.log(`Creating agent with organization ID: ${organizationId}`);
+  async create(createAgentDto: CreateAgentDto, workspaceId: string): Promise<ExtendedAgent> {
+    this.logger.log(`Creating agent with workspace ID: ${workspaceId}`);
     this.logger.debug(`Agent data: ${JSON.stringify(createAgentDto)}`);
 
-    
-    // Validate organizationId
-    if (!organizationId) {
-      this.logger.error('Organization ID is missing in agent creation');
-      throw new BadRequestException('Organization ID is required');
+    if (!workspaceId) {
+      this.logger.error('Workspace ID is missing in agent creation');
+      throw new BadRequestException('Workspace ID is required');
     }
 
     try {
-      // Verify the organization exists
-      const organization = await this.prisma.organization.findUnique({
-        where: { id: organizationId },
+      const workspace = await this.prisma.workspace.findUnique({
+        where: { id: workspaceId },
       });
 
-      if (!organization) {
-        this.logger.error(`Organization with ID ${organizationId} not found`);
-        throw new BadRequestException(`Organization with ID ${organizationId} not found`);
+      if (!workspace) {
+        this.logger.error(`Workspace with ID ${workspaceId} not found`);
+        throw new BadRequestException(`Workspace with ID ${workspaceId} not found`);
       }
 
-      // Check if assistantId is provided and verify it belongs to the organization
       if (createAgentDto.assistantId) {
         const assistant = await this.prisma.assistant.findFirst({
           where: {
             id: createAgentDto.assistantId,
-            organizationId,
+            workspaceId,
           },
         });
 
         if (!assistant) {
-          this.logger.error(`Assistant with ID ${createAgentDto.assistantId} not found in organization ${organizationId}`);
-          throw new BadRequestException(`Assistant with ID ${createAgentDto.assistantId} not found in this organization`);
+          this.logger.error(`Assistant with ID ${createAgentDto.assistantId} not found in workspace ${workspaceId}`);
+          throw new BadRequestException(`Assistant with ID ${createAgentDto.assistantId} not found in this workspace`);
         }
-      } else {
-        // If no assistantId provided, that's okay - we'll create the agent without an assistant
-        this.logger.log('No assistantId provided, creating agent without an assistant');
-        // Agent can be linked to assistant later
       }
 
-      // Create the base data object
       const createData: any = {
         name: createAgentDto.name,
         description: createAgentDto.description || '',
-        organization: {
-          connect: { id: organizationId }
-        }
+        workspace: {
+          connect: { id: workspaceId },
+        },
       };
-      
-      // Only include assistant relation if assistantId is provided
+
       if (createAgentDto.assistantId) {
         createData.assistant = {
-          connect: { id: createAgentDto.assistantId }
+          connect: { id: createAgentDto.assistantId },
         };
       }
 
-      this.logger.debug(`Creating agent with data: ${JSON.stringify(createData, null, 2)}`);
-      
-      // Create the agent
       const newAgent = await this.prisma.agent.create({
         data: createData,
         include: {
           assistant: true,
-          organization: true
-        }
-      }) as unknown as Agent;
-      
-      // Now create a master workflow for the agent
+          workspace: true,
+        },
+      }) as unknown as ExtendedAgent;
+
       try {
-        // Use type assertion to make TypeScript recognize the properties
         const agentData = newAgent as unknown as { id: string; name: string };
         this.logger.log(`Creating master workflow for agent: ${agentData.id}`);
-        
-        // Extract nodes and edges from the DTO if provided
+
         const nodes = createAgentDto.nodes || {};
         const edges = createAgentDto.edges || {};
-        
-        // Check if we need to extract assistantId from nodes
+
         if (!createAgentDto.assistantId) {
           const extractedAssistantId = this.extractAssistantIdFromNodes(nodes);
           if (extractedAssistantId) {
             this.logger.log(`Extracted assistantId ${extractedAssistantId} from workflow nodes`);
-            // Update the agent with the extracted assistantId
             await this.prisma.agent.update({
               where: { id: newAgent.id },
               data: {
-                assistant: { connect: { id: extractedAssistantId } }
-              }
+                assistant: { connect: { id: extractedAssistantId } },
+              },
             });
-            // Update our local instance
             newAgent.assistantId = extractedAssistantId;
           }
         }
-        
+
         const workflowData: CreateWorkflowDto = {
           name: `${agentData.name} Workflow`,
           description: `Master workflow for ${agentData.name}`,
           nodes: nodes,
           edges: edges,
           startNodeId: createAgentDto.startNodeId || '',
-          isPublished: false, // Default to false for new agents
-          organizationId: organizationId
+          isPublished: false,
+          workspaceId: workspaceId,
         };
-        
-        // Create the workflow entity for the agent
+
         const workflow = await this.workflowService.createMasterWorkflow(agentData.id, workflowData);
         this.logger.log(`Master workflow created successfully: ${workflow.id}`);
-        
       } catch (workflowError) {
         this.logger.error(`Error creating master workflow: ${workflowError.message}`);
-        // We don't want to fail the agent creation if workflow creation fails
-        // Just log the error and continue
       }
-      
+
       return newAgent;
     } catch (error) {
       this.logger.error(`Error creating agent: ${error.message}`);
@@ -188,252 +136,184 @@ export class AgentService {
     }
   }
 
-  async findAll(organizationId: string): Promise<Agent[]> {
-    this.logger.log(`Finding all agents for organization ID: ${organizationId}`);
-    
-    // Find all agents and their associated workflows for the given organization
+  async findAll(workspaceId: string): Promise<ExtendedAgent[]> {
+    this.logger.log(`Finding all agents for workspace ID: ${workspaceId}`);
+
     const agents = await this.prisma.agent.findMany({
       where: {
-        organizationId: organizationId,
+        workspaceId: workspaceId,
       },
       include: {
-        workflows: true, // Include workflows to check for publication status
+        workflows: true,
       },
       orderBy: {
         updatedAt: 'desc',
       },
     });
 
-    // Map the result to include the isPublished status
     return agents.map(agent => ({
       ...agent,
       isPublished: agent.workflows?.some(w => w.isPublished) ?? false,
-    })) as unknown as Agent[];
+    })) as unknown as ExtendedAgent[];
   }
 
-  async findAllByAssistant(assistantId: string, organizationId: string): Promise<Agent[]> {
+  async findAllByAssistant(assistantId: string, workspaceId: string): Promise<ExtendedAgent[]> {
     return this.prisma.agent.findMany({
       where: {
         assistantId,
-        organizationId,
+        workspaceId,
       },
       orderBy: {
         updatedAt: 'desc',
       },
-    }) as unknown as Agent[];
+    }) as unknown as ExtendedAgent[];
   }
 
-  async findOne(id: string, organizationId: string): Promise<Agent> {
+  async findOne(id: string, workspaceId: string): Promise<ExtendedAgent> {
     const agent = await this.prisma.agent.findFirst({
       where: {
         id,
-        organizationId,
+        workspaceId,
       },
     });
 
     if (!agent) {
-      throw new NotFoundException(`Agent with ID ${id} not found`);
+      throw new NotFoundException(`Agent with ID ${id} not found in this workspace`);
     }
 
-    return agent as Agent;
+    return agent as ExtendedAgent;
   }
 
-  async update(id: string, updateAgentDto: UpdateAgentDto, organizationId: string): Promise<Agent> {
-    // Validate organizationId
-    if (!organizationId) {
-      throw new BadRequestException('Organization ID is required');
+  async update(id: string, updateAgentDto: UpdateAgentDto, workspaceId: string): Promise<ExtendedAgent> {
+    if (!workspaceId) {
+      throw new BadRequestException('Workspace ID is required');
     }
-    
-    // Verify the agent exists and belongs to the organization
-    await this.findOne(id, organizationId);
 
-    // If assistantId is provided, verify it belongs to the organization
+    await this.findOne(id, workspaceId);
+
     if (updateAgentDto.assistantId) {
       const assistant = await this.prisma.assistant.findFirst({
         where: {
           id: updateAgentDto.assistantId,
-          organizationId,
+          workspaceId,
         },
       });
 
       if (!assistant) {
-        throw new BadRequestException(`Assistant with ID ${updateAgentDto.assistantId} not found in this organization`);
+        throw new BadRequestException(`Assistant with ID ${updateAgentDto.assistantId} not found in this workspace`);
       }
     }
 
-    // Prepare the update data
     const updateData: any = {};
-    
-    // Try to extract assistantId from workflow nodes if provided
-    let extractedAssistantId: string | undefined;
+
     if (updateAgentDto.nodes !== undefined) {
-      extractedAssistantId = this.extractAssistantIdFromNodes(updateAgentDto.nodes);
+      const extractedAssistantId = this.extractAssistantIdFromNodes(updateAgentDto.nodes);
       if (extractedAssistantId && updateAgentDto.assistantId === undefined) {
-        console.log(`Found assistantId ${extractedAssistantId} in workflow nodes during agent update`);
-        // Only use extracted ID if no explicit assistantId was provided
         updateAgentDto.assistantId = extractedAssistantId;
       }
-      // Store nodes as usual
       updateData.nodes = JSON.stringify(updateAgentDto.nodes);
     }
-    
-    // Handle basic fields
-    if (updateAgentDto.name !== undefined) {
-      updateData.name = updateAgentDto.name;
-    }
-    
-    if (updateAgentDto.description !== undefined) {
-      updateData.description = updateAgentDto.description;
-    }
-    
-    if (updateAgentDto.edges !== undefined) {
-      updateData.edges = JSON.stringify(updateAgentDto.edges);
-    }
-    
-    if (updateAgentDto.startNodeId !== undefined) {
-      updateData.startNodeId = updateAgentDto.startNodeId;
-    }
-    
+
+    if (updateAgentDto.name !== undefined) updateData.name = updateAgentDto.name;
+    if (updateAgentDto.description !== undefined) updateData.description = updateAgentDto.description;
+    if (updateAgentDto.edges !== undefined) updateData.edges = JSON.stringify(updateAgentDto.edges);
+    if (updateAgentDto.startNodeId !== undefined) updateData.startNodeId = updateAgentDto.startNodeId;
+
     if (updateAgentDto.isPublished !== undefined) {
       updateData.isPublished = updateAgentDto.isPublished;
-      // If isPublished is being set to true, update publishedAt
       if (updateAgentDto.isPublished === true) {
         updateData.publishedAt = new Date();
       }
     }
-    
-    // Handle the assistant relation properly
+
     if (updateAgentDto.assistantId !== undefined) {
       if (updateAgentDto.assistantId === null) {
-        // If assistantId is explicitly set to null, disconnect the assistant
         updateData.assistant = { disconnect: true };
       } else {
-        // If assistantId is provided, connect to that assistant
         updateData.assistant = { connect: { id: updateAgentDto.assistantId } };
       }
     }
 
     try {
       return this.prisma.agent.update({
-        where: { id, organizationId },
+        where: { id },
         data: updateData,
-      }) as unknown as Agent;
+      }) as unknown as ExtendedAgent;
     } catch (error) {
-      console.error('Error updating agent:', error);
+      this.logger.error('Error updating agent:', error);
       throw new BadRequestException(`Failed to update agent: ${error.message}`);
     }
   }
 
-  async remove(id: string, organizationId: string): Promise<Agent> {
-    // Verify the agent exists and belongs to the organization
-    await this.findOne(id, organizationId);
+  async remove(id: string, workspaceId: string): Promise<ExtendedAgent> {
+    await this.findOne(id, workspaceId);
 
     return this.prisma.agent.delete({
       where: {
         id,
-        organizationId,
       },
-    }) as unknown as Agent;
+    }) as unknown as ExtendedAgent;
   }
 
-  async publish(id: string, organizationId: string): Promise<Agent> {
+  async publish(id: string, workspaceId: string): Promise<ExtendedAgent> {
     try {
       this.logger.log(`Publishing agent ${id}`);
-      
-      // Verify the agent exists and belongs to the organization
-      const agent = await this.findOne(id, organizationId);
+      await this.findOne(id, workspaceId);
 
-      // Since publication status was moved to the Workflow model, we need to:
-      // 1. Update agent's timestamp
-      // 2. Update all workflows associated with this agent to be published
-      
-      // First update the agent
       const updatedAgent = await this.prisma.agent.update({
         where: { id },
-        data: { updatedAt: new Date() }
+        data: { updatedAt: new Date() },
       });
-      
-      // Then update all workflows associated with this agent
+
       await this.prisma.workflow.updateMany({
         where: { agentId: id },
         data: {
           isPublished: true,
-          publishedAt: new Date()
-        }
+          publishedAt: new Date(),
+        },
       });
-      
-      // Get the primary workflow for this agent with its nodes and edges
+
       const workflow = await this.prisma.workflow.findFirst({
         where: {
           agentId: id,
-          organizationId
-        }
+          workspaceId,
+        },
       });
-      
+
       if (!workflow) {
         this.logger.warn(`No primary workflow found for agent ${id}.`);
-        return updatedAgent as unknown as Agent;
       }
-      
-      return updatedAgent as unknown as Agent;
+
+      return updatedAgent as unknown as ExtendedAgent;
     } catch (error) {
       this.logger.error(`Error publishing agent: ${error.message}`, error.stack);
-      
-      // Return the agent as it currently exists
-      const updatedAgent = await this.prisma.agent.findUnique({
-        where: { id }
-      });
-      return updatedAgent as unknown as Agent;
+      const agent = await this.prisma.agent.findUnique({ where: { id } });
+      return agent as unknown as ExtendedAgent;
     }
   }
 
-  async unpublish(id: string, organizationId: string): Promise<Agent> {
+  async unpublish(id: string, workspaceId: string): Promise<ExtendedAgent> {
     try {
-      // Verify the agent exists and belongs to the organization
-      const agent = await this.findOne(id, organizationId);
-      
+      const agent = await this.findOne(id, workspaceId);
       if (!agent) {
         throw new NotFoundException(`Agent with ID "${id}" not found`);
       }
-      
-      // Publication status has been moved to the Workflow model
-      // This method is kept for backward compatibility
+
       return this.prisma.agent.update({
         where: { id },
         data: { updatedAt: new Date() },
-      }) as unknown as Agent;
+      }) as unknown as ExtendedAgent;
     } catch (error) {
-      console.error('Error unpublishing agent:', error);
+      this.logger.error('Error unpublishing agent:', error);
       throw error;
     }
   }
 
-  /**
-   * Get all workflows for a specific agent
-   * This includes the master workflow and any associated secondary workflows
-   */
-  async getAgentWorkflows(agentId: string, organizationId: string): Promise<any[]> {
-    try {
-      // Workflow-related methods have been moved to WorkflowService
-      throw new Error('Method has been moved to WorkflowService');
-    } catch (error) {
-      console.error('Error getting agent workflows:', error);
-      throw error;
-    }
+  async getAgentWorkflows(agentId: string, workspaceId: string): Promise<any[]> {
+    throw new Error('Method has been moved to WorkflowService');
   }
 
-  /**
-   * Create a secondary workflow that is linked to a master workflow
-   */
-  async createSecondaryWorkflow(createSecondaryWorkflowParams: any, organizationId: string): Promise<Agent> {
-    try {
-      // Workflow-related methods have been moved to WorkflowService
-      throw new Error('Method has been moved to WorkflowService');
-    } catch (error) {
-      console.error('Error creating secondary workflow:', error);
-      throw error;
-    }
+  async createSecondaryWorkflow(createSecondaryWorkflowParams: any, workspaceId: string): Promise<ExtendedAgent> {
+    throw new Error('Method has been moved to WorkflowService');
   }
-  
-  // N8N workflow mapping has been removed as part of the N8N removal process
 }

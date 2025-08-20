@@ -1,5 +1,4 @@
-import { fetchAPI, API_BASE_URL } from './api';
-import { getActiveOrgId } from './fileApi';
+import { fetchAPI } from './api';
 
 /**
  * Interface for voice data from the ElevenLabs API

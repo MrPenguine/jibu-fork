@@ -1,6 +1,6 @@
 "use client";
 
-import { useOrganization } from "../../../../utils/organizationContext";
+import { useWorkspace } from "../../../../utils/workspaceContext";
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton";
 import { Separator } from "@libs/shadcn-ui/components/ui/separator";
 import { Input } from "@libs/shadcn-ui/components/ui/input";
@@ -8,11 +8,14 @@ import { Button } from "@libs/shadcn-ui/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@libs/shadcn-ui/components/ui/card";
 import { Badge } from "@libs/shadcn-ui/components/ui/badge";
 import { MessageSquare, LayoutGrid, Calendar, Users, HeadphonesIcon, FileText, Bot } from "lucide-react";
+import { useParams } from "next/navigation";
 
-export default function WorkspaceHomePage({ params }: { params: { workspaceId: string } }) {
-  const { activeOrganization, loading } = useOrganization();
+export default function WorkspaceHomePage() {
+  const params = useParams<{ workspaceId: string }>();
+  const workspaceId = params?.workspaceId;
+  const { activeWorkspace, loading } = useWorkspace();
 
-  if (loading || !activeOrganization) {
+  if (loading || !activeWorkspace) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
         <div className="max-w-[1600px] mx-auto">
@@ -27,7 +30,7 @@ export default function WorkspaceHomePage({ params }: { params: { workspaceId: s
     );
   }
 
-  const isSameWorkspace = params.workspaceId === activeOrganization.id;
+  const isSameWorkspace = workspaceId === activeWorkspace.id;
 
   return (
     <div className="w-full px-6 pb-6 pt-0">
@@ -35,7 +38,7 @@ export default function WorkspaceHomePage({ params }: { params: { workspaceId: s
         <div className="mt-0">
           <h1 className="text-3xl font-bold tracking-tight">My workspace</h1>
           <p className="text-muted-foreground">
-            {activeOrganization.name} {isSameWorkspace ? "" : `(viewing ${params.workspaceId})`}
+            {activeWorkspace.name} {isSameWorkspace ? "" : `(viewing ${workspaceId})`}
           </p>
         </div>
 

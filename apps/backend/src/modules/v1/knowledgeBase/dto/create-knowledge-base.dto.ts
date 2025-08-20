@@ -20,12 +20,12 @@ export class CreateKnowledgeBaseDto {
   description?: string;
 
   @ApiProperty({
-    description: 'Organization ID that this knowledge base belongs to. If not provided, it will be determined from request context.',
+    description: 'Workspace ID that this knowledge base belongs to. If not provided, it will be determined from request context.',
     example: '5d58b0b2-52cf-44f7-9cef-4932dc9e1591',
     required: false,
   })
   @IsOptional()
   @IsUUID()
   @IsString()
-  organizationId?: string;
+  workspaceId?: string;
 } 

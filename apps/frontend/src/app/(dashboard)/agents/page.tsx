@@ -13,10 +13,10 @@ import { Label } from '@libs/shadcn-ui/components/ui/label';
 import { PlusCircle, Edit, Play, Trash2, Pencil } from 'lucide-react';
 import { agentApiClient } from '../../../utils/AgentApi';
 import { fetchAPI } from "../../../utils/api";
-import { useOrganization } from '../../../utils/organizationContext';
+import { useWorkspace } from '../../../utils/workspaceContext';
 
 export default function AgentsPage() {
-  const { activeOrganization } = useOrganization();
+  const { activeWorkspace } = useWorkspace();
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -30,14 +30,14 @@ export default function AgentsPage() {
 
   useEffect(() => {
     const fetchAgents = async () => {
-      if (!activeOrganization) {
+      if (!activeWorkspace) {
         setAgents([]);
         setIsLoading(false);
         return;
       }
       setIsLoading(true);
       try {
-        const fetchedAgents = await fetchAPI(`/v1/agents?organizationId=${activeOrganization.id}`);
+        const fetchedAgents = await fetchAPI(`/v1/agents?workspaceId=${activeWorkspace.id}`);
         setAgents(fetchedAgents as any[]);
       } catch (error) {
         console.error("Failed to fetch agents:", error);
@@ -47,7 +47,7 @@ export default function AgentsPage() {
     };
     
     fetchAgents();
-  }, [activeOrganization]);
+  }, [activeWorkspace]);
 
   const handleCreateAgent = async () => {
     if (!newAgentName.trim()) {

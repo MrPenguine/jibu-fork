@@ -9,60 +9,51 @@ export class FolderService {
   
   constructor(private prisma: PrismaService) {}
 
-  async create(createFolderDto: CreateFolderDto, organizationId: string, userId: string) {
-    this.logger.log(`Creating folder for user ${userId} in organization ${organizationId}`);
+  async create(createFolderDto: CreateFolderDto, workspaceId: string, userId: string) {
+    this.logger.log(`Creating folder for user ${userId} in workspace ${workspaceId}`);
     
-    // Verify user is a member of the organization
-    await this.verifyOrganizationMembership(userId, organizationId);
+    await this.verifyWorkspaceMembership(userId, workspaceId);
     
     return this.prisma.folder.create({
       data: {
         ...createFolderDto,
-        organizationId,
+        workspaceId,
       },
     });
   }
   
-  /**
-   * Verifies that a user is a member of the specified organization
-   * @param userId The ID of the user
-   * @param organizationId The ID of the organization
-   * @throws ForbiddenException if the user is not a member of the organization
-   */
-  private async verifyOrganizationMembership(userId: string, organizationId: string): Promise<void> {
-    const membership = await this.prisma.organizationMembership.findFirst({
+  private async verifyWorkspaceMembership(userId: string, workspaceId: string): Promise<void> {
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId,
-        organizationId,
+        workspaceId,
         status: 'active',
       },
     });
     
     if (!membership) {
-      this.logger.warn(`User ${userId} attempted to access organization ${organizationId} without membership`);
-      throw new ForbiddenException('You are not a member of this organization');
+      this.logger.warn(`User ${userId} attempted to access workspace ${workspaceId} without membership`);
+      throw new ForbiddenException('You are not a member of this workspace');
     }
   }
 
-  async findAll(organizationId: string, userId: string) {
-    this.logger.log(`Finding all folders for user ${userId} in organization ${organizationId}`);
+  async findAll(workspaceId: string, userId: string) {
+    this.logger.log(`Finding all folders for user ${userId} in workspace ${workspaceId}`);
     
-    // Verify user is a member of the organization
-    await this.verifyOrganizationMembership(userId, organizationId);
+    await this.verifyWorkspaceMembership(userId, workspaceId);
     
     return this.prisma.folder.findMany({
-      where: { organizationId },
+      where: { workspaceId },
     });
   }
 
-  async findOne(id: string, organizationId: string, userId: string) {
-    this.logger.log(`Finding folder ${id} for user ${userId} in organization ${organizationId}`);
+  async findOne(id: string, workspaceId: string, userId: string) {
+    this.logger.log(`Finding folder ${id} for user ${userId} in workspace ${workspaceId}`);
     
-    // Verify user is a member of the organization
-    await this.verifyOrganizationMembership(userId, organizationId);
+    await this.verifyWorkspaceMembership(userId, workspaceId);
     
     const folder = await this.prisma.folder.findFirst({
-      where: { id, organizationId },
+      where: { id, workspaceId },
     });
     
     if (!folder) {
@@ -72,11 +63,10 @@ export class FolderService {
     return folder;
   }
 
-  async update(id: string, updateFolderDto: UpdateFolderDto, organizationId: string, userId: string) {
-    this.logger.log(`Updating folder ${id} for user ${userId} in organization ${organizationId}`);
+  async update(id: string, updateFolderDto: UpdateFolderDto, workspaceId: string, userId: string) {
+    this.logger.log(`Updating folder ${id} for user ${userId} in workspace ${workspaceId}`);
     
-    // Verify user is a member of the organization and folder exists
-    await this.findOne(id, organizationId, userId);
+    await this.findOne(id, workspaceId, userId);
     
     return this.prisma.folder.update({
       where: { id },
@@ -84,11 +74,10 @@ export class FolderService {
     });
   }
 
-  async remove(id: string, organizationId: string, userId: string) {
-    this.logger.log(`Removing folder ${id} for user ${userId} in organization ${organizationId}`);
+  async remove(id: string, workspaceId: string, userId: string) {
+    this.logger.log(`Removing folder ${id} for user ${userId} in workspace ${workspaceId}`);
     
-    // Verify user is a member of the organization and folder exists
-    await this.findOne(id, organizationId, userId);
+    await this.findOne(id, workspaceId, userId);
     
     return this.prisma.folder.delete({ where: { id } });
   }

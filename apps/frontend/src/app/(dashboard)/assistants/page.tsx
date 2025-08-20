@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { Plus, Loader2 } from "lucide-react"
 import { Assistant } from "../../../utils/AssistantsApi"
-import { useOrganization } from "../../../utils/organizationContext"
+import { useWorkspace } from "../../../utils/workspaceContext"
 import { fetchAPI } from "../../../utils/api"
 
 export default function AssistantsPage() {
@@ -13,21 +13,21 @@ export default function AssistantsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const { activeOrganization, loading: orgLoading } = useOrganization()
+  const { activeWorkspace, loading: workspaceLoading } = useWorkspace()
 
   useEffect(() => {
     const fetchAssistants = async () => {
-      if (!activeOrganization || orgLoading) {
+      if (!activeWorkspace || workspaceLoading) {
         // Not ready to fetch yet, wait for organization context
         return;
       }
       
       try {
         setLoading(true)
-        console.log(`[AssistantsPage] Fetching assistants for organization: ${activeOrganization.id} (${activeOrganization.name})`);
+        console.log(`[AssistantsPage] Fetching assistants for workspace: ${activeWorkspace.id} (${activeWorkspace.name})`);
         
         // Use fetchAPI directly with the organization ID from context, just like in MembersList
-        const data = await fetchAPI(`/assistants?organizationId=${activeOrganization.id}`);
+        const data = await fetchAPI(`/assistants?workspaceId=${activeWorkspace.id}`);
         console.log(`[AssistantsPage] Successfully loaded ${data.length} assistants`);
         
         setAssistants(data);
@@ -36,16 +36,16 @@ export default function AssistantsPage() {
         console.error("[AssistantsPage] Error fetching assistants:", err)
         
         // Handle specific error cases
-        if (err.message && err.message.includes('No active organization found')) {
-          setError("Please select an organization to view assistants.")
-        } else if (err.message && err.message.includes('You do not have access to this organization')) {
-          setError("You don't have access to the selected organization. Please choose a different one.")
+        if (err.message && err.message.includes('No active workspace found')) {
+          setError("Please select a workspace to view assistants.")
+        } else if (err.message && err.message.includes('You do not have access to this workspace')) {
+          setError("You don't have access to the selected workspace. Please choose a different one.")
         } else if (err.message && (
           err.message.includes('404') || 
           err.message.includes('not found') ||
           err.message.toLowerCase().includes('no assistants')
         )) {
-          // This is normal for a new organization - treat as empty
+          // This is normal for a new workspace - treat as empty
           setAssistants([])
           setError(null)
         } else {
@@ -58,7 +58,7 @@ export default function AssistantsPage() {
     }
 
     fetchAssistants()
-  }, [activeOrganization, orgLoading])
+  }, [activeWorkspace, workspaceLoading])
 
   const handleCreateAssistantClick = () => {
     // Find and trigger the create assistant button in the layout
@@ -69,7 +69,7 @@ export default function AssistantsPage() {
   }
 
   // Show loading state
-  if (loading || orgLoading) {
+  if (loading || workspaceLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-180px)]">
         <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />

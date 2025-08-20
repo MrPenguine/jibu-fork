@@ -10,7 +10,7 @@ import { Request } from 'express';
 interface AuthenticatedRequest extends Request {
   user: {
     userId: string;
-    orgId: string;
+    workspaceId: string;
   };
 }
 
@@ -27,18 +27,18 @@ export class InvitationController {
   @ApiResponse({ status: 403, description: 'Forbidden: Insufficient permissions.' })
   @UseGuards(RoleGuard('ADMIN', 'OWNER'))
   create(@Body() createInvitationDto: CreateInvitationDto, @Req() req: AuthenticatedRequest) {
-    const { userId } = req.user;
+    const userId = (req as any)?.user?.id;
     return this.invitationService.create(createInvitationDto, userId);
   }
 
-  @Get('organization/:organizationId')
-  @ApiOperation({ summary: 'List all invitations for an organization' })
-  @ApiResponse({ status: 200, description: 'Return all invitations for the organization.' })
+  @Get('workspace/:workspaceId')
+  @ApiOperation({ summary: 'List all invitations for a workspace' })
+  @ApiResponse({ status: 200, description: 'Return all invitations for the workspace.' })
   @ApiResponse({ status: 403, description: 'Forbidden: Insufficient permissions.' })
   @UseGuards(RoleGuard('ADMIN', 'OWNER'))
-  findAllByOrganization(@Param('organizationId') organizationId: string, @Req() req: AuthenticatedRequest) {
-    const { userId } = req.user;
-    return this.invitationService.findAllByOrganization(organizationId, userId);
+  findAllByWorkspace(@Param('workspaceId') workspaceId: string, @Req() req: AuthenticatedRequest) {
+    const userId = (req as any)?.user?.id;
+    return this.invitationService.findAllByWorkspace(workspaceId, userId);
   }
 
   @Get(':id')
@@ -48,7 +48,7 @@ export class InvitationController {
   @ApiResponse({ status: 403, description: 'Forbidden: Insufficient permissions.' })
   @UseGuards(RoleGuard('ADMIN', 'OWNER'))
   findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { userId } = req.user;
+    const userId = (req as any)?.user?.id;
     return this.invitationService.findOne(id, userId);
   }
 
@@ -67,7 +67,7 @@ export class InvitationController {
   @ApiResponse({ status: 403, description: 'Forbidden: Insufficient permissions.' })
   @UseGuards(RoleGuard('ADMIN', 'OWNER'))
   revoke(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { userId } = req.user;
+    const userId = (req as any)?.user?.id;
     return this.invitationService.revoke(id, userId);
   }
 
@@ -78,7 +78,7 @@ export class InvitationController {
   @ApiResponse({ status: 403, description: 'Forbidden: Insufficient permissions.' })
   @UseGuards(RoleGuard('ADMIN', 'OWNER'))
   resend(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { userId } = req.user;
+    const userId = (req as any)?.user?.id;
     return this.invitationService.resend(id, userId);
   }
 }

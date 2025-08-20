@@ -1,6 +1,6 @@
 import { createClient } from './supabase/client';
 import { fetchAPI, API_BASE_URL } from './api';
-import { getActiveOrgId } from './fileApi';
+import { getActiveWorkspaceId } from './fileApi';
 
 // Google Calendar types
 export interface GoogleCalendarEvent {
@@ -66,29 +66,29 @@ export interface GoogleSheetsStatus {
   spreadsheets?: any[];
 }
 
-// Wrapper around getActiveOrgId for better logging
-export function getCurrentOrganizationId(specificOrgId?: string): string | null {
-  // Prioritize the specificOrgId if provided
-  if (specificOrgId) {
-    console.log(`[getCurrentOrganizationId] Using provided specific organization ID: ${specificOrgId}`);
-    return specificOrgId;
+// Wrapper around getActiveWorkspaceId for better logging
+export function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
+  // Prioritize the specificWorkspaceId if provided
+  if (specificWorkspaceId) {
+    console.log(`[getCurrentWorkspaceId] Using provided specific workspace ID: ${specificWorkspaceId}`);
+    return specificWorkspaceId;
   }
   
-  // Try to get organization ID from local storage or other sources
-  const orgId = getActiveOrgId();
+  // Try to get workspace ID from local storage or other sources
+  const workspaceId = getActiveWorkspaceId();
   
   // Add extra logging for debugging purposes
-  if (orgId) {
-    console.log(`[getCurrentOrganizationId] Using organization ID from active context: ${orgId}`);
+  if (workspaceId) {
+    console.log(`[getCurrentWorkspaceId] Using workspace ID from active context: ${workspaceId}`);
   } else {
-    console.warn('[getCurrentOrganizationId] No organization ID available from any source');
+    console.warn('[getCurrentWorkspaceId] No workspace ID available from any source');
   }
   
-  return orgId;
+  return workspaceId;
 }
 
-// Get authorization headers with token and organization ID
-async function getAuthHeaders(orgId: string) {
+// Get authorization headers with token and workspace ID
+async function getAuthHeaders(workspaceId: string) {
   const supabase = createClient();
   const session = await supabase.auth.getSession();
   const token = session.data.session?.access_token;
@@ -100,8 +100,8 @@ async function getAuthHeaders(orgId: string) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
-    'X-Organization-ID': orgId,
-    'organization-id': orgId, // Some endpoints might expect this format
+    'X-Workspace-ID': workspaceId,
+    'workspace-id': workspaceId, // Some endpoints might expect this format
     'X-User-ID': session.data.session?.user?.id || '',
   };
 }
@@ -110,20 +110,20 @@ async function getAuthHeaders(orgId: string) {
  * Get the Google OAuth authorization URL
  * @returns The authorization URL
  */
-export async function getGoogleCalendarAuthUrl(specificOrgId?: string): Promise<string> {
+export async function getGoogleCalendarAuthUrl(specificWorkspaceId?: string): Promise<string> {
   try {
-    // Use the provided specificOrgId or get from getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[getGoogleCalendarAuthUrl] No organization ID available');
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      console.warn('[getGoogleCalendarAuthUrl] No workspace ID available');
+      throw new Error('No workspace ID available');
     }
     
-    console.log(`[getGoogleCalendarAuthUrl] Using organization ID: ${organizationId}`);
+    console.log(`[getGoogleCalendarAuthUrl] Using workspace ID: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-calendar/auth-url`, {
       method: 'GET',
@@ -150,14 +150,14 @@ export async function getGoogleCalendarAuthUrl(specificOrgId?: string): Promise<
  */
 export async function handleGoogleCalendarCallback(code: string): Promise<any> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-calendar/callback`, {
@@ -202,14 +202,14 @@ export async function getGoogleCalendarEvents(
   calendarId: string = 'primary'
 ): Promise<GoogleCalendarEvent[]> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(
@@ -251,14 +251,14 @@ export async function createGoogleCalendarEvent(
   calendarId: string = 'primary'
 ): Promise<GoogleCalendarEvent> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Check if we have stored tokens in localStorage
     const storedTokensJson = localStorage.getItem('googleCalendarTokens');
@@ -309,14 +309,14 @@ export async function checkGoogleCalendarAvailability(
   calendarId: string = 'primary'
 ): Promise<{ available: boolean; conflictingEvents: GoogleCalendarEvent[] }> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(
@@ -343,14 +343,14 @@ export async function checkGoogleCalendarAvailability(
  * Get the connection status of Google Calendar
  * @returns The connection status
  */
-export async function getGoogleCalendarStatus(specificOrgId?: string): Promise<GoogleCalendarStatus> {
+export async function getGoogleCalendarStatus(specificWorkspaceId?: string): Promise<GoogleCalendarStatus> {
   try {
-    // Use the provided specificOrgId or get from getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[getGoogleCalendarStatus] No organization ID available');
-      // Return a default disconnected state if no organization ID
+    if (!workspaceId) {
+      console.warn('[getGoogleCalendarStatus] No workspace ID available');
+      // Return a default disconnected state if no workspace ID
       return {
         connected: false,
         settings: null,
@@ -361,10 +361,10 @@ export async function getGoogleCalendarStatus(specificOrgId?: string): Promise<G
       };
     }
     
-    console.log(`[getGoogleCalendarStatus] Using organization ID: ${organizationId}`);
+    console.log(`[getGoogleCalendarStatus] Using workspace ID: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Try to get the status from the backend
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-calendar/status`, {
@@ -408,14 +408,14 @@ export async function getGoogleCalendarStatus(specificOrgId?: string): Promise<G
  */
 export async function disconnectGoogleCalendar(): Promise<boolean> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-calendar/disconnect`, {
@@ -442,14 +442,14 @@ export async function disconnectGoogleCalendar(): Promise<boolean> {
  */
 export async function createGoogleCalendarTestEvent(): Promise<GoogleCalendarEvent> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Check if we have stored tokens in localStorage
     const storedTokensJson = localStorage.getItem('googleCalendarTokens');
@@ -491,14 +491,14 @@ export async function createGoogleCalendarTestEvent(): Promise<GoogleCalendarEve
  */
 export async function getGoogleSheetsAuthUrl(): Promise<string> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-sheets/auth-url`, {
@@ -526,14 +526,14 @@ export async function getGoogleSheetsAuthUrl(): Promise<string> {
  */
 export async function handleGoogleSheetsCallback(code: string): Promise<any> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-sheets/callback`, {
@@ -571,14 +571,14 @@ export async function handleGoogleSheetsCallback(code: string): Promise<any> {
  */
 export async function getGoogleSheetsSpreadsheets(): Promise<any[]> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-sheets/spreadsheets`, {
@@ -611,14 +611,14 @@ export async function createGoogleSpreadsheet(
   }
 ): Promise<GoogleSpreadsheet> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Check if we have stored tokens in localStorage
     const storedTokensJson = localStorage.getItem('googleSheetsTokens');
@@ -659,14 +659,14 @@ export async function createGoogleSpreadsheet(
  */
 export async function getGoogleSheetsStatus(): Promise<GoogleSheetsStatus> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-sheets/test`, {
@@ -718,20 +718,20 @@ export interface McpToolStatus {
   toolExists: boolean;
 }
 
-export async function getFunctionToolStatus(specificOrgId?: string): Promise<FunctionToolStatus> {
+export async function getFunctionToolStatus(specificWorkspaceId?: string): Promise<FunctionToolStatus> {
   try {
-    // Use the provided specificOrgId or get from getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[getFunctionToolStatus] No organization ID available');
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      console.warn('[getFunctionToolStatus] No workspace ID available');
+      throw new Error('No workspace ID available');
     }
     
-    console.log(`[getFunctionToolStatus] Using organization ID: ${organizationId}`);
+    console.log(`[getFunctionToolStatus] Using workspace ID: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     const response = await fetch(`${API_BASE_URL}/v1/tools/function-tool/status`, {
       method: 'GET',
@@ -756,20 +756,20 @@ export async function getFunctionToolStatus(specificOrgId?: string): Promise<Fun
   }
 }
 
-export async function configureFunctionTool(config: any, specificOrgId?: string): Promise<any> {
+export async function configureFunctionTool(config: any, specificWorkspaceId?: string): Promise<any> {
   try {
-    // Use the provided specificOrgId or get from getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[configureFunctionTool] No organization ID available');
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      console.warn('[configureFunctionTool] No workspace ID available');
+      throw new Error('No workspace ID available');
     }
     
-    console.log(`[configureFunctionTool] Using organization ID: ${organizationId}`);
+    console.log(`[configureFunctionTool] Using workspace ID: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     const response = await fetch(`${API_BASE_URL}/v1/tools/function-tool/configure`, {
       method: 'POST',
@@ -791,20 +791,20 @@ export async function configureFunctionTool(config: any, specificOrgId?: string)
   }
 }
 
-export async function executeFunctionTool(params: any, specificOrgId?: string): Promise<any> {
+export async function executeFunctionTool(params: any, specificWorkspaceId?: string): Promise<any> {
   try {
-    // Use the provided specificOrgId or get from getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[executeFunctionTool] No organization ID available');
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      console.warn('[executeFunctionTool] No workspace ID available');
+      throw new Error('No workspace ID available');
     }
     
-    console.log(`[executeFunctionTool] Using organization ID: ${organizationId}`);
+    console.log(`[executeFunctionTool] Using workspace ID: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     const response = await fetch(`${API_BASE_URL}/v1/tools/function-tool/execute`, {
       method: 'POST',
@@ -828,14 +828,14 @@ export async function executeFunctionTool(params: any, specificOrgId?: string): 
 
 /**
  * Get the status of the MCP tool
- * @param specificOrgId Optional specific organization ID
+ * @param specificWorkspaceId Optional specific workspace ID
  * @returns The status of the MCP tool
  */
-export async function getMcpToolStatus(specificOrgId?: string): Promise<McpToolStatus> {
+export async function getMcpToolStatus(specificWorkspaceId?: string): Promise<McpToolStatus> {
   try {
-    const orgId = getCurrentOrganizationId(specificOrgId);
-    if (!orgId) {
-      console.warn('[getMcpToolStatus] No organization ID available, using development mode');
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      console.warn('[getMcpToolStatus] No workspace ID available, using development mode');
       // Return a default status for development mode
       return {
         configured: false,
@@ -846,7 +846,7 @@ export async function getMcpToolStatus(specificOrgId?: string): Promise<McpToolS
 
     let headers;
     try {
-      headers = await getAuthHeaders(orgId);
+      headers = await getAuthHeaders(workspaceId);
     } catch (authError) {
       console.warn('[getMcpToolStatus] Failed to get auth headers, using default headers:', authError);
       // Use default headers if authentication fails
@@ -884,14 +884,14 @@ export async function getMcpToolStatus(specificOrgId?: string): Promise<McpToolS
 /**
  * Configure the MCP tool
  * @param config The configuration for the MCP tool
- * @param specificOrgId Optional specific organization ID
+ * @param specificWorkspaceId Optional specific workspace ID
  * @returns The configured tool
  */
-export async function configureMcpTool(config: any, specificOrgId?: string): Promise<any> {
+export async function configureMcpTool(config: any, specificWorkspaceId?: string): Promise<any> {
   try {
-    const orgId = getCurrentOrganizationId(specificOrgId);
-    if (!orgId) {
-      console.warn('[configureMcpTool] No organization ID available, using development mode');
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      console.warn('[configureMcpTool] No workspace ID available, using development mode');
       // Return a mock success response for development mode
       return {
         success: true,
@@ -907,7 +907,7 @@ export async function configureMcpTool(config: any, specificOrgId?: string): Pro
 
     let headers;
     try {
-      headers = await getAuthHeaders(orgId);
+      headers = await getAuthHeaders(workspaceId);
     } catch (authError) {
       console.warn('[configureMcpTool] Failed to get auth headers, using default headers:', authError);
       // Use default headers if authentication fails
@@ -959,14 +959,14 @@ export async function configureMcpTool(config: any, specificOrgId?: string): Pro
 /**
  * Execute the MCP tool
  * @param params The parameters to pass to the MCP server
- * @param specificOrgId Optional specific organization ID
+ * @param specificWorkspaceId Optional specific workspace ID
  * @returns The result of the execution
  */
-export async function executeMcpTool(params: any, specificOrgId?: string): Promise<any> {
+export async function executeMcpTool(params: any, specificWorkspaceId?: string): Promise<any> {
   try {
-    const orgId = getCurrentOrganizationId(specificOrgId);
-    if (!orgId) {
-      console.warn('[executeMcpTool] No organization ID available, using development mode');
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      console.warn('[executeMcpTool] No workspace ID available, using development mode');
       // In development mode, try to execute the tool without authentication
       // This will work if the backend has been modified to allow public access
       try {
@@ -1008,7 +1008,7 @@ export async function executeMcpTool(params: any, specificOrgId?: string): Promi
 
     let headers;
     try {
-      headers = await getAuthHeaders(orgId);
+      headers = await getAuthHeaders(workspaceId);
     } catch (authError) {
       console.warn('[executeMcpTool] Failed to get auth headers, using default headers:', authError);
       // Use default headers if authentication fails
@@ -1172,14 +1172,14 @@ export async function discoverMcpTools(serverUrl: string, serverToken?: string):
 
 export async function createGoogleSheetsTestSpreadsheet(): Promise<any> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API
     const response = await fetch(`${API_BASE_URL}/v1/tools/google-sheets/test-sheet`, {
@@ -1212,14 +1212,14 @@ export async function appendToGoogleSheet(
   values: any[][]
 ): Promise<any> {
   try {
-    const organizationId = getCurrentOrganizationId();
+    const workspaceId = getCurrentWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No organization ID available');
+    if (!workspaceId) {
+      throw new Error('No workspace ID available');
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Check if we have stored tokens in localStorage
     const storedTokensJson = localStorage.getItem('googleSheetsTokens');

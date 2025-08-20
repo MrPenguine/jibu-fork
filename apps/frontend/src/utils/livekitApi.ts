@@ -1,6 +1,4 @@
-import { fetchAPI, API_BASE_URL } from './api';
-import { createClient } from './supabase/client';
-import { getActiveOrgId } from './fileApi';
+import { fetchAPI } from './api';
 
 /**
  * Interface for LiveKit token request
@@ -65,25 +63,7 @@ export interface ParticipantInfo {
   region?: string;
 }
 
-/**
- * Get authorization headers with token and organization ID
- */
-async function getAuthHeaders() {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  const orgId = getActiveOrgId();
-  
-  if (!token) {
-    throw new Error('No authentication token available');
-  }
-  
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    ...(orgId ? { 'X-Organization-ID': orgId } : {})
-  };
-}
+// All requests below use fetchAPI which attaches auth and X-Workspace-ID headers automatically.
 
 /**
  * LiveKit API client functions
@@ -181,7 +161,7 @@ export const livekitApiClient = {
       });
     } catch (error) {
       console.error('[livekitApi] Error checking health:', error);
-      return { status: 'error', healthy: false };
+      return { status: 'error', configured: false, serverUrl: '' };
     }
   }
 };

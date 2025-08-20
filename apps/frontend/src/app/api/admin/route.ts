@@ -1,41 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withAuthAndOrg } from '../../../utils/apiRouteProtection';
+import { withAuthAndWorkspace } from '../../../utils/apiRouteProtection';
 import { API_BASE_URL } from '../../../utils/api';
 
 export async function GET(request: NextRequest) {
-  return withAuthAndOrg(
+  return withAuthAndWorkspace(
     request,
-    async (session, organizationId, request) => {
+    async (session: any, workspaceId: string | null, request: NextRequest) => {
       // This route will only execute if user has 'admin' or 'owner' role
       return NextResponse.json({
         message: 'Welcome to the admin area!',
-        organizationId,
+        workspaceId,
         userEmail: session.user?.email,
         timestamp: new Date().toISOString()
       });
     },
     { 
-      requireOrg: true, // Organization is required for this route
+      requireWorkspace: true, // Workspace is required for this route
       allowedRoles: ['admin', 'owner'] // Only these roles can access
     }
   );
 }
 
 export async function POST(request: NextRequest) {
-  return withAuthAndOrg(
+  return withAuthAndWorkspace(
     request,
-    async (session, organizationId, request) => {
+    async (session: any, workspaceId: string | null, request: NextRequest) => {
       try {
         // Parse the request body
         const requestData = await request.json();
         
-        // Forward the request to the backend API with auth and org context
+        // Forward the request to the backend API with auth and workspace context
         const response = await fetch(`${API_BASE_URL}/admin/settings`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
-            'X-Organization-ID': organizationId || '',
+            'X-Workspace-ID': workspaceId || '',
           },
           body: JSON.stringify(requestData),
         });
@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
       }
     },
     { 
-      requireOrg: true,
+      requireWorkspace: true,
       allowedRoles: ['admin', 'owner']
     }
   );
-} 
+}

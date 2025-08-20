@@ -20,13 +20,13 @@ import {
   SelectValue,
 } from "@libs/shadcn-ui/components/ui/select"
 import { useToast } from "@libs/shadcn-ui/components/ui/use-toast"
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext'
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext'
 import { fetchAPI } from '../../../../../apps/frontend/src/utils/api'
 
 interface InviteMembersProps {
   isOpen: boolean
   onClose: () => void
-  organizationId?: string
+  workspaceId?: string
 }
 
 // Interface for email validation status
@@ -36,20 +36,20 @@ interface EmailStatus {
   message?: string
 }
 
-export function InviteMembers({ isOpen, onClose, organizationId }: InviteMembersProps) {
+export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersProps) {
   const { toast } = useToast()
-  const { activeOrganization, inviteMembers, refreshOrganizations } = useOrganization()
+  const { activeWorkspace, refreshWorkspaces } = useWorkspace()
   const [emailsWithStatus, setEmailsWithStatus] = React.useState<EmailStatus[]>([])
   const [currentEmail, setCurrentEmail] = React.useState("")
   const [role, setRole] = React.useState("editor")
   const [message, setMessage] = React.useState("")
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   
-  // Get organization ID from props or active organization
-  const targetOrgId = organizationId || activeOrganization?.id
+  // Get workspace ID from props or active workspace
+  const targetWorkspaceId = workspaceId || activeWorkspace?.id
   
   // Check if user has permission to invite members
-  const userRole = activeOrganization?.role
+  const userRole = activeWorkspace?.role
   const canInviteMembers = userRole === 'owner' || userRole === 'admin'
   
   // Helper to check if all emails are valid
@@ -64,10 +64,9 @@ export function InviteMembers({ isOpen, onClose, organizationId }: InviteMembers
       // Add email with 'checking' status
       setEmailsWithStatus(prev => [...prev, { email, status: 'checking' }]);
       
-      // Call backend validation endpoint
-      const result = await fetchAPI(`/organizations/${targetOrgId}/validate-email`, {
-        method: 'POST',
-        body: JSON.stringify({ email })
+      // Call backend validation endpoint (GET with query param)
+      const result = await fetchAPI(`/workspaces/${targetWorkspaceId}/validate-email?email=${encodeURIComponent(email)}`, {
+        method: 'GET'
       });
       
       // Update email status based on response
@@ -136,10 +135,10 @@ export function InviteMembers({ isOpen, onClose, organizationId }: InviteMembers
       return
     }
     
-    if (!targetOrgId) {
+    if (!targetWorkspaceId) {
       toast({
         title: "Error",
-        description: "No organization selected.",
+        description: "No workspace selected.",
         variant: "destructive",
       })
       return
@@ -160,23 +159,26 @@ export function InviteMembers({ isOpen, onClose, organizationId }: InviteMembers
         .filter(e => e.status === 'valid')
         .map(e => e.email);
         
-      await inviteMembers(targetOrgId, validEmails, role, message || undefined)
+      await fetchAPI(`/workspaces/${targetWorkspaceId}/invitations`, {
+        method: 'POST',
+        body: JSON.stringify({ emails: validEmails, role, message: message || undefined })
+      });
       
       toast({
         title: "Invitations sent",
-        description: `Invited ${validEmails.length} member${validEmails.length > 1 ? 's' : ''} to your organization.`,
+        description: `Invited ${validEmails.length} member${validEmails.length > 1 ? 's' : ''} to your workspace.`,
         variant: "default",
       })
       
       setEmailsWithStatus([])
       
-      // Force a refresh of the organization context to update member lists
+      // Force a refresh of the workspace context to update member lists
       if (typeof window !== 'undefined') {
         // Small delay to ensure API operations complete
         setTimeout(() => {
-          // Refresh organization data before closing
-          if (refreshOrganizations) {
-            refreshOrganizations()
+          // Refresh workspace data before closing
+          if (refreshWorkspaces) {
+            refreshWorkspaces()
           }
           
           // Close the modal after sending invitations
@@ -255,7 +257,7 @@ export function InviteMembers({ isOpen, onClose, organizationId }: InviteMembers
             <Mail className="h-5 w-5" /> Invite New Members
           </DialogTitle>
           <DialogDescription>
-            Add people to your organization and collaborate with them.
+            Add people to your workspace and collaborate with them.
           </DialogDescription>
         </DialogHeader>
         

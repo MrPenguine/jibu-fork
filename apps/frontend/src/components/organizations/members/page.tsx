@@ -2,17 +2,17 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useOrganization } from "../../../../utils/organizationContext"
+import { useWorkspace } from "../../../../utils/workspaceContext"
 
 export default function MembersPage() {
   const router = useRouter();
-  const { activeOrganization, loading } = useOrganization();
+  const { activeWorkspace, loading } = useWorkspace();
   
   useEffect(() => {
-    if (!loading && activeOrganization?.id) {
-      router.replace(`/workspace/${activeOrganization.id}/settings/members`);
+    if (!loading && activeWorkspace?.id) {
+      router.replace(`/workspace/${activeWorkspace.id}/settings/members`);
     }
-  }, [loading, activeOrganization?.id, router]);
+  }, [loading, activeWorkspace?.id, router]);
   
   return null;
 }

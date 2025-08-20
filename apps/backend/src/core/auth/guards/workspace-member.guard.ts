@@ -22,6 +22,7 @@ export class WorkspaceMemberGuard implements CanActivate {
       request.params.organizationId || 
       request.body.workspaceId || 
       request.body.organizationId ||
+      request.headers['x-workspace-id'] ||
       request.headers['x-organization-id'];
 
     // If no user or workspace ID, deny access
@@ -31,11 +32,11 @@ export class WorkspaceMemberGuard implements CanActivate {
     }
 
     try {
-      // Check if the user is a member of the organization
-      const membership = await this.prisma.organizationMembership.findFirst({
+      // Check if the user is a member of the workspace
+      const membership = await this.prisma.workspaceMembership.findFirst({
         where: { 
           userId: user.id,
-          organizationId: workspaceId,
+          workspaceId: workspaceId,
           status: 'active' // Only active memberships should grant access
         },
       });
@@ -59,3 +60,4 @@ export class WorkspaceMemberGuard implements CanActivate {
     }
   }
 }
+

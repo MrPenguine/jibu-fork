@@ -3,18 +3,21 @@
 import * as React from "react";
 import { Plus, User } from "lucide-react";
 import { Button } from "@libs/shadcn-ui/components/ui/button";
-import { MembersList } from "@libs/shadcn-ui/components/organization/MembersList";
-import { InviteMembers } from "@libs/shadcn-ui/components/organization/InviteMembers";
-import { PendingInvitations } from "@libs/shadcn-ui/components/organization/PendingInvitations";
-import { useOrganization } from "../../../../../../utils/organizationContext";
+import { MembersList } from "@libs/shadcn-ui/components/workspace/MembersList";
+import { InviteMembers } from "@libs/shadcn-ui/components/workspace/InviteMembers";
+import { PendingInvitations } from "@libs/shadcn-ui/components/workspace/PendingInvitations";
+import { useWorkspace } from "../../../../../../utils/workspaceContext";
+import { useParams } from "next/navigation";
 
-export default function MembersPage({ params }: { params: { workspaceId: string } }) {
+export default function MembersPage() {
   const [showInviteModal, setShowInviteModal] = React.useState(false);
-  const { activeOrganization } = useOrganization();
+  const { activeWorkspace } = useWorkspace();
+  const routeParams = useParams<{ workspaceId: string }>();
+  const workspaceId = (routeParams?.workspaceId as string) || "";
 
   // Determine if the user can invite members (only owner and admin)
   const canInviteMembers =
-    activeOrganization?.role === "owner" || activeOrganization?.role === "admin";
+    activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin";
 
   return (
     <div className="w-full p-6">
@@ -25,7 +28,7 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
               <User className="h-7 w-7 text-muted-foreground" /> Members
             </h1>
             <p className="text-muted-foreground">
-              Manage organization members and their access levels.
+              Manage workspace members and their access levels.
             </p>
           </div>
 
@@ -41,20 +44,21 @@ export default function MembersPage({ params }: { params: { workspaceId: string 
 
         {/* Pending invitations */}
         <PendingInvitations 
-          organizationId={params.workspaceId} 
+          workspaceId={workspaceId} 
           refreshMembers={() => { /* Placeholder for refresh logic */ }}
         />
 
         {/* Members list */}
-        <MembersList organizationId={params.workspaceId} />
+        <MembersList workspaceId={workspaceId} />
 
         {/* Invite members modal */}
         <InviteMembers
           isOpen={showInviteModal}
           onClose={() => setShowInviteModal(false)}
-          organizationId={params.workspaceId}
+          workspaceId={workspaceId}
         />
       </div>
     </div>
   );
 }
+

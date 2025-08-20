@@ -14,13 +14,12 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
-import { OrgRoleGuard } from '../../../../core/auth/guards/org-role.guard';
 import { WorkflowService } from '../services/workflow.service';
 import { CreateWorkflowDto, UpdateWorkflowDto, CreateSecondaryWorkflowDto } from '../dto';
 
 @ApiTags('workflows')
 @Controller('v1/workflows')
-@UseGuards(JwtAuthGuard, OrgRoleGuard)
+@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class WorkflowController {
   constructor(private readonly workflowService: WorkflowService) {}
@@ -28,11 +27,11 @@ export class WorkflowController {
   @Get('agent/:agentId/workflows')
   @ApiOperation({ summary: 'Get all workflows for an agent' })
   async getAgentWorkflows(@Param('agentId') agentId: string, @Req() req) {
-    const organizationId = req.user.orgId;
-    if (!organizationId) {
-      throw new BadRequestException('No organization selected');
+    const workspaceId = req.user.workspaceId;
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
     }
-    return this.workflowService.getAgentWorkflows(agentId, organizationId);
+    return this.workflowService.getAgentWorkflows(agentId, workspaceId);
   }
 
   @Get(':id')
@@ -48,14 +47,13 @@ export class WorkflowController {
     @Body() createWorkflowDto: CreateWorkflowDto,
     @Req() req,
   ) {
-    const organizationId = req.user.orgId;
-    if (!organizationId) {
-      throw new BadRequestException('No organization selected');
+    const workspaceId = req.user.workspaceId;
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
     }
-    // Add the organization ID to the workflow
     return this.workflowService.createMasterWorkflow(agentId, {
       ...createWorkflowDto,
-      organizationId,
+      workspaceId,
     });
   }
 
@@ -67,12 +65,11 @@ export class WorkflowController {
     @Req() req,
     @Query('agentId') queryAgentId?: string,
   ) {
-    const organizationId = req.user.orgId;
-    if (!organizationId) {
-      throw new BadRequestException('No organization selected');
+    const workspaceId = req.user.workspaceId;
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
     }
 
-    // If agentId isn't provided in query, get it from the master workflow
     let agentId = queryAgentId;
     if (!agentId) {
       try {
@@ -97,7 +94,7 @@ export class WorkflowController {
       masterWorkflowId,
       createSecondaryWorkflowDto,
       agentId,
-      organizationId,
+      workspaceId,
     );
   }
 
@@ -106,8 +103,17 @@ export class WorkflowController {
   async updateWorkflow(
     @Param('id') id: string,
     @Body() updateWorkflowDto: UpdateWorkflowDto,
+    @Req() req,
   ) {
-    return this.workflowService.updateWorkflow(id, updateWorkflowDto);
+    const workspaceId = req.user.workspaceId;
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    return this.workflowService.updateWorkflow(id, {
+      ...updateWorkflowDto,
+      workspaceId,
+    });
   }
 
   @Put(':id/publish')

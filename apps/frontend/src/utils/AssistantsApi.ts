@@ -1,11 +1,12 @@
-import { fetchAPI, getActiveOrganizationId } from './api';
-import { useOrganization } from './organizationContext';
+import { fetchAPI } from './api';
+import { getActiveWorkspaceId } from './fileApi';
+import { useWorkspace } from './workspaceContext';
 import { createClient } from './supabase/client';
 
 export interface Assistant {
   id: string;
   name: string;
-  organizationId: string;
+  workspaceId: string;
   createdAt: string;
   updatedAt: string;
   knowledgeBaseId?: string | null;
@@ -103,22 +104,22 @@ const shouldUseMockData = (error: any) => {
 };
 
 /**
- * Get all assistants for the active organization
+ * Get all assistants for the active workspace
  */
-export const getAssistants = async (organizationId?: string): Promise<Assistant[]> => {
+export const getAssistants = async (workspaceId?: string): Promise<Assistant[]> => {
   try {
-    // Get active organization ID from context if not provided
-    const orgId = organizationId || getActiveOrganizationId();
+    // Get active workspace ID from context if not provided
+    const wsId = workspaceId || getActiveWorkspaceId();
     
-    if (!orgId) {
-      console.error('[getAssistants] No active organization found in any source');
-      console.error('[getAssistants] LocalStorage contains:', localStorage.getItem('activeOrganizationId'));
-      console.error('[getAssistants] SessionStorage contains:', sessionStorage.getItem('activeOrganizationId'));
-      throw new Error('No active organization found. Please select an organization first.');
+    if (!wsId) {
+      console.error('[getAssistants] No active workspace found in any source');
+      console.error('[getAssistants] LocalStorage contains:', localStorage.getItem('activeWorkspaceId'));
+      console.error('[getAssistants] SessionStorage contains:', sessionStorage.getItem('activeWorkspaceId'));
+      throw new Error('No active workspace found. Please select a workspace first.');
     }
     
     try {
-      console.log(`[getAssistants] Fetching assistants for organization: ${orgId}`);
+      console.log(`[getAssistants] Fetching assistants for workspace: ${wsId}`);
       
       // Add extra debugging to trace the exact headers being sent
       const supabase = createClient();
@@ -131,29 +132,29 @@ export const getAssistants = async (organizationId?: string): Promise<Assistant[
       
       console.log('[getAssistants] Headers that will be sent:', {
         'Authorization': `Bearer ${token.substring(0, 10)}...`, // Only log part of the token for security
-        'X-Organization-ID': orgId,
+        'X-Workspace-ID': wsId,
       });
       
-      const assistants = await fetchAPI(`/assistants?organizationId=${orgId}`);
+      const assistants = await fetchAPI(`/assistants?workspaceId=${wsId}`);
       console.log(`[getAssistants] Successfully fetched ${assistants.length} assistants`);
       return assistants.map(transformAssistant) || [];
     } catch (error: any) {
-      // If the error indicates the user doesn't have access to the organization,
-      // this likely means there's a mismatch between the stored organization ID
+      // If the error indicates the user doesn't have access to the workspace,
+      // this likely means there's a mismatch between the stored workspace ID
       // and what the user actually has access to
-      if (error.message && error.message.includes('User does not have access to this organization')) {
-        console.error(`[getAssistants] Access denied to organization ${orgId}. User likely doesn't have membership.`);
-        // Clear the stored organization ID as it's invalid for this user
+      if (error.message && error.message.includes('User does not have access to this workspace')) {
+        console.error(`[getAssistants] Access denied to workspace ${wsId}. User likely doesn't have membership.`);
+        // Clear the stored workspace ID as it's invalid for this user
         try {
-          localStorage.removeItem('activeOrganizationId');
-          sessionStorage.removeItem('activeOrganizationId');
-          console.log('[getAssistants] Cleared invalid organization ID from storage');
+          localStorage.removeItem('activeWorkspaceId');
+          sessionStorage.removeItem('activeWorkspaceId');
+          console.log('[getAssistants] Cleared invalid workspace ID from storage');
         } catch (storageError) {
           console.error('[getAssistants] Failed to clear storage:', storageError);
         }
         
         // Return empty array with a more helpful error
-        throw new Error('You do not have access to this organization. Please select a different organization.');
+        throw new Error('You do not have access to this workspace. Please select a different workspace.');
       }
       
       // If the endpoint doesn't exist or returns 404, return empty array (normal for new app)
@@ -177,9 +178,9 @@ export const getAssistant = async (assistantId: string): Promise<Assistant> => {
   try {
     console.log(`[getAssistant] Fetching assistant with ID: ${assistantId}`);
     
-    // Get active organization ID for logging purposes
-    const orgId = getActiveOrganizationId();
-    console.log(`[getAssistant] Current organization ID: ${orgId || 'none'}`);
+    // Get active workspace ID for logging purposes
+    const workspaceId = getActiveWorkspaceId();
+    console.log(`[getAssistant] Current workspace ID: ${workspaceId || 'none'}`);
     
     try {
       // Add extra debugging to trace the exact headers being sent
@@ -219,7 +220,7 @@ export const getAssistant = async (assistantId: string): Promise<Assistant> => {
         const newMockAssistant: Assistant = {
           id: assistantId,
           name: `Assistant ${assistantId.substring(0, 5)}`,
-          organizationId: getActiveOrganizationId() || 'mock-org',
+          workspaceId: getActiveWorkspaceId() || 'mock-ws',
           firstMessage: 'Hello! How can I help you today?',
           voicemailMessage: 'I am a helpful assistant.',
           model: { provider: 'openai', model: 'gpt-4-turbo' },
@@ -246,11 +247,11 @@ export const getAssistant = async (assistantId: string): Promise<Assistant> => {
  */
 export const createAssistant = async (params: CreateAssistantParams): Promise<Assistant> => {
   try {
-    // Get active organization ID
-    const organizationId = getActiveOrganizationId();
+    // Get active workspace ID
+    const workspaceId = getActiveWorkspaceId();
     
-    if (!organizationId) {
-      throw new Error('No active organization found');
+    if (!workspaceId) {
+      throw new Error('No active workspace found');
     }
     
     try {
@@ -259,7 +260,7 @@ export const createAssistant = async (params: CreateAssistantParams): Promise<As
       // Create request payload, converting any old format data to new format
       const payload = {
         ...params,
-        organizationId,
+        workspaceId,
         // If templateId is provided but not model, include it as model config
         ...(params.templateId && !params.model && {
           model: {
@@ -270,7 +271,7 @@ export const createAssistant = async (params: CreateAssistantParams): Promise<As
       
       console.log('[createAssistant] Sending payload:', JSON.stringify(payload, null, 2));
       
-      // Create assistant with organization ID
+      // Create assistant with workspace ID
       const assistant = await fetchAPI('/assistants', {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -289,7 +290,7 @@ export const createAssistant = async (params: CreateAssistantParams): Promise<As
           voicemailMessage: params.systemPrompt || "{# Appointment Scheduling Agent Prompt\n\n## Identity & Purpose\n\nYou are Riley, an appointment scheduling voice assistant for Wellness Partners, a multi-specialty health clinic. Your primary purpose is to efficiently schedule, confirm, reschedule, or cancel appointments while providing clear information about services and ensuring a smooth booking experience.",
           knowledgeBaseId: params.knowledgeBaseId,
           model: params.model ? { ...params.model } : undefined,
-          organizationId,
+          workspaceId,
           hipaaEnabled: false,
           backgroundDenoisingEnabled: false,
           endCallPhrases: [],
@@ -443,9 +444,9 @@ export const linkKnowledgeBaseToAssistant = async (
     try {
       console.log(`[linkKnowledgeBaseToAssistant] Linking KB ${knowledgeBaseId} to assistant ${assistantId}`);
       
-      const orgId = getActiveOrganizationId();
-      if (!orgId) {
-        throw new Error('No active organization ID found');
+      const workspaceId = getActiveWorkspaceId();
+      if (!workspaceId) {
+        throw new Error('No active workspace ID found');
       }
       
       const response = await fetchAPI(`/v1/knowledge-bases/link-to-assistant`, {
@@ -453,7 +454,7 @@ export const linkKnowledgeBaseToAssistant = async (
         body: JSON.stringify({
           assistantId,
           knowledgeBaseId,
-          organizationId: orgId
+          workspaceId: workspaceId
         })
       });
       
@@ -699,33 +700,33 @@ export const getAvailableModels = async (): Promise<CategorizedModels> => {
 };
 
 /**
- * Custom hook to get assistants with organization context
+ * Custom hook to get assistants with workspace context
  */
 export const useAssistants = () => {
-  const { activeOrganization, loading: orgLoading } = useOrganization();
+  const { activeWorkspace, loading: workspaceLoading } = useWorkspace();
   
   // Instead of providing functions that users call later, 
-  // this hook now provides direct access to the organization context
+  // this hook now provides direct access to the workspace context
   return {
     // Data
-    organizationId: activeOrganization?.id,
-    organizationName: activeOrganization?.name,
-    organizationLoading: orgLoading,
+    workspaceId: activeWorkspace?.id,
+    workspaceName: activeWorkspace?.name,
+    workspaceLoading: workspaceLoading,
     
-    // Functions that use the current active organization from context
+    // Functions that use the current active workspace from context
     getAssistants: () => {
-      if (!activeOrganization?.id) {
-        console.warn('[useAssistants] No active organization available');
+      if (!activeWorkspace?.id) {
+        console.warn('[useAssistants] No active workspace available');
         return Promise.resolve([]);
       }
-      return getAssistants(activeOrganization.id);
+      return getAssistants(activeWorkspace.id);
     },
     
     createAssistant: (params: CreateAssistantParams) => {
-      if (!activeOrganization?.id) {
-        return Promise.reject(new Error('No active organization selected'));
+      if (!activeWorkspace?.id) {
+        return Promise.reject(new Error('No active workspace selected'));
       }
-      // The organizationId is already handled in the createAssistant function
+      // The workspaceId is already handled in the createAssistant function
       return createAssistant(params);
     },
     

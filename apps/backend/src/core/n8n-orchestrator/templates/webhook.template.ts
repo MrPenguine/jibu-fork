@@ -1,12 +1,13 @@
+import { N8nWebhookType } from "../../../integrations/n8n/n8n-types";
+
 export const WebhookTemplate = {
   parameters: {
-    httpMethod: 'POST',
     path: '{{WEBHOOK_PATH}}',
-    responseMode: 'onReceived',
-    options: {}
+    responsePropertyName: 'text',
+    options: {},
   },
-  name: 'Webhook',
-  type: 'n8n-nodes-base.webhook',
-  typeVersion: 1.1,
+  name: 'Chat Trigger',
+  type: N8nWebhookType.CHAT_TRIGGER,
+  typeVersion: 1,
   webhookId: '{{WEBHOOK_ID}}',
 };

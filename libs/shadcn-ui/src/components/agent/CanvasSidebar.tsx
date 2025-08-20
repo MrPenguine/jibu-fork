@@ -112,6 +112,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
         { type: AgentNodeType.TOOL_CALL, label: 'Tool Call', icon: Puzzle },
         { type: AgentNodeType.API_CALL, label: 'API Call', icon: Share },
         { type: AgentNodeType.KNOWLEDGE_BASE_SEARCH, label: 'KB Search', icon: Search },
+        { type: AgentNodeType.N8N_INTEGRATION, label: 'n8n Integration', icon: Cpu },
       ],
     },
   ];

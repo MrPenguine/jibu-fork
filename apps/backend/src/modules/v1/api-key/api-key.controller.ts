@@ -8,7 +8,7 @@ import { Request } from 'express';
 interface AuthenticatedRequest extends Request {
   user: {
     userId: string;
-    orgId: string;
+    workspaceId: string;
   };
 }
 
@@ -25,16 +25,16 @@ export class ApiKeyController {
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async createApiKey(@Body() body: CreateApiKeyDto, @Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.apiKeyService.createApiKey(body, orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.apiKeyService.createApiKey(body, workspaceId, userId);
   }
 
     @Get()
   @ApiOperation({ summary: 'List all API keys for the organization' })
   @ApiResponse({ status: 200, description: 'A list of API keys.' })
   async listApiKeys(@Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.apiKeyService.listApiKeys(orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.apiKeyService.listApiKeys(workspaceId, userId);
   }
 
     @Get(':id')
@@ -42,8 +42,8 @@ export class ApiKeyController {
   @ApiResponse({ status: 200, description: 'The API key.' })
   @ApiResponse({ status: 404, description: 'API key not found.' })
   async getApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.apiKeyService.getApiKey(id, orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.apiKeyService.getApiKey(id, workspaceId, userId);
   }
 
     @Delete(':id')
@@ -51,8 +51,8 @@ export class ApiKeyController {
   @ApiResponse({ status: 200, description: 'The API key has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'API key not found.' })
   async deleteApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.apiKeyService.deleteApiKey(id, orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.apiKeyService.deleteApiKey(id, workspaceId, userId);
   }
 
     @Post(':id/revoke')
@@ -60,7 +60,7 @@ export class ApiKeyController {
   @ApiResponse({ status: 200, description: 'The API key has been successfully revoked.' })
   @ApiResponse({ status: 404, description: 'API key not found.' })
   async revokeApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { orgId, userId } = req.user;
-    return this.apiKeyService.revokeApiKey(id, orgId, userId);
+    const { workspaceId, userId } = req.user;
+    return this.apiKeyService.revokeApiKey(id, workspaceId, userId);
   }
 } 

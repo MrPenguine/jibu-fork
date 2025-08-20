@@ -43,12 +43,12 @@ export class AssistantController {
   @ApiResponse({ status: HttpStatus.CREATED, description: 'The assistant has been successfully created.' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data.' })
   async create(@Body() createAssistantDto: CreateAssistantDto, @Request() req) {
-    this.logger.log(`Creating assistant for org ${createAssistantDto.organizationId}`);
-    // Ensure the user has access to the organization
+    this.logger.log(`Creating assistant for workspace ${createAssistantDto.workspaceId}`);
+    // Ensure the user has access to the workspace
     const userId = req.user.sub || req.user.id;
     
-    if (!createAssistantDto.organizationId) {
-      throw new HttpException('Organization ID is required', HttpStatus.BAD_REQUEST);
+    if (!createAssistantDto.workspaceId) {
+      throw new HttpException('Workspace ID is required', HttpStatus.BAD_REQUEST);
     }
     
     return this.assistantService.create(createAssistantDto, userId);
@@ -276,19 +276,19 @@ export class AssistantController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all assistants for an organization' })
-  @ApiQuery({ name: 'organizationId', required: true, description: 'ID of the organization' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Returns all assistants for the organization.' })
-  async findAll(@Query('organizationId') organizationId: string, @Request() req) {
-    this.logger.log(`Fetching assistants for org ${organizationId}`);
-    if (!organizationId) {
-      throw new HttpException('Organization ID is required', HttpStatus.BAD_REQUEST);
+  @ApiOperation({ summary: 'Get all assistants for a workspace' })
+  @ApiQuery({ name: 'workspaceId', required: true, description: 'ID of the workspace' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Returns all assistants for the workspace.' })
+  async findAll(@Query('workspaceId') workspaceId: string, @Request() req) {
+    this.logger.log(`Fetching assistants for workspace ${workspaceId}`);
+    if (!workspaceId) {
+      throw new HttpException('Workspace ID is required', HttpStatus.BAD_REQUEST);
     }
     
     // Get user's ID from the request
     const userId = req.user.sub || req.user.id;
     
-    return this.assistantService.findAllByOrganization(organizationId, userId);
+    return this.assistantService.findAllByWorkspace(workspaceId, userId);
   }
 
   @Get(':id')

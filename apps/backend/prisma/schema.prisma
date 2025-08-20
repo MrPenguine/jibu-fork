@@ -23,49 +23,51 @@ model User {
   phoneConfirmed   Boolean                  @default(false)
   isAnonymous      Boolean                  @default(false)
   metadata         Json? // For storing additional user_metadata
-  lastOrgId        String? // Store the ID of the last organization the user accessed
+  lastWorkspaceId        String? // Store the ID of the last organization the user accessed
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
-  memberships      OrganizationMembership[] // Relation field
+  memberships      WorkspaceMembership[] // Relation field
   files            File[] // Reverse relation
-  lastOrg          Organization?            @relation("UserLastOrg", fields: [lastOrgId], references: [id], onDelete: SetNull)
+  lastWorkspace          Workspace?            @relation("UserLastWorkspace", fields: [lastWorkspaceId], references: [id], onDelete: SetNull)
   sentInvitations  Invitation[] // Invitations sent by this user
   createdTools     Tool[] // Tools created by this user
   toolExecutions   ToolExecution[] // Tool executions performed by this user
   onboardingStatus OnboardingStatus? // Relation to onboarding status
   apiKeys          ApiKey[]
 
-  @@index([lastOrgId])
+  @@index([lastWorkspaceId])
 }
 
-model Organization {
+model Workspace {
   id                   String                   @id @default(uuid())
   name                 String
   email                String?
-  settings             Json? // Store organization settings as JSON
+  settings             Json? // Store workspace settings as JSON
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
-  memberships          OrganizationMembership[] // Relation field
+  memberships          WorkspaceMembership[] // Relation field
   credentials          Credential[] // Relation to credentials
   files                File[] // Reverse relation
-  usersLastOrg         User[]                   @relation("UserLastOrg") // Users who have this as their last organization
-  invitations          Invitation[] // Invitations for this organization
+  usersLastWorkspace   User[]                   @relation("UserLastWorkspace") // Users who have this as their last workspace
+  invitations          Invitation[] // Invitations for this workspace
   workflows            Workflow[] // Relation to workflows
-  apiKeys              ApiKey[] // API keys belonging to this organization
-  knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this organization
-  knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this organization
-  assistants           Assistant[] // Assistants belonging to this organization
-  chats                Chat[] // All chats in this organization
-  tools                Tool[] // Tools belonging to this organization
-  agents               Agent[] // Agents belonging to this organization
-  agentSessions        AgentSession[] // Agent sessions belonging to this organization
-  n8nWorkflows         N8nWorkflow[] // N8n workflows for this organization
-  folders              Folder[] // Folders belonging to this organization
+  apiKeys              ApiKey[] // API keys belonging to this workspace
+  knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this workspace
+  knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this workspace
+  assistants           Assistant[] // Assistants belonging to this workspace
+  chats                Chat[] // All chats in this workspace
+  tools                Tool[] // Tools belonging to this workspace
+  agents               Agent[] // Agents belonging to this workspace
+  agentSessions        AgentSession[] // Agent sessions belonging to this workspace
+  n8nWorkflows         N8nWorkflow[] // N8n workflows for this workspace
+  folders              Folder[] // Folders belonging to this workspace
+  webhooks             Webhook[]
+  webhookInvocations   WebhookInvocation[]
 }
 
-model OrganizationMembership {
+model WorkspaceMembership {
   id             String   @id @default(uuid())
-  organizationId String
+  workspaceId String
   userId         String? // Optional to handle invitations for non-users
   email          String? // Store email for pending memberships with no user
   role           String
@@ -73,18 +75,18 @@ model OrganizationMembership {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([email])
 }
 
 model Invitation {
   id             String   @id @default(uuid())
   email          String
-  organizationId String
+  workspaceId String
   role           String
   token          String   @unique
   status         String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
@@ -94,18 +96,20 @@ model Invitation {
   updatedAt      DateTime @updatedAt
   expiresAt      DateTime
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   invitedBy    User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([invitedById])
   @@index([token])
   @@index([email])
+
+  @@unique([email, workspaceId])
 }
 
 model Credential {
   id                   String   @id @default(uuid())
-  organizationId       String
+  workspaceId       String
   provider             String
   type                 String
   name                 String
@@ -115,11 +119,11 @@ model Credential {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tools        Tool[] // Tools that use this credential
 
-  @@unique([organizationId, provider, name])
-  @@index([organizationId])
+  @@unique([workspaceId, provider, name])
+  @@index([workspaceId])
 }
 
 model File {
@@ -129,24 +133,24 @@ model File {
   storageKey      String   @unique
   mimeType        String
   sizeBytes       Int
-  organizationId  String
+  workspaceId  String
   userId          String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   knowledgeBaseSources KnowledgeBaseSource[] // Relationship to knowledge base sources
 
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([userId])
 }
 
 model Folder {
   id             String       @id @default(cuid())
   name           String
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   agents         Agent[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -157,8 +161,8 @@ model ApiKey {
   name           String
   prefix         String       @unique
   scopes         String[]
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   agentId        String?
@@ -168,7 +172,7 @@ model ApiKey {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @default(now())
 
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([userId])
   @@index([agentId])
 }
@@ -189,44 +193,44 @@ model OnboardingStatus {
 model KnowledgeBase {
   id             String                @id @default(uuid())
   name           String
-  organizationId String
-  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sources        KnowledgeBaseSource[]
   chunks         ChunkMetadata[] // Relation to chunks
   assistants     Assistant[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
-  @@index([organizationId])
+  @@index([workspaceId])
 }
 
 model KnowledgeBaseSource {
   id                String          @id @default(uuid())
   knowledgeBaseId   String
-  organizationId    String
+  workspaceId    String
   sourceType        String          @default("file")
   sourcePointer     String // Stores File ID for sourceType='file'
   indexingStatus    String          @default("PENDING")
   hasIndexedContent Boolean         @default(false)
   knowledgeBase     KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
-  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   file              File            @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
   chunks            ChunkMetadata[] // Relation to chunks
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
   @@index([knowledgeBaseId])
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([sourcePointer])
 }
 
 model Assistant {
   id                         String          @id @default(uuid())
   name                       String
-  organizationId             String
+  workspaceId             String
   n8nWorkflowId              String? // n8n integration fields
   n8nWorkflow                N8nWorkflow?    @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
-  organization               Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace               Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   knowledgeBaseId            String?
   knowledgeBase              KnowledgeBase?  @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
   voice                      Json?
@@ -248,7 +252,7 @@ model Assistant {
   tools                      AssistantTool[] // Tools assigned to this assistant
   agents                     Agent[] // Agents associated with this assistant
 
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([knowledgeBaseId])
   @@index([n8nWorkflowId])
 }
@@ -275,7 +279,7 @@ model ChunkMetadata {
 model Chat {
   id             String         @id @default(uuid())
   name           String? // Optional name for the chat
-  organizationId String
+  workspaceId String
   assistantId    String? // Optional: Can be null for agent-based chats
   agentId        String? // Optional: For agent-based chats
   workflowId     String? // Optional: For associating chats with workflows
@@ -286,7 +290,7 @@ model Chat {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   assistant     Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   agent         Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
   workflow      Workflow?      @relation(fields: [workflowId], references: [id], onDelete: SetNull)
@@ -296,7 +300,7 @@ model Chat {
   // Updated constraints to ensure a chat is uniquely identified by either assistant+session or agent+session
   @@unique([assistantId, sessionId])
   @@unique([agentId, sessionId])
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([assistantId])
   @@index([agentId])
   @@index([workflowId])
@@ -325,7 +329,7 @@ model Message {
 
 model Tool {
   id             String   @id @default(uuid())
-  organizationId String
+  workspaceId String
   name           String
   description    String?
   type           String // e.g., "google.calendar.availability.check", "google.sheets.row.append"
@@ -339,15 +343,15 @@ model Tool {
   createdById    String
 
   // Relationships
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace   Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   credential     Credential?     @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
   assistantTools AssistantTool[]
   workflowNodes  WorkflowNode[]  @relation("ToolToWorkflowNode")
 
-  @@unique([organizationId, name])
-  @@index([organizationId])
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
   @@index([credentialId])
   @@index([createdById])
   @@index([type])
@@ -420,10 +424,10 @@ model Agent {
   name           String
   description    String?
   metadata       Json?
-  organizationId String
+  workspaceId    String?
   assistantId    String?
   n8nWorkflowId  String?
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace   Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   assistant      Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   n8nWorkflow    N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
   chats          Chat[]
@@ -433,7 +437,7 @@ model Agent {
   apiKeys        ApiKey[]
   workflows      Workflow[]
 
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([assistantId])
   @@index([n8nWorkflowId])
 }
@@ -446,8 +450,8 @@ model AgentSession {
   agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
   chatId         String?
   chat           Chat?        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   status         String       @default("active") // e.g., active, completed, failed
   currentNodeId  String?
   variables      Json?
@@ -456,7 +460,7 @@ model AgentSession {
 
   @@index([agentId])
   @@index([chatId])
-  @@index([organizationId])
+  @@index([workspaceId])
 }
 
 model Workflow {
@@ -469,7 +473,7 @@ model Workflow {
   edges              Json // Array of FlowEdge objects
   isPrimary          Boolean      @default(false)
   agentId            String
-  organizationId     String
+  workspaceId        String?
   startNodeId        String? // ID of the node where execution begins
   version            Int          @default(1)
   isPublished        Boolean      @default(false)
@@ -481,14 +485,15 @@ model Workflow {
   n8nWorkflowId      String?
   n8nWorkflow        N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
 
-  agent         Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  chats         Chat[]
+  agent     Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  workspace Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chats     Chat[]
   workflowNodes WorkflowNode[]
   workflowEdges WorkflowEdge[]
+  webhooks      Webhook[]
 
   @@index([agentId])
-  @@index([organizationId])
+  @@index([workspaceId])
 }
 
 model WorkflowNode {
@@ -550,16 +555,54 @@ model N8nWorkflow {
   updatedAt       DateTime        @updatedAt
 
   // Relations
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
   assistants Assistant[] // Assistants that use this workflow (always PRIMARY)
   agents     Agent[] // Agents that use this workflow (can be PRIMARY or SECONDARY)
   workflows  Workflow[] // Workflows linked to this n8n workflow
 
-  @@index([organizationId])
+  @@index([workspaceId])
   @@index([n8nWorkflowId])
   @@index([isActive])
   @@index([workflowType]) // Add index for the new field
+}
+
+
+model Webhook {
+  id             String             @id @default(uuid())
+  name           String
+  description    String?
+  workflowId     String?            // Optional link to a workflow
+  workspaceId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  
+  // Relations
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflow       Workflow?          @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  invocations    WebhookInvocation[]
+
+  @@index([workspaceId])
+  @@index([workflowId])
+}
+
+model WebhookInvocation {
+  id             String   @id @default(uuid())
+  webhookId      String
+  payload        Json
+  headers        Json
+  status         String   @default("pending") // pending, completed, failed
+  error          String?
+  workspaceId String
+  createdAt      DateTime @default(now())
+  
+  // Relations
+  webhook        Webhook      @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([workspaceId])
+  @@index([status])
 }

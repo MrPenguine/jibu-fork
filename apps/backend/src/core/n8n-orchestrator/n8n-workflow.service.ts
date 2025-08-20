@@ -7,6 +7,7 @@ import { RespondToWebhookTemplate } from './templates/respond-to-webhook.templat
 import { N8nClient } from './n8n-client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/database/prisma.service';
+import * as crypto from 'crypto';
 
 /**
  * Service for managing n8n workflows
@@ -149,12 +150,12 @@ export class N8nWorkflowService {
    * 4. Simple memory for conversation context
    * 
    * @param assistantId The assistant ID this workflow belongs to
-   * @param organizationId The organization ID this workflow belongs to
+   * @param workspaceId The workspace ID this workflow belongs to
    * @param userId The user ID this workflow belongs to (optional)
    * @param name The name of the workflow (will use a standard name if not provided)
    * @returns The created N8nWorkflow record including its ID
    */
-  async createAgentChatWorkflow(assistantId: string, organizationId: string, userId?: string, name?: string) {
+  async createAgentChatWorkflow(assistantId: string, workspaceId: string, userId?: string, name?: string) {
     const workflowName = name || `Agent Chat Workflow - Assistant ${assistantId}`;
     const webhookId = crypto.randomUUID();
     
@@ -229,7 +230,7 @@ export class N8nWorkflowService {
       createdWorkflow.id,
       triggerReference, // Store the trigger reference instead of webhook URL
       workflowData,
-      organizationId,
+      workspaceId,
       assistantId,
     );
 
@@ -241,7 +242,7 @@ export class N8nWorkflowService {
    * @param n8nWorkflowId The ID of the workflow in n8n
    * @param webhookUrl Optional webhook URL for the workflow
    * @param workflowJson Optional serialized workflow JSON
-   * @param organizationId The organization ID this workflow belongs to
+   * @param workspaceId The workspace ID this workflow belongs to
    * @param assistantId Optional assistant ID to link this workflow to
    * @param agentId Optional agent ID to link this workflow to
    * @returns The created N8nWorkflow record
@@ -250,7 +251,7 @@ export class N8nWorkflowService {
     n8nWorkflowId: string,
     webhookUrl: string | null,
     workflowJson: object | null,
-    organizationId: string,
+    workspaceId: string,
     assistantId?: string,
     agentId?: string,
   ) {
@@ -264,7 +265,7 @@ export class N8nWorkflowService {
       workflowJson: object | null;
       isActive: boolean;
       lastValidatedAt: Date;
-      organizationId: string;
+      workspaceId: string;
     }
     
     // Create the N8nWorkflow record
@@ -275,7 +276,7 @@ export class N8nWorkflowService {
         workflowJson,
         isActive: true,
         lastValidatedAt: new Date(),
-        organization: { connect: { id: organizationId } },
+        workspace: { connect: { id: workspaceId } },
         ...(assistantId && { assistants: { connect: { id: assistantId } } }),
         ...(agentId && { agents: { connect: { id: agentId } } }),
       },
@@ -297,10 +298,10 @@ export class N8nWorkflowService {
   /**
    * Get an existing N8nWorkflow or create a new one for an assistant
    * @param assistantId The assistant ID 
-   * @param organizationId The organization ID
+   * @param workspaceId The workspace ID
    * @returns The N8nWorkflow record
    */
-  async getOrCreateAssistantWorkflow(assistantId: string, organizationId: string) {
+  async getOrCreateAssistantWorkflow(assistantId: string, workspaceId: string) {
     // First check if the assistant already has a workflow
     const assistant = await this.prisma.assistant.findUnique({
       where: { id: assistantId },
@@ -326,10 +327,10 @@ export class N8nWorkflowService {
     }
 
     // If no workflow exists, create a new one
-    return this.createAgentChatWorkflow(assistantId, organizationId);
+    return this.createAgentChatWorkflow(assistantId, workspaceId);
   }
 
-  async createEmptyWorkflow(workflowName: string, organizationId: string) {
+  async createEmptyWorkflow(workflowName: string, workspaceId: string) {
     this.logger.log(`Creating empty workflow: ${workflowName}`);
     
     // First, test N8N connectivity
@@ -378,7 +379,7 @@ export class N8nWorkflowService {
           n8nWorkflowId: newWorkflow.id,
           workflowJson: workflowData,
           isActive: false, // Will be activated separately if needed
-          organizationId: organizationId
+          workspaceId: workspaceId
         }
       });
       
@@ -421,13 +422,13 @@ export class N8nWorkflowService {
    * Create or update a N8nWorkflow and ensure it's active
    * @param workflowId Optional existing N8nWorkflow ID
    * @param assistantId The associated assistant ID
-   * @param organizationId The organization ID
+   * @param workspaceId The workspace ID
    * @returns The active N8nWorkflow record
    */
   async ensureActiveWorkflow(
     workflowId?: string, 
     assistantId?: string, 
-    organizationId?: string
+    workspaceId?: string
   ): Promise<any> {
     // If we have a workflowId, try to get the existing record using raw SQL
     if (workflowId) {
@@ -461,11 +462,11 @@ export class N8nWorkflowService {
       }
     }
 
-    // If we have an assistantId and organizationId, create a new workflow
-    if (assistantId && organizationId) {
-      return this.getOrCreateAssistantWorkflow(assistantId, organizationId);
+    // If we have an assistantId and workspaceId, create a new workflow
+    if (assistantId && workspaceId) {
+      return this.getOrCreateAssistantWorkflow(assistantId, workspaceId);
     }
 
-    throw new Error('Cannot ensure active workflow without either an existing workflowId or assistantId+organizationId');
+    throw new Error('Cannot ensure active workflow without either an existing workflowId or assistantId+workspaceId');
   }
 }

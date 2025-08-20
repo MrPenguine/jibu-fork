@@ -4,7 +4,7 @@ import * as React from "react"
 import { useSidebar } from "@libs/shadcn-ui/components/ui/sidebar"
 import { cn } from "@libs/shadcn-ui/lib/utils"
 import { useTranslations } from "@libs/shadcn-ui/lib/i18n"
-import { useOrganization } from "../../../../../apps/frontend/src/utils/organizationContext"
+import { useWorkspace } from "../../../../../apps/frontend/src/utils/workspaceContext"
 import { fetchAPI } from "../../../../../apps/frontend/src/utils/api"
 import {
   Sidebar,
@@ -20,7 +20,7 @@ import {
 import { NavUser } from "@libs/shadcn-ui/components/nav/nav-user"
 import { Separator } from "@libs/shadcn-ui/components/ui/separator"
 import { Badge } from "@libs/shadcn-ui/components/ui/badge"
-import { OrganizationSwitcher } from "@libs/shadcn-ui/components/workspace/OrganizationSwitcher"
+import { WorkspaceSwitcher } from "@libs/shadcn-ui/components/workspace/WorkspaceSwitcher"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -98,8 +98,8 @@ export function CustomAppSidebar({
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const t = useTranslations("Sidebar");
-  const { activeOrganization } = useOrganization();
-  const wsBase = activeOrganization ? `/workspace/${activeOrganization.id}` : null;
+  const { activeWorkspace } = useWorkspace();
+  const wsBase = activeWorkspace ? `/workspace/${activeWorkspace.id}` : null;
 
   const [userInfo, setUserInfo] = React.useState<{ name: string; email: string; avatar: string } | null>(null);
 
@@ -154,7 +154,7 @@ export function CustomAppSidebar({
         {!isCollapsed && (
           <div className="px-4 py-2 mt-1 mb-2">
             <div className="p-1 bg-violet-50/50 dark:bg-gray-800/50 rounded-xl">
-              <OrganizationSwitcher />
+              <WorkspaceSwitcher />
             </div>
           </div>
         )}
@@ -252,7 +252,7 @@ export function CustomAppSidebar({
         </NavItem>
         <NavUser 
           user={userInfo ?? { name: 'User', email: '', avatar: '' }} 
-          profileHref={wsBase ? `${wsBase}/settings` : "/organizations"}
+          profileHref={wsBase ? `${wsBase}/settings` : "/workspaces"}
           {...navUserProps} 
         />
       </SidebarFooter>

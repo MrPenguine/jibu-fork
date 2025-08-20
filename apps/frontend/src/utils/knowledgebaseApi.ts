@@ -1,9 +1,9 @@
 import { createClient } from './supabase/client';
-import { getActiveOrgId } from './fileApi';
+import { getActiveWorkspaceId } from './fileApi';
 import { fetchAPI, API_BASE_URL } from './api';
 
-// Import organization context for types only
-import { useOrganization } from './organizationContext';
+// Import workspace context for types only
+import { useWorkspace } from './workspaceContext';
 
 // Knowledge base types
 export interface KnowledgeBase {
@@ -12,7 +12,7 @@ export interface KnowledgeBase {
   description?: string;
   createdAt: string;
   updatedAt: string;
-  organizationId: string;
+  workspaceId: string;
 }
 
 export interface KnowledgeBaseSource {
@@ -26,29 +26,29 @@ export interface KnowledgeBaseSource {
   updatedAt: string;
 }
 
-// Wrapper around getActiveOrgId for better logging
-export function getCurrentOrganizationId(specificOrgId?: string): string | null {
-  // Prioritize the specificOrgId if provided (could be from the assistant or props)
-  if (specificOrgId) {
-    console.log(`[getCurrentOrganizationId] Using provided specific organization ID: ${specificOrgId}`);
-    return specificOrgId;
+// Wrapper around getActiveWorkspaceId for better logging
+export function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
+  // Prioritize the specificWorkspaceId if provided (could be from the assistant or props)
+  if (specificWorkspaceId) {
+        console.log(`[getCurrentWorkspaceId] Using provided specific workspace ID: ${specificWorkspaceId}`);
+    return specificWorkspaceId;
   }
   
   // Try to get organization ID from local storage or other sources
-  const orgId = getActiveOrgId();
+  const workspaceId = getActiveWorkspaceId();
   
   // Add extra logging for debugging purposes
-  if (orgId) {
-    console.log(`[getCurrentOrganizationId] Using organization ID from active context: ${orgId}`);
+  if (workspaceId) {
+        console.log(`[getCurrentWorkspaceId] Using workspace ID from active context: ${workspaceId}`);
   } else {
-    console.warn('[getCurrentOrganizationId] No organization ID available from any source');
+        console.warn('[getCurrentWorkspaceId] No workspace ID available from any source');
   }
   
-  return orgId;
+  return workspaceId;
 }
 
-// Get authorization headers with token and organization ID
-async function getAuthHeaders(orgId: string) {
+// Get authorization headers with token and workspace ID
+async function getAuthHeaders(workspaceId: string) {
   const supabase = createClient();
   const session = await supabase.auth.getSession();
   const token = session.data.session?.access_token;
@@ -60,34 +60,34 @@ async function getAuthHeaders(orgId: string) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
-    'X-Organization-ID': orgId,
-    'organization-id': orgId, // Some endpoints might expect this format
-    'X-Force-Organization-ID': orgId, // Extra header for debugging/clarity
+    'X-Workspace-ID': workspaceId,
+    'workspace-id': workspaceId, // Some endpoints might expect this format
+        'X-Force-Workspace-ID': workspaceId, // Extra header for debugging/clarity
   };
 }
 
 /**
- * List all knowledge bases for the current organization
- * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
+ * List all knowledge bases for the current workspace
+ * @param specificWorkspaceId Optional: Provide a specific organization ID, otherwise uses active org
  */
-export async function listKnowledgeBases(specificOrgId?: string): Promise<KnowledgeBase[]> {
+export async function listKnowledgeBases(specificWorkspaceId?: string): Promise<KnowledgeBase[]> {
   try {
-    // Use the provided specificOrgId or get from getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[listKnowledgeBases] No organization ID available, results may be limited');
+    if (!workspaceId) {
+            console.warn('[listKnowledgeBases] No workspace ID available, results may be limited');
     } else {
-      console.log(`[listKnowledgeBases] Using organization ID in headers: ${organizationId}`);
+            console.log(`[listKnowledgeBases] Using workspace ID in headers: ${workspaceId}`);
     }
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId || '');
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId || '');
     
-    // Call the backend API directly, organization ID is passed in headers
-    console.log(`[listKnowledgeBases] Requesting knowledge bases with organization headers:`, 
+    // Call the backend API directly, workspace ID is passed in headers
+    console.log(`[listKnowledgeBases] Requesting knowledge bases with workspace headers:`, 
       Object.entries(headers)
-        .filter(([key]) => key.toLowerCase().includes('organization'))
+        .filter(([key]) => key.toLowerCase().includes('workspace'))
         .reduce((obj, [key, value]) => {
           obj[key] = value;
           return obj;
@@ -108,17 +108,17 @@ export async function listKnowledgeBases(specificOrgId?: string): Promise<Knowle
     
     if (Array.isArray(data)) {
       const knowledgeBases = data;
-      console.log(`[listKnowledgeBases] Found ${knowledgeBases.length} knowledge bases for org ${organizationId || 'unknown'}`);
+            console.log(`[listKnowledgeBases] Found ${knowledgeBases.length} knowledge bases for workspace ${workspaceId || 'unknown'}`);
       
       if (knowledgeBases.length > 0) {
-        // Log organization distribution for debugging
-        const orgCounts = knowledgeBases.reduce((acc, kb) => {
-          const orgId = kb.organizationId || 'unknown';
-          acc[orgId] = (acc[orgId] || 0) + 1;
+        // Log workspace distribution for debugging
+        const workspaceCounts = knowledgeBases.reduce((acc, kb) => {
+          const workspaceId = kb.workspaceId || 'unknown';
+          acc[workspaceId] = (acc[workspaceId] || 0) + 1;
           return acc;
-        }, {});
+        }, {} as Record<string, number>);
         
-        console.log(`[listKnowledgeBases] Knowledge bases by organization:`, orgCounts);
+                console.log(`[listKnowledgeBases] Knowledge bases by workspace:`, workspaceCounts);
       }
       
       return knowledgeBases;
@@ -136,31 +136,31 @@ export async function listKnowledgeBases(specificOrgId?: string): Promise<Knowle
 /**
  * Create a new knowledge base
  * @param name The name of the knowledge base
- * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
+ * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  */
-export async function createKnowledgeBase(name: string, specificOrgId?: string): Promise<KnowledgeBase> {
+export async function createKnowledgeBase(name: string, specificWorkspaceId?: string): Promise<KnowledgeBase> {
   try {
-    // Use provided orgId, or get the current one consistently via getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      const error = new Error('[createKnowledgeBase] No organization ID available');
+    if (!workspaceId) {
+            const error = new Error('[createKnowledgeBase] No workspace ID available');
       console.error(error);
       throw error;
     }
     
-    console.log(`[createKnowledgeBase] Creating knowledge base "${name}" for org: ${organizationId}`);
+        console.log(`[createKnowledgeBase] Creating knowledge base "${name}" for workspace: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
-    // Call the backend API directly with the organization ID explicitly in the body
+    // Call the backend API directly with the workspace ID explicitly in the body
     const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         name,
-        organizationId
+        workspaceId
       })
     });
     
@@ -190,26 +190,26 @@ export async function createKnowledgeBase(name: string, specificOrgId?: string):
       throw new Error('Invalid response data from server');
     }
     
-    // Ensure the organizationId is set in the response data
-    if (!data.organizationId) {
-      console.log('[createKnowledgeBase] Response missing organizationId, using provided id:', organizationId);
-      data.organizationId = organizationId;
+    // Ensure the workspaceId is set in the response data
+    if (!data.workspaceId) {
+      console.log('[createKnowledgeBase] Response missing workspaceId, using provided id:', workspaceId);
+      data.workspaceId = workspaceId;
     }
     
-    // Verify that the created KB belongs to the correct organization
-    if (data.organizationId !== organizationId) {
-      console.warn('[createKnowledgeBase] Created KB has different organization ID:', {
-        expected: organizationId,
-        received: data.organizationId
+    // Verify that the created KB belongs to the correct workspace
+    if (data.workspaceId !== workspaceId) {
+            console.warn('[createKnowledgeBase] Created KB has different workspace ID:', {
+        expected: workspaceId,
+        received: data.workspaceId
       });
-      // Override the organization ID to ensure consistency
-      data.organizationId = organizationId;
+      // Override the workspace ID to ensure consistency
+      data.workspaceId = workspaceId;
       
       // Log the issue to help with debugging
-      console.error('[createKnowledgeBase] Organization ID mismatch in created knowledge base!', {
+            console.error('[createKnowledgeBase] Workspace ID mismatch in created knowledge base!', {
         kbId: data.id,
-        requestedOrgId: organizationId,
-        returnedOrgId: data.organizationId
+                requestedWorkspaceId: workspaceId,
+                returnedWorkspaceId: data.workspaceId
       });
     }
     
@@ -224,27 +224,27 @@ export async function createKnowledgeBase(name: string, specificOrgId?: string):
 /**
  * List all sources for a knowledge base
  * @param knowledgeBaseId The ID of the knowledge base
- * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
+ * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  */
-export async function listKnowledgeBaseSources(knowledgeBaseId: string, specificOrgId?: string): Promise<KnowledgeBaseSource[]> {
+export async function listKnowledgeBaseSources(knowledgeBaseId: string, specificWorkspaceId?: string): Promise<KnowledgeBaseSource[]> {
   try {
     if (!knowledgeBaseId) {
       console.error('[listKnowledgeBaseSources] No knowledge base ID provided');
       return [];
     }
 
-    // Use provided orgId, or get the current one consistently via getCurrentOrganizationId
-    const organizationId = getCurrentOrganizationId(specificOrgId);
+    // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!organizationId) {
-      console.warn('[listKnowledgeBaseSources] No organization ID available');
+    if (!workspaceId) {
+            console.warn('[listKnowledgeBaseSources] No workspace ID available');
       return [];
     }
     
-    console.log(`[listKnowledgeBaseSources] Listing sources for KB: ${knowledgeBaseId} with org: ${organizationId}`);
+        console.log(`[listKnowledgeBaseSources] Listing sources for KB: ${knowledgeBaseId} with workspace: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(organizationId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API directly
     const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/sources`, {
@@ -268,21 +268,21 @@ export async function listKnowledgeBaseSources(knowledgeBaseId: string, specific
       
       // For 404 errors, we need special handling
       if (response.status === 404) {
-        console.error(`[listKnowledgeBaseSources] Knowledge base ${knowledgeBaseId} not found in organization ${organizationId}`);
+                console.error(`[listKnowledgeBaseSources] Knowledge base ${knowledgeBaseId} not found in workspace ${workspaceId}`);
         
-        // Try to check if the knowledge base exists in any organization
+        // Try to check if the knowledge base exists in any workspace
         try {
           const allKbs = await listKnowledgeBases();
           const kb = allKbs.find(kb => kb.id === knowledgeBaseId);
           
           if (kb) {
-            // KB exists but in a different organization
-            console.error(`[listKnowledgeBaseSources] Knowledge base ${knowledgeBaseId} found in organization ${kb.organizationId}, not ${organizationId}`);
-            throw new Error(`Knowledge base ${knowledgeBaseId} belongs to organization ${kb.organizationId}, not ${organizationId}`);
+            // KB exists but in a different workspace
+                        console.error(`[listKnowledgeBaseSources] Knowledge base ${knowledgeBaseId} found in workspace ${kb.workspaceId}, not ${workspaceId}`);
+                        throw new Error(`Knowledge base ${knowledgeBaseId} belongs to workspace ${kb.workspaceId}, not ${workspaceId}`);
           } else {
             // KB doesn't exist at all
-            console.error(`[listKnowledgeBaseSources] Knowledge base ${knowledgeBaseId} not found in any organization`);
-            throw new Error(`Knowledge base ${knowledgeBaseId} not found in any organization`);
+                        console.error(`[listKnowledgeBaseSources] Knowledge base ${knowledgeBaseId} not found in any workspace`);
+                        throw new Error(`Knowledge base ${knowledgeBaseId} not found in any workspace`);
           }
         } catch (err) {
           // Just rethrow the original error if we can't check
@@ -314,21 +314,21 @@ export async function listKnowledgeBaseSources(knowledgeBaseId: string, specific
  * Link a file to a knowledge base
  * @param knowledgeBaseId Knowledge base ID
  * @param fileId File ID
- * @param organizationId Organization ID
+ * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  * @returns The created knowledge base source
  */
 export async function linkFileToKnowledgeBase(
   knowledgeBaseId: string,
   fileId: string,
-  organizationId?: string
+  specificWorkspaceId?: string
 ): Promise<KnowledgeBaseSource> {
   try {
-    // Use provided orgId, or get the current one consistently via getCurrentOrganizationId
-    const orgId = getCurrentOrganizationId(organizationId);
+    // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!orgId) {
-      console.warn('[linkFileToKnowledgeBase] No active organization selected.');
-      throw new Error("No active organization selected");
+    if (!workspaceId) {
+            console.warn('[linkFileToKnowledgeBase] No active workspace selected.');
+      throw new Error("No active workspace selected");
     }
     
     if (!knowledgeBaseId) {
@@ -341,10 +341,10 @@ export async function linkFileToKnowledgeBase(
       throw new Error("File ID is required");
     }
     
-    console.log(`[linkFileToKnowledgeBase] Linking file ${fileId} to knowledge base ${knowledgeBaseId} in org ${orgId}`);
+            console.log(`[linkFileToKnowledgeBase] Linking file ${fileId} to knowledge base ${knowledgeBaseId} in workspace ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(orgId);
+    // Get auth headers with the workspace ID
+        const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API directly
     const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/sources`, {
@@ -352,7 +352,7 @@ export async function linkFileToKnowledgeBase(
       headers,
       body: JSON.stringify({
         fileId,
-        organizationId: orgId,
+        workspaceId: workspaceId,
         sourceType: 'file',
         indexingStatus: 'PENDING'
       })
@@ -373,13 +373,13 @@ export async function linkFileToKnowledgeBase(
     const data = await response.json();
     console.log(`[linkFileToKnowledgeBase] Successfully linked file ${fileId} to knowledge base ${knowledgeBaseId}`, data);
 
-    // Ensure the returned data has the correct organization ID
+    // Ensure the returned data has the correct workspace ID
     if (data) {
-      if (!data.organizationId) {
-        data.organizationId = orgId;
-      } else if (data.organizationId !== orgId) {
-        console.warn(`[linkFileToKnowledgeBase] Organization ID mismatch in response: ${data.organizationId} vs expected ${orgId}, fixing...`);
-        data.organizationId = orgId;
+      if (!data.workspaceId) {
+        data.workspaceId = workspaceId;
+            } else if (data.workspaceId !== workspaceId) {
+                        console.warn(`[linkFileToKnowledgeBase] Workspace ID mismatch in response: ${data.workspaceId} vs expected ${workspaceId}, fixing...`);
+        data.workspaceId = workspaceId;
       }
     }
 
@@ -394,20 +394,20 @@ export async function linkFileToKnowledgeBase(
  * Link a knowledge base to an assistant
  * @param knowledgeBaseId Knowledge base ID
  * @param assistantId Assistant ID
- * @param organizationId Optional: Organization ID
+ * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  */
 export async function linkKnowledgeBaseToAssistant(
   knowledgeBaseId: string,
   assistantId: string,
-  organizationId?: string
+  specificWorkspaceId?: string
 ): Promise<any> {
   try {
-    // Use provided orgId, or get the current one consistently via getCurrentOrganizationId
-    const orgId = getCurrentOrganizationId(organizationId);
+    // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!orgId) {
-      console.warn('[linkKnowledgeBaseToAssistant] No active organization selected.');
-      throw new Error("No active organization selected");
+    if (!workspaceId) {
+            console.warn('[linkKnowledgeBaseToAssistant] No active workspace selected.');
+      throw new Error("No active workspace selected");
     }
     
     if (!knowledgeBaseId) {
@@ -420,10 +420,10 @@ export async function linkKnowledgeBaseToAssistant(
       throw new Error("Assistant ID is required");
     }
     
-    console.log(`[linkKnowledgeBaseToAssistant] Linking knowledge base ${knowledgeBaseId} to assistant ${assistantId} in org ${orgId}`);
+            console.log(`[linkKnowledgeBaseToAssistant] Linking knowledge base ${knowledgeBaseId} to assistant ${assistantId} in workspace ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(orgId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     
     // Call the backend API directly
     const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/link-to-assistant`, {
@@ -432,7 +432,7 @@ export async function linkKnowledgeBaseToAssistant(
       body: JSON.stringify({
         knowledgeBaseId,
         assistantId,
-        organizationId: orgId
+                workspaceId: workspaceId
       })
     });
     
@@ -461,14 +461,14 @@ export async function linkKnowledgeBaseToAssistant(
 export async function directUnlinkRequest(
   knowledgeBaseId: string,
   sourceId: string,
-  organizationId?: string
+  specificWorkspaceId?: string
 ): Promise<boolean> {
   return new Promise((resolve, reject) => {
     try {
-      // Use provided orgId, or get the current one consistently via getCurrentOrganizationId
-      const orgId = getCurrentOrganizationId(organizationId);
+      // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
-      if (!orgId || !knowledgeBaseId || !sourceId) {
+      if (!workspaceId || !knowledgeBaseId || !sourceId) {
         console.error('[directUnlinkRequest] Missing required parameters');
         return reject(new Error('Missing required parameters'));
       }
@@ -484,8 +484,8 @@ export async function directUnlinkRequest(
       
       // Add headers
       xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('X-Organization-ID', orgId);
-      xhr.setRequestHeader('organization-id', orgId);
+      xhr.setRequestHeader('X-Workspace-ID', workspaceId);
+      xhr.setRequestHeader('workspace-id', workspaceId);
       
       // Get auth token and add to request
       const getAndSetAuthToken = async () => {
@@ -552,13 +552,13 @@ export async function directUnlinkRequest(
  * Remove a file from a knowledge base
  * @param knowledgeBaseId Knowledge base ID
  * @param sourceId Source ID to remove (the ID of the KnowledgeBaseSource record)
- * @param organizationId Optional: Organization ID
+ * @param workspaceId Optional: Workspace ID
  * @returns Success status
  */
 export async function unlinkFileFromKnowledgeBase(
   knowledgeBaseId: string,
   sourceId: string,
-  organizationId?: string
+  specificWorkspaceId?: string
 ): Promise<boolean> {
   try {
     console.log(`[unlinkFileFromKnowledgeBase] Starting unlink operation with sourceId=${sourceId}`);
@@ -566,7 +566,7 @@ export async function unlinkFileFromKnowledgeBase(
     // Try the direct XMLHttpRequest approach first
     try {
       console.log('[unlinkFileFromKnowledgeBase] Attempting direct XMLHttpRequest approach');
-      const result = await directUnlinkRequest(knowledgeBaseId, sourceId, organizationId);
+      const result = await directUnlinkRequest(knowledgeBaseId, sourceId, specificWorkspaceId);
       console.log('[unlinkFileFromKnowledgeBase] Direct request succeeded:', result);
       return result;
     } catch (directError) {
@@ -575,12 +575,12 @@ export async function unlinkFileFromKnowledgeBase(
     }
     
     // Regular fetch approach as fallback
-    // Use provided orgId, or get the current one consistently via getCurrentOrganizationId
-    const orgId = getCurrentOrganizationId(organizationId);
+    // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
     
-    if (!orgId) {
-      console.warn('[unlinkFileFromKnowledgeBase] No active organization selected.');
-      throw new Error("No active organization selected");
+    if (!workspaceId) {
+      console.warn('[unlinkFileFromKnowledgeBase] No active workspace selected.');
+      throw new Error("No active workspace selected");
     }
     
     if (!knowledgeBaseId) {
@@ -596,10 +596,10 @@ export async function unlinkFileFromKnowledgeBase(
     console.log(`===== [unlinkFileFromKnowledgeBase] UNLINK REQUEST =====`);
     console.log(`KnowledgeBaseId: ${knowledgeBaseId}`);
     console.log(`SourceId: ${sourceId}`);
-    console.log(`OrgId: ${orgId}`);
+        console.log(`WorkspaceId: ${workspaceId}`);
     
-    // Get auth headers with the organization ID
-    const headers = await getAuthHeaders(orgId);
+    // Get auth headers with the workspace ID
+    const headers = await getAuthHeaders(workspaceId);
     console.log(`Authorization headers:`, Object.keys(headers));
     
     // The correct endpoint URL based on backend controller: DELETE /v1/knowledge-bases/sources/:sourceId
@@ -611,7 +611,7 @@ export async function unlinkFileFromKnowledgeBase(
       method: 'DELETE',
       url: endpointUrl,
       headers: Object.entries(headers)
-        .filter(([key]) => key.toLowerCase().includes('organization'))
+        .filter(([key]) => key.toLowerCase().includes('workspace'))
         .reduce((acc, [key, value]) => {
           acc[key] = value;
           return acc;

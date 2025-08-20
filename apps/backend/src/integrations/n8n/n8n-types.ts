@@ -137,7 +137,8 @@ export interface N8nResponse<T> {
  * Webhook node types with their default configurations
  */
 export enum N8nWebhookType {
-  STANDARD = 'n8n-nodes-base.webhook',
+  STANDARD = 'n8n-nodes-base.chatTrigger', // Keep for compatibility, but prefer CHAT_TRIGGER
+  CHAT_TRIGGER = 'n8n-nodes-base.chatTrigger',
   RESPONSE = 'n8n-nodes-base.respondToWebhook',
 }
 

@@ -7,44 +7,43 @@ export async function GET(request: NextRequest) {
     // Create Supabase client
     const supabase = await createClient()
     
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
+    // Get current session (token) and ensure authenticated
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       )
     }
     
-    // Call backend API to get user's last organization or default organization
+    // Call backend API to get user's last workspace or default workspace
     try {
-      const response = await fetch(`${API_BASE_URL}/users/last-organization`, {
+      const response = await fetch(`${API_BASE_URL}/users/last-workspace`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${await supabase.auth.getSession().then(res => res.data.session?.access_token)}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
       })
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch organization: ${response.statusText}`)
+        throw new Error(`Failed to fetch workspace: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
       return NextResponse.json(data)
     } catch (error) {
-      console.error('Error fetching last organization:', error)
+      console.error('Error fetching last workspace:', error)
       return NextResponse.json(
-        { error: 'Failed to fetch organization' },
+        { error: 'Failed to fetch workspace' },
         { status: 500 }
       )
     }
   } catch (error) {
-    console.error('Error in get-user-org:', error)
+    console.error('Error in get-user-workspace (compat route):', error)
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }
     )
   }
-} 
+}

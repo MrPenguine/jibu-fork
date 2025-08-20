@@ -21,27 +21,25 @@ export class InvitationService {
   async create(createInvitationDto: CreateInvitationDto, invitedById: string) {
     this.logger.log(`Creating invitation for ${createInvitationDto.email} by user ${invitedById}`);
     
-    // Verify the user is a member of the organization with appropriate permissions
-    const membership = await this.prisma.organizationMembership.findFirst({
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId: invitedById,
-        organizationId: createInvitationDto.organizationId,
+        workspaceId: createInvitationDto.workspaceId,
         role: {
-          in: ['ADMIN', 'OWNER'],
+          in: ['admin', 'owner'],
         },
-        status: 'ACTIVE',
+        status: 'active',
       },
     });
 
     if (!membership) {
-      throw new BadRequestException('You do not have permission to invite members to this organization');
+      throw new BadRequestException('You do not have permission to invite members to this workspace');
     }
 
-    // Check if an active invitation already exists for this email and organization
     const existingInvitation = await this.prisma.invitation.findFirst({
       where: {
         email: createInvitationDto.email,
-        organizationId: createInvitationDto.organizationId,
+        workspaceId: createInvitationDto.workspaceId,
         status: 'PENDING',
       },
     });
@@ -50,18 +48,15 @@ export class InvitationService {
       throw new BadRequestException('An invitation has already been sent to this email');
     }
 
-    // Generate a secure random token
     const token = randomBytes(32).toString('hex');
     
-    // Set expiration date (default: 7 days)
     const expirationDays = this.configService.get<number>('INVITATION_EXPIRY_DAYS', 7);
     const expiresAt = add(new Date(), { days: expirationDays });
 
-    // Create the invitation
     return this.prisma.invitation.create({
       data: {
         email: createInvitationDto.email,
-        organizationId: createInvitationDto.organizationId,
+        workspaceId: createInvitationDto.workspaceId,
         role: createInvitationDto.role,
         token,
         invitedById,
@@ -72,28 +67,27 @@ export class InvitationService {
   }
 
   /**
-   * Get all invitations for an organization
+   * Get all invitations for a workspace
    */
-  async findAllByOrganization(organizationId: string, userId: string) {
-    // Verify the user is a member of the organization with appropriate permissions
-    const membership = await this.prisma.organizationMembership.findFirst({
+  async findAllByWorkspace(workspaceId: string, userId: string) {
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId,
-        organizationId,
+        workspaceId,
         role: {
-          in: ['ADMIN', 'OWNER'],
+          in: ['admin', 'owner'],
         },
-        status: 'ACTIVE',
+        status: 'active',
       },
     });
 
     if (!membership) {
-      throw new BadRequestException('You do not have permission to view invitations for this organization');
+      throw new BadRequestException('You do not have permission to view invitations for this workspace');
     }
 
     return this.prisma.invitation.findMany({
       where: {
-        organizationId,
+        workspaceId,
       },
       include: {
         invitedBy: {
@@ -120,7 +114,7 @@ export class InvitationService {
     const invitation = await this.prisma.invitation.findUnique({
       where: { id },
       include: {
-        organization: true,
+        workspace: true,
         invitedBy: {
           select: {
             id: true,
@@ -138,15 +132,14 @@ export class InvitationService {
       throw new NotFoundException(`Invitation with ID ${id} not found`);
     }
 
-    // Verify the user is a member of the organization with appropriate permissions
-    const membership = await this.prisma.organizationMembership.findFirst({
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId,
-        organizationId: invitation.organizationId,
+        workspaceId: invitation.workspaceId,
         role: {
-          in: ['ADMIN', 'OWNER'],
+          in: ['admin', 'owner'],
         },
-        status: 'ACTIVE',
+        status: 'active',
       },
     });
 
@@ -164,7 +157,7 @@ export class InvitationService {
     const invitation = await this.prisma.invitation.findUnique({
       where: { token },
       include: {
-        organization: true,
+        workspace: true,
         invitedBy: {
           select: {
             id: true,
@@ -182,9 +175,7 @@ export class InvitationService {
       throw new NotFoundException('Invitation not found');
     }
 
-    // Check if the invitation has expired
     if (invitation.status === 'EXPIRED' || invitation.expiresAt < new Date()) {
-      // Update the status to EXPIRED if it's not already
       if (invitation.status !== 'EXPIRED') {
         await this.prisma.invitation.update({
           where: { id: invitation.id },
@@ -194,7 +185,6 @@ export class InvitationService {
       throw new BadRequestException('This invitation has expired');
     }
 
-    // Check if the invitation has been revoked
     if (invitation.status === 'REVOKED') {
       throw new BadRequestException('This invitation has been revoked');
     }
@@ -214,15 +204,14 @@ export class InvitationService {
       throw new NotFoundException(`Invitation with ID ${id} not found`);
     }
 
-    // Verify the user is a member of the organization with appropriate permissions
-    const membership = await this.prisma.organizationMembership.findFirst({
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId,
-        organizationId: invitation.organizationId,
+        workspaceId: invitation.workspaceId,
         role: {
-          in: ['ADMIN', 'OWNER'],
+          in: ['admin', 'owner'],
         },
-        status: 'ACTIVE',
+        status: 'active',
       },
     });
 
@@ -248,15 +237,14 @@ export class InvitationService {
       throw new NotFoundException(`Invitation with ID ${id} not found`);
     }
 
-    // Verify the user is a member of the organization with appropriate permissions
-    const membership = await this.prisma.organizationMembership.findFirst({
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId,
-        organizationId: invitation.organizationId,
+        workspaceId: invitation.workspaceId,
         role: {
-          in: ['ADMIN', 'OWNER'],
+          in: ['admin', 'owner'],
         },
-        status: 'ACTIVE',
+        status: 'active',
       },
     });
 
@@ -264,14 +252,11 @@ export class InvitationService {
       throw new BadRequestException('You do not have permission to resend this invitation');
     }
 
-    // Generate a new token
     const token = randomBytes(32).toString('hex');
     
-    // Set new expiration date
     const expirationDays = this.configService.get<number>('INVITATION_EXPIRY_DAYS', 7);
     const expiresAt = add(new Date(), { days: expirationDays });
 
-    // Update the invitation
     return this.prisma.invitation.update({
       where: { id },
       data: {

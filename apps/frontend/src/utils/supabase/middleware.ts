@@ -90,14 +90,19 @@ export async function updateSession(request: NextRequest) {
   ) {
     const redirectUrl = request.nextUrl.clone()
     try {
-      const apiUrl = new URL('/api/auth/get-user-org', request.nextUrl)
-      const orgResp = await fetch(apiUrl.toString(), {
+      const apiUrl = new URL('/api/auth/get-user-context', request.nextUrl)
+      const wsResp = await fetch(apiUrl.toString(), {
         // Forward cookies so the internal API sees the session
         headers: { cookie: request.headers.get('cookie') ?? '' },
       })
-      if (orgResp.ok) {
-        const data = await orgResp.json()
-        const workspaceId = data?.organization?.id
+      if (wsResp.ok) {
+        const data = await wsResp.json()
+        // Be flexible with response shapes
+        const workspaceId =
+          data?.workspace?.id ||
+          data?.activeWorkspace?.id ||
+          data?.lastWorkspace?.id ||
+          data?.workspaceId
         if (workspaceId) {
           redirectUrl.pathname = `/workspace/${workspaceId}`
           return NextResponse.redirect(redirectUrl)
@@ -107,7 +112,7 @@ export async function updateSession(request: NextRequest) {
       // ignore and fallback below
     }
     // Standard fallback if we can't resolve a workspace
-    redirectUrl.pathname = '/organizations'
+    redirectUrl.pathname = '/workspaces'
     return NextResponse.redirect(redirectUrl)
   }
 

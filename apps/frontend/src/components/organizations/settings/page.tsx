@@ -10,27 +10,27 @@ import {
 } from "@libs/shadcn-ui/components/ui/custom-card";
 import { Separator } from "@libs/shadcn-ui/components/ui/separator";
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton";
-import OrganizationSettings from "@libs/shadcn-ui/components/organization/OrganizationSettings";
-import ServerUrlSettings from "@libs/shadcn-ui/components/organization/ServerUrlSettings";
-import DeleteOrganization from "@libs/shadcn-ui/components/organization/DeleteOrganization";
-import { RoleGuard } from "@libs/shadcn-ui/components/organization/RoleGuard";
-import { useOrganization } from "../../../../utils/organizationContext";
+import WorkspaceSettings from "@libs/shadcn-ui/components/workspace/WorkspaceSettings";
+import ServerUrlSettings from "@libs/shadcn-ui/components/workspace/ServerUrlSettings";
+import DeleteWorkspace from "@libs/shadcn-ui/components/workspace/DeleteWorkspace";
+import { RoleGuard } from "@libs/shadcn-ui/components/workspace/RoleGuard";
+import { useWorkspace } from "../../../../utils/workspaceContext";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@libs/shadcn-ui/components/ui/alert";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function OrganizationSettingsPage() {
-  const { activeOrganization, loading } = useOrganization();
+export default function WorkspaceSettingsPage() {
+  const { activeWorkspace, loading } = useWorkspace();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && activeOrganization?.id) {
-      router.replace(`/workspace/${activeOrganization.id}/settings`);
+    if (!loading && activeWorkspace?.id) {
+      router.replace(`/workspace/${activeWorkspace.id}/settings`);
     }
-  }, [loading, activeOrganization?.id, router]);
+  }, [loading, activeWorkspace?.id, router]);
 
-  if (loading || !activeOrganization) {
+  if (loading || !activeWorkspace) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
         <div className="max-w-[1600px] mx-auto">
@@ -51,15 +51,15 @@ export default function OrganizationSettingsPage() {
     );
   }
 
-  const isEditor = activeOrganization.role === 'editor';
+  const isEditor = activeWorkspace.role === 'editor';
 
   return (
     <div className="w-full px-6 pb-6 pt-0">
       <div className="max-w-[1600px] mx-auto">
         <div className="mt-0">
-          <h1 className="text-3xl font-bold tracking-tight">{activeOrganization.name}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{activeWorkspace.name}</h1>
           <p className="text-muted-foreground">
-            Manage organization settings and preferences.
+            Manage workspace settings and preferences.
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export default function OrganizationSettingsPage() {
             <Alert className="bg-blue-50 border-blue-200">
               <AlertCircle className="h-4 w-4 text-blue-600" />
               <AlertDescription>
-                You have view-only access to organization settings. Contact an admin or owner for changes.
+                You have view-only access to workspace settings. Contact an admin or owner for changes.
               </AlertDescription>
             </Alert>
           </div>
@@ -81,26 +81,26 @@ export default function OrganizationSettingsPage() {
             {isEditor ? (
               <CustomCard>
                 <CustomCardHeader>
-                  <CardTitle>Organization Settings</CardTitle>
+                  <CardTitle>Workspace Settings</CardTitle>
                   <CardDescription>
-                    View your organization's basic information
+                    View your workspace's basic information
                   </CardDescription>
                 </CustomCardHeader>
                 <CustomCardContent>
-                  <OrganizationSettings readOnly={true} />
+                  <WorkspaceSettings readOnly={true} />
                 </CustomCardContent>
               </CustomCard>
             ) : (
               <RoleGuard allowedRoles={["owner", "admin"]}>
                 <CustomCard>
                   <CustomCardHeader>
-                    <CardTitle>Organization Settings</CardTitle>
+                    <CardTitle>Workspace Settings</CardTitle>
                     <CardDescription>
-                      Update your organization's basic information
+                      Update your workspace's basic information
                     </CardDescription>
                   </CustomCardHeader>
                   <CustomCardContent>
-                    <OrganizationSettings />
+                    <WorkspaceSettings />
                   </CustomCardContent>
                 </CustomCard>
               </RoleGuard>
@@ -115,7 +115,7 @@ export default function OrganizationSettingsPage() {
                 <CustomCardHeader>
                   <CardTitle>Server URLs</CardTitle>
                   <CardDescription>
-                    View server URLs for your organization
+                    View server URLs for your workspace
                   </CardDescription>
                 </CustomCardHeader>
                 <CustomCardContent>
@@ -128,7 +128,7 @@ export default function OrganizationSettingsPage() {
                   <CustomCardHeader>
                     <CardTitle>Server URLs</CardTitle>
                     <CardDescription>
-                      Configure server URLs for your organization
+                      Configure server URLs for your workspace
                     </CardDescription>
                   </CustomCardHeader>
                   <CustomCardContent>
@@ -148,11 +148,11 @@ export default function OrganizationSettingsPage() {
                   <CustomCardHeader>
                     <CardTitle className="text-destructive">Danger Zone</CardTitle>
                     <CardDescription>
-                      Permanently delete this organization and all associated data
+                      Permanently delete this workspace and all associated data
                     </CardDescription>
                   </CustomCardHeader>
                   <CustomCardContent>
-                    <DeleteOrganization />
+                    <DeleteWorkspace />
                   </CustomCardContent>
                 </CustomDangerCard>
               </RoleGuard>

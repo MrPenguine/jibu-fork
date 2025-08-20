@@ -152,7 +152,7 @@ interface ModelConfigProps {
   maxTokens: number;
   assistantId?: string;
   knowledgeBaseId?: string;
-  organizationId?: string;
+  workspaceId?: string;
   modelPreference?: 'latency' | 'balance' | 'capability';
   onFirstMessageChange: (value: string) => void;
   onSystemPromptChange: (value: string) => void;
@@ -173,7 +173,7 @@ export function ModelConfig({
   maxTokens,
   assistantId,
   knowledgeBaseId,
-  organizationId,
+  workspaceId,
   modelPreference = 'latency',
   onFirstMessageChange,
   onSystemPromptChange,
@@ -270,7 +270,7 @@ export function ModelConfig({
   // Fetch models on component mount
   useEffect(() => {
     fetchModels();
-  }, [organizationId]);
+  }, [workspaceId]);
   
   // Filter models based on selected provider
   const filteredModels = useMemo(() => {

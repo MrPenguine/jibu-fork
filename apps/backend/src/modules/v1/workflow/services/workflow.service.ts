@@ -19,25 +19,25 @@ export class WorkflowService {
   ) {}
 
   /**
-   * Find all workflows for an agent, scoped by organizationId
+   * Find all workflows for an agent, scoped by workspaceId
    */
-  async getAgentWorkflows(agentId: string, organizationId: string) {
+  async getAgentWorkflows(agentId: string, workspaceId: string) {
     // Verify the agent exists and belongs to the organization
     const agent = await this.prisma.agent.findFirst({
       where: {
         id: agentId,
-        organizationId
+        workspaceId
       },
     });
 
     if (!agent) {
-      throw new Error(`Agent with ID "${agentId}" not found in organization ${organizationId}`);
+      throw new Error(`Agent with ID "${agentId}" not found in organization ${workspaceId}`);
     }
 
     const workflows = await this.prisma.workflow.findMany({
       where: { 
         agentId,
-        organizationId
+        workspaceId
       },
       include: {
         masterWorkflow: {
@@ -100,8 +100,8 @@ export class WorkflowService {
         agent: {
           connect: { id: agentId }
         },
-        organization: data.organizationId ? {
-          connect: { id: data.organizationId }
+        workspace: data.workspaceId ? {
+          connect: { id: data.workspaceId }
         } : undefined,
       },
     });
@@ -114,7 +114,7 @@ export class WorkflowService {
     masterWorkflowId: string,
     data: CreateSecondaryWorkflowDto,
     agentId: string,
-    organizationId: string,
+    workspaceId: string,
   ) {
     const masterWorkflow = await this.prisma.workflow.findUnique({
       where: { id: masterWorkflowId },
@@ -143,8 +143,8 @@ export class WorkflowService {
         agent: {
           connect: { id: agentId }
         },
-        organization: {
-          connect: { id: organizationId }
+        workspace: {
+          connect: { id: workspaceId }
         },
       },
     });
@@ -154,30 +154,33 @@ export class WorkflowService {
    * Update a workflow
    */
   async updateWorkflow(id: string, data: UpdateWorkflowDto) {
-    const workflow = await this.prisma.workflow.findUnique({
+    return this.prisma.workflow.upsert({
       where: { id },
-      include: {
-        n8nWorkflow: true
-      }
-    });
-
-    if (!workflow) {
-      throw new Error('Workflow not found');
-    }
-
-    // Update the workflow in the database
-    const updatedWorkflow = await this.prisma.workflow.update({
-      where: { id },
-      data: {
-        ...data,
-        nodes: data.nodes || workflow.nodes,
-        edges: data.edges || workflow.edges,
+      update: {
+        name: data.name,
+        description: data.description,
+        nodes: data.nodes,
+        edges: data.edges,
+        startNodeId: data.startNodeId,
+        isPublished: data.isPublished,
+      },
+      create: {
+        id,
+        name: data.name || 'Untitled Workflow',
+        description: data.description,
+        nodes: data.nodes || {},
+        edges: data.edges || {},
+        startNodeId: data.startNodeId,
+        isPublished: data.isPublished || false,
+        workflowType: WorkflowType.MASTER, // Default to MASTER
+        agent: {
+          connect: { id: data.agentId },
+        },
+        workspace: {
+          connect: { id: data.workspaceId },
+        },
       },
     });
-
-    // N8N synchronization has been removed
-
-    return updatedWorkflow;
   }
 
   /**
@@ -216,9 +219,6 @@ export class WorkflowService {
   async deleteWorkflow(id: string) {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id },
-      include: {
-        n8nWorkflow: true
-      }
     });
 
     if (!workflow) {

@@ -42,7 +42,7 @@ import {
 import axios from 'axios'
 
 // Define VoiceProvider type - currently only ElevenLabs is supported
-type VoiceProvider = 'elevenlabs';
+type VoiceProvider = 'elevenlabs' | 'azure';
 
 // Import the getVoices and playVoiceSample functions from voicesApi
 import { getVoices, playVoiceSample, stopAllAudio } from "../../../../../apps/frontend/src/utils/voicesApi";
@@ -93,7 +93,8 @@ interface ElevenLabsVoiceDto {
 
 // Voice provider options - only ElevenLabs is supported
 const VOICE_PROVIDERS = [
-  { id: 'elevenlabs', name: 'Eleven Labs' }
+  { id: 'elevenlabs', name: 'Eleven Labs' },
+  { id: 'azure', name: 'Azure' }
 ];
 
 // Default voice settings
@@ -275,7 +276,7 @@ export function VoiceConfig({
           // This ensures consistency with the backend's expected format
           onVoiceSettingsChange({
             voiceId: voiceId,
-            provider: "11labs", // Backend expects '11labs' not 'elevenlabs'
+            provider: voiceProvider === 'elevenlabs' ? '11labs' : voiceProvider,
             similarityBoost: newSettings.similarity,
             stability: newSettings.stability,
             model: newSettings.model,
@@ -390,7 +391,7 @@ export function VoiceConfig({
         // Create updated settings object
         const updatedSettings = {
           voiceId: value,
-          provider: "11labs", // Backend expects '11labs' not 'elevenlabs'
+          provider: voiceProvider === 'elevenlabs' ? '11labs' : voiceProvider,
           similarityBoost: settings.similarity,
           stability: settings.stability,
           model: settings.model,

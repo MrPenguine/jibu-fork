@@ -20,7 +20,7 @@ import { getAgentWebhookUrl, sendStreamingWebhookMessage } from '../../../../../
 import { playTextToSpeech, stopTextToSpeech, isTtsPlaying } from '../../../../../apps/frontend/src/utils/ttsUtils';
 
 // Organization context
-import { useOrganization } from '../../../../../apps/frontend/src/utils/organizationContext';
+import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext';
 
 // --- Interfaces ---
 interface Message {
@@ -136,7 +136,7 @@ export default function AgentChat({
   children
 }: AgentChatProps) {
   // Organization context
-  const { activeOrganizationId } = useOrganization();
+  const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
 
   // State
@@ -170,7 +170,7 @@ export default function AgentChat({
     }
     try {
       setIsInitialized(false);
-      const agent = await agentApi.agentApiClient.getAgent(agentId, activeOrganizationId);
+      const agent = await agentApi.agentApiClient.getAgent(agentId, activeWorkspaceId);
       setAgentDetails(agent);
       
       // Set agent name if not provided in props
@@ -189,7 +189,7 @@ export default function AgentChat({
       }
       
       // Fetch the webhook URL for this agent
-      const webhookUrlResult = await getAgentWebhookUrl(agentId, activeOrganizationId);
+      const webhookUrlResult = await getAgentWebhookUrl(agentId, activeWorkspaceId);
       if (webhookUrlResult) {
         setWebhookUrl(webhookUrlResult);
         console.log('Agent webhook URL found:', webhookUrlResult);
@@ -202,13 +202,13 @@ export default function AgentChat({
       console.error('Error fetching agent details:', error);
       toast({ title: 'Error', description: 'Failed to load agent details', variant: 'destructive' });
     }
-  }, [isOpen, agentId, activeOrganizationId, initialAgentName, checkPublishStatus, toast]);
+  }, [isOpen, agentId, activeWorkspaceId, initialAgentName, checkPublishStatus, toast]);
 
   const fetchUserChats = useCallback(async () => {
     if (!agentId) return;
     try {
       setIsLoadingChats(true);
-      const chats = await chatApi.listChats(agentId, 'agent', 'chat', activeOrganizationId);
+      const chats = await chatApi.listChats(agentId, 'agent', 'chat', activeWorkspaceId);
       // Convert Chat[] to ChatSession[] by ensuring all properties match the expected types
       const chatSessions: ChatSession[] = chats.map((chat: chatApi.Chat) => ({
         id: chat.id,
@@ -223,13 +223,13 @@ export default function AgentChat({
     } finally {
       setIsLoadingChats(false);
     }
-  }, [agentId, activeOrganizationId, toast]);
+  }, [agentId, activeWorkspaceId, toast]);
 
   const fetchChatMessages = useCallback(async (chatId: string) => {
     try {
       setIsLoadingMessages(true);
       setShowingChatList(false);
-      const apiMessages = await chatApi.getChatMessages(chatId, activeOrganizationId);
+      const apiMessages = await chatApi.getChatMessages(chatId, activeWorkspaceId);
       const formattedMessages = (apiMessages || []).map((msg: any) => ({
         id: msg.id,
         text: msg.content,
@@ -244,7 +244,7 @@ export default function AgentChat({
     } finally {
       setIsLoadingMessages(false);
     }
-  }, [activeOrganizationId, toast]);
+  }, [activeWorkspaceId, toast]);
 
   const handleNewChat = () => {
     setCurrentChatId(null);
@@ -255,7 +255,7 @@ export default function AgentChat({
 
   const handleDeleteChat = async (chatId: string) => {
     try {
-      await chatApi.deleteChat(chatId, activeOrganizationId);
+      await chatApi.deleteChat(chatId, activeWorkspaceId);
       toast({ title: 'Success', description: 'Chat deleted successfully.' });
       if (currentChatId === chatId) {
         setShowingChatList(true);
@@ -290,7 +290,7 @@ export default function AgentChat({
 
     try {
       if (!chatId) {
-        const newChat = await chatApi.createChat(agentId, currentInput.substring(0, 30), activeOrganizationId, true);
+        const newChat = await chatApi.createChat(agentId, currentInput.substring(0, 30), activeWorkspaceId, true);
         if (!newChat) {
           throw new Error('Failed to create new chat');
         }
@@ -384,7 +384,7 @@ export default function AgentChat({
         console.log(`Final request config:`, request.config);
         
         await agentApi.sendStreamingAgentRequest(request, {
-          headers: { 'X-Organization-ID': activeOrganizationId },
+          headers: { 'X-Organization-ID': activeWorkspaceId },
           onToken: (token) => {
             agentResponseRef.current += token;
             setMessages((prev) =>
@@ -454,7 +454,7 @@ export default function AgentChat({
       try {
         if (!currentChatId) return;
         
-        const apiMessages = await chatApi.getChatMessages(currentChatId, activeOrganizationId);
+        const apiMessages = await chatApi.getChatMessages(currentChatId, activeWorkspaceId);
         const latestMessages = (apiMessages || []).map((msg: any) => ({
           id: msg.id,
           text: msg.content,
@@ -476,7 +476,7 @@ export default function AgentChat({
     return () => {
       clearInterval(pollingInterval);
     };
-  }, [currentChatId, activeOrganizationId, loading, isLoadingMessages, messages]);
+  }, [currentChatId, activeWorkspaceId, loading, isLoadingMessages, messages]);
 
   useEffect(() => {
     return () => {

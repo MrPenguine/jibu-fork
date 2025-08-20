@@ -14,12 +14,12 @@ import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { AuthGuard } from '@nestjs/passport';
 import { ConsoleService } from './console.service';
 import { LogEntryDto } from './dto/log-entry.dto';
-import { OrgRoleGuard } from '../../../core/auth/guards/org-role.guard';
+import { WorkspaceRoleGuard } from '../../../core/auth/guards/workspace-role.guard';
 import { Request } from 'express';
 
 @ApiTags('console')
 @Controller('v1/console')
-@UseGuards(AuthGuard('jwt'), OrgRoleGuard)
+@UseGuards(AuthGuard('jwt'), WorkspaceRoleGuard)
 @ApiBearerAuth()
 export class ConsoleController {
   constructor(private readonly consoleService: ConsoleService) {}
@@ -34,12 +34,12 @@ export class ConsoleController {
     @Query('sessionId') sessionId: string,
     @Req() req: Request
   ) {
-    const organizationId = req.headers['x-organization-id'] as string;
+    const workspaceId = req.headers['x-workspace-id'] as string;
     
-    // Verify assistant exists in this organization
-    const isValid = await this.consoleService.verifyAssistant(assistantId, organizationId);
+    // Verify assistant exists in this workspace
+    const isValid = await this.consoleService.verifyAssistant(assistantId, workspaceId);
     if (!isValid) {
-      throw new NotFoundException('Assistant not found or not accessible in this organization');
+      throw new NotFoundException('Assistant not found or not accessible in this workspace');
     }
     
     return this.consoleService.logMessage(
@@ -60,12 +60,12 @@ export class ConsoleController {
     @Query('sessionId') sessionId: string,
     @Req() req: Request
   ) {
-    const organizationId = req.headers['x-organization-id'] as string;
+    const workspaceId = req.headers['x-workspace-id'] as string;
     
-    // Verify assistant exists in this organization
-    const isValid = await this.consoleService.verifyAssistant(assistantId, organizationId);
+    // Verify assistant exists in this workspace
+    const isValid = await this.consoleService.verifyAssistant(assistantId, workspaceId);
     if (!isValid) {
-      throw new NotFoundException('Assistant not found or not accessible in this organization');
+      throw new NotFoundException('Assistant not found or not accessible in this workspace');
     }
     
     return this.consoleService.getConsoleEntries(assistantId, sessionId);
@@ -80,12 +80,12 @@ export class ConsoleController {
     @Query('sessionId') sessionId: string,
     @Req() req: Request
   ) {
-    const organizationId = req.headers['x-organization-id'] as string;
+    const workspaceId = req.headers['x-workspace-id'] as string;
     
-    // Verify assistant exists in this organization
-    const isValid = await this.consoleService.verifyAssistant(assistantId, organizationId);
+    // Verify assistant exists in this workspace
+    const isValid = await this.consoleService.verifyAssistant(assistantId, workspaceId);
     if (!isValid) {
-      throw new NotFoundException('Assistant not found or not accessible in this organization');
+      throw new NotFoundException('Assistant not found or not accessible in this workspace');
     }
     
     const success = await this.consoleService.clearConsole(assistantId, sessionId);

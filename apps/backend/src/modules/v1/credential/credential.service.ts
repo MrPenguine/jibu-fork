@@ -11,19 +11,19 @@ export class CredentialService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async createCredential(body: CreateCredentialDto, orgId: string, userId: string) {
+  async createCredential(body: CreateCredentialDto, workspaceId: string, userId: string) {
     const { type, name, data } = body;
     const credentialId = randomUUID();
     const provider = 'custom'; // Or extract from body if needed
 
     // 1. Store secret in Vault
-    await this.vaultService.writeSecret('credentials', orgId, credentialId, data, userId);
+    await this.vaultService.writeSecret('credentials', workspaceId, credentialId, data, userId);
 
     // 2. Store metadata in DB
     const created = await this.prisma.credential.create({
       data: {
         id: credentialId,
-        organizationId: orgId,
+        workspaceId: workspaceId,
         provider,
         type,
         name,
@@ -35,37 +35,37 @@ export class CredentialService {
     return { id: created.id, name: created.name, type: created.type };
   }
 
-  async listCredentials(orgId: string) {
+  async listCredentials(workspaceId: string) {
     return this.prisma.credential.findMany({
-      where: { organizationId: orgId },
+      where: { workspaceId: workspaceId },
       select: { id: true, name: true, type: true, createdAt: true, updatedAt: true },
     });
   }
 
-  async getCredential(id: string, orgId: string, userId: string) {
+  async getCredential(id: string, workspaceId: string, userId: string) {
     // 1. Get metadata from DB
     const meta = await this.prisma.credential.findUnique({ where: { id } });
     if (!meta) return null;
     // 2. Get secret from Vault
-    const secret = await this.vaultService.readSecret('credentials', orgId, id, userId);
+    const secret = await this.vaultService.readSecret('credentials', workspaceId, id, userId);
     return { ...meta, secret };
   }
 
-  async deleteCredential(id: string, orgId: string, userId: string) {
+  async deleteCredential(id: string, workspaceId: string, userId: string) {
     // 1. Get metadata from DB
     const meta = await this.prisma.credential.findUnique({ where: { id } });
     if (!meta) return null;
     // 2. Delete from Vault
-    await this.vaultService.deleteSecret('credentials', orgId, id, userId);
+    await this.vaultService.deleteSecret('credentials', workspaceId, id, userId);
     // 3. Delete metadata from DB
     await this.prisma.credential.delete({ where: { id } });
     return { id };
   }
 
-  async updateCredential(id: string, orgId: string, userId: string, data: { name?: string; type?: string }) {
+  async updateCredential(id: string, workspaceId: string, userId: string, data: { name?: string; type?: string }) {
     return this.prisma.credential.update({
       where: { id },
       data,
     });
   }
-} 
+}

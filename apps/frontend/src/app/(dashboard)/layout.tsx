@@ -16,7 +16,7 @@ import {
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { logout } from "../../utils/auth/actions"
 import { Toaster } from "@libs/shadcn-ui/components/ui/toaster"
-import { OrganizationProvider } from "../../utils/organizationContext"
+import { WorkspaceProvider } from "../../utils/workspaceContext"
 import { usePathname } from "next/navigation"
 import { useMemo } from "react"
 
@@ -53,12 +53,12 @@ function DynamicBreadcrumbs() {
       // Format the label (capitalize, replace hyphens with spaces)
       let label = part.replace(/-/g, ' ');
       
-      // Special case for organizations paths
-      if (part === 'organizations' && isLast) {
-        label = 'Organizations';
-      } else if (part === 'organizations' && !isLast) {
-        label = 'Organizations';
-      } else if (part === 'settings' && parts[index-1] === 'organizations') {
+      // Special case for workspace paths
+      if (part === 'workspace' && isLast) {
+        label = 'Workspaces';
+      } else if (part === 'workspace' && !isLast) {
+        label = 'Workspaces';
+      } else if (part === 'settings' && parts[index-1] === 'workspace') {
         label = 'Settings';
       }
       
@@ -110,7 +110,7 @@ export default function DashboardLayout({
   return (
     <div className="relative flex min-h-screen w-full flex-col">
       <SidebarProvider>
-        <OrganizationProvider>
+        <WorkspaceProvider>
             {!isAgentPage && <CustomAppSidebar navUserProps={{ onLogout: handleLogout }} />}
             <SidebarInset className="flex flex-col w-full">
               {!isAgentPage && (
@@ -125,7 +125,7 @@ export default function DashboardLayout({
               </main>
             </SidebarInset>
             <Toaster />
-        </OrganizationProvider>
+        </WorkspaceProvider>
       </SidebarProvider>
     </div>
   )

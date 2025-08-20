@@ -60,7 +60,7 @@ export async function createN8nWorkflow(template: WebhookWorkflowTemplate): Prom
     // Fallback for direct workflow response (legacy support)
     const workflow = result;
     const webhookNode = workflow.nodes?.find((node: any) => 
-      node.type === 'n8n-nodes-base.webhook'
+      node.type === 'n8n-nodes-base.chatTrigger'
     );
     
     let webhookUrl = '';
@@ -187,24 +187,21 @@ export function extractWebhookInfo(workflow: N8nWorkflowResponse): { webhookUrl:
     hasChatTrigger: false
   };
   
-  // Look for webhook node first (legacy support)
-  const webhookNode = workflow.nodes?.find((node: any) => 
-    node.type === 'n8n-nodes-base.webhook'
-  );
-  
-  if (webhookNode?.parameters?.webhookId || webhookNode?.webhookId) {
-    const webhookId = webhookNode.parameters?.webhookId || webhookNode.webhookId;
-    result.webhookUrl = `${process.env.NEXT_PUBLIC_N8N_WEBHOOK_BASE_URL || 'http://localhost:5678'}/webhook/${webhookId}`;
-  }
-  
   // Look for Chat Trigger node
   const chatTriggerNode = workflow.nodes?.find((node: any) => 
-    node.type === '@n8n/n8n-nodes-langchain.chatTrigger'
+    node.type === 'n8n-nodes-base.chatTrigger'
   );
-  
-  if (chatTriggerNode?.webhookId) {
-    result.triggerRef = chatTriggerNode.webhookId;
+
+  if (chatTriggerNode) {
     result.hasChatTrigger = true;
+    if (chatTriggerNode.webhookId) {
+      result.triggerRef = chatTriggerNode.webhookId;
+    }
+    // Also check for webhookId in parameters for consistency
+    if (chatTriggerNode.parameters?.webhookId) {
+      const webhookId = chatTriggerNode.parameters.webhookId;
+      result.webhookUrl = `${process.env.NEXT_PUBLIC_N8N_WEBHOOK_BASE_URL || 'http://localhost:5678'}/webhook/${webhookId}`;
+    }
   }
   
   return result;

@@ -28,14 +28,18 @@ export function RoleGuard(...roles: string[]) {
       }
 
       // Get the user's role from the membership
-      const userRole = membership.role;
+      const userRoleRaw = membership.role;
+      const userRole = typeof userRoleRaw === 'string' ? userRoleRaw.toLowerCase() : '';
+      const requiredRoles = roles.map(r => (typeof r === 'string' ? r.toLowerCase() : ''));
 
       // Check if the user has any of the required roles
-      const hasRequiredRole = roles.some(role => userRole === role);
+      const hasRequiredRole = requiredRoles.includes(userRole);
 
       if (!hasRequiredRole) {
-        this.logger.warn(`User ${user.id} with role ${userRole} attempted to access route requiring roles: ${roles.join(', ')}`);
-        throw new ForbiddenException(`Access denied: Required role(s): ${roles.join(', ')}`);
+        const userIdentifier = user?.userId ?? user?.id ?? 'unknown';
+        const requestedRolesLog = roles.join(', ');
+        this.logger.warn(`User ${userIdentifier} with role ${userRoleRaw} attempted to access route requiring roles: ${requestedRolesLog}`);
+        throw new ForbiddenException(`Access denied: Required role(s): ${requestedRolesLog}`);
       }
 
       return true;

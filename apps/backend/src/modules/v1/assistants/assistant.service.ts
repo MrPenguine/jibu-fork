@@ -25,13 +25,13 @@ export class AssistantService {
   ) {}
 
   /**
-   * Check if a user has access to an organization
+   * Check if a user has access to a workspace
    */
-  private async validateUserOrgAccess(userId: string, organizationId: string): Promise<boolean> {
-    const membership = await this.prisma.organizationMembership.findFirst({
+  private async validateUserWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
+    const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId,
-        organizationId,
+        workspaceId,
         status: 'active',
       },
     });
@@ -43,12 +43,12 @@ export class AssistantService {
    * Create a new assistant
    */
   async create(createAssistantDto: CreateAssistantDto, userId: string) {
-    const { organizationId, name, description, systemPrompt, templateId, knowledgeBaseId, model } = createAssistantDto;
+    const { workspaceId, name, description, systemPrompt, templateId, knowledgeBaseId, model } = createAssistantDto;
 
-    // Validate that the user has access to this organization
-    const hasAccess = await this.validateUserOrgAccess(userId, organizationId);
+    // Validate that the user has access to this workspace
+    const hasAccess = await this.validateUserWorkspaceAccess(userId, workspaceId);
     if (!hasAccess) {
-      throw new HttpException('User does not have access to this organization', HttpStatus.FORBIDDEN);
+      throw new HttpException('User does not have access to this workspace', HttpStatus.FORBIDDEN);
     }
 
     // Default values for firstMessage and voicemailMessage
@@ -89,7 +89,7 @@ export class AssistantService {
       const assistant = await this.prisma.assistant.create({
         data: {
           name,
-          organizationId,
+          workspaceId,
           // Optional fields
           ...(knowledgeBaseId && { knowledgeBaseId }),
           ...(modelConfig && { model: modelConfig }),
@@ -115,19 +115,19 @@ export class AssistantService {
   }
 
   /**
-   * Find all assistants for an organization
+   * Find all assistants for a workspace
    */
-  async findAllByOrganization(organizationId: string, userId: string) {
-    // Validate that the user has access to this organization
-    const hasAccess = await this.validateUserOrgAccess(userId, organizationId);
+  async findAllByWorkspace(workspaceId: string, userId: string) {
+    // Validate that the user has access to this workspace
+    const hasAccess = await this.validateUserWorkspaceAccess(userId, workspaceId);
     if (!hasAccess) {
-      throw new HttpException('User does not have access to this organization', HttpStatus.FORBIDDEN);
+      throw new HttpException('User does not have access to this workspace', HttpStatus.FORBIDDEN);
     }
 
-    // Get all assistants for this organization
+    // Get all assistants for this workspace
     return this.prisma.assistant.findMany({
       where: {
-        organizationId,
+        workspaceId,
       },
       orderBy: {
         createdAt: 'desc',
@@ -148,8 +148,8 @@ export class AssistantService {
       throw new HttpException('Assistant not found', HttpStatus.NOT_FOUND);
     }
 
-    // Validate that the user has access to this organization
-    const hasAccess = await this.validateUserOrgAccess(userId, assistant.organizationId);
+    // Validate that the user has access to this workspace
+    const hasAccess = await this.validateUserWorkspaceAccess(userId, assistant.workspaceId);
     if (!hasAccess) {
       throw new HttpException('User does not have access to this assistant', HttpStatus.FORBIDDEN);
     }
@@ -172,8 +172,8 @@ export class AssistantService {
       throw new HttpException('Assistant not found', HttpStatus.NOT_FOUND);
     }
 
-    // Validate that the user has access to this organization
-    const hasAccess = await this.validateUserOrgAccess(userId, assistant.organizationId);
+    // Validate that the user has access to this workspace
+    const hasAccess = await this.validateUserWorkspaceAccess(userId, assistant.workspaceId);
     if (!hasAccess) {
       throw new HttpException('User does not have access to this assistant', HttpStatus.FORBIDDEN);
     }
@@ -261,8 +261,8 @@ export class AssistantService {
       throw new HttpException('Assistant not found', HttpStatus.NOT_FOUND);
     }
 
-    // Validate that the user has access to this organization
-    const hasAccess = await this.validateUserOrgAccess(userId, assistant.organizationId);
+    // Validate that the user has access to this workspace
+    const hasAccess = await this.validateUserWorkspaceAccess(userId, assistant.workspaceId);
     if (!hasAccess) {
       throw new HttpException('User does not have access to this assistant', HttpStatus.FORBIDDEN);
     }

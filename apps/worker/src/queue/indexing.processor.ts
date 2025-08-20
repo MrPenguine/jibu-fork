@@ -72,7 +72,7 @@ export class IndexingProcessor {
       // 2. Get a signed download URL for the file using FileService
       const downloadUrl = await this.fileService.getDownloadUrl(
         source.file.id, 
-        source.organizationId
+        source.file.workspaceId
       );
       
       this.logger.debug(`Got signed download URL for file: ${source.file.name}`);
@@ -243,7 +243,8 @@ export class IndexingProcessor {
             fileId: source.sourcePointer,
             fileName: source.file.name,
             knowledgeBaseId: source.knowledgeBaseId,
-            organizationId: source.organizationId,
+            organizationId: job.data.organizationId,
+            workspaceId: source.file.workspaceId,
             chunkIndex: index
           }
         };

@@ -35,7 +35,7 @@ export class FileService {
   ) {}
 
   async uploadAndCreateFileMetadata(
-    orgId: string,
+    workspaceId: string,
     userId: string,
     file: MulterFile,
   ): Promise<FileResponseDto> {
@@ -43,10 +43,7 @@ export class FileService {
     const fileId = generateId();
     const storageKey = `${fileId}/${sanitizedName}`;
 
-    // Enhanced handling of userId - handle arrays, comma-separated strings, and other edge cases
     let cleanUserId = userId;
-    
-    // Handle arrays or comma-separated values
     if (userId?.includes(',')) {
       cleanUserId = userId.split(',')[0];
       this.logger.warn(`Received comma-separated userId: ${userId}, using first value: ${cleanUserId}`);
@@ -55,69 +52,30 @@ export class FileService {
       this.logger.warn(`Received array userId: ${userId}, using first value: ${cleanUserId}`);
     }
     
-    // Ensure userId is a proper string
     if (!cleanUserId || typeof cleanUserId !== 'string') {
       this.logger.error(`Invalid userId provided: ${userId}. Using default placeholder.`);
       cleanUserId = 'unknown-user';
     }
 
-    this.logger.log(`Uploading file ${sanitizedName} for organization ${orgId} by user ${cleanUserId}`);
+    this.logger.log(`Uploading file ${sanitizedName} for workspace ${workspaceId} by user ${cleanUserId}`);
     this.logger.log(`File details: size=${file.size} bytes, type=${file.mimetype}`);
 
     try {
-      // First check if organization exists
-      const organization = await this.prisma.organization.findUnique({
-        where: { id: orgId },
+      const workspace = await this.prisma.workspace.findUnique({
+        where: { id: workspaceId },
       });
 
-      if (!organization) {
-        this.logger.warn(`Organization with ID ${orgId} not found. Need to create it first.`);
-        
-        // Check if user exists
-        const user = await this.prisma.user.findUnique({
-          where: { id: cleanUserId },
-        });
-        
-        if (!user) {
-          this.logger.warn(`User with ID ${cleanUserId} not found. Creating user first.`);
-          
-          // Create user if not exists (basic info)
-          await this.prisma.user.create({
-            data: {
-              id: cleanUserId,
-              email: `${cleanUserId}@example.com`, // Placeholder email
-            },
-          });
-        }
-        
-        // Create organization
-        await this.prisma.organization.create({
-          data: {
-            id: orgId,
-            name: `Organization ${orgId.substring(0, 8)}`,
-            memberships: {
-              create: {
-                userId: cleanUserId,
-                role: 'admin',
-              },
-            },
-          },
-        });
-        
-        this.logger.log(`Created organization ${orgId} and linked to user ${cleanUserId}`);
-      } else {
-        this.logger.log(`Using existing organization: ${organization.name} (${orgId})`);
+      if (!workspace) {
+        throw new NotFoundException(`Workspace with ID ${workspaceId} not found`);
       }
 
-      // Upload to storage service
       const uploadResult = await this.storageService.upload(
         storageKey,
         file.buffer,
         file.mimetype,
-        orgId,
+        workspaceId,
       );
 
-      // Save metadata to database
       const fileRecord = await this.prisma.file.create({
         data: {
           name: sanitizedName,
@@ -125,21 +83,21 @@ export class FileService {
           storageKey: uploadResult.key,
           mimeType: file.mimetype,
           sizeBytes: file.size,
-          organizationId: orgId,
+          workspaceId: workspaceId,
           userId: cleanUserId,
         },
       });
 
-      this.logger.log(`File ${fileRecord.id} uploaded and metadata saved with organization ${orgId}`);
+      this.logger.log(`File ${fileRecord.id} uploaded and metadata saved with workspace ${workspaceId}`);
       return plainToInstance(FileResponseDto, fileRecord);
     } catch (error) {
-      this.logger.error(`File upload failed for organization ${orgId}: ${error.message}`, error.stack);
+      this.logger.error(`File upload failed for workspace ${workspaceId}: ${error.message}`, error.stack);
       throw error;
     }
   }
 
-  async findFilesByOrg(
-    orgId: string,
+  async findFilesByWorkspace(
+    workspaceId: string,
     paginationOptions?: { page?: number; pageSize?: number },
   ): Promise<ListFilesDto> {
     const page = paginationOptions?.page ?? 1;
@@ -149,7 +107,7 @@ export class FileService {
     try {
       const [files, total] = await Promise.all([
         this.prisma.file.findMany({
-          where: { organizationId: orgId },
+          where: { workspaceId: workspaceId },
           take: pageSize,
           skip,
           orderBy: { createdAt: 'desc' },
@@ -164,13 +122,12 @@ export class FileService {
             }
           }
         }),
-        this.prisma.file.count({ where: { organizationId: orgId } }),
+        this.prisma.file.count({ where: { workspaceId: workspaceId } }),
       ]);
 
       return plainToInstance(ListFilesDto, {
         data: files.map(file => {
           const fileDto = plainToInstance(FileResponseDto, file);
-          // Add uploader info if available
           if (file.user) {
             fileDto.uploader = {
               id: file.user.id,
@@ -186,14 +143,14 @@ export class FileService {
         pageSize,
       });
     } catch (error) {
-      this.logger.error(`Error finding files for org ${orgId}: ${error.message}`, error.stack);
+      this.logger.error(`Error finding files for workspace ${workspaceId}: ${error.message}`, error.stack);
       throw error;
     }
   }
 
-  async findFileById(fileId: string, orgId: string): Promise<FileResponseDto> {
+  async findFileById(fileId: string, workspaceId: string): Promise<FileResponseDto> {
     const file = await this.prisma.file.findFirst({
-      where: { id: fileId, organizationId: orgId },
+      where: { id: fileId, workspaceId: workspaceId },
       include: {
         user: {
           select: {
@@ -212,7 +169,6 @@ export class FileService {
 
     const fileDto = plainToInstance(FileResponseDto, file);
     
-    // Add uploader info if available
     if (file.user) {
       fileDto.uploader = {
         id: file.user.id,
@@ -227,10 +183,10 @@ export class FileService {
 
   async getFileMetadataForDownload(
     fileId: string,
-    orgId: string,
+    workspaceId: string,
   ): Promise<{ storageKey: string; name: string }> {
     const file = await this.prisma.file.findFirst({
-      where: { id: fileId, organizationId: orgId },
+      where: { id: fileId, workspaceId: workspaceId },
       select: { storageKey: true, name: true },
     });
 
@@ -241,16 +197,14 @@ export class FileService {
     return file;
   }
 
-  async getDownloadUrl(fileId: string, orgId: string): Promise<string> {
-    const metadata = await this.getFileMetadataForDownload(fileId, orgId);
-    return this.storageService.getSignedDownloadUrl(metadata.storageKey, orgId);
+  async getDownloadUrl(fileId: string, workspaceId: string): Promise<string> {
+    const metadata = await this.getFileMetadataForDownload(fileId, workspaceId);
+    return this.storageService.getSignedDownloadUrl(metadata.storageKey, workspaceId);
   }
 
-  async deleteFile(fileId: string, orgId: string, userId: string, isAdmin = false): Promise<void> {
-    // Enhanced handling of userId - handle arrays, comma-separated strings, and other edge cases
+  async deleteFile(fileId: string, workspaceId: string, userId: string, isAdmin = false): Promise<void> {
     let cleanUserId = userId;
     
-    // Handle arrays or comma-separated values
     if (userId?.includes(',')) {
       cleanUserId = userId.split(',')[0];
       this.logger.warn(`Received comma-separated userId for deletion: ${userId}, using first value: ${cleanUserId}`);
@@ -259,39 +213,34 @@ export class FileService {
       this.logger.warn(`Received array userId for deletion: ${userId}, using first value: ${cleanUserId}`);
     }
     
-    // Ensure userId is a proper string
     if (!cleanUserId || typeof cleanUserId !== 'string') {
       this.logger.error(`Invalid userId provided for deletion: ${userId}. Using default placeholder.`);
       cleanUserId = 'unknown-user';
     }
     
-    this.logger.log(`Delete request for file ${fileId} in organization ${orgId} by user ${cleanUserId}`);
+    this.logger.log(`Delete request for file ${fileId} in workspace ${workspaceId} by user ${cleanUserId}`);
     
-    // First get the file to check ownership
     const file = await this.prisma.file.findFirst({
-      where: { id: fileId, organizationId: orgId },
+      where: { id: fileId, workspaceId: workspaceId },
     });
     
     if (!file) {
       throw new NotFoundException(`File with ID ${fileId} not found`);
     }
     
-    // Only allow deletion if the user is the uploader or has admin permissions
     if (!isAdmin && file.userId !== cleanUserId) {
       this.logger.warn(`Permission denied: User ${cleanUserId} attempting to delete file ${fileId} owned by ${file.userId}`);
       throw new BadRequestException('You do not have permission to delete this file');
     }
     
     try {
-      // Delete from storage
-      await this.storageService.delete(file.storageKey, orgId);
+      await this.storageService.delete(file.storageKey, workspaceId);
       
-      // Delete metadata from database
       await this.prisma.file.delete({
         where: { id: fileId },
       });
       
-      this.logger.log(`File ${fileId} deleted successfully for org ${orgId} by user ${cleanUserId}`);
+      this.logger.log(`File ${fileId} deleted successfully for workspace ${workspaceId} by user ${cleanUserId}`);
     } catch (error) {
       this.logger.error(`Failed to delete file ${fileId}: ${error.message}`, error.stack);
       throw error;
