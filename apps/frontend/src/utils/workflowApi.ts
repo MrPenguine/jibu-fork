@@ -33,12 +33,16 @@ async function getAuthHeaders(workspaceId: string) {
     throw new Error('No authentication token available');
   }
   
+  // Provide common header casings to satisfy different backends
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
+    // Common variants
     'X-Workspace-ID': workspaceId,
-    'workspace-id': workspaceId
-  };
+    'X-Workspace-Id': workspaceId,
+    'x-workspace-id': workspaceId,
+    'workspace-id': workspaceId,
+  } as Record<string, string>;
 }
 
 // Interface for workflow creation
@@ -132,7 +136,7 @@ export const workflowApi = {
   },
 
   // Fetch a specific workflow by ID
-  async getWorkflow(workflowId: string, specificWorkspaceId?: string): Promise<WorkflowDefinition> {
+  async getWorkflow(workflowId: string, specificWorkspaceId?: string): Promise<WorkflowDefinition | null> {
     try {
       const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
       
@@ -150,8 +154,13 @@ export const workflowApi = {
       if (!response.ok) {
         throw new Error(`Failed to fetch workflow: ${response.statusText}`);
       }
-      
-      return response.json();
+      // Some environments may return 204 or an empty body for a new/unknown workflow.
+      const text = await response.text();
+      if (!text || text.trim().length === 0) {
+        console.warn('[workflowApi] getWorkflow received empty body');
+        return null;
+      }
+      return JSON.parse(text);
     } catch (error) {
       console.error('[workflowApi] Error fetching workflow:', error);
       throw error;
@@ -209,14 +218,15 @@ export const workflowApi = {
       const headers = await getAuthHeaders(workspaceId);
       
       console.log(`[workflowApi] Updating workflow ${workflowId} with data:`, data);
-      console.log(`[workflowApi] Using API URL: ${API_BASE_URL}/v1/workflows/${workflowId}`);
+      console.log(`[workflowApi] Using API URL: ${API_BASE_URL}/v1/workflows/${workflowId}?workspaceId=${workspaceId}`);
       
-      const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}`, {
+      const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}?workspaceId=${encodeURIComponent(workspaceId)}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
           ...data,
           agentId: data.assistantId, // Pass agentId for upsert
+          workspaceId,               // Include workspace in body as well
         }),
       });
       

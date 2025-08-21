@@ -5,9 +5,11 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Flag } from 'lucide-react';
 
 export const StartNode = memo(({ id, data, selected }: NodeProps) => {
+  const color = (data?.color as string) ?? (typeof window !== 'undefined' ? (window as any)?.__nodeColors?.[id] : undefined) ?? '#16a34a';
   return (
     <div
-      className={`inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-full text-white font-medium text-sm cursor-pointer transition-colors group ${selected ? 'ring-2 ring-green-400/60' : ''}`}
+      className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-white font-medium text-sm cursor-pointer transition-colors group ${selected ? 'ring-2 ring-green-400/60' : ''}`}
+      style={{ backgroundColor: color }}
     >
       {/* Hidden right-side handle (source), vertically centered */}
       <Handle

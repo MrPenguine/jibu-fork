@@ -5,9 +5,11 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Zap } from 'lucide-react';
 
 export const TriggerNode = memo(({ id, data, selected }: NodeProps) => {
+  const color = (data?.color as string) ?? (typeof window !== 'undefined' ? (window as any)?.__nodeColors?.[id] : undefined) ?? '#0f172a';
   return (
     <div
-      className={`inline-flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-900 rounded-full text-white font-medium text-sm cursor-pointer transition-colors group ${selected ? 'ring-2 ring-gray-400/60' : ''}`}
+      className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-white font-medium text-sm cursor-pointer transition-colors group ${selected ? 'ring-2 ring-gray-400/60' : ''}`}
+      style={{ backgroundColor: color }}
     >
       {/* Hidden right-side handle (source), vertically centered */}
       <Handle

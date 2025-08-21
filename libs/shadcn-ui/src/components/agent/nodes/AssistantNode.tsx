@@ -1,10 +1,10 @@
 "use client";
 
 import React, { memo, useState, useEffect, useCallback } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { NodeProps } from 'reactflow';
 import { AgentNodeType } from '../../../types';
-import { User, Play } from 'lucide-react';
-import { Card } from '../../ui/card';
+import { User } from 'lucide-react';
+import { PillNodeShell } from './PillNodeShell';
 import { getAssistant as fetchAssistant } from '../../../../../../apps/frontend/src/utils/AssistantsApi';
 
 // Define an Assistant interface to match what we get from the API
@@ -39,6 +39,7 @@ export interface AssistantNodeData {
   systemMessage?: string;
   firstMessage?: string;
   blockNumber?: number;
+  color?: string;
   model?: {
     provider?: string;
     model?: string; // Specific model identifier, e.g., 'gpt-4-turbo'
@@ -161,67 +162,22 @@ export const AssistantNode = memo<NodeProps<AssistantNodeData>>(({ id, data, sel
     }
   }, [id, onNodeDoubleClick]);
 
-  // No fixed dimensions; rely on utility classes for sizing
-  
+  // No fixed dimensions; rely on PillNodeShell sizing
+
   return (
-    <div 
-      className={`w-96 p-4 bg-slate-200/50 rounded-2xl border border-slate-300/50 group hover:bg-slate-200/70 transition-colors cursor-pointer ${selected ? 'ring-2 ring-slate-400' : ''}`}
+    <PillNodeShell
+      id={id}
+      selected={selected}
+      nodeTitle={nodeTitle}
+      roleTitle={roleTitle}
+      description={isLoading ? 'Loading...' : (error ? 'Error loading data' : (displaySystemMessage || truncatedFirstMessage))}
+      Icon={User}
+      blockNumber={blockNumber}
+      onTest={(nodeId) => data.onTest?.(nodeId)}
       onDoubleClick={handleDoubleClick}
-      data-type="assistantNode"
-      data-node-type="assistantNode"
-    >
-      {/* Hidden left handle (target), vertically centered */}
-      <Handle
-        id="in"
-        type="target"
-        position={Position.Left}
-        className="w-2 h-2 opacity-0 bg-transparent"
-        style={{ left: -6, top: '50%', transform: 'translateY(-50%)' }}
-        isValidConnection={(connection) => connection.source !== id}
-      />
-
-      {/* Header with hover Play */}
-      <div className="mb-3 relative">
-        <h3 className="text-slate-600 font-medium text-sm">{nodeTitle}</h3>
-        <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <div
-            className="w-4 h-4 bg-slate-400 rounded-sm flex items-center justify-center"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (data.onTest) data.onTest(id);
-            }}
-            role="button"
-            aria-label="Test block"
-          >
-            <Play className="w-2.5 h-2.5 text-white" />
-          </div>
-        </div>
-      </div>
-
-      {/* Content Card */}
-      <Card className="p-4 bg-white border-slate-200 shadow-sm">
-        <div className="flex items-start gap-3">
-          {/* User Icon */}
-          <div className="flex-shrink-0 mt-0.5">
-            <div className="w-5 h-5 rounded bg-slate-100 flex items-center justify-center">
-              <User className="w-3 h-3 text-slate-600" />
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-slate-900 text-sm mb-1">{roleTitle}</h4>
-            <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">
-              {isLoading
-                ? 'Loading...'
-                : error
-                ? 'Error loading data'
-                : (displaySystemMessage || truncatedFirstMessage)}
-            </p>
-          </div>
-        </div>
-      </Card>
-    </div>
+      includeRightHandle
+      themeColor={(data as any)?.color}
+    />
   );
 });
 

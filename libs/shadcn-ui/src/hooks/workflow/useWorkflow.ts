@@ -94,11 +94,28 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
               console.error('Error parsing viewport data:', err);
             }
           }
+        } else {
+          // No data returned (e.g., 204/empty body). Initialize a fresh canvas with Start.
+          const sanitized = sanitizeWorkflowData({ nodes: [], edges: [] });
+          setWorkflow(null);
+          setWorkflowName('Untitled Workflow');
+          setIsPublished(false);
+          setNodes(sanitized.nodes);
+          setEdges(sanitized.edges);
+          console.warn('[Workflow] No workflow data returned. Initialized new workflow with Start node.');
         }
       }
     } catch (error) {
       console.error('Error fetching workflow:', error);
       setSaveError('Failed to load workflow');
+      // Fallback: still initialize a fresh canvas so the page remains usable
+      const sanitized = sanitizeWorkflowData({ nodes: [], edges: [] });
+      setWorkflow(null);
+      setWorkflowName('Untitled Workflow');
+      setIsPublished(false);
+      setNodes(sanitized.nodes);
+      setEdges(sanitized.edges);
+      console.warn('[Workflow] Initialized fallback canvas with Start node due to fetch error.');
     } finally {
       setIsLoading(false);
     }
@@ -335,7 +352,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       target: connection.target,
       sourceHandle: connection.sourceHandle ?? undefined,
       targetHandle: connection.targetHandle ?? undefined,
-      type: 'smoothstep',
+      type: 'step',
     };
     
     // Make sure we deduplicate when adding new edges too
@@ -373,7 +390,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
                 e.target === connection.target &&
                 e.sourceHandle === connection.sourceHandle &&
                 e.targetHandle === connection.targetHandle &&
-                e.type === 'smoothstep'
+                e.type === 'step'
               )
           )
         ); // Remove edge if critical ID is missing
@@ -441,7 +458,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
                     e.target === connection.target &&
                     e.sourceHandle === connection.sourceHandle &&
                     e.targetHandle === connection.targetHandle &&
-                    e.type === 'smoothstep'
+                    e.type === 'step'
                   )
               )
             );

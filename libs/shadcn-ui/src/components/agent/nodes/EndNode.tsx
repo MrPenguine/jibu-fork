@@ -8,7 +8,7 @@ import { PillNodeShell } from './PillNodeShell';
 export const EndNode = memo(({ id, data, selected }: NodeProps) => {
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'End'}
@@ -18,6 +18,7 @@ export const EndNode = memo(({ id, data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle={false}
+      themeColor={data.color}
     />
   );
 });

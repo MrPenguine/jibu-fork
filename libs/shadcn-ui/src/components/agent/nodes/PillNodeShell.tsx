@@ -32,6 +32,8 @@ interface PillNodeShellProps {
     style?: React.CSSProperties;
     isValidConnection?: (connection: any) => boolean;
   }>;
+  /** Theme base color (hex). Will be rendered as a lighter background and border. */
+  themeColor?: string;
 }
 
 export const PillNodeShell = memo(function PillNodeShell(props: PillNodeShellProps) {
@@ -47,13 +49,39 @@ export const PillNodeShell = memo(function PillNodeShell(props: PillNodeShellPro
     onDoubleClick,
     includeRightHandle,
     handles,
+    themeColor,
   } = props;
+
+  // Helpers to derive lighter variants
+  const hexToRgb = (hex?: string) => {
+    if (!hex) return null;
+    const h = hex.replace('#', '');
+    const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return { r, g, b };
+  };
+  const withAlpha = (hex?: string, alpha = 0.18) => {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return undefined;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+  };
+  // Prefer runtime map color (for live slider updates) and fall back to prop themeColor
+  const liveColor = (typeof window !== 'undefined' ? (window as any)?.__nodeColors?.[id] : undefined);
+  const runtimeColor = liveColor ?? themeColor;
+  // Default base swatch (lighter slate) used across UI color menu as the first/active swatch
+  const DEFAULT_BASE_HEX = '#94a3b8';
+  // When no color is set, compute bg/border from the default swatch so visuals match the active selection
+  const bgColor = withAlpha(runtimeColor ?? DEFAULT_BASE_HEX, 0.18);
+  const borderColor = withAlpha(runtimeColor ?? DEFAULT_BASE_HEX, 0.35);
 
   const title = nodeTitle || `New Block${typeof blockNumber === 'number' ? ` ${blockNumber}` : ''}`;
 
   return (
     <div
-      className={`w-96 p-4 bg-slate-200/50 rounded-2xl border border-slate-300/50 group hover:bg-slate-200/70 transition-colors cursor-pointer ${selected ? 'ring-2 ring-slate-400' : ''}`}
+      className={`w-96 p-4 rounded-2xl border group transition-colors cursor-pointer ${selected ? 'ring-2 ring-slate-400' : ''}`}
+      style={{ backgroundColor: bgColor, borderColor: borderColor }}
       onDoubleClick={(e) => {
         e.preventDefault();
         e.stopPropagation();

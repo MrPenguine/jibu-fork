@@ -5,13 +5,13 @@ import { NodeProps } from 'reactflow';
 import { Globe } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const ApiCallNode = memo(({ data, selected }: NodeProps) => {
+export const ApiCallNode = memo(({ id, data, selected }: NodeProps) => {
   const summary = data.url
     ? `${data.method || 'GET'} ${data.url}${data.responseVariableName ? ` → ${data.responseVariableName}` : ''}`
     : 'API Call';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'API Call'}
@@ -21,6 +21,7 @@ export const ApiCallNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

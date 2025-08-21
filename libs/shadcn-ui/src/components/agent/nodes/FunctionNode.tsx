@@ -5,7 +5,7 @@ import { NodeProps } from 'reactflow';
 import { Code2 } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const FunctionNode = memo(({ data, selected }: NodeProps) => {
+export const FunctionNode = memo(({ id, data, selected }: NodeProps) => {
   const summaryParts: string[] = [];
   if (data.functionName) summaryParts.push(`fn: ${data.functionName}`);
   if (data.parameters) summaryParts.push('with params');
@@ -13,7 +13,7 @@ export const FunctionNode = memo(({ data, selected }: NodeProps) => {
   const summary = summaryParts.join(' • ') || 'Function';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'Function'}
@@ -23,6 +23,7 @@ export const FunctionNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

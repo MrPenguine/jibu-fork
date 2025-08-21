@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation"
 import { cn } from "../../lib/utils"
 import {
   Sidebar,
-  SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarHeader,
@@ -50,11 +49,11 @@ function NavItem({
         "w-full flex items-center justify-center group relative px-3 py-2 rounded-md transition-colors",
         isActive ? "bg-gray-800 text-white" : "text-gray-300 hover:bg-gray-800 hover:text-white"
       )}>
-        <Link href={href} className="w-full flex items-center justify-center">
+        <Link href={href} className="w-full flex items-center justify-center" aria-label={String(children)} title={String(children)}>
           {React.cloneElement(icon, {
             className: cn("h-5 w-5", icon.props.className),
           })}
-          <span className="absolute left-12 ml-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+          <span className="pointer-events-none absolute left-12 ml-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
             {children}
           </span>
         </Link>
@@ -88,8 +87,9 @@ export function AgentNavSidebar({
         </div>
       </SidebarHeader>
       
-      <SidebarContent className="border-0 pt-0">
-        <SidebarGroup>
+      {/* Replace SidebarContent (which adds a ScrollArea) with a simple container to remove extra scrollbar */}
+      <div className="border-0 pt-0">
+        <SidebarGroup className="m-0 p-0">
           <SidebarMenu>
             <NavItem href={`/agent/${agentId}/workflows`} icon={<LayoutDashboard />}>
               Workflows
@@ -114,7 +114,7 @@ export function AgentNavSidebar({
             </NavItem>
           </SidebarMenu>
         </SidebarGroup>
-      </SidebarContent>
+      </div>
 
       <SidebarFooter className="border-0 flex-col gap-2 mt-auto">
         <Separator className="my-2" />

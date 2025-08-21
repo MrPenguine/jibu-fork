@@ -5,13 +5,13 @@ import { NodeProps } from 'reactflow';
 import { Wrench } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const ToolCallNode = memo(({ data, selected }: NodeProps) => {
+export const ToolCallNode = memo(({ id, data, selected }: NodeProps) => {
   const summary = data.toolId
     ? `${data.toolName || 'Tool'} • ${data.toolId}${data.outputVariableName ? ` → ${data.outputVariableName}` : ''}`
     : (data.toolName || 'Tool Call');
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle || data.toolName}
       roleTitle={data.role || 'Tool Call'}
@@ -21,6 +21,7 @@ export const ToolCallNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

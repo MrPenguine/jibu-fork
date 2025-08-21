@@ -5,13 +5,13 @@ import { NodeProps } from 'reactflow';
 import { FileCode2 } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const JavaScriptNode = memo(({ data, selected }: NodeProps) => {
+export const JavaScriptNode = memo(({ id, data, selected }: NodeProps) => {
   const summary = data.code
     ? `JS: ${data.code.length > 80 ? data.code.slice(0, 80) + '…' : data.code}${data.outputVariableName ? ` → ${data.outputVariableName}` : ''}`
     : 'JavaScript';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'JavaScript'}
@@ -21,6 +21,7 @@ export const JavaScriptNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

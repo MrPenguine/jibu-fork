@@ -25,6 +25,9 @@ export interface KnowledgeBaseSearchNodeData {
   knowledgeBaseName?: string;
   query?: string;
   outputVariableName?: string;
+  nodeTitle?: string;
+  role?: string;
+  color?: string;
   onTest?: (nodeId: string) => void;
   onUpdateBlockData?: (nodeId: string, data: Partial<KnowledgeBaseSearchNodeData>) => void;
   connectedAssistantId?: string;
@@ -293,7 +296,7 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
   return (
     <>
       <PillNodeShell
-        id={id!}
+        id={id}
         selected={selected}
         nodeTitle={data?.nodeTitle}
         roleTitle={data?.knowledgeBaseName || 'KB Search'}
@@ -303,6 +306,7 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
         onTest={data?.onTest}
         onDoubleClick={(evt) => handleDoubleClick(evt)}
         includeRightHandle
+        themeColor={(data as any)?.color}
       />
       {renderConfigModal()}
     </>

@@ -18,6 +18,7 @@ export enum AgentNodeType {
   KNOWLEDGE_BASE_SEARCH = 'knowledgeBaseSearchNode',
   CUSTOM = 'CUSTOM',
   N8N_INTEGRATION = 'N8N_INTEGRATION',
+  NOTE = 'NOTE',
   // Added to support new sidebar taxonomy
   PROMPT = 'PROMPT',
   BUTTONS = 'BUTTONS',

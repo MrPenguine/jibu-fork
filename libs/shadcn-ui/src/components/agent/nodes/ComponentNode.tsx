@@ -5,14 +5,14 @@ import { NodeProps } from 'reactflow';
 import { Component } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const ComponentNode = memo(({ data, selected }: NodeProps) => {
+export const ComponentNode = memo(({ id, data, selected }: NodeProps) => {
   const summaryParts: string[] = [];
   if (data.componentType) summaryParts.push(`type: ${data.componentType}`);
   if (data.props) summaryParts.push('with props');
   const summary = summaryParts.join(' • ') || 'Component';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'Component'}
@@ -22,6 +22,7 @@ export const ComponentNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

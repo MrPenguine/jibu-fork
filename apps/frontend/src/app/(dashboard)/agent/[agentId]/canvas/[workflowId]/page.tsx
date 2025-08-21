@@ -6,7 +6,6 @@ import {
   ReactFlow,
   ReactFlowProvider,
   NodeMouseHandler,
-  Connection,
   Controls,
   Background,
   BackgroundVariant,
@@ -14,10 +13,7 @@ import {
   ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Input } from '@libs/shadcn-ui/components/ui/input';
 import { Button } from '@libs/shadcn-ui/components/ui/button';
-import { Separator } from '@libs/shadcn-ui/components/ui/separator';
-import { Dialog, DialogContent } from '@libs/shadcn-ui/components/ui/dialog';
 import {
   AgentNodeType,
   FlowNode,
@@ -27,16 +23,17 @@ import {
   AssistantConfigModal,
 } from '@libs/shadcn-ui/components/agent';
 import { AssistantInspector } from '@libs/shadcn-ui/components/agent/AssistantInspector';
-import { AgentNavSidebar } from '@libs/shadcn-ui/components/agent/AgentNavSidebar';
 import {
   AgentExecutionDialog,
-  AgentNodeInspector,
 } from '@libs/shadcn-ui/components/agent';
-import { nodeTypes, defaultEdgeOptions } from '@libs/shadcn-ui/components/agent/constants';
+import { nodeTypes, defaultEdgeOptions, edgeTypes } from '@libs/shadcn-ui/components/agent/constants';
 // (icons now encapsulated within TopRightButtons)
 import { TopRightButtons } from '@libs/shadcn-ui/components/agent/canvas/TopRightButtons';
 import { ControlPanel } from '@libs/shadcn-ui/components/agent/canvas/ControlPanel';
 import { TestAgentButton } from '@libs/shadcn-ui/components/agent/canvas/TestAgentButton';
+import { ColorMenu } from '@libs/shadcn-ui/components/agent/canvas/ColorMenu';
+import { EdgeContextMenu } from '@libs/shadcn-ui/components/agent/canvas/EdgeContextMenu';
+import { NodeContextMenu } from '@libs/shadcn-ui/components/agent/canvas/NodeContextMenu';
 
 // Import our custom hook and components
 import { getDefaultNodeData } from '@libs/shadcn-ui/hooks/agent';
@@ -50,8 +47,6 @@ import { workflowApi } from '../../../../../../utils/workflowApi';
 import { agentApiClient } from '../../../../../../utils/AgentApi';
 // Import the assistants API for fetching assistant data
 import { getAssistant } from '../../../../../../utils/AssistantsApi';
-// Import UI toast component for notifications
-import { toast } from '@libs/shadcn-ui/components/ui/use-toast';
 
 // nodeTypes and defaultEdgeOptions are imported from shared constants
 
@@ -61,9 +56,8 @@ function AgentCanvasContent() {
   const agentId = params.agentId as string;
   const workflowId = params.workflowId as string;
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { fitView } = useReactFlow();
   const router = useRouter();
-  const [agent, setAgent] = useState<any>(null);
+  const [, setAgent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Use our custom hook for workflow management
@@ -91,33 +85,230 @@ function AgentCanvasContent() {
     updateNodeData,
     saveWorkflow,
     publishWorkflow,
-    scheduleAutoSave
+    scheduleAutoSave,
+    setEdges: setWorkflowEdges
   } = useWorkflow(workflowId, workflowApi);
 
   // State for React Flow instance and active popover
-  const { zoomIn, zoomOut, fitView: rfFitView, setViewport } = useReactFlow();
+  const { zoomIn, zoomOut, fitView: rfFitView, setViewport, setCenter } = useReactFlow();
   const [showGrid, setShowGrid] = useState(true);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [activePopover, setActivePopover] = useState<string | null>(null);
   const [isAssistantConfigOpen, setIsAssistantConfigOpen] = useState(false);
   const [selectedAssistantData, setSelectedAssistantData] = useState<any>(null);
   const [selectedAssistantNodeId, setSelectedAssistantNodeId] = useState<string | null>(null);
-  const [isAgentPublished, setIsAgentPublished] = useState(false);
   const [isPublishingAgent, setIsPublishingAgent] = useState(false);
   // Assistant inspector sidebar state
   const [inspectingAssistantNode, setInspectingAssistantNode] = useState<FlowNode | null>(null);
+  // Guard to avoid duplicate client-side injection
+  const startInjectedRef = useRef(false);
+  // Run fitView only once after nodes are initially loaded
+  const hasFittedRef = useRef(false);
+  // Note placement mode
+  const [isPlacingNote, setIsPlacingNote] = useState(false);
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; type: 'node' | 'edge' | 'canvas' | null; nodeId?: string | null; edgeId?: string | null }>({ visible: false, x: 0, y: 0, type: null, nodeId: null, edgeId: null });
+  const [colorMenu, setColorMenu] = useState<{ visible: boolean; x: number; y: number; kind?: 'node' | 'edge'; nodeId?: string | null; edgeId?: string | null }>({ visible: false, x: 0, y: 0, kind: undefined, nodeId: null, edgeId: null });
+  const lastFlowClickPos = useRef<{ x: number; y: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const colorMenuRef = useRef<HTMLDivElement | null>(null);
+  const [hue, setHue] = useState<number>(0);
+  // Color swatches and active selection state
+  const swatches = ['#94a3b8', '#60a5fa', '#86efac', '#fda4af', '#f59e0b']; // lighter slate first
+  const [selectedSwatch, setSelectedSwatch] = useState<string>('#94a3b8');
+  // Close menus on outside click / ESC
+  useEffect(() => {
+    const handleDown = (e: Event) => {
+      if (!(contextMenu.visible || colorMenu.visible)) return;
+      const target = e.target as Node | null;
+      const ctxEl = contextMenuRef.current;
+      const clrEl = colorMenuRef.current;
+      const insideContext = !!(ctxEl && target && ctxEl.contains(target as Node));
+      const insideColor = !!(clrEl && target && clrEl.contains(target as Node));
+      if (insideContext || insideColor) return;
+      setContextMenu({ visible: false, x: 0, y: 0, type: null, nodeId: null, edgeId: null });
+      setColorMenu({ visible: false, x: 0, y: 0, kind: undefined, nodeId: null, edgeId: null });
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu({ visible: false, x: 0, y: 0, type: null, nodeId: null, edgeId: null });
+        setColorMenu({ visible: false, x: 0, y: 0, kind: undefined, nodeId: null, edgeId: null });
+      }
+    };
+    // Use capture-phase pointerdown so outside clicks are caught even if inner handlers stop propagation
+    window.addEventListener('pointerdown', handleDown, { capture: true });
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('pointerdown', handleDown, { capture: true } as any);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [contextMenu.visible, colorMenu.visible]);
+
+  // Global Delete key: delete selected nodes (except START) or selected edges; if none selected, delete the context edge
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete') return;
+      // Avoid when typing in inputs/textarea/contenteditable
+      const t = e.target as HTMLElement | null;
+      const tag = (t?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (t as any)?.isContentEditable) return;
+      // Compute edges to delete first
+      let deletedAny = false;
+      setWorkflowEdges((eds: FlowEdge[]) => {
+        const selectedEdgeIds = eds.filter((e: FlowEdge) => (e as any)?.selected).map((e: FlowEdge) => e.id);
+        let idsToDelete = selectedEdgeIds;
+        if (idsToDelete.length === 0 && contextMenu.type === 'edge' && contextMenu.edgeId) {
+          idsToDelete = [contextMenu.edgeId];
+        }
+        if (idsToDelete.length === 0) return eds as any;
+        deletedAny = true;
+        return eds.filter((e: FlowEdge) => !idsToDelete.includes(e.id)) as any;
+      });
+      // Then compute nodes to delete: prefer multi-selected; fallback to selectedNode
+      setNodes((nds) => {
+        const selectedIds = nds.filter((n: any) => n?.selected).map(n => n.id);
+        const fallbackId = selectedNode?.id ? [selectedNode.id] : [];
+        let idsToDelete = (selectedIds.length ? selectedIds : fallbackId).filter((id) => {
+          const n = nds.find(nn => nn.id === id);
+          const typeStr = String(n?.type).toUpperCase();
+          return typeStr !== 'START';
+        });
+        if (idsToDelete.length === 0 && !deletedAny) return nds as any;
+        const filtered = nds.filter(n => !idsToDelete.includes(n.id));
+        return filtered as any;
+      });
+      setSelectedNode(null);
+      scheduleAutoSave();
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true } as any);
+  }, [selectedNode, setNodes, setSelectedNode, scheduleAutoSave]);
+  // Persist note edits coming from NoteNode custom event
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id?: string; text?: string } | undefined;
+      if (!detail?.id) return;
+      updateNodeData(detail.id, { ...(nodes.find(n => n.id === detail.id)?.data as any), text: detail.text ?? '' });
+      scheduleAutoSave();
+    };
+    window.addEventListener('note:changed', handler as EventListener);
+    return () => window.removeEventListener('note:changed', handler as EventListener);
+  }, [nodes, updateNodeData, scheduleAutoSave]);
+
+  // Autosave after edge label commits from custom edge
+  useEffect(() => {
+    const onEdgeLabelSaved = () => {
+      scheduleAutoSave();
+    };
+    window.addEventListener('edge:labelSaved', onEdgeLabelSaved as EventListener);
+    return () => window.removeEventListener('edge:labelSaved', onEdgeLabelSaved as EventListener);
+  }, [scheduleAutoSave]);
+
+  // Persist note style (size/rotation/font) updates and adjust position when resizing from left/top
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail as { id?: string; width?: number; height?: number; rotation?: number; fontSize?: number; offsetX?: number; offsetY?: number } | undefined;
+      if (!d?.id) return;
+      const nodeIndex = nodes.findIndex(n => n.id === d.id);
+      if (nodeIndex === -1) return;
+
+      const current = nodes[nodeIndex];
+      const prevData = current.data as any;
+
+      // Convert screen-space offset to flow-space using current zoom
+      const zoom = (reactFlowInstance && (reactFlowInstance as any).getZoom) ? (reactFlowInstance as any).getZoom() : 1;
+      const dx = (d.offsetX ?? 0) / (zoom || 1);
+      const dy = (d.offsetY ?? 0) / (zoom || 1);
+
+      // Update size/rotation/font
+      updateNodeData(d.id, { ...prevData, width: d.width, height: d.height, rotation: d.rotation, fontSize: d.fontSize });
+
+      // Apply positional shift for left/top resize so the stationary edge feels correct
+      if (dx !== 0 || dy !== 0) {
+        setNodes((nds) => nds.map(n => n.id !== d.id ? n : ({
+          ...n,
+          position: {
+            x: (n.position?.x ?? 0) + dx,
+            y: (n.position?.y ?? 0) + dy,
+          },
+        } as any)));
+      }
+
+      scheduleAutoSave();
+    };
+    window.addEventListener('note:style', handler as EventListener);
+    return () => window.removeEventListener('note:style', handler as EventListener);
+  }, [nodes, updateNodeData, scheduleAutoSave, setNodes, reactFlowInstance]);
   
-  // Auto-fit view when nodes load so Start node is visible
+  // Auto-fit view once when nodes first load so Start node is visible
   useEffect(() => {
     if (!reactFlowInstance) return;
-    if (nodes && nodes.length > 0) {
+    if (nodes && nodes.length > 0 && !hasFittedRef.current) {
       try {
         rfFitView({ padding: 0.2 });
+        hasFittedRef.current = true;
       } catch (e) {
         console.warn('fitView failed:', e);
       }
     }
   }, [nodes, reactFlowInstance, rfFitView]);
+
+  // Reset fit flag when workflow changes
+  useEffect(() => {
+    hasFittedRef.current = false;
+  }, [workflowId]);
+
+  // Debug: log nodes on change and inject Start if nothing loaded after an error/new canvas
+  useEffect(() => {
+    console.log('[Canvas] nodes state:', nodes);
+    if (startInjectedRef.current) return;
+    if (workflowLoading) return;
+    if (nodes && nodes.length > 0) return;
+    if (!reactFlowInstance || !reactFlowWrapper.current) return; // wait until instance and wrapper are ready
+
+    // Schedule to ensure layout is settled
+    requestAnimationFrame(() => {
+      const bounds = reactFlowWrapper.current!.getBoundingClientRect();
+      const center = reactFlowInstance.project({ x: bounds.width / 2, y: bounds.height / 2 });
+      const position = { x: center.x - 50, y: center.y - 20 };
+
+      const startNode: FlowNode = {
+        id: 'start',
+        type: AgentNodeType.START,
+        position,
+        data: { id: 'start', nodeTitle: 'Start', blockNumber: 1 } as any,
+      };
+      setNodes([startNode]);
+      startInjectedRef.current = true;
+      console.warn('[Canvas] Injected fallback Start node at center');
+    });
+  }, [nodes, workflowLoading, setNodes, reactFlowInstance]);
+
+  // If only Start node exists and hasn't been moved, center it once on screen
+  const startCenteredRef = useRef(false);
+  useEffect(() => {
+    if (startCenteredRef.current) return;
+    if (!reactFlowInstance || !reactFlowWrapper.current) return;
+    if (!nodes || nodes.length !== 1) return;
+    const n = nodes[0];
+    const typeStr = String(n.type).toUpperCase();
+    const isStartType = typeStr === 'START';
+    if (!isStartType) return;
+
+    // Schedule after layout so wrapper bounds are accurate
+    requestAnimationFrame(() => {
+      const bounds = reactFlowWrapper.current!.getBoundingClientRect();
+      const center = reactFlowInstance.project({ x: bounds.width / 2, y: bounds.height / 2 });
+      const pos = { x: center.x - 50, y: center.y - 20 };
+      if (Math.abs((n.position?.x ?? 0) - pos.x) > 1 || Math.abs((n.position?.y ?? 0) - pos.y) > 1) {
+        setNodes([{ ...n, position: pos } as FlowNode]);
+        // Optionally refit once for consistent zoom
+        try { rfFitView({ padding: 0.2 }); } catch {}
+        console.log('[Canvas] Centered lone Start node');
+      }
+      startCenteredRef.current = true;
+    });
+  }, [nodes, reactFlowInstance, setNodes]);
 
   // Fetch agent details
   useEffect(() => {
@@ -147,6 +338,15 @@ function AgentCanvasContent() {
   
   // Node click handler
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
+    setSelectedNode(node as FlowNode);
+  }, [setSelectedNode]);
+
+  // Right-click on node: open context menu
+  const onNodeContextMenu: NodeMouseHandler = useCallback((event, node) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({ visible: true, x: event.clientX, y: event.clientY, type: 'node', nodeId: node.id });
+    setColorMenu({ visible: false, x: 0, y: 0, kind: undefined, nodeId: null, edgeId: null });
     setSelectedNode(node as FlowNode);
   }, [setSelectedNode]);
 
@@ -355,11 +555,49 @@ function AgentCanvasContent() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes as any}
           defaultEdgeOptions={defaultEdgeOptions}
           onInit={setReactFlowInstance}
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
+          onNodeContextMenu={onNodeContextMenu}
+          onEdgeContextMenu={(event, edge) => {
+            event.preventDefault();
+            event.stopPropagation();
+            setContextMenu({ visible: true, x: event.clientX, y: event.clientY, type: 'edge', edgeId: edge.id });
+            setColorMenu({ visible: false, x: 0, y: 0, kind: undefined, nodeId: null, edgeId: null });
+          }}
           onDragOver={onDragOver}
+          onPaneContextMenu={(event: React.MouseEvent) => {
+            event.preventDefault();
+            setColorMenu({ visible: false, x: 0, y: 0, kind: undefined, nodeId: null, edgeId: null });
+            if (!reactFlowInstance || !reactFlowWrapper.current) return;
+            const bounds = reactFlowWrapper.current.getBoundingClientRect();
+            const flowPos = reactFlowInstance.project({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+            lastFlowClickPos.current = flowPos;
+            setContextMenu({ visible: true, x: event.clientX, y: event.clientY, type: 'canvas', nodeId: null });
+          }}
+          nodesDraggable={true}
+          panOnDrag={[0, 1]}
+          onPaneClick={(event: React.MouseEvent) => {
+            if (!isPlacingNote) return;
+            event.preventDefault();
+            if (!reactFlowInstance || !reactFlowWrapper.current) return;
+            const bounds = reactFlowWrapper.current.getBoundingClientRect();
+            const position = reactFlowInstance.project({
+              x: event.clientX - bounds.left,
+              y: event.clientY - bounds.top,
+            });
+            const newNode: FlowNode = {
+              id: `note-${Date.now()}`,
+              type: AgentNodeType.NOTE,
+              position,
+              data: { text: '', width: 224, height: 128, rotation: 0, fontSize: 14 },
+            } as any;
+            setNodes((nds) => [...nds, newNode]);
+            setIsPlacingNote(false);
+            scheduleAutoSave();
+          }}
           onDrop={(event) => {
             event.preventDefault();
             
@@ -411,7 +649,6 @@ function AgentCanvasContent() {
               console.error('Error handling node drop:', error);
             }
           }}
-          fitView
         >
           {showGrid && (
             <Background
@@ -439,6 +676,7 @@ function AgentCanvasContent() {
             onFitView={() => rfFitView({ padding: 0.2 })}
             onReset={() => setViewport({ x: 0, y: 0, zoom: 1 })}
             onToggleGrid={() => setShowGrid((v) => !v)}
+            onToggleNoteMode={() => setIsPlacingNote((v) => !v)}
           />
 
           {/* Bottom-right test agent button */}
@@ -458,6 +696,101 @@ function AgentCanvasContent() {
             setActivePopover={setActivePopover}
           />
         </ReactFlow>
+        {/* Context Menus */}
+        {contextMenu.visible && (
+          <div
+            className="absolute bg-white border border-gray-200 rounded-md shadow-lg z-50 text-sm select-none"
+            style={{ left: contextMenu.x, top: contextMenu.y, minWidth: 200 }}
+            ref={contextMenuRef}
+          >
+            {contextMenu.type === 'node' && (
+              <NodeContextMenu
+                contextMenu={{
+                  visible: true,
+                  x: contextMenu.x,
+                  y: contextMenu.y,
+                  type: 'node',
+                  nodeId: contextMenu.nodeId as string,
+                }}
+                setContextMenu={setContextMenu as any}
+                nodes={nodes as any}
+                setNodes={setNodes as any}
+                setSelectedNode={setSelectedNode as any}
+                setColorMenu={setColorMenu as any}
+                setSelectedSwatch={setSelectedSwatch}
+                scheduleAutoSave={scheduleAutoSave}
+              />
+            )}
+            {contextMenu.type === 'canvas' && (
+              <div className="py-1">
+                <button
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                  onClick={() => {
+                    if (!lastFlowClickPos.current) return;
+                    const pos = lastFlowClickPos.current;
+                    const newNode: FlowNode = { id: `trigger-${Date.now()}`, type: 'TRIGGER' as any, position: pos, data: {} as any };
+                    setNodes((nds) => [...nds, newNode]);
+                    scheduleAutoSave();
+                    setContextMenu({ visible: false, x: 0, y: 0, type: null });
+                  }}
+                >Add Trigger</button>
+                <button
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                  onClick={() => {
+                    if (!lastFlowClickPos.current) return;
+                    const pos = lastFlowClickPos.current;
+                    const newNode: FlowNode = { id: `note-${Date.now()}`, type: AgentNodeType.NOTE, position: pos, data: { text: '', width: 224, height: 128, rotation: 0, fontSize: 14 } as any };
+                    setNodes((nds) => [...nds, newNode]);
+                    scheduleAutoSave();
+                    setContextMenu({ visible: false, x: 0, y: 0, type: null });
+                  }}
+                >Add Note</button>
+                <button
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                  onClick={() => {
+                    const start = nodes.find(n => String(n.type).toUpperCase() === 'START' || n.id === 'start');
+                    if (start) {
+                      try {
+                        setCenter(start.position?.x ?? 0, start.position?.y ?? 0, { zoom: 1.2, duration: 300 });
+                      } catch {
+                        rfFitView({ padding: 0.2 });
+                      }
+                    }
+                    setContextMenu({ visible: false, x: 0, y: 0, type: null });
+                  }}
+                >Return to Start</button>
+              </div>
+            )}
+            {contextMenu.type === 'edge' && (
+              <EdgeContextMenu
+                contextMenu={{ visible: true, x: contextMenu.x, y: contextMenu.y, type: 'edge', edgeId: contextMenu.edgeId as string }}
+                setContextMenu={setContextMenu as any}
+                edges={edges as any}
+                setEdges={setWorkflowEdges as any}
+                setColorMenu={setColorMenu as any}
+                setSelectedSwatch={setSelectedSwatch}
+                scheduleAutoSave={scheduleAutoSave}
+              />
+            )}
+          </div>
+        )}
+        {colorMenu.visible && (
+          <ColorMenu
+            state={colorMenu}
+            setState={setColorMenu as any}
+            hue={hue}
+            setHue={setHue}
+            swatches={swatches}
+            selectedSwatch={selectedSwatch}
+            setSelectedSwatch={setSelectedSwatch}
+            nodes={nodes as any}
+            setNodes={setNodes as any}
+            setEdges={setWorkflowEdges as any}
+            updateNodeData={updateNodeData}
+            scheduleAutoSave={scheduleAutoSave}
+            colorMenuRef={colorMenuRef}
+          />
+        )}
       </div>
         
       {/* Node inspector panel */}

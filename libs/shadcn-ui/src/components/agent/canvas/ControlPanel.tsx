@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Button } from '../../ui/button';
-import { ZoomIn, ZoomOut, Maximize, RotateCcw, Grid } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, RotateCcw, Grid, StickyNote } from 'lucide-react';
 
 export type ControlPanelProps = {
   onZoomOut: () => void;
@@ -10,9 +10,10 @@ export type ControlPanelProps = {
   onFitView: () => void;
   onReset: () => void;
   onToggleGrid: () => void;
+  onToggleNoteMode: () => void;
 };
 
-export function ControlPanel({ onZoomOut, onZoomIn, onFitView, onReset, onToggleGrid }: ControlPanelProps) {
+export function ControlPanel({ onZoomOut, onZoomIn, onFitView, onReset, onToggleGrid, onToggleNoteMode }: ControlPanelProps) {
   return (
     <div className="fixed bottom-4 left-20 flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1 shadow-sm z-20">
       <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={onZoomOut}>
@@ -29,6 +30,9 @@ export function ControlPanel({ onZoomOut, onZoomIn, onFitView, onReset, onToggle
       </Button>
       <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={onToggleGrid}>
         <Grid className="w-4 h-4" />
+      </Button>
+      <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Notes" aria-label="Notes" onClick={onToggleNoteMode}>
+        <StickyNote className="w-4 h-4" />
       </Button>
     </div>
   );

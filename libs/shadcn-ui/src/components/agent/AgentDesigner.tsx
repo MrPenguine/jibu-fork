@@ -26,6 +26,7 @@ import { AgentNodeType, AssistantNodeData, BaseNodeData, FlowNode, FlowEdge } fr
 import { FlowNode as InspectorFlowNode } from '../../../../src'; // Import for Inspector compatibility
 import { Button } from '../ui/button';
 import { AgentPalette } from './AgentPalette';
+import { StepEditableEdge, BezierEditableEdge } from './canvas/EditableEdge';
 import { AgentNodeInspector } from './AgentNodeInspector';
 import { AssistantInspector } from './AssistantInspector';
 import { AssistantConfigModal } from './AssistantConfigModal'; 
@@ -57,8 +58,14 @@ const nodeTypes: any = {
   [AgentNodeType.KNOWLEDGE_BASE_SEARCH]: KnowledgeBaseSearchNode, // Use enum member
 };
 
-// Define edge types for React Flow
-const edgeTypes: any = {};
+// Define edge types for React Flow (use our editable edges for all shapes)
+const edgeTypes: any = {
+  step: StepEditableEdge,
+  smoothstep: StepEditableEdge,
+  bezier: BezierEditableEdge,
+  default: BezierEditableEdge,
+  simplebezier: BezierEditableEdge,
+};
 
 // Default edge options
 const defaultEdgeOptions: any = {
@@ -163,6 +170,32 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
       setEdges(initialEdges as any);
     }
   }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  // Normalize edge types so our custom edge components are always used
+  useEffect(() => {
+    setEdges((eds: any[]) => {
+      let changed = false;
+      const mappedKeys = new Set(['step', 'smoothstep', 'bezier', 'simplebezier']);
+      const next = eds.map((e: any) => {
+        let type = e.type;
+        if (type === 'default') {
+          type = 'simplebezier';
+          changed = true;
+        } else if (!type || !mappedKeys.has(type)) {
+          type = 'simplebezier'; // use our mapped bezier renderer
+          changed = true;
+        }
+        // ensure arrow marker exists for visibility
+        const markerEnd = e.markerEnd || { type: 'arrowclosed' };
+        if (!e.markerEnd) changed = true;
+        if (type !== e.type || markerEnd !== e.markerEnd) {
+          return { ...e, type, markerEnd };
+        }
+        return e;
+      });
+      return changed ? next : eds;
+    });
+  }, [setEdges]);
 
   // Handle node updates and track dirty state
   const onNodeUpdate = useCallback((nodeId: string, data: any) => {

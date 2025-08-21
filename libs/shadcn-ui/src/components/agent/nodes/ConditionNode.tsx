@@ -5,11 +5,11 @@ import { Position, NodeProps } from 'reactflow';
 import { GitBranch } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const ConditionNode = memo(({ data, selected }: NodeProps) => {
+export const ConditionNode = memo(({ id, data, selected }: NodeProps) => {
   const desc = data.variable ? `${data.variable} ${data.operator} ${data.value}` : 'Condition';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'Condition'}
@@ -18,6 +18,7 @@ export const ConditionNode = memo(({ data, selected }: NodeProps) => {
       blockNumber={data.blockNumber}
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
+      themeColor={data.color}
       handles={[
         {
           id: 'in',

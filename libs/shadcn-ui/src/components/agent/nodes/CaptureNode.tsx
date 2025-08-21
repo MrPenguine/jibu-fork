@@ -5,7 +5,7 @@ import { NodeProps } from 'reactflow';
 import { Mic } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const CaptureNode = memo(({ data, selected }: NodeProps) => {
+export const CaptureNode = memo(({ id, data, selected }: NodeProps) => {
   const summaryParts: string[] = [];
   if (data.variableName) summaryParts.push(`→ ${data.variableName}`);
   if (Array.isArray(data.expectedPhrases) && data.expectedPhrases.length)
@@ -13,7 +13,7 @@ export const CaptureNode = memo(({ data, selected }: NodeProps) => {
   const summary = summaryParts.join(' • ') || 'Capture';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'Capture'}
@@ -23,6 +23,7 @@ export const CaptureNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

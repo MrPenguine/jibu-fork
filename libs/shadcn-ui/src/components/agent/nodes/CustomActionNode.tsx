@@ -5,7 +5,7 @@ import { NodeProps } from 'reactflow';
 import { Puzzle } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const CustomActionNode = memo(({ data, selected }: NodeProps) => {
+export const CustomActionNode = memo(({ id, data, selected }: NodeProps) => {
   const summaryParts: string[] = [];
   if (data.actionName) summaryParts.push(`Action: ${data.actionName}`);
   if (data.parameters) summaryParts.push('with params');
@@ -13,7 +13,7 @@ export const CustomActionNode = memo(({ data, selected }: NodeProps) => {
   const summary = summaryParts.join(' • ') || 'Custom Action';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'Custom Action'}
@@ -23,6 +23,7 @@ export const CustomActionNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

@@ -17,8 +17,10 @@ import { ApiCallNode } from './nodes/ApiCallNode';
 import { ToolCallNode } from './nodes/ToolCallNode';
 import { FunctionNode } from './nodes/FunctionNode';
 import { JavaScriptNode } from './nodes/JavaScriptNode';
+import { NoteNode } from './nodes/NoteNode';
 import { KnowledgeBaseSearchNode } from './nodes/KnowledgeBaseSearchNode';
 import { CallForwardNode } from './nodes/CallForwardNode';
+import { StepEditableEdge, BezierEditableEdge } from './canvas/EditableEdge';
 import { CustomActionNode } from './nodes/CustomActionNode';
 
 // Define node types for React Flow
@@ -53,14 +55,22 @@ export const nodeTypes = {
   [AgentNodeType.KNOWLEDGE_BASE_SEARCH]: KnowledgeBaseSearchNode,
   [AgentNodeType.CALL_FORWARD]: CallForwardNode,
   [AgentNodeType.CUSTOM_ACTION]: CustomActionNode,
+  [AgentNodeType.NOTE]: NoteNode,
 
   // Trigger (kept)
   // If Trigger uses a dedicated type elsewhere, include mapping here when available
+  TRIGGER: TriggerNode,
+};
+
+// Custom edge types mapping for editable labels
+export const edgeTypes = {
+  step: StepEditableEdge,
+  bezier: BezierEditableEdge,
 };
 
 // Default edge options
 export const defaultEdgeOptions = {
-  type: 'smoothstep',
+  type: 'step',
   markerEnd: {
     type: MarkerType.ArrowClosed,
   },

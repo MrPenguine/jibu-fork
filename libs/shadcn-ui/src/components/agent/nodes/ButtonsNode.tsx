@@ -5,13 +5,13 @@ import { NodeProps } from 'reactflow';
 import { ListChecks } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
 
-export const ButtonsNode = memo(({ data, selected }: NodeProps) => {
+export const ButtonsNode = memo(({ id, data, selected }: NodeProps) => {
   const summaryParts: string[] = [];
   if (Array.isArray(data.choices)) summaryParts.push(`${data.choices.length} options`);
   const summary = summaryParts.join(' • ') || 'Buttons';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'Buttons'}
@@ -21,6 +21,7 @@ export const ButtonsNode = memo(({ data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });

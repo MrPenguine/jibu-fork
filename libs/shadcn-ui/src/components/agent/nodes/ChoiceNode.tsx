@@ -11,7 +11,7 @@ export const ChoiceNode = memo(({ id, data, selected }: NodeProps) => {
     : 'Present choices to user';
   return (
     <PillNodeShell
-      id={data.id}
+      id={id}
       selected={selected}
       nodeTitle={data.nodeTitle}
       roleTitle={data.role || 'Choice'}
@@ -21,6 +21,7 @@ export const ChoiceNode = memo(({ id, data, selected }: NodeProps) => {
       onTest={data.onTest}
       onDoubleClick={data.onNodeDoubleClick}
       includeRightHandle
+      themeColor={data.color}
     />
   );
 });
