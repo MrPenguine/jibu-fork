@@ -1,88 +1,138 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@libs/shadcn-ui/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@libs/shadcn-ui/components/ui/card';
 import { Skeleton } from '@libs/shadcn-ui/components/ui/skeleton';
 import { Plus, Edit, Play, Trash2 } from 'lucide-react';
 import { fetchAPI } from '../../../../../utils/api';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@libs/shadcn-ui/components/ui/dialog';
+import { Input } from '@libs/shadcn-ui/components/ui/input';
+import { Label } from '@libs/shadcn-ui/components/ui/label';
+import { Textarea } from '@libs/shadcn-ui/components/ui/textarea';
+import { workflowApi } from '../../../../../utils/workflowApi';
 
 interface Workflow {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   createdAt: string;
   updatedAt: string;
+  isPrimary?: boolean;
+  workflowType?: 'MASTER' | 'SECONDARY';
+  isPublished?: boolean;
 }
 
-export default function AgentWorkflowsPage({ params }: { params: { agentId: string } }) {
+export default function AgentWorkflowsPage() {
+  const params = useParams<{ agentId: string }>();
+  const agentId = (params?.agentId as string) || '';
   const [isLoading, setIsLoading] = useState(true);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [agentName, setAgentName] = useState<string>('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newWorkflowName, setNewWorkflowName] = useState('');
+  const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    const fetchWorkflows = async () => {
-      if (!params.agentId) {
+    const fetchData = async () => {
+      if (!agentId) {
         router.push('/workspace');
         return;
       }
-
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        // Fetch workflows for this agent
-        const fetchedWorkflows = await fetchAPI(`/v1/agents/${params.agentId}/workflows`);
-        setWorkflows(fetchedWorkflows || []);
-      } catch (error) {
-        console.error("Failed to fetch workflows:", error);
-        // Set sample data for demonstration
-        setWorkflows([
-          {
-            id: 'workflow-1',
-            name: 'Customer Onboarding',
-            description: 'Guide new customers through the onboarding process',
-            createdAt: '2023-08-15T10:30:00Z',
-            updatedAt: '2023-09-01T15:45:00Z'
-          },
-          {
-            id: 'workflow-2',
-            name: 'Support Ticket Triage',
-            description: 'Automatically categorize and route support tickets',
-            createdAt: '2023-07-20T08:15:00Z',
-            updatedAt: '2023-08-25T11:20:00Z'
-          }
+        const [agentRes, workflowsRes] = await Promise.all([
+          fetchAPI(`/v1/agents/${agentId}`),
+          fetchAPI(`/v1/agents/${agentId}/workflows`)
         ]);
+        if (agentRes && agentRes.name) setAgentName(agentRes.name);
+        setWorkflows((workflowsRes as Workflow[]) || []);
+      } catch (error) {
+        console.error('Failed to fetch agent/workflows:', error);
+        setWorkflows([]);
       } finally {
         setIsLoading(false);
       }
     };
+    fetchData();
+  }, [agentId, router]);
 
-    fetchWorkflows();
-  }, [params.agentId, router]);
+  const masterWorkflow = useMemo(
+    () => workflows.find(w => w.isPrimary || w.workflowType === 'MASTER'),
+    [workflows]
+  );
+  const secondaryWorkflows = useMemo(
+    () => workflows.filter(w => !w.isPrimary && w.workflowType === 'SECONDARY'),
+    [workflows]
+  );
 
   const handleCreateWorkflow = () => {
-    router.push(`/agent/${params.agentId}/workflows/create`);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleSaveWorkflow = async () => {
+    if (!newWorkflowName.trim()) {
+      alert('Workflow name cannot be empty.');
+      return;
+    }
+    try {
+      if (!masterWorkflow?.id) {
+        alert('Master workflow not found. Please ensure the agent has a master workflow.');
+        return;
+      }
+      await workflowApi.createSecondaryWorkflow(
+        masterWorkflow.id,
+        agentId,
+        {
+          name: newWorkflowName,
+          description: newWorkflowDescription || undefined,
+        }
+      );
+      // Refetch workflows to ensure we have server-shaped data (createdAt/updatedAt, links)
+      const workflowsRes = await fetchAPI(`/v1/agents/${agentId}/workflows`);
+      setWorkflows((workflowsRes as Workflow[]) || []);
+      setIsCreateModalOpen(false);
+      setNewWorkflowName('');
+      setNewWorkflowDescription('');
+    } catch (error) {
+      console.error('Failed to create workflow:', error);
+      alert('Failed to create workflow. Please try again.');
+    }
   };
 
   const handleEditWorkflow = (workflowId: string) => {
-    router.push(`/agent/${params.agentId}/workflows/${workflowId}/edit`);
+    router.push(`/agent/${agentId}/canvas/${workflowId}`);
   };
 
   const handleRunWorkflow = (workflowId: string) => {
-    router.push(`/agent/${params.agentId}/workflows/${workflowId}/run`);
+    router.push(`/agent/${agentId}/workflows/${workflowId}/run`);
   };
 
   const handleDeleteWorkflow = async (workflowId: string) => {
-    if (window.confirm("Are you sure you want to delete this workflow?")) {
+    if (window.confirm('Are you sure you want to delete this workflow?')) {
       try {
-        await fetchAPI(`/v1/agents/${params.agentId}/workflows/${workflowId}`, {
-          method: 'DELETE'
-        });
-        setWorkflows(workflows.filter(wf => wf.id !== workflowId));
+        await fetchAPI(`/v1/agents/${agentId}/workflows/${workflowId}`, { method: 'DELETE' });
+        setWorkflows(prev => prev.filter(wf => wf.id !== workflowId));
       } catch (error) {
-        console.error("Failed to delete workflow:", error);
-        alert("Failed to delete workflow. Please try again.");
+        console.error('Failed to delete workflow:', error);
+        alert('Failed to delete workflow. Please try again.');
       }
+    }
+  };
+
+  const togglePublish = async (wf: Workflow) => {
+    try {
+      const updated = await fetchAPI(`/v1/agents/${agentId}/workflows/${wf.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublished: !wf.isPublished })
+      });
+      setWorkflows(prev => prev.map(x => (x.id === wf.id ? { ...x, ...(updated || {}), isPublished: !wf.isPublished } : x)));
+    } catch (e) {
+      console.error('Failed to toggle publish:', e);
+      alert('Failed to update workflow status.');
     }
   };
 
@@ -99,55 +149,97 @@ export default function AgentWorkflowsPage({ params }: { params: { agentId: stri
 
   return (
     <div className="w-full px-6 pb-6 pt-0">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">Workflows</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">Workflows for agent {agentName || '...'}</h1>
+      </div>
+
+      {/* Master Workflow */}
+      {masterWorkflow ? (
+        <div className="mb-8">
+          <Card className="rounded-xl border shadow-sm bg-primary/5 hover:bg-primary/10 hover:border-primary/30 transition-all overflow-hidden">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Main Agent Workflow</CardTitle>
+                  <CardDescription className="truncate">{masterWorkflow.description || 'Primary workflow for this agent'}</CardDescription>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <Button
+                    variant={masterWorkflow.isPublished ? 'secondary' : 'default'}
+                    size="sm"
+                    className="text-xs h-8 px-3"
+                    onClick={() => togglePublish(masterWorkflow)}
+                  >
+                    {masterWorkflow.isPublished ? 'Deactivate' : 'Activate'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground mb-4">Last updated: {new Date(masterWorkflow.updatedAt).toLocaleDateString()}</div>
+              <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full min-w-0">
+                <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleEditWorkflow(masterWorkflow.id)}>
+                  <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Edit</span>
+                </Button>
+                <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleRunWorkflow(masterWorkflow.id)}>
+                  <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Run</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleDeleteWorkflow(masterWorkflow.id)}>
+                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" /> <span className="hidden sm:inline">Delete</span>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="mb-8">
+          <Card className="rounded-xl border shadow-sm">
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground mb-4">No main workflow yet</p>
+              <Button onClick={handleCreateWorkflow}>
+                <Plus className="mr-2 h-4 w-4" /> Create Master Workflow
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Secondary Workflows */}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Secondary Workflows</h2>
         <Button onClick={handleCreateWorkflow}>
           <Plus className="mr-2 h-4 w-4" /> Create Workflow
         </Button>
       </div>
 
-      {workflows.length === 0 ? (
+      {secondaryWorkflows.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-10">
-            <p className="text-muted-foreground mb-4">No workflows found</p>
+            <p className="text-muted-foreground mb-4">No secondary workflows found</p>
             <Button onClick={handleCreateWorkflow}>
-              <Plus className="mr-2 h-4 w-4" /> Create Your First Workflow
+              <Plus className="mr-2 h-4 w-4" /> Create Secondary Workflow
             </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {workflows.map((workflow) => (
-            <Card key={workflow.id}>
+          {secondaryWorkflows.map((workflow) => (
+            <Card key={workflow.id} className="rounded-xl border shadow-sm bg-primary/5 hover:bg-primary/10 hover:border-primary/30 transition-all overflow-hidden">
               <CardHeader>
-                <CardTitle>{workflow.name}</CardTitle>
-                <CardDescription>{workflow.description}</CardDescription>
+                <CardTitle className="truncate">{workflow.name}</CardTitle>
+                <CardDescription className="truncate">{workflow.description || 'Secondary workflow'}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-muted-foreground mb-4">
-                  Last updated: {new Date(workflow.updatedAt).toLocaleDateString()}
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleEditWorkflow(workflow.id)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" /> Edit
+                <div className="text-sm text-muted-foreground mb-4">Last updated: {new Date(workflow.updatedAt).toLocaleDateString()}</div>
+                <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full min-w-0">
+                  <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleEditWorkflow(workflow.id)}>
+                    <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Edit</span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleRunWorkflow(workflow.id)}
-                  >
-                    <Play className="h-4 w-4 mr-1" /> Run
+                  <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleRunWorkflow(workflow.id)}>
+                    <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Run</span>
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleDeleteWorkflow(workflow.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                  <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleDeleteWorkflow(workflow.id)}>
+                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" /> <span className="hidden sm:inline">Delete</span>
                   </Button>
                 </div>
               </CardContent>
@@ -155,6 +247,32 @@ export default function AgentWorkflowsPage({ params }: { params: { agentId: stri
           ))}
         </div>
       )}
+
+      {/* Create Workflow Modal */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Workflow</DialogTitle>
+            <DialogDescription>
+              Enter a name and optional description for the new workflow. It will be created under Secondary Workflows for this agent.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="wf-name" className="text-right">Name</Label>
+              <Input id="wf-name" value={newWorkflowName} onChange={(e) => setNewWorkflowName(e.target.value)} className="col-span-3" placeholder="My Workflow" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="wf-description" className="text-right">Description</Label>
+              <Textarea id="wf-description" rows={3} value={newWorkflowDescription} onChange={(e) => setNewWorkflowDescription(e.target.value)} className="col-span-3" placeholder="Optional: Describe what this workflow does" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveWorkflow}>Save Workflow</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

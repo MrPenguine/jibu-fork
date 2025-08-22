@@ -27,7 +27,10 @@ export class WorkflowController {
   @Get('agent/:agentId/workflows')
   @ApiOperation({ summary: 'Get all workflows for an agent' })
   async getAgentWorkflows(@Param('agentId') agentId: string, @Req() req) {
-    const workspaceId = req.user.workspaceId;
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
     if (!workspaceId) {
       throw new BadRequestException('No workspace selected');
     }
@@ -47,7 +50,10 @@ export class WorkflowController {
     @Body() createWorkflowDto: CreateWorkflowDto,
     @Req() req,
   ) {
-    const workspaceId = req.user.workspaceId;
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
     if (!workspaceId) {
       throw new BadRequestException('No workspace selected');
     }
@@ -65,7 +71,10 @@ export class WorkflowController {
     @Req() req,
     @Query('agentId') queryAgentId?: string,
   ) {
-    const workspaceId = req.user.workspaceId;
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
     if (!workspaceId) {
       throw new BadRequestException('No workspace selected');
     }
@@ -105,7 +114,10 @@ export class WorkflowController {
     @Body() updateWorkflowDto: UpdateWorkflowDto,
     @Req() req,
   ) {
-    const workspaceId = req.user.workspaceId;
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
     if (!workspaceId) {
       throw new BadRequestException('No workspace selected');
     }

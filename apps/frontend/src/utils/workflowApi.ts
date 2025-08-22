@@ -79,6 +79,15 @@ interface ContinueWorkflowRequest {
   event?: Record<string, any>;
 }
 
+// Interface for secondary workflow creation
+interface CreateSecondaryWorkflowRequest {
+  name: string;
+  description?: string;
+  nodes?: FlowNode[] | string;
+  edges?: FlowEdge[] | string;
+  startNodeId?: string;
+}
+
 // Workflow API client
 export const workflowApi = {
   // Fetch all workflows
@@ -202,6 +211,42 @@ export const workflowApi = {
       return response.json();
     } catch (error) {
       console.error('[workflowApi] Error creating workflow:', error);
+      throw error;
+    }
+  },
+
+  // Create a secondary workflow linked to a master workflow and agent
+  async createSecondaryWorkflow(
+    masterWorkflowId: string,
+    agentId: string,
+    data: CreateSecondaryWorkflowRequest,
+    specificWorkspaceId?: string,
+  ): Promise<WorkflowDefinition> {
+    try {
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+      
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
+      }
+      
+      const headers = await getAuthHeaders(workspaceId);
+      const url = `${API_BASE_URL}/v1/workflows/${masterWorkflowId}/secondary?agentId=${encodeURIComponent(agentId)}`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error('[workflowApi] Server response error (createSecondary):', errorText);
+        throw new Error(`Failed to create secondary workflow: ${response.statusText}. ${errorText || ''}`);
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('[workflowApi] Error creating secondary workflow:', error);
       throw error;
     }
   },

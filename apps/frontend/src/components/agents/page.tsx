@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button } from '@libs/shadcn-ui/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@libs/shadcn-ui/components/ui/card';
 import { Badge } from '@libs/shadcn-ui/components/ui/badge';
@@ -10,14 +10,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@libs/shadcn-ui/components/ui/input';
 import { Textarea } from '@libs/shadcn-ui/components/ui/textarea';
 import { Label } from '@libs/shadcn-ui/components/ui/label';
-import { PlusCircle, Play, Trash2, Pencil, Search, FolderPlus, Upload } from 'lucide-react';
-import { agentApiClient } from '../../../../../utils/AgentApi';
-import { fetchAPI } from "../../../../../utils/api";
-import { useWorkspace } from '../../../../../utils/workspaceContext';
-import { Skeleton } from '@libs/shadcn-ui/components/ui/skeleton';
+import { PlusCircle, Edit, Play, Trash2, Pencil } from 'lucide-react';
+import { agentApiClient } from '../../../utils/AgentApi';
+import { fetchAPI } from "../../../utils/api";
+import { useWorkspace } from '../../../utils/workspaceContext';
 
 export default function AgentsPage() {
-  const { activeWorkspace, loading } = useWorkspace();
+  const { activeWorkspace } = useWorkspace();
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -27,21 +26,18 @@ export default function AgentsPage() {
   const [editingAgent, setEditingAgent] = useState<any | null>(null);
   const [editAgentName, setEditAgentName] = useState('');
   const [editAgentDescription, setEditAgentDescription] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
-  const routeParams = useParams<{ workspaceId: string }>();
-  const workspaceId = (routeParams?.workspaceId as string) || '';
 
   useEffect(() => {
     const fetchAgents = async () => {
-      if (!workspaceId) {
+      if (!activeWorkspace) {
         setAgents([]);
         setIsLoading(false);
         return;
       }
       setIsLoading(true);
       try {
-        const fetchedAgents = await fetchAPI(`/v1/agents?workspaceId=${workspaceId}`);
+        const fetchedAgents = await fetchAPI(`/v1/agents?workspaceId=${activeWorkspace.id}`);
         setAgents(fetchedAgents as any[]);
       } catch (error) {
         console.error("Failed to fetch agents:", error);
@@ -51,7 +47,7 @@ export default function AgentsPage() {
     };
     
     fetchAgents();
-  }, [workspaceId]);
+  }, [activeWorkspace]);
 
   const handleCreateAgent = async () => {
     if (!newAgentName.trim()) {
@@ -60,22 +56,18 @@ export default function AgentsPage() {
     }
     
     try {
-      // Create agent with support for multiple assistants and optional folders
       const newAgent = await agentApiClient.createAgentDefinition({
         name: newAgentName,
-        description: newAgentDescription || '',
-        workspaceId: workspaceId,
+        description: newAgentDescription,
         nodes: [], // Empty nodes array to start with
         edges: [], // Empty edges array to start with
-        // Note: We're not specifying assistantId to allow for multiple assistants
-        // folderId is optional and can be null/undefined
       });
       
       setAgents(prev => [...prev, newAgent as any]);
       setIsCreateModalOpen(false);
       setNewAgentName('');
       setNewAgentDescription('');
-      router.push(`/agent/${newAgent.id}/canvas/${newAgent.id}`);
+      router.push(`/agents/${newAgent.id}/cms/workflows`);
     } catch (error) {
       console.error("Failed to create agent:", error);
       alert("Failed to create agent. Please try again.");
@@ -127,26 +119,16 @@ export default function AgentsPage() {
     }
   };
 
-  const filteredAgents = searchQuery
-    ? agents.filter(agent => 
-        agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (agent.description && agent.description.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : agents;
-
-  if (loading || !activeWorkspace) {
+  if (isLoading) {
     return (
-      <div className="w-full px-6 pb-6 pt-0">
-        <Skeleton className="h-10 w-1/3" />
-        <div className="mt-6">
-          <Skeleton className="h-64 w-full" />
-        </div>
+      <div className="container mx-auto py-6 flex justify-center items-center">
+        <p>Loading agents...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full px-6 pb-6 pt-0">
+    <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Agents</h1>
@@ -154,16 +136,7 @@ export default function AgentsPage() {
             Create and manage automated conversation flows
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => alert('Create folder functionality coming soon')}>
-            <FolderPlus className="mr-2 h-4 w-4" />
-            New Folder
-          </Button>
-          <Button variant="outline" onClick={() => alert('Import functionality coming soon')}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => setIsCreateModalOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -209,26 +182,9 @@ export default function AgentsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        </div>
       </div>
 
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Search agents..." 
-            className="pl-10" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="container mx-auto py-6 flex justify-center items-center">
-          <p>Loading agents...</p>
-        </div>
-      ) : filteredAgents.length === 0 ? (
+      {!isLoading && agents.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center space-y-3">
@@ -245,8 +201,8 @@ export default function AgentsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAgents.map((agent) => (
-            <Card key={agent.id} className="rounded-xl border shadow-sm bg-primary/5 transition-all duration-200 hover:shadow-md hover:border-primary/30 hover:bg-primary/10 overflow-hidden">
+          {agents.map((agent) => (
+            <Card key={agent.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle className="truncate">{agent.name}</CardTitle>
@@ -259,28 +215,28 @@ export default function AgentsPage() {
               <CardContent>
                 <div className="text-sm">
                   <div>
-                    <span className="text-muted-foreground">Version:</span> {agent.version || '1.0'}
+                    <span className="text-muted-foreground">Version:</span> {agent.version}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Last updated:</span>{' '}
-                    {agent.updatedAt ? new Date(agent.updatedAt).toLocaleDateString() : 'N/A'}
+                    {new Date(agent.updatedAt).toLocaleDateString()}
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col gap-2 min-w-0 overflow-x-hidden">
-                <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full min-w-0">
-                  <Button variant="default" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" asChild>
-                    <Link href={`/agent/${agent.id}/workflows`} className="min-w-0">
-                      <Play className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Open Agent</span>
+              <CardFooter className="flex justify-between">
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/agents/${agent.id}/cms/workflows`}>
+                      <Edit className="mr-2 h-4 w-4" /> View/Design
                     </Link>
                   </Button>
-                  <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => handleOpenEditModal(agent)}>
-                    <Pencil className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Edit</span>
-                  </Button>
-                  <Button variant="destructive" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => handleDeleteAgent(agent.id)}>
-                  <Trash2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Delete</span>
+                  <Button variant="ghost" size="sm" onClick={() => handleOpenEditModal(agent)}>
+                    <Pencil className="mr-2 h-4 w-4" /> Edit
                   </Button>
                 </div>
+                <Button variant="destructive" size="sm" onClick={() => handleDeleteAgent(agent.id)}>
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                </Button>
               </CardFooter>
             </Card>
           ))}
