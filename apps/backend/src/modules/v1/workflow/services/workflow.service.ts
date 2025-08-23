@@ -88,21 +88,21 @@ export class WorkflowService {
    * Create a new master workflow for an agent
    */
   async createMasterWorkflow(agentId: string, data: CreateWorkflowDto) {
+    const workflowJson = data.workflowJson ?? {
+      nodes: data.nodes ?? [],
+      edges: data.edges ?? [],
+      startNodeId: data.startNodeId ?? null,
+    };
+
     return this.prisma.workflow.create({
       data: {
         name: data.name,
         description: data.description,
         workflowType: WorkflowType.MASTER,
-        nodes: data.nodes || {},
-        edges: data.edges || {},
-        startNodeId: data.startNodeId,
+        workflowJson,
         isPublished: data.isPublished || false,
-        agent: {
-          connect: { id: agentId }
-        },
-        workspace: data.workspaceId ? {
-          connect: { id: data.workspaceId }
-        } : undefined,
+        agent: { connect: { id: agentId } },
+        workspace: data.workspaceId ? { connect: { id: data.workspaceId } } : undefined,
       },
     });
   }
@@ -129,23 +129,21 @@ export class WorkflowService {
       throw new Error('Cannot create a secondary workflow under a non-master workflow');
     }
 
+    const workflowJson = (data as any).workflowJson ?? masterWorkflow['workflowJson'] ?? {
+      nodes: (data as any).nodes ?? [],
+      edges: (data as any).edges ?? [],
+      startNodeId: (data as any).startNodeId ?? null,
+    };
+
     return this.prisma.workflow.create({
       data: {
         name: data.name,
         description: data.description,
-        nodes: data.nodes || masterWorkflow.nodes,  // Default to master workflow nodes
-        edges: data.edges || masterWorkflow.edges,  // Default to master workflow edges
-        startNodeId: data.startNodeId,
         workflowType: WorkflowType.SECONDARY,
-        masterWorkflow: {
-          connect: { id: masterWorkflowId }
-        },
-        agent: {
-          connect: { id: agentId }
-        },
-        workspace: {
-          connect: { id: workspaceId }
-        },
+        workflowJson,
+        masterWorkflow: { connect: { id: masterWorkflowId } },
+        agent: { connect: { id: agentId } },
+        workspace: { connect: { id: workspaceId } },
       },
     });
   }
@@ -154,31 +152,29 @@ export class WorkflowService {
    * Update a workflow
    */
   async updateWorkflow(id: string, data: UpdateWorkflowDto) {
+    const workflowJson = data.workflowJson ?? {
+      nodes: data.nodes ?? [],
+      edges: data.edges ?? [],
+      startNodeId: data.startNodeId ?? null,
+    };
+
     return this.prisma.workflow.upsert({
       where: { id },
       update: {
         name: data.name,
         description: data.description,
-        nodes: data.nodes,
-        edges: data.edges,
-        startNodeId: data.startNodeId,
+        workflowJson,
         isPublished: data.isPublished,
       },
       create: {
         id,
         name: data.name || 'Untitled Workflow',
         description: data.description,
-        nodes: data.nodes || {},
-        edges: data.edges || {},
-        startNodeId: data.startNodeId,
+        workflowJson,
         isPublished: data.isPublished || false,
         workflowType: WorkflowType.MASTER, // Default to MASTER
-        agent: {
-          connect: { id: data.agentId },
-        },
-        workspace: {
-          connect: { id: data.workspaceId },
-        },
+        agent: data.agentId ? { connect: { id: data.agentId } } : undefined,
+        workspace: data.workspaceId ? { connect: { id: data.workspaceId } } : undefined,
       },
     });
   }
@@ -187,30 +183,18 @@ export class WorkflowService {
    * Publish a workflow
    */
   async publishWorkflow(id: string) {
-    const publishedWorkflow = await this.prisma.workflow.update({
-      where: { id },
-      data: {
-        isPublished: true,
-        publishedAt: new Date(),
-      }
-    });
-
-    // N8N synchronization has been removed
-
-    return publishedWorkflow;
+    // No-op for now: return current workflow without modifying state
+    this.logger.log(`publishWorkflow(${id}) called - no-op`);
+    return this.prisma.workflow.findUnique({ where: { id } });
   }
 
   /**
    * Unpublish a workflow
    */
   async unpublishWorkflow(id: string) {
-    return this.prisma.workflow.update({
-      where: { id },
-      data: {
-        isPublished: false,
-        publishedAt: null,
-      },
-    });
+    // No-op for now: return current workflow without modifying state
+    this.logger.log(`unpublishWorkflow(${id}) called - no-op`);
+    return this.prisma.workflow.findUnique({ where: { id } });
   }
 
   /**

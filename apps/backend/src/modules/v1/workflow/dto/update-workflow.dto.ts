@@ -21,6 +21,15 @@ export class UpdateWorkflowDto {
   description?: string;
 
   @ApiProperty({
+    description: 'Entire workflow definition as JSON',
+    required: false,
+    example: '{"nodes": [], "edges": [], "startNodeId": "start-1"}',
+  })
+  @IsJSON()
+  @IsOptional()
+  workflowJson?: Record<string, any>;
+
+  @ApiProperty({
     description: 'Flow nodes data as JSON',
     example: '{"node1": {"id": "node1", "type": "start"}}',
     required: false,

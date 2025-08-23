@@ -15,9 +15,7 @@ interface Workflow {
   updatedAt: Date;
   name: string;
   description?: string;
-  nodes: any; // JSON
-  edges: any; // JSON
-  startNodeId?: string;
+  workflowJson: any; // consolidated JSON of workflow (nodes, edges, startNodeId, etc.)
   version: number;
   isPublished: boolean;
   publishedAt?: Date;

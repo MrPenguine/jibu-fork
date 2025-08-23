@@ -140,15 +140,22 @@ export class AgentService {
               if (publishedWorkflow) {
                 workflowId = publishedWorkflow.id;
                 this.logger.log(`[AGENT_ASSISTANT_DEBUG] Found published workflow ${workflowId} for agent ${agentId}`);
-                
-                // Extract nodes from workflow
-                const nodes = publishedWorkflow.nodes ? 
-                  (typeof publishedWorkflow.nodes === 'string' ? JSON.parse(publishedWorkflow.nodes) : publishedWorkflow.nodes) : {};
-                
+
+                // Extract nodes from consolidated workflowJson
+                let nodes: any = {};
+                try {
+                  const wfJson = (publishedWorkflow as any).workflowJson;
+                  const parsed = typeof wfJson === 'string' ? JSON.parse(wfJson) : wfJson;
+                  nodes = parsed?.nodes || {};
+                } catch (e) {
+                  this.logger.warn(`[AGENT_ASSISTANT_DEBUG] Could not parse workflowJson for ${workflowId}: ${e.message}`);
+                  nodes = {};
+                }
+
                 // Search for ASSISTANT node
                 for (const nodeId in nodes) {
                   const node = nodes[nodeId];
-                  if (node.type === 'ASSISTANT' && (node.data?.assistantId || node.data?.apiAssistantId)) {
+                  if (node?.type === 'ASSISTANT' && (node.data?.assistantId || node.data?.apiAssistantId)) {
                     realAssistantId = node.data.assistantId || node.data.apiAssistantId;
                     this.logger.log(`[AGENT_ASSISTANT_DEBUG] Found assistantId ${realAssistantId} in workflow ${workflowId}, node ${nodeId}`);
                     break;

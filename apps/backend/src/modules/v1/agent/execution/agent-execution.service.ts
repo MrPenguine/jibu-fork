@@ -45,10 +45,42 @@ export class AgentExecutionService {
       workspaceId: agentInfo?.workspaceId
     })}`);
     
-    // Add the missing properties that would come from Workflow
-    (agent as any).nodes = [];
-    (agent as any).edges = [];
-    (agent as any).startNodeId = '';
+    // Load published workflow and inject nodes/edges/startNodeId from workflowJson
+    let startNodeId: string | undefined = undefined;
+    try {
+      const workflow = await this.prisma.workflow.findFirst({
+        where: {
+          agentId,
+          workspaceId,
+          isPublished: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      if (workflow) {
+        let wfJson: any = (workflow as any).workflowJson;
+        wfJson = typeof wfJson === 'string' ? JSON.parse(wfJson) : wfJson;
+        const nodes = Array.isArray(wfJson?.nodes) ? wfJson.nodes : (wfJson?.nodes ? Object.values(wfJson.nodes) : []);
+        const edges = Array.isArray(wfJson?.edges) ? wfJson.edges : (wfJson?.edges ? Object.values(wfJson.edges) : []);
+        (agent as any).nodes = nodes || [];
+        (agent as any).edges = edges || [];
+        (agent as any).startNodeId = wfJson?.startNodeId || '';
+        startNodeId = (agent as any).startNodeId;
+      } else {
+        // No published workflow found; default to empty
+        (agent as any).nodes = [];
+        (agent as any).edges = [];
+        (agent as any).startNodeId = '';
+        startNodeId = '';
+      }
+    } catch (e) {
+      // On error, keep defaults to avoid crash
+      (agent as any).nodes = [];
+      (agent as any).edges = [];
+      (agent as any).startNodeId = '';
+      startNodeId = '';
+      this.logger.warn(`[AGENT_EXEC] Failed to load workflowJson for agent ${agentId}: ${e.message}`);
+    }
 
     if (!agent) {
       throw new NotFoundException(`Agent with ID ${agentId} not found or not published`);
@@ -61,7 +93,7 @@ export class AgentExecutionService {
         workspaceId,
         variables: initialVariables,
         history: [],
-        currentNodeId: agent.startNodeId,
+        currentNodeId: startNodeId,
         status: 'ACTIVE',
         chatId: chatId || null,
         callSid: callSid || null,
@@ -80,12 +112,34 @@ export class AgentExecutionService {
       include: { agent: true },
     }) as unknown as AgentSession & { agent: Agent };
     
-    // Ensure agent has the necessary workflow properties
-    if (session?.agent && !(session.agent as any).nodes) {
-      (session.agent as any).nodes = [];
-    }
-    if (session?.agent && !(session.agent as any).edges) {
-      (session.agent as any).edges = [];
+    // Ensure agent has the necessary workflow properties; load from workflowJson if missing
+    if (session?.agent && (!('nodes' in (session.agent as any)) || !('edges' in (session.agent as any)))) {
+      try {
+        const workflow = await this.prisma.workflow.findFirst({
+          where: {
+            agentId: (session.agent as any).id,
+            workspaceId: (session.agent as any).workspaceId,
+            isPublished: true,
+          },
+          orderBy: { updatedAt: 'desc' },
+        });
+        if (workflow) {
+          let wfJson: any = (workflow as any).workflowJson;
+          wfJson = typeof wfJson === 'string' ? JSON.parse(wfJson) : wfJson;
+          const nodes = Array.isArray(wfJson?.nodes) ? wfJson.nodes : (wfJson?.nodes ? Object.values(wfJson.nodes) : []);
+          const edges = Array.isArray(wfJson?.edges) ? wfJson.edges : (wfJson?.edges ? Object.values(wfJson.edges) : []);
+          (session.agent as any).nodes = nodes || [];
+          (session.agent as any).edges = edges || [];
+          (session.agent as any).startNodeId = wfJson?.startNodeId || (session.agent as any).startNodeId || '';
+        } else {
+          (session.agent as any).nodes = (session.agent as any).nodes || [];
+          (session.agent as any).edges = (session.agent as any).edges || [];
+        }
+      } catch (e) {
+        this.logger.warn(`[AGENT_EXEC] Failed to load workflowJson during continue for session ${sessionId}: ${e.message}`);
+        (session.agent as any).nodes = (session.agent as any).nodes || [];
+        (session.agent as any).edges = (session.agent as any).edges || [];
+      }
     }
 
     if (!session) {

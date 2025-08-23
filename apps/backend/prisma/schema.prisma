@@ -348,7 +348,6 @@ model Tool {
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
   assistantTools AssistantTool[]
-  workflowNodes  WorkflowNode[]  @relation("ToolToWorkflowNode")
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -469,12 +468,10 @@ model Workflow {
   updatedAt          DateTime     @updatedAt
   name               String
   description        String?
-  nodes              Json // Array of FlowNode objects
-  edges              Json // Array of FlowEdge objects
+  workflowJson       Json // Entire workflow definition as JSON
   isPrimary          Boolean      @default(false)
   agentId            String
   workspaceId        String?
-  startNodeId        String? // ID of the node where execution begins
   version            Int          @default(1)
   isPublished        Boolean      @default(false)
   publishedAt        DateTime?
@@ -488,53 +485,13 @@ model Workflow {
   agent     Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
   workspace Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   chats     Chat[]
-  workflowNodes WorkflowNode[]
-  workflowEdges WorkflowEdge[]
   webhooks      Webhook[]
 
   @@index([agentId])
   @@index([workspaceId])
 }
 
-model WorkflowNode {
-  id               String         @id @default(uuid())
-  workflowId       String
-  type             AgentNodeType
-  nodeType         AgentNodeType? // Legacy field for compatibility
-  data             Json
-  position         Json
-  parameters       String? // Node parameters as JSON string
-  toolId           String?
-  incomingChoiceId String?
-
-  workflow    Workflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  tool        Tool?          @relation("ToolToWorkflowNode", fields: [toolId], references: [id], onDelete: SetNull)
-  sourceEdges WorkflowEdge[] @relation("SourceNode")
-  targetEdges WorkflowEdge[] @relation("TargetNode")
-
-  @@index([workflowId])
-  @@index([toolId])
-}
-
-model WorkflowEdge {
-  id              String  @id @default(uuid())
-  workflowId      String
-  sourceId        String
-  targetId        String
-  sourceHandle    String?
-  targetHandle    String?
-  n8nSourceOutput String? // The output of the source node in n8n
-  n8nTargetInput  String? // The input of the target node in n8n
-
-  workflow Workflow     @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  source   WorkflowNode @relation("SourceNode", fields: [sourceId], references: [id], onDelete: NoAction)
-  target   WorkflowNode @relation("TargetNode", fields: [targetId], references: [id], onDelete: NoAction)
-
-  @@unique([sourceId, targetId])
-  @@index([workflowId])
-  @@index([sourceId])
-  @@index([targetId])
-}
+// WorkflowNode and WorkflowEdge models have been removed.
 
 // Enum for N8nWorkflow type (primary/secondary)
 enum N8nWorkflowType {

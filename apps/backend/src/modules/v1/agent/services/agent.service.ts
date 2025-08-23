@@ -116,9 +116,11 @@ export class AgentService {
         const workflowData: CreateWorkflowDto = {
           name: `${agentData.name} Workflow`,
           description: `Master workflow for ${agentData.name}`,
-          nodes: nodes,
-          edges: edges,
-          startNodeId: createAgentDto.startNodeId || '',
+          workflowJson: {
+            nodes: nodes,
+            edges: edges,
+            startNodeId: createAgentDto.startNodeId || ''
+          },
           isPublished: false,
           workspaceId: workspaceId,
         };
@@ -211,13 +213,12 @@ export class AgentService {
       if (extractedAssistantId && updateAgentDto.assistantId === undefined) {
         updateAgentDto.assistantId = extractedAssistantId;
       }
-      updateData.nodes = JSON.stringify(updateAgentDto.nodes);
+      // Do not persist nodes on Agent; nodes belong to workflowJson on Workflow
     }
 
     if (updateAgentDto.name !== undefined) updateData.name = updateAgentDto.name;
     if (updateAgentDto.description !== undefined) updateData.description = updateAgentDto.description;
-    if (updateAgentDto.edges !== undefined) updateData.edges = JSON.stringify(updateAgentDto.edges);
-    if (updateAgentDto.startNodeId !== undefined) updateData.startNodeId = updateAgentDto.startNodeId;
+    // Remove legacy persistence to Agent model: edges/startNodeId are not Agent fields
 
     if (updateAgentDto.isPublished !== undefined) {
       updateData.isPublished = updateAgentDto.isPublished;
