@@ -1,10 +1,9 @@
-import { fetchAPI } from './api';
+import { fetchAPI, API_BASE_URL } from './api';
 import { FlowNode, FlowEdge, AgentDefinition, AgentSessionOutput } from '../../../../libs/src';
 import { createClient } from './supabase/client';
 import { getActiveWorkspaceId } from './fileApi';
 
-// Base URL for API requests
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+// Use shared API_BASE_URL from utils/api for consistent base path handling
 
 /**
  * Utility for making requests to the Agent API
@@ -541,14 +540,16 @@ export const agentApiClient = {
       }
       
       const headers = await getAuthHeaders(workspaceId);
-      
-      const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
+      // Some controllers also accept/require workspaceId via query param. Include it for compatibility.
+      const url = `${API_BASE_URL}/v1/agents/${agentId}?workspaceId=${encodeURIComponent(workspaceId)}`;
+      const response = await fetch(url, {
         method: 'DELETE',
         headers
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to delete agent definition: ${response.statusText}`);
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Failed to delete agent definition: ${response.status} ${response.statusText}. ${errorText}`);
       }
     } catch (error) {
       console.error('[agentApi] Error deleting agent definition:', error);

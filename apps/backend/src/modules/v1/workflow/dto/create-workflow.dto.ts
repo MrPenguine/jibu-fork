@@ -19,50 +19,20 @@ export class CreateWorkflowDto {
   description?: string;
 
   @ApiProperty({
-    description: 'Entire workflow definition as JSON',
-    required: false,
-    example: '{"nodes": [], "edges": [], "startNodeId": "start-1"}',
+    description: 'ID of the assistant (agent) to associate with the workflow',
+    example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
   })
-  @IsJSON()
-  @IsOptional()
-  workflowJson?: Record<string, any>;
+  @IsUUID()
+  assistantId: string;
 
   @ApiProperty({
-    description: 'Flow nodes data as JSON',
-    example: '{"node1": {"id": "node1", "type": "start"}}',
+    description: 'ID of the master workflow if creating a secondary workflow',
+    example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
     required: false,
   })
-  @IsJSON()
+  @IsUUID()
   @IsOptional()
-  nodes?: Record<string, any>;
-
-  @ApiProperty({
-    description: 'Flow edges data as JSON',
-    example: '[{"source": "node1", "target": "node2"}]',
-    required: false,
-  })
-  @IsJSON()
-  @IsOptional()
-  edges?: Record<string, any>;
-
-  @ApiProperty({
-    description: 'ID of the starting node',
-    example: 'node1',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  startNodeId?: string;
-
-  @ApiProperty({
-    description: 'Whether the workflow is published',
-    example: false,
-    required: false,
-    default: false,
-  })
-  @IsBoolean()
-  @IsOptional()
-  isPublished?: boolean;
+  masterWorkflowId?: string;
 
   @ApiProperty({
     description: 'Workspace ID that the workflow belongs to',

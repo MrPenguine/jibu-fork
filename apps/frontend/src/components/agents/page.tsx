@@ -11,9 +11,9 @@ import { Input } from '@libs/shadcn-ui/components/ui/input';
 import { Textarea } from '@libs/shadcn-ui/components/ui/textarea';
 import { Label } from '@libs/shadcn-ui/components/ui/label';
 import { PlusCircle, Edit, Play, Trash2, Pencil } from 'lucide-react';
-import { agentApiClient } from '../../../utils/AgentApi';
-import { fetchAPI } from "../../../utils/api";
-import { useWorkspace } from '../../../utils/workspaceContext';
+import { agentApiClient } from '../../utils/AgentApi';
+import { fetchAPI } from "../../utils/api";
+import { useWorkspace } from '../../utils/workspaceContext';
 
 export default function AgentsPage() {
   const { activeWorkspace } = useWorkspace();
@@ -61,7 +61,9 @@ export default function AgentsPage() {
         description: newAgentDescription,
         nodes: [], // Empty nodes array to start with
         edges: [], // Empty edges array to start with
-      });
+        // Ensure TS type requirement and correct header resolution
+        workspaceId: activeWorkspace?.id || ''
+      }, activeWorkspace?.id);
       
       setAgents(prev => [...prev, newAgent as any]);
       setIsCreateModalOpen(false);
@@ -110,7 +112,8 @@ export default function AgentsPage() {
   const handleDeleteAgent = async (agentId: string) => {
     if (window.confirm("Are you sure you want to delete this agent? This action cannot be undone.")) {
       try {
-        await agentApiClient.deleteAgentDefinition(agentId);
+        // Pass explicit workspaceId to ensure correct headers (auth + workspace)
+        await agentApiClient.deleteAgentDefinition(agentId, activeWorkspace?.id);
         setAgents(agents.filter(wf => wf.id !== agentId));
       } catch (error) {
         console.error("Failed to delete agent:", error);

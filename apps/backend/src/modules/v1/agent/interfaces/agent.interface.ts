@@ -20,7 +20,6 @@ export interface ExtendedAgent extends PrismaAgent {
   description: string | null;
   metadata: any | null;
   workspaceId: string;
-  assistantId: string | null;
   n8nWorkflowId: string | null;
   folderId: string | null;
 }

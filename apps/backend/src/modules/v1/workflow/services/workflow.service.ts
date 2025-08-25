@@ -1,11 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../core/database/prisma.service';
-
-// Define WorkflowType locally until Prisma client is regenerated properly
-export enum WorkflowType {
-  MASTER = 'MASTER',
-  SECONDARY = 'SECONDARY'
-}
 import { CreateWorkflowDto } from '../dto/create-workflow.dto';
 import { UpdateWorkflowDto } from '../dto/update-workflow.dto';
 import { CreateSecondaryWorkflowDto } from '../dto/create-secondary-workflow.dto';
@@ -39,20 +33,6 @@ export class WorkflowService {
         agentId,
         workspaceId
       },
-      include: {
-        masterWorkflow: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        secondaryWorkflows: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
     });
 
     return workflows;
@@ -65,116 +45,63 @@ export class WorkflowService {
     return this.prisma.workflow.findUnique({
       where: { id },
       include: {
-        masterWorkflow: true,
-        secondaryWorkflows: true,
         agent: true,
       },
     });
   }
 
-  /**
-   * Get master workflow for an agent
-   */
-  async getMasterWorkflow(agentId: string) {
-    return this.prisma.workflow.findFirst({
-      where: {
-        agentId,
-        workflowType: WorkflowType.MASTER,
-      },
-    });
-  }
 
   /**
-   * Create a new master workflow for an agent
+   * Create a new workflow (master or secondary)
    */
-  async createMasterWorkflow(agentId: string, data: CreateWorkflowDto) {
-    const workflowJson = data.workflowJson ?? {
-      nodes: data.nodes ?? [],
-      edges: data.edges ?? [],
-      startNodeId: data.startNodeId ?? null,
-    };
+  async create(data: CreateWorkflowDto) {
+    const { name, description, assistantId, masterWorkflowId, workspaceId } = data;
 
-    return this.prisma.workflow.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        workflowType: WorkflowType.MASTER,
-        workflowJson,
-        isPublished: data.isPublished || false,
-        agent: { connect: { id: agentId } },
-        workspace: data.workspaceId ? { connect: { id: data.workspaceId } } : undefined,
-      },
-    });
-  }
+    if (masterWorkflowId) {
+      // This is a secondary workflow
+      const master = await this.prisma.workflow.findUnique({ where: { id: masterWorkflowId } });
+      if (!master) {
+        throw new Error('Master workflow not found');
+      }
 
-  /**
-   * Create a secondary workflow
-   */
-  async createSecondaryWorkflow(
-    masterWorkflowId: string,
-    data: CreateSecondaryWorkflowDto,
-    agentId: string,
-    workspaceId: string,
-  ) {
-    const masterWorkflow = await this.prisma.workflow.findUnique({
-      where: { id: masterWorkflowId },
-    });
-
-    if (!masterWorkflow) {
-      throw new Error('Master workflow not found');
+      return this.prisma.workflow.create({
+        data: {
+          name,
+          description,
+          isPrimary: false,
+          agent: { connect: { id: assistantId } },
+          workspace: { connect: { id: workspaceId } },
+          // masterWorkflow: { connect: { id: masterWorkflowId } }, // If you add a direct relation
+        },
+      });
+    } else {
+      // This is a master workflow
+      return this.prisma.workflow.create({
+        data: {
+          name,
+          description,
+          isPrimary: true,
+          agent: { connect: { id: assistantId } },
+          workspace: { connect: { id: workspaceId } },
+        },
+      });
     }
-
-    // Validate that the master workflow is actually a master workflow
-    if (masterWorkflow.workflowType !== WorkflowType.MASTER) {
-      throw new Error('Cannot create a secondary workflow under a non-master workflow');
-    }
-
-    const workflowJson = (data as any).workflowJson ?? masterWorkflow['workflowJson'] ?? {
-      nodes: (data as any).nodes ?? [],
-      edges: (data as any).edges ?? [],
-      startNodeId: (data as any).startNodeId ?? null,
-    };
-
-    return this.prisma.workflow.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        workflowType: WorkflowType.SECONDARY,
-        workflowJson,
-        masterWorkflow: { connect: { id: masterWorkflowId } },
-        agent: { connect: { id: agentId } },
-        workspace: { connect: { id: workspaceId } },
-      },
-    });
   }
+
 
   /**
    * Update a workflow
    */
+  /**
+   * Update a workflow
+   */
   async updateWorkflow(id: string, data: UpdateWorkflowDto) {
-    const workflowJson = data.workflowJson ?? {
-      nodes: data.nodes ?? [],
-      edges: data.edges ?? [],
-      startNodeId: data.startNodeId ?? null,
-    };
-
-    return this.prisma.workflow.upsert({
+    // Note: workflowJson and versioning logic will be handled separately.
+    return this.prisma.workflow.update({
       where: { id },
-      update: {
+      data: {
         name: data.name,
         description: data.description,
-        workflowJson,
-        isPublished: data.isPublished,
-      },
-      create: {
-        id,
-        name: data.name || 'Untitled Workflow',
-        description: data.description,
-        workflowJson,
-        isPublished: data.isPublished || false,
-        workflowType: WorkflowType.MASTER, // Default to MASTER
-        agent: data.agentId ? { connect: { id: data.agentId } } : undefined,
-        workspace: data.workspaceId ? { connect: { id: data.workspaceId } } : undefined,
       },
     });
   }

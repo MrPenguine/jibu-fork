@@ -45,7 +45,7 @@ export class ChatsController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Get chats by assistantId, agentId, or workflowId' })
+  @ApiOperation({ summary: 'Get chats by assistantId (treated as agentId), agentId, or workflowId' })
   @ApiQuery({ name: 'assistantId', required: false })
   @ApiQuery({ name: 'agentId', required: false })
   @ApiQuery({ name: 'workflowId', required: false })
@@ -67,10 +67,10 @@ export class ChatsController {
     
     // Handle multiple possible filter types
     if (assistantId) {
-      // Filtering by assistantId
+      // Back-compat: treat assistantId as agentId
       if (agentId) filters.agentId = agentId;
       if (workflowId) filters.workflowId = workflowId;
-      return this.chatsService.getChats(workspaceId, assistantId, filters);
+      return this.chatsService.getChatsByAgentId(workspaceId, assistantId, filters);
     } else if (agentId) {
       // Filtering by agentId
       if (workflowId) filters.workflowId = workflowId;

@@ -118,10 +118,10 @@ export class AgentController {
   @ApiOperation({ summary: 'Delete a agent' })
   @ApiResponse({ status: 200, description: 'The agent has been successfully deleted.' })
   @ApiResponse({ status: 404, description: 'Agent not found.' })
-  remove(@Param('id') id: string, @Req() req): Promise<ExtendedAgent> {
-    const workspaceId = req.user.lastWorkspaceId;
+  remove(@Param('id') id: string, @Req() req, @Query('workspaceId') queryWorkspaceId?: string): Promise<ExtendedAgent> {
+    const workspaceId = queryWorkspaceId || req.user.lastWorkspaceId;
     if (!workspaceId) {
-      throw new BadRequestException('No workspace selected');
+      throw new BadRequestException('Workspace ID must be provided to delete an agent.');
     }
     return this.agentService.remove(id, workspaceId);
   }
@@ -317,7 +317,7 @@ export class AgentController {
       try {
         jsonContent = JSON.parse(content);
       } catch (e) {
-        const jsonMatch = content.match(/\{.*\}|\[.*\]/s);
+        const jsonMatch = content.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
         if (jsonMatch) {
           try {
             jsonContent = JSON.parse(jsonMatch[0]);

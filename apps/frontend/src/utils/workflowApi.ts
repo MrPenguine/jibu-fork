@@ -52,7 +52,8 @@ interface CreateWorkflowRequest {
   nodes: FlowNode[];
   edges: FlowEdge[];
   startNodeId?: string;
-  assistantId?: string;
+  assistantId?: string; // This is the agentId
+  masterWorkflowId?: string; // For creating a secondary workflow
 }
 
 // Interface for workflow update
@@ -77,15 +78,6 @@ interface ExecuteWorkflowRequest {
 interface ContinueWorkflowRequest {
   userInput?: string;
   event?: Record<string, any>;
-}
-
-// Interface for secondary workflow creation
-interface CreateSecondaryWorkflowRequest {
-  name: string;
-  description?: string;
-  nodes?: FlowNode[] | string;
-  edges?: FlowEdge[] | string;
-  startNodeId?: string;
 }
 
 // Workflow API client
@@ -117,7 +109,7 @@ export const workflowApi = {
     }
   },
 
-  // Fetch workflows for a specific assistant
+  // Fetch workflows for a specific assistant (agent)
   async getWorkflowsByAssistant(assistantId: string, specificWorkspaceId?: string): Promise<WorkflowDefinition[]> {
     try {
       const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
@@ -128,7 +120,8 @@ export const workflowApi = {
       
       const headers = await getAuthHeaders(workspaceId);
       
-      const response = await fetch(`${API_BASE_URL}/v1/workflows/assistant/${assistantId}`, {
+      // Backend route from WorkflowController: @Get('agent/:agentId/workflows') on controller 'v1/workflows'
+      const response = await fetch(`${API_BASE_URL}/v1/workflows/agent/${assistantId}/workflows`, {
         method: 'GET',
         headers
       });
@@ -215,42 +208,6 @@ export const workflowApi = {
     }
   },
 
-  // Create a secondary workflow linked to a master workflow and agent
-  async createSecondaryWorkflow(
-    masterWorkflowId: string,
-    agentId: string,
-    data: CreateSecondaryWorkflowRequest,
-    specificWorkspaceId?: string,
-  ): Promise<WorkflowDefinition> {
-    try {
-      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
-      
-      if (!workspaceId) {
-        throw new Error('No workspace ID available');
-      }
-      
-      const headers = await getAuthHeaders(workspaceId);
-      const url = `${API_BASE_URL}/v1/workflows/${masterWorkflowId}/secondary?agentId=${encodeURIComponent(agentId)}`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        console.error('[workflowApi] Server response error (createSecondary):', errorText);
-        throw new Error(`Failed to create secondary workflow: ${response.statusText}. ${errorText || ''}`);
-      }
-      
-      return response.json();
-    } catch (error) {
-      console.error('[workflowApi] Error creating secondary workflow:', error);
-      throw error;
-    }
-  },
-
   // Update an existing workflow
   async updateWorkflow(workflowId: string, data: UpdateWorkflowRequest, specificWorkspaceId?: string): Promise<WorkflowDefinition> {
     try {
@@ -299,14 +256,23 @@ export const workflowApi = {
       }
       
       const headers = await getAuthHeaders(workspaceId);
-      
-      const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}`, {
+
+      const url = `${API_BASE_URL}/v1/workflows/${workflowId}?workspaceId=${encodeURIComponent(workspaceId)}`;
+      console.log('[workflowApi.deleteWorkflow] URL:', url);
+      console.log('[workflowApi.deleteWorkflow] Headers:', {
+        authorization: headers['Authorization'] ? 'Bearer ...' : 'MISSING',
+        xWorkspaceId: headers['X-Workspace-ID'] || headers['x-workspace-id'] || headers['workspace-id'] || 'MISSING',
+      });
+
+      const response = await fetch(url, {
         method: 'DELETE',
         headers
       });
+      console.log('[workflowApi.deleteWorkflow] Response status:', response.status, response.statusText);
       
       if (!response.ok) {
-        throw new Error(`Failed to delete workflow: ${response.statusText}`);
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Failed to delete workflow: ${response.status} ${response.statusText}. ${errorText}`);
       }
     } catch (error) {
       console.error('[workflowApi] Error deleting workflow:', error);
@@ -353,7 +319,7 @@ export const workflowApi = {
       const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}/unpublish`, {
-        method: 'POST',
+        method: 'PUT',
         headers
       });
       

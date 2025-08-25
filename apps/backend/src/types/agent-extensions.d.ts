@@ -10,7 +10,6 @@ declare global {
     interface AgentWhereInput {
       id?: string | Prisma.StringFilter;
       organizationId?: string | Prisma.StringFilter;
-      isPublished?: boolean | Prisma.BoolFilter;
       [key: string]: any;
     }
   }
@@ -23,7 +22,6 @@ declare module '@prisma/client' {
     nodes?: any; // Stored as JSON in the database, representing FlowNode[]
     edges?: any; // Stored as JSON in the database, representing FlowEdge[]
     startNodeId?: string;
-    isPublished?: boolean;
     workflowType?: string;
     masterWorkflowId?: string;
     workflows?: any[];
@@ -32,7 +30,6 @@ declare module '@prisma/client' {
   // Extend Prisma's generated types as well
   namespace Prisma {
     interface AgentWhereInput {
-      isPublished?: boolean | BoolFilter;
       nodes?: any;
       edges?: any;
       startNodeId?: string | StringFilter;

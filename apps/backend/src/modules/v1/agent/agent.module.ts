@@ -2,7 +2,6 @@ import { Module, forwardRef } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { PrismaModule } from '../../../core/database/prisma.module';
 import { RedisModule } from '../../../core/redis/redis.module';
-import { AssistantsModule } from '../assistants/assistants.module';
 import { ChatsModule } from '../chats/chats.module';
 import { WorkflowModule } from '../workflow/workflow.module';
 
@@ -20,7 +19,6 @@ import { RagService } from '../../../integrations/agent/providers/langchain/rag.
     HttpModule,
     RedisModule,
     ChatsModule,
-    forwardRef(() => AssistantsModule),
     WorkflowModule
   ],
   controllers: [AgentController],

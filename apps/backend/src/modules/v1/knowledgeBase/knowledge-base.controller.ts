@@ -610,35 +610,39 @@ export class KnowledgeBaseController {
       
       this.logger.log(`Found knowledge base: ${JSON.stringify(knowledgeBase)}`);
 
-      // Verify the assistant exists and belongs to the organization
+      // Verify the agent (formerly assistant) exists and belongs to the organization
       // @ts-ignore - PrismaClient models are not properly typed
-      const assistant = await this.prisma.assistant.findFirst({
+      const agent = await this.prisma.agent.findFirst({
         where: {
           id: linkData.assistantId,
           workspaceId: orgId,
         },
       });
 
-      if (!assistant) {
-        this.logger.error(`Assistant ${linkData.assistantId} not found for org ${orgId}`);
-        return { error: 'Assistant not found' };
+      if (!agent) {
+        this.logger.error(`Agent ${linkData.assistantId} not found for org ${orgId}`);
+        return { error: 'Agent not found' };
       }
       
-      this.logger.log(`Found assistant: ${JSON.stringify(assistant)}`);
+      this.logger.log(`Found agent: ${JSON.stringify({ id: agent.id, name: agent.name })}`);
 
-      // Update the assistant to link it to the knowledge base
+      // Update the agent metadata to link it to the knowledge base
+      // @ts-ignore - Prisma client typings might be outdated; schema includes Agent.metadata Json
+      const currentMetadata: any = agent.metadata || {};
+      const newMetadata = { ...currentMetadata, knowledgeBaseId: linkData.knowledgeBaseId };
       // @ts-ignore - PrismaClient models are not properly typed
-      const updatedAssistant = await this.prisma.assistant.update({
+      const updatedAgent = await this.prisma.agent.update({
         where: { id: linkData.assistantId },
-        data: { knowledgeBaseId: linkData.knowledgeBaseId },
+        // @ts-ignore - Prisma client typings might be outdated; schema includes Agent.metadata Json
+        data: { metadata: newMetadata },
       });
       
-      this.logger.log(`Successfully linked KB to assistant: ${JSON.stringify(updatedAssistant)}`);
+      this.logger.log(`Successfully linked KB to agent: ${JSON.stringify({ id: updatedAgent.id, metadata: updatedAgent.metadata })}`);
 
       return { 
         success: true, 
-        message: 'Knowledge base linked to assistant',
-        assistant: updatedAssistant
+        message: 'Knowledge base linked to agent',
+        agent: updatedAgent
       };
     } catch (error) {
       this.logger.error(`Failed to link knowledge base to assistant: ${error.message}`, error.stack);

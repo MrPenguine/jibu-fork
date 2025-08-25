@@ -54,7 +54,6 @@ model Workspace {
   apiKeys              ApiKey[] // API keys belonging to this workspace
   knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this workspace
   knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this workspace
-  assistants           Assistant[] // Assistants belonging to this workspace
   chats                Chat[] // All chats in this workspace
   tools                Tool[] // Tools belonging to this workspace
   agents               Agent[] // Agents belonging to this workspace
@@ -197,7 +196,6 @@ model KnowledgeBase {
   workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sources        KnowledgeBaseSource[]
   chunks         ChunkMetadata[] // Relation to chunks
-  assistants     Assistant[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
@@ -224,39 +222,6 @@ model KnowledgeBaseSource {
   @@index([sourcePointer])
 }
 
-model Assistant {
-  id                         String          @id @default(uuid())
-  name                       String
-  workspaceId             String
-  n8nWorkflowId              String? // n8n integration fields
-  n8nWorkflow                N8nWorkflow?    @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
-  workspace               Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  knowledgeBaseId            String?
-  knowledgeBase              KnowledgeBase?  @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
-  voice                      Json?
-  model                      Json?
-  firstMessage               String?
-  voicemailMessage           String?
-  endCallMessage             String?
-  transcriber                Json?
-  endCallPhrases             String[]        @default([])
-  startSpeakingPlan          Json?
-  isServerUrlSecretSet       Boolean         @default(false)
-  backgroundDenoisingEnabled Boolean         @default(false)
-  serverMessages             String[]        @default([])
-  clientMessages             String[]        @default([])
-  hipaaEnabled               Boolean         @default(false)
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
-  chats                      Chat[]
-  tools                      AssistantTool[] // Tools assigned to this assistant
-  agents                     Agent[] // Agents associated with this assistant
-
-  @@index([workspaceId])
-  @@index([knowledgeBaseId])
-  @@index([n8nWorkflowId])
-}
-
 model ChunkMetadata {
   id              String   @id @default(uuid())
   knowledgeBaseId String
@@ -280,7 +245,6 @@ model Chat {
   id             String         @id @default(uuid())
   name           String? // Optional name for the chat
   workspaceId String
-  assistantId    String? // Optional: Can be null for agent-based chats
   agentId        String? // Optional: For agent-based chats
   workflowId     String? // Optional: For associating chats with workflows
   sessionId      String // Required: For calls: phone number, For chats: user identifier or anonymous session
@@ -291,17 +255,13 @@ model Chat {
   updatedAt      DateTime       @updatedAt
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  assistant     Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   agent         Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
   workflow      Workflow?      @relation(fields: [workflowId], references: [id], onDelete: SetNull)
   messages      Message[]
   agentSessions AgentSession[] // Agent sessions associated with this chat
 
-  // Updated constraints to ensure a chat is uniquely identified by either assistant+session or agent+session
-  @@unique([assistantId, sessionId])
   @@unique([agentId, sessionId])
   @@index([workspaceId])
-  @@index([assistantId])
   @@index([agentId])
   @@index([workflowId])
   @@index([sessionId])
@@ -347,7 +307,6 @@ model Tool {
   credential     Credential?     @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
-  assistantTools AssistantTool[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -375,22 +334,6 @@ model ToolExecution {
   @@index([status])
 }
 
-model AssistantTool {
-  id          String   @id @default(uuid())
-  assistantId String
-  toolId      String
-  isEnabled   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  assistant Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
-  tool      Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
-
-  @@unique([assistantId, toolId])
-  @@index([assistantId])
-  @@index([toolId])
-}
-
 // --- Enums for Agent ---
 enum AgentNodeType {
   START
@@ -407,12 +350,37 @@ enum AgentNodeType {
   RECORD // For voice: record audio
   PLAY_AUDIO // For voice: play a pre-recorded audio URL
   WORKFLOW_CALL // Execute a secondary workflow
-  ASSISTANT // Use an Assistant for chat/voice interaction
 }
 
-enum WorkflowType {
-  MASTER
-  SECONDARY
+
+// --- New Enums for Agent-level defaults ---
+enum LlmProvider {
+  OPENAI
+  ANTHROPIC
+  AZURE_OPENAI
+  GOOGLE
+  CUSTOM
+}
+
+enum LlmModelPreset {
+  GPT_4O_MINI
+  CLAUDE_3_5_SONNET
+  CUSTOM
+}
+
+enum TtsProvider {
+  OPENAI
+  AZURE
+  ELEVENLABS
+  CUSTOM
+}
+
+enum SttProvider {
+  WHISPER
+  AZURE
+  DEEPGRAM
+  GOOGLE
+  CUSTOM
 }
 
 // --- Agent Definition ---
@@ -422,23 +390,46 @@ model Agent {
   updatedAt      DateTime       @updatedAt
   name           String
   description    String?
-  metadata       Json?
-  workspaceId    String?
-  assistantId    String?
+  workspaceId    String
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folderId       String?
+  folder         Folder?        @relation(fields: [folderId], references: [id])
+
+  // --- Agent-level default settings (typed) ---
+  llmProvider    LlmProvider?
+  llmModel       String?
+  ttsProvider    TtsProvider?
+  ttsVoiceId     String?
+  sttProvider    SttProvider?
+  sttModel       String?
+
+  // --- Call/Channel Specific Settings (moved from Assistant) ---
+  firstMessage               String?
+  voicemailMessage           String?
+  endCallMessage             String?
+  endCallPhrases             String[] @default([])
+  startSpeakingPlan          Json?
+  isServerUrlSecretSet       Boolean  @default(false)
+  backgroundDenoisingEnabled Boolean  @default(false)
+  serverMessages             String[] @default([])
+  clientMessages             String[] @default([])
+  hipaaEnabled               Boolean  @default(false)
+  metadata                   Json? // For storing agent-specific settings, like system prompts
+
+  // --- Optional links retained ---
   n8nWorkflowId  String?
-  workspace   Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  assistant      Assistant?     @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   n8nWorkflow    N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
   chats          Chat[]
   sessions       AgentSession[]
-  folderId       String?
-  folder         Folder?        @relation(fields: [folderId], references: [id])
   apiKeys        ApiKey[]
   workflows      Workflow[]
 
+  // --- Primary Workflow Link ---
+  primaryWorkflowId String?   @unique
+  primaryWorkflow   Workflow? @relation("PrimaryAgentWorkflow", fields: [primaryWorkflowId], references: [id], onDelete: SetNull)
+
   @@index([workspaceId])
-  @@index([assistantId])
-  @@index([n8nWorkflowId])
+  @@index([folderId])
 }
 
 model AgentSession {
@@ -468,27 +459,36 @@ model Workflow {
   updatedAt          DateTime     @updatedAt
   name               String
   description        String?
-  workflowJson       Json // Entire workflow definition as JSON
-  isPrimary          Boolean      @default(false)
+
+  // Agent & Workspace relations
   agentId            String
-  workspaceId        String?
-  version            Int          @default(1)
-  isPublished        Boolean      @default(false)
-  publishedAt        DateTime?
-  workflowType       WorkflowType @default(MASTER)
-  masterWorkflowId   String?
-  masterWorkflow     Workflow?    @relation("SecondaryWorkflows", fields: [masterWorkflowId], references: [id], onDelete: Cascade)
-  secondaryWorkflows Workflow[]   @relation("SecondaryWorkflows")
+  agent              Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  workspaceId        String
+  workspace          Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Workflow classification
+  isPrimary          Boolean      @default(false)
+
+  // n8n link
   n8nWorkflowId      String?
   n8nWorkflow        N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
 
-  agent     Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  workspace Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  chats     Chat[]
-  webhooks      Webhook[]
+  // Versioning pointers
+  publishedVersionId String?          @unique
+  publishedVersion   WorkflowVersion? @relation("PublishedWorkflowVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
+
+  draftVersionId     String?          @unique
+  draftVersion       WorkflowVersion? @relation("DraftWorkflowVersion", fields: [draftVersionId], references: [id], onDelete: SetNull)
+
+  // Reverse relations
+  versions           WorkflowVersion[]
+  agentAsPrimary     Agent?       @relation("PrimaryAgentWorkflow")
+  chats              Chat[]
+  webhooks           Webhook[]
 
   @@index([agentId])
   @@index([workspaceId])
+  @@index([n8nWorkflowId])
 }
 
 // WorkflowNode and WorkflowEdge models have been removed.
@@ -516,7 +516,6 @@ model N8nWorkflow {
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
-  assistants Assistant[] // Assistants that use this workflow (always PRIMARY)
   agents     Agent[] // Agents that use this workflow (can be PRIMARY or SECONDARY)
   workflows  Workflow[] // Workflows linked to this n8n workflow
 
@@ -526,6 +525,29 @@ model N8nWorkflow {
   @@index([workflowType]) // Add index for the new field
 }
 
+
+// New model: WorkflowVersion for versioned workflow JSON snapshots
+model WorkflowVersion {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workflowId   String
+  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  version      Int
+  workflowJson Json
+
+  status       String   @default("draft") // "draft" | "published" | "archived"
+  publishedAt  DateTime?
+
+  // Back-links for pointers on Workflow
+  workflowAsPublishedVersion Workflow? @relation("PublishedWorkflowVersion")
+  workflowAsDraftVersion     Workflow? @relation("DraftWorkflowVersion")
+
+  @@unique([workflowId, version])
+  @@index([workflowId])
+}
 
 model Webhook {
   id             String             @id @default(uuid())

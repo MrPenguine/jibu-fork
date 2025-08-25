@@ -184,20 +184,21 @@ export class LangchainAgentService implements IAgentService {
       const { assistantId, knowledgeBaseId } = config || {};
       
       if (!assistantId) {
-        throw new Error('Assistant ID is required');
+        throw new Error('Agent ID is required');
       }
       
-      // Get the assistant
-      const assistant = await this.prisma.assistant.findUnique({
+      // Get the agent (assistants removed)
+      const agent = await this.prisma.agent.findUnique({
         where: { id: assistantId }
       });
       
-      if (!assistant) {
-        throw new Error(`Assistant with ID ${assistantId} not found`);
+      if (!agent) {
+        throw new Error(`Agent with ID ${assistantId} not found`);
       }
       
-      // Extract model configuration from assistant and determine provider
-      const modelConfig = assistant.model as any || {};
+      // Extract model configuration from agent metadata and determine provider
+      // @ts-ignore prisma types may be out of date; Agent.metadata exists in schema
+      const modelConfig = (agent.metadata as any)?.model || {};
       const { provider, modelName, modelUsed } = this.determineProvider(modelConfig);
       
       if (!provider) {
@@ -209,8 +210,9 @@ export class LangchainAgentService implements IAgentService {
       
      // Get knowledge base results if needed
 let context = '';
-      // Use knowledgeBaseId from request config or from the assistant if not provided
-      const effectiveKnowledgeBaseId = knowledgeBaseId || assistant.knowledgeBaseId;
+      // Use knowledgeBaseId from request config or from the agent metadata if not provided
+      // @ts-ignore prisma types may be out of date; Agent.metadata exists in schema
+      const effectiveKnowledgeBaseId = knowledgeBaseId || (agent.metadata as any)?.knowledgeBaseId;
 
       if (effectiveKnowledgeBaseId) {
         this.logger.log(`Using knowledge base ID: ${effectiveKnowledgeBaseId} for query`);
@@ -223,7 +225,7 @@ let context = '';
           this.logger.warn(`No results found from knowledge base ${effectiveKnowledgeBaseId}`);
         }
       } else {
-        this.logger.log('No knowledge base ID available for this assistant');
+        this.logger.log('No knowledge base ID available for this agent');
       }
       
       // Process request based on provider
@@ -235,7 +237,7 @@ let context = '';
         // Add system prompt
         // Make sure we're using the voicemailMessage which contains the actual system instructions
         // NOT the firstMessage which contains the greeting
-        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        let systemPrompt = agent.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
         // This prevents the greeting from appearing in every response
@@ -302,7 +304,7 @@ let context = '';
         };
       } else if (provider === 'google') {
         // Use Gemini
-        // Create the model with the assistant's configuration
+        // Create the model with the agent's configuration
         const genAI = new GoogleGenerativeAI(this.googleApiKey);
         const model = genAI.getGenerativeModel({
           model: modelName,
@@ -318,7 +320,7 @@ let context = '';
         // Add system prompt
         // Make sure we're using the voicemailMessage which contains the actual system instructions
         // NOT the firstMessage which contains the greeting
-        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        let systemPrompt = agent.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
         // This prevents the greeting from appearing in every response
@@ -369,7 +371,7 @@ let context = '';
         const messages = [];
         
         // Add system prompt
-        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        let systemPrompt = agent.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
         if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
@@ -464,37 +466,29 @@ let context = '';
       this.logger.log(`[AGENT_ASSISTANT_DEBUG] Request config: ${JSON.stringify(config || {})}`);
       this.logger.log(`[AGENT_ASSISTANT_DEBUG] Workflow agent flag: ${!!workflowAgent}`);
       
-      // Check for assistantId - this is the critical part where errors occur
+      // Check for assistantId (used as agentId for backward compatibility)
       if (!assistantId) {
-        this.logger.error(`[AGENT_ASSISTANT_DEBUG] No assistantId provided in request config. This is required for assistant chat.`);
-        throw new Error('Assistant ID is required');
+        this.logger.error(`[AGENT_ASSISTANT_DEBUG] No assistantId (agentId) provided in request config. This is required for agent chat.`);
+        throw new Error('Agent ID is required');
       }
       
-      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Looking up assistant with ID: ${assistantId}`);
+      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Looking up agent with ID: ${assistantId}`);
       
-      // Get the assistant
-      const assistant = await this.prisma.assistant.findUnique({
+      // Get the agent (assistants removed)
+      const agent = await this.prisma.agent.findUnique({
         where: { id: assistantId }
       });
       
-      if (!assistant) {
-        this.logger.error(`[AGENT_ASSISTANT_DEBUG] Assistant with ID ${assistantId} not found in database`);
-        // Check if the ID might be an agent ID instead of an assistant ID
-        const potentialAgent = await this.prisma.agent.findUnique({
-          where: { id: assistantId }
-        });
-        
-        if (potentialAgent) {
-          this.logger.error(`[AGENT_ASSISTANT_DEBUG] ID ${assistantId} actually belongs to an agent, not an assistant. This suggests incorrect extraction from workflow.`);
-        }
-        
-        throw new Error(`Assistant with ID ${assistantId} not found`);
+      if (!agent) {
+        this.logger.error(`[AGENT_ASSISTANT_DEBUG] Agent with ID ${assistantId} not found in database`);
+        throw new Error(`Agent with ID ${assistantId} not found`);
       }
       
-      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Successfully found assistant with name: ${assistant.name}`);
+      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Successfully found agent with name: ${agent.name}`);
       
-      // Extract model configuration from assistant and determine provider
-      const modelConfig = assistant.model as any || {};
+      // Extract model configuration from agent metadata and determine provider
+      // @ts-ignore Prisma types may lag schema; Agent.metadata exists
+      const modelConfig = (agent.metadata as any)?.model || {};
       const { provider, modelName, modelUsed } = this.determineProvider(modelConfig);
       
       if (!provider) {
@@ -506,8 +500,9 @@ let context = '';
       
       // Get knowledge base results if needed
       let context = '';
-      // Use knowledgeBaseId from request config or from the assistant if not provided
-      const effectiveKnowledgeBaseId = knowledgeBaseId || assistant.knowledgeBaseId;
+      // Use knowledgeBaseId from request config or from the agent metadata if not provided
+      // @ts-ignore Prisma types may lag schema; Agent.metadata exists
+      const effectiveKnowledgeBaseId = knowledgeBaseId || (agent.metadata as any)?.knowledgeBaseId;
 
       if (effectiveKnowledgeBaseId) {
         this.logger.log(`Using knowledge base ID: ${effectiveKnowledgeBaseId} for streaming query`);
@@ -520,7 +515,7 @@ let context = '';
           this.logger.warn(`No results found from knowledge base ${effectiveKnowledgeBaseId} for streaming request`);
         }
       } else {
-        this.logger.log('No knowledge base ID available for this assistant');
+        this.logger.log('No knowledge base ID available for this agent');
       }
       
       // Process streaming request based on provider
@@ -530,7 +525,7 @@ let context = '';
         const messages = [];
         
         // Add system prompt
-        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        let systemPrompt = agent.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
         if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
@@ -617,7 +612,7 @@ let context = '';
       } else if (provider === 'google') {
         // Use Gemini
         // Prepare system instructions
-        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        let systemPrompt = agent.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
         if (systemPrompt.includes('Thank you for calling Wellness Partners')) {
@@ -648,7 +643,7 @@ let context = '';
           });
         }
         
-        // Create the model with the assistant's configuration
+        // Create the model with the agent's configuration
         const genAI = new GoogleGenerativeAI(this.googleApiKey);
         const model = genAI.getGenerativeModel({
           model: modelName,
@@ -712,7 +707,7 @@ let context = '';
         const messages = [];
         
         // Add system prompt
-        let systemPrompt = assistant.voicemailMessage || 'You are a helpful assistant.';
+        let systemPrompt = agent.voicemailMessage || 'You are a helpful assistant.';
         
         // Remove any greeting text that might have been included in the system prompt
         if (systemPrompt.includes('Thank you for calling Wellness Partners')) {

@@ -12,13 +12,13 @@ import { Input } from '@libs/shadcn-ui/components/ui/input';
 import { Label } from '@libs/shadcn-ui/components/ui/label';
 import { Textarea } from '@libs/shadcn-ui/components/ui/textarea';
 import { workflowApi } from '../../../../../utils/workflowApi';
-
-interface Workflow {
+import { getActiveWorkspaceId } from '../../../../../utils/fileApi';
+interface UIWorkflow {
   id: string;
   name: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
+  description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   isPrimary?: boolean;
   workflowType?: 'MASTER' | 'SECONDARY';
   isPublished?: boolean;
@@ -28,12 +28,15 @@ export default function AgentWorkflowsPage() {
   const params = useParams<{ agentId: string }>();
   const agentId = (params?.agentId as string) || '';
   const [isLoading, setIsLoading] = useState(true);
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [workflows, setWorkflows] = useState<UIWorkflow[]>([]);
   const [agentName, setAgentName] = useState<string>('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState('');
   const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const router = useRouter();
+  const workspaceId = useMemo(() => getActiveWorkspaceId() || '', []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,10 +48,10 @@ export default function AgentWorkflowsPage() {
       try {
         const [agentRes, workflowsRes] = await Promise.all([
           fetchAPI(`/v1/agents/${agentId}`),
-          fetchAPI(`/v1/agents/${agentId}/workflows`)
+          workflowApi.getWorkflowsByAssistant(agentId),
         ]);
         if (agentRes && agentRes.name) setAgentName(agentRes.name);
-        setWorkflows((workflowsRes as Workflow[]) || []);
+        setWorkflows((workflowsRes as unknown as UIWorkflow[]) || []);
       } catch (error) {
         console.error('Failed to fetch agent/workflows:', error);
         setWorkflows([]);
@@ -64,7 +67,7 @@ export default function AgentWorkflowsPage() {
     [workflows]
   );
   const secondaryWorkflows = useMemo(
-    () => workflows.filter(w => !w.isPrimary && w.workflowType === 'SECONDARY'),
+    () => workflows.filter(w => !w.isPrimary),
     [workflows]
   );
 
@@ -78,21 +81,19 @@ export default function AgentWorkflowsPage() {
       return;
     }
     try {
-      if (!masterWorkflow?.id) {
-        alert('Master workflow not found. Please ensure the agent has a master workflow.');
-        return;
-      }
-      await workflowApi.createSecondaryWorkflow(
-        masterWorkflow.id,
-        agentId,
+      await workflowApi.createWorkflow(
         {
           name: newWorkflowName,
           description: newWorkflowDescription || undefined,
+          nodes: [],
+          edges: [],
+          assistantId: agentId,
+          masterWorkflowId: masterWorkflow?.id,
         }
       );
       // Refetch workflows to ensure we have server-shaped data (createdAt/updatedAt, links)
-      const workflowsRes = await fetchAPI(`/v1/agents/${agentId}/workflows`);
-      setWorkflows((workflowsRes as Workflow[]) || []);
+      const workflowsRes = await workflowApi.getWorkflowsByAssistant(agentId);
+      setWorkflows((workflowsRes as unknown as UIWorkflow[]) || []);
       setIsCreateModalOpen(false);
       setNewWorkflowName('');
       setNewWorkflowDescription('');
@@ -110,25 +111,38 @@ export default function AgentWorkflowsPage() {
     router.push(`/agent/${agentId}/workflows/${workflowId}/run`);
   };
 
-  const handleDeleteWorkflow = async (workflowId: string) => {
-    if (window.confirm('Are you sure you want to delete this workflow?')) {
-      try {
-        await fetchAPI(`/v1/agents/${agentId}/workflows/${workflowId}`, { method: 'DELETE' });
-        setWorkflows(prev => prev.filter(wf => wf.id !== workflowId));
-      } catch (error) {
-        console.error('Failed to delete workflow:', error);
-        alert('Failed to delete workflow. Please try again.');
-      }
+  const openDeleteConfirm = (workflowId: string) => {
+    console.log('[AgentWorkflowsPage] Open delete confirm for workflow:', workflowId);
+    setDeleteTargetId(workflowId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteWorkflow = async () => {
+    if (!deleteTargetId) return;
+    console.log('[AgentWorkflowsPage] Confirming delete for workflow:', deleteTargetId);
+    try {
+      await workflowApi.deleteWorkflow(deleteTargetId, workspaceId);
+      setWorkflows(prev => prev.filter(wf => wf.id !== deleteTargetId));
+      setDeleteConfirmOpen(false);
+      setDeleteTargetId(null);
+    } catch (error) {
+      console.error('Failed to delete workflow:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      alert(`Failed to delete workflow. ${message}`);
     }
   };
 
-  const togglePublish = async (wf: Workflow) => {
+  const cancelDeleteWorkflow = () => {
+    console.log('[AgentWorkflowsPage] Delete canceled by user');
+    setDeleteConfirmOpen(false);
+    setDeleteTargetId(null);
+  };
+
+  const togglePublish = async (wf: UIWorkflow) => {
     try {
-      const updated = await fetchAPI(`/v1/agents/${agentId}/workflows/${wf.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isPublished: !wf.isPublished })
-      });
+      const updated = wf.isPublished
+        ? await workflowApi.unpublishWorkflow(wf.id)
+        : await workflowApi.publishWorkflow(wf.id);
       setWorkflows(prev => prev.map(x => (x.id === wf.id ? { ...x, ...(updated || {}), isPublished: !wf.isPublished } : x)));
     } catch (e) {
       console.error('Failed to toggle publish:', e);
@@ -176,15 +190,15 @@ export default function AgentWorkflowsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground mb-4">Last updated: {new Date(masterWorkflow.updatedAt).toLocaleDateString()}</div>
+              <div className="text-sm text-muted-foreground mb-4">Last updated: {masterWorkflow?.updatedAt ? new Date(masterWorkflow.updatedAt).toLocaleDateString() : '—'}</div>
               <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full min-w-0">
-                <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleEditWorkflow(masterWorkflow.id)}>
+                <Button type="button" variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleEditWorkflow(masterWorkflow.id)}>
                   <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Edit</span>
                 </Button>
-                <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleRunWorkflow(masterWorkflow.id)}>
+                <Button type="button" variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleRunWorkflow(masterWorkflow.id)}>
                   <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Run</span>
                 </Button>
-                <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleDeleteWorkflow(masterWorkflow.id)}>
+                <Button type="button" variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => openDeleteConfirm(masterWorkflow.id)}>
                   <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" /> <span className="hidden sm:inline">Delete</span>
                 </Button>
               </div>
@@ -230,15 +244,15 @@ export default function AgentWorkflowsPage() {
                 <CardDescription className="truncate">{workflow.description || 'Secondary workflow'}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-muted-foreground mb-4">Last updated: {new Date(workflow.updatedAt).toLocaleDateString()}</div>
+                <div className="text-sm text-muted-foreground mb-4">Last updated: {workflow?.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString() : '—'}</div>
                 <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full min-w-0">
-                  <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleEditWorkflow(workflow.id)}>
+                  <Button type="button" variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleEditWorkflow(workflow.id)}>
                     <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Edit</span>
                   </Button>
-                  <Button variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleRunWorkflow(workflow.id)}>
+                  <Button type="button" variant="outline" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleRunWorkflow(workflow.id)}>
                     <Play className="h-3 w-3 sm:h-4 sm:w-4 mr-2" /> <span className="hidden sm:inline">Run</span>
                   </Button>
-                  <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => handleDeleteWorkflow(workflow.id)}>
+                  <Button type="button" variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4" onClick={() => openDeleteConfirm(workflow.id)}>
                     <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" /> <span className="hidden sm:inline">Delete</span>
                   </Button>
                 </div>
@@ -270,6 +284,22 @@ export default function AgentWorkflowsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveWorkflow}>Save Workflow</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={(v) => (v ? setDeleteConfirmOpen(true) : cancelDeleteWorkflow())}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Workflow</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this workflow? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDeleteWorkflow}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDeleteWorkflow}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

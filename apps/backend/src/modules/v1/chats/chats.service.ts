@@ -5,7 +5,7 @@ import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
 import { ConfigService } from '@nestjs/config';
-import { Agent, Assistant, Chat, Message, Prisma } from '@prisma/client';
+import { Agent, Chat, Message, Prisma } from '@prisma/client';
 
 // Extended chat type to include system prompt
 interface ChatWithSystemPrompt extends Chat {
@@ -32,27 +32,11 @@ export class ChatsService {
   ) {}
 
   async createChat(createChatDto: CreateChatDto & { workspaceId: string }) {
-    if (createChatDto.assistantId) {
-      this.logger.log(`Creating chat for assistant ${createChatDto.assistantId} in workspace ${createChatDto.workspaceId}`);
-    } else if (createChatDto.agentId) {
+    if (createChatDto.agentId) {
       this.logger.log(`Creating chat for agent ${createChatDto.agentId} in workspace ${createChatDto.workspaceId}`);
     }
     
     this.logger.log(`Session ID: ${createChatDto.sessionId}, Session Type: ${createChatDto.sessionType || 'chat'}`);
-    
-    if (createChatDto.assistantId) {
-      const assistant = await this.prisma.assistant.findFirst({
-        where: {
-          id: createChatDto.assistantId,
-          workspaceId: createChatDto.workspaceId
-        }
-      });
-
-      if (!assistant) {
-        this.logger.error(`Assistant ${createChatDto.assistantId} not found in workspace ${createChatDto.workspaceId}`);
-        throw new NotFoundException(`Assistant not found or not accessible in this workspace`);
-      }
-    }
 
     if (createChatDto.agentId) {
       const agent = await this.prisma.agent.findFirst({
@@ -88,7 +72,6 @@ export class ChatsService {
       sessionId: createChatDto.sessionId,
       sessionType: createChatDto.sessionType || 'chat',
       metadata: createChatDto.metadata || {},
-      ...(createChatDto.assistantId && { assistant: { connect: { id: createChatDto.assistantId } } }),
       ...(createChatDto.agentId && { agent: { connect: { id: createChatDto.agentId } } }),
       ...(createChatDto.workflowId && { workflow: { connect: { id: createChatDto.workflowId } } }),
       ...(createChatDto.nodeType && { nodeType: createChatDto.nodeType }),
@@ -122,48 +105,6 @@ export class ChatsService {
     return updatedChat;
   }
 
-  async getChats(workspaceId: string, assistantId: string, filters?: { sessionType?: string, sessionId?: string, agentId?: string, workflowId?: string }) {
-    this.logger.log(`Getting chats for assistant ${assistantId} in workspace ${workspaceId}`);
-    if (filters) {
-      this.logger.log(`Filters: ${JSON.stringify(filters)}`);
-    }
-    
-    const assistant = await this.prisma.assistant.findFirst({
-      where: { id: assistantId, workspaceId }
-    });
-
-    if (!assistant) {
-      this.logger.error(`Assistant ${assistantId} not found in workspace ${workspaceId}`);
-      throw new NotFoundException(`Assistant not found or not accessible in this workspace`);
-    }
-
-    const where: Prisma.ChatWhereInput = {
-      workspaceId,
-      assistantId,
-      ...(filters?.sessionType && { sessionType: filters.sessionType }),
-      ...(filters?.sessionId && { sessionId: filters.sessionId }),
-      ...(filters?.agentId && { agentId: filters.agentId }),
-      ...(filters?.workflowId && { workflowId: filters.workflowId }),
-    };
-
-    const chats = await this.prisma.chat.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        messages: {
-          orderBy: { sequenceId: 'desc' },
-          take: 1,
-        }
-      }
-    });
-
-    this.logger.log(`Found ${chats.length} chats for assistant ${assistantId}`);
-
-    return chats.map(chat => ({
-      ...chat,
-      lastMessage: chat.messages[0]?.content || null
-    }));
-  }
   
   async getChatsByAgentId(workspaceId: string, agentId: string, filters?: { sessionType?: string, sessionId?: string, workflowId?: string }) {
     this.logger.log(`Getting chats for agent ${agentId} in workspace ${workspaceId}`);
@@ -253,8 +194,7 @@ export class ChatsService {
     this.logger.log(`Getting chat ${id} for workspace ${workspaceId}`);
     
     const chat = await this.prisma.chat.findUnique({
-      where: { id },
-      include: { assistant: true }
+      where: { id }
     });
 
     if (!chat) {
@@ -328,10 +268,7 @@ export class ChatsService {
     const temperature = 0.7; // Default temperature
 
     if (createMessageDto.role === 'user') {
-      if (chat.assistantId) {
-        const assistant = await this.prisma.assistant.findUnique({ where: { id: chat.assistantId } });
-        // N8N workflow verification removed
-      } else if (chat.agentId) {
+      if (chat.agentId) {
         // Simplified agent handling without N8N integration
         try {
           // Attempt to get system prompt from agent metadata if needed
@@ -379,8 +316,7 @@ export class ChatsService {
   // N8N webhook method has been removed
 
   private getRedisKey(chat: Chat): string {
-    const { id: chatId, assistantId, agentId, sessionId } = chat;
-    if (assistantId) return `chat:assistant:${assistantId}:${sessionId}`;
+    const { id: chatId, agentId, sessionId } = chat;
     if (agentId) return `chat:agent:${agentId}:${sessionId}`;
     return `chat:${chatId}:${sessionId}`;
   }

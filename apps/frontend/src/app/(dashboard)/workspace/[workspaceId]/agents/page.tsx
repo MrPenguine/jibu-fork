@@ -28,6 +28,8 @@ export default function AgentsPage() {
   const [editAgentName, setEditAgentName] = useState('');
   const [editAgentDescription, setEditAgentDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const router = useRouter();
   const routeParams = useParams<{ workspaceId: string }>();
   const workspaceId = (routeParams?.workspaceId as string) || '';
@@ -115,16 +117,31 @@ export default function AgentsPage() {
     }
   };
 
-  const handleDeleteAgent = async (agentId: string) => {
-    if (window.confirm("Are you sure you want to delete this agent? This action cannot be undone.")) {
-      try {
-        await agentApiClient.deleteAgentDefinition(agentId);
-        setAgents(agents.filter(wf => wf.id !== agentId));
-      } catch (error) {
-        console.error("Failed to delete agent:", error);
-        alert("Failed to delete agent. Please try again.");
-      }
+  const openDeleteConfirm = (agentId: string) => {
+    console.log('[AgentsPage] Open delete confirm for agent:', agentId);
+    setDeleteTargetId(agentId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteAgent = async () => {
+    if (!deleteTargetId) return;
+    console.log('[AgentsPage] Confirming delete for agent:', deleteTargetId);
+    try {
+      await agentApiClient.deleteAgentDefinition(deleteTargetId, workspaceId);
+      setAgents(prev => prev.filter(a => a.id !== deleteTargetId));
+      setDeleteConfirmOpen(false);
+      setDeleteTargetId(null);
+    } catch (error) {
+      console.error('Failed to delete agent:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      alert(`Failed to delete agent. ${message}`);
     }
+  };
+
+  const cancelDeleteAgent = () => {
+    console.log('[AgentsPage] Delete canceled by user');
+    setDeleteConfirmOpen(false);
+    setDeleteTargetId(null);
   };
 
   const filteredAgents = searchQuery
@@ -277,7 +294,7 @@ export default function AgentsPage() {
                   <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => handleOpenEditModal(agent)}>
                     <Pencil className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Edit</span>
                   </Button>
-                  <Button variant="destructive" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => handleDeleteAgent(agent.id)}>
+                  <Button type="button" variant="destructive" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => openDeleteConfirm(agent.id)}>
                   <Trash2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Delete</span>
                   </Button>
                 </div>
@@ -329,6 +346,22 @@ export default function AgentsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Agent Confirmation Modal */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={(v) => (v ? setDeleteConfirmOpen(true) : cancelDeleteAgent())}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Agent</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this agent? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDeleteAgent}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDeleteAgent}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

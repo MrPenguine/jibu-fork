@@ -43,68 +43,22 @@ export class WorkflowController {
     return this.workflowService.findById(id);
   }
 
-  @Post('agent/:agentId')
-  @ApiOperation({ summary: 'Create a new master workflow for an agent' })
-  async createMasterWorkflow(
-    @Param('agentId') agentId: string,
-    @Body() createWorkflowDto: CreateWorkflowDto,
-    @Req() req,
-  ) {
+  @Post()
+  @ApiOperation({ summary: 'Create a new workflow (master or secondary)' })
+  async create(@Body() createWorkflowDto: CreateWorkflowDto, @Req() req) {
     const workspaceId =
       req.user?.workspaceId ||
       req.user?.lastWorkspaceId ||
       (req.headers['x-workspace-id'] as string);
-    if (!workspaceId) {
-      throw new BadRequestException('No workspace selected');
-    }
-    return this.workflowService.createMasterWorkflow(agentId, {
-      ...createWorkflowDto,
-      workspaceId,
-    });
-  }
 
-  @Post(':masterWorkflowId/secondary')
-  @ApiOperation({ summary: 'Create a secondary workflow' })
-  async createSecondaryWorkflow(
-    @Param('masterWorkflowId') masterWorkflowId: string,
-    @Body() createSecondaryWorkflowDto: CreateSecondaryWorkflowDto,
-    @Req() req,
-    @Query('agentId') queryAgentId?: string,
-  ) {
-    const workspaceId =
-      req.user?.workspaceId ||
-      req.user?.lastWorkspaceId ||
-      (req.headers['x-workspace-id'] as string);
     if (!workspaceId) {
       throw new BadRequestException('No workspace selected');
     }
 
-    let agentId = queryAgentId;
-    if (!agentId) {
-      try {
-        console.log(`Retrieving agentId for master workflow ${masterWorkflowId}`);
-        const masterWorkflow = await this.workflowService.findById(masterWorkflowId);
-        if (!masterWorkflow) {
-          throw new NotFoundException(`Master workflow with ID ${masterWorkflowId} not found`);
-        }
-        agentId = masterWorkflow.agentId;
-        console.log(`Using agentId ${agentId} from master workflow`);
-      } catch (error) {
-        console.error('Error retrieving master workflow:', error);
-        throw new NotFoundException(`Master workflow with ID ${masterWorkflowId} not found or inaccessible`);
-      }
-    }
+    // Ensure the DTO has the workspaceId
+    createWorkflowDto.workspaceId = workspaceId;
 
-    if (!agentId) {
-      throw new BadRequestException('Agent ID is required to create a secondary workflow');
-    }
-
-    return this.workflowService.createSecondaryWorkflow(
-      masterWorkflowId,
-      createSecondaryWorkflowDto,
-      agentId,
-      workspaceId,
-    );
+    return this.workflowService.create(createWorkflowDto);
   }
 
   @Put(':id')

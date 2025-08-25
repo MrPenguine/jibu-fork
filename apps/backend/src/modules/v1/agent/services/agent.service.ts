@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { Agent as PrismaAgent, WorkflowType } from '@prisma/client';
+import { Agent as PrismaAgent } from '@prisma/client';
 import { ExtendedAgent } from '../interfaces/agent.interface';
 import { CreateAgentDto } from '../dto/create-agent.dto';
 import { PrismaService } from '../../../../core/database/prisma.service';
@@ -16,25 +16,9 @@ export class AgentService {
     private readonly workflowService: WorkflowService,
   ) {}
 
-  private extractAssistantIdFromNodes(nodes: any): string | undefined {
-    try {
-      if (!nodes) return undefined;
-      const parsedNodes = typeof nodes === 'string' ? JSON.parse(nodes) : nodes;
-      const assistantNodes = Object.values(parsedNodes).filter(
-        (node: any) => node.type === 'ASSISTANT' && node.data?.assistantId,
-      );
-      if (assistantNodes.length > 0) {
-        const assistantId = (assistantNodes[0] as any).data?.assistantId;
-        if (assistantId) {
-          this.logger.log(`Found assistantId ${assistantId} in workflow nodes`);
-          return assistantId;
-        }
-      }
-      return undefined;
-    } catch (error) {
-      this.logger.warn(`Error extracting assistantId from nodes: ${error.message}`);
-      return undefined;
-    }
+  // Legacy no-op: assistants are removed
+  private extractAssistantIdFromNodes(_: any): string | undefined {
+    return undefined;
   }
 
   async create(createAgentDto: CreateAgentDto, workspaceId: string): Promise<ExtendedAgent> {
@@ -56,20 +40,6 @@ export class AgentService {
         throw new BadRequestException(`Workspace with ID ${workspaceId} not found`);
       }
 
-      if (createAgentDto.assistantId) {
-        const assistant = await this.prisma.assistant.findFirst({
-          where: {
-            id: createAgentDto.assistantId,
-            workspaceId,
-          },
-        });
-
-        if (!assistant) {
-          this.logger.error(`Assistant with ID ${createAgentDto.assistantId} not found in workspace ${workspaceId}`);
-          throw new BadRequestException(`Assistant with ID ${createAgentDto.assistantId} not found in this workspace`);
-        }
-      }
-
       const createData: any = {
         name: createAgentDto.name,
         description: createAgentDto.description || '',
@@ -78,16 +48,9 @@ export class AgentService {
         },
       };
 
-      if (createAgentDto.assistantId) {
-        createData.assistant = {
-          connect: { id: createAgentDto.assistantId },
-        };
-      }
-
       const newAgent = await this.prisma.agent.create({
         data: createData,
         include: {
-          assistant: true,
           workspace: true,
         },
       }) as unknown as ExtendedAgent;
@@ -96,36 +59,14 @@ export class AgentService {
         const agentData = newAgent as unknown as { id: string; name: string };
         this.logger.log(`Creating master workflow for agent: ${agentData.id}`);
 
-        const nodes = createAgentDto.nodes || {};
-        const edges = createAgentDto.edges || {};
-
-        if (!createAgentDto.assistantId) {
-          const extractedAssistantId = this.extractAssistantIdFromNodes(nodes);
-          if (extractedAssistantId) {
-            this.logger.log(`Extracted assistantId ${extractedAssistantId} from workflow nodes`);
-            await this.prisma.agent.update({
-              where: { id: newAgent.id },
-              data: {
-                assistant: { connect: { id: extractedAssistantId } },
-              },
-            });
-            newAgent.assistantId = extractedAssistantId;
-          }
-        }
-
         const workflowData: CreateWorkflowDto = {
           name: `${agentData.name} Workflow`,
           description: `Master workflow for ${agentData.name}`,
-          workflowJson: {
-            nodes: nodes,
-            edges: edges,
-            startNodeId: createAgentDto.startNodeId || ''
-          },
-          isPublished: false,
           workspaceId: workspaceId,
+          assistantId: agentData.id,
         };
 
-        const workflow = await this.workflowService.createMasterWorkflow(agentData.id, workflowData);
+        const workflow = await this.workflowService.create(workflowData);
         this.logger.log(`Master workflow created successfully: ${workflow.id}`);
       } catch (workflowError) {
         this.logger.error(`Error creating master workflow: ${workflowError.message}`);
@@ -155,20 +96,15 @@ export class AgentService {
 
     return agents.map(agent => ({
       ...agent,
-      isPublished: agent.workflows?.some(w => w.isPublished) ?? false,
+      // Derive published status from presence of a published version on any workflow
+      isPublished: agent.workflows?.some((w: any) => !!w.publishedVersionId) ?? false,
     })) as unknown as ExtendedAgent[];
   }
 
-  async findAllByAssistant(assistantId: string, workspaceId: string): Promise<ExtendedAgent[]> {
-    return this.prisma.agent.findMany({
-      where: {
-        assistantId,
-        workspaceId,
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    }) as unknown as ExtendedAgent[];
+  async findAllByAssistant(_assistantId: string, _workspaceId: string): Promise<ExtendedAgent[]> {
+    // Legacy endpoint: assistants removed. Return empty list for back-compat.
+    this.logger.warn('findAllByAssistant called but assistants have been removed. Returning empty list.');
+    return [] as unknown as ExtendedAgent[];
   }
 
   async findOne(id: string, workspaceId: string): Promise<ExtendedAgent> {
@@ -183,7 +119,7 @@ export class AgentService {
       throw new NotFoundException(`Agent with ID ${id} not found in this workspace`);
     }
 
-    return agent as ExtendedAgent;
+    return agent as unknown as ExtendedAgent;
   }
 
   async update(id: string, updateAgentDto: UpdateAgentDto, workspaceId: string): Promise<ExtendedAgent> {
@@ -193,47 +129,13 @@ export class AgentService {
 
     await this.findOne(id, workspaceId);
 
-    if (updateAgentDto.assistantId) {
-      const assistant = await this.prisma.assistant.findFirst({
-        where: {
-          id: updateAgentDto.assistantId,
-          workspaceId,
-        },
-      });
-
-      if (!assistant) {
-        throw new BadRequestException(`Assistant with ID ${updateAgentDto.assistantId} not found in this workspace`);
-      }
-    }
-
     const updateData: any = {};
 
-    if (updateAgentDto.nodes !== undefined) {
-      const extractedAssistantId = this.extractAssistantIdFromNodes(updateAgentDto.nodes);
-      if (extractedAssistantId && updateAgentDto.assistantId === undefined) {
-        updateAgentDto.assistantId = extractedAssistantId;
-      }
-      // Do not persist nodes on Agent; nodes belong to workflowJson on Workflow
-    }
+    // Do not persist nodes/edges/startNodeId on Agent; handled via Workflow versions
 
     if (updateAgentDto.name !== undefined) updateData.name = updateAgentDto.name;
     if (updateAgentDto.description !== undefined) updateData.description = updateAgentDto.description;
-    // Remove legacy persistence to Agent model: edges/startNodeId are not Agent fields
-
-    if (updateAgentDto.isPublished !== undefined) {
-      updateData.isPublished = updateAgentDto.isPublished;
-      if (updateAgentDto.isPublished === true) {
-        updateData.publishedAt = new Date();
-      }
-    }
-
-    if (updateAgentDto.assistantId !== undefined) {
-      if (updateAgentDto.assistantId === null) {
-        updateData.assistant = { disconnect: true };
-      } else {
-        updateData.assistant = { connect: { id: updateAgentDto.assistantId } };
-      }
-    }
+    // Remove legacy publish/assistant updates; those concepts no longer exist on Agent
 
     try {
       return this.prisma.agent.update({
@@ -247,13 +149,22 @@ export class AgentService {
   }
 
   async remove(id: string, workspaceId: string): Promise<ExtendedAgent> {
+    // Ensure the agent exists and belongs to the workspace
     await this.findOne(id, workspaceId);
 
-    return this.prisma.agent.delete({
-      where: {
-        id,
-      },
-    }) as unknown as ExtendedAgent;
+    this.logger.log(`Deleting agent ${id} and cascading related data (workspace ${workspaceId})`);
+
+    try {
+      const deletedAgent = await this.prisma.agent.delete({
+        where: { id },
+      });
+
+      this.logger.log(`Deleted agent ${id} and related data via Prisma cascade`);
+      return deletedAgent as unknown as ExtendedAgent;
+    } catch (error) {
+      this.logger.error(`Error deleting agent ${id}: ${error.message}`, error.stack);
+      throw new BadRequestException(`Failed to delete agent: ${error.message}`);
+    }
   }
 
   async publish(id: string, workspaceId: string): Promise<ExtendedAgent> {
@@ -261,29 +172,11 @@ export class AgentService {
       this.logger.log(`Publishing agent ${id}`);
       await this.findOne(id, workspaceId);
 
+      // No-op publish: update timestamp only; publishing handled at WorkflowVersion level elsewhere
       const updatedAgent = await this.prisma.agent.update({
         where: { id },
         data: { updatedAt: new Date() },
       });
-
-      await this.prisma.workflow.updateMany({
-        where: { agentId: id },
-        data: {
-          isPublished: true,
-          publishedAt: new Date(),
-        },
-      });
-
-      const workflow = await this.prisma.workflow.findFirst({
-        where: {
-          agentId: id,
-          workspaceId,
-        },
-      });
-
-      if (!workflow) {
-        this.logger.warn(`No primary workflow found for agent ${id}.`);
-      }
 
       return updatedAgent as unknown as ExtendedAgent;
     } catch (error) {
@@ -300,6 +193,7 @@ export class AgentService {
         throw new NotFoundException(`Agent with ID "${id}" not found`);
       }
 
+      // No-op unpublish: update timestamp only
       return this.prisma.agent.update({
         where: { id },
         data: { updatedAt: new Date() },

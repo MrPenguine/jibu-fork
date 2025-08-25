@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../core/database/prisma.service';
 import { HttpService } from '@nestjs/axios';
-import { AssistantsService } from '../../assistants/assistants.service';
 import { ChatsService } from '../../chats/chats.service';
 import { AgentSessionOutput, AgentNodeType, FlowNode, FlowEdge } from '../../../../../../../libs/src';
 import { firstValueFrom } from 'rxjs';
@@ -23,8 +22,6 @@ export class AgentExecutionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
-    @Inject(forwardRef(() => AssistantsService))
-    private readonly assistantsService: AssistantsService,
     @Inject(forwardRef(() => ChatsService))
     private readonly chatsService: ChatsService,
   ) {}
@@ -45,20 +42,20 @@ export class AgentExecutionService {
       workspaceId: agentInfo?.workspaceId
     })}`);
     
-    // Load published workflow and inject nodes/edges/startNodeId from workflowJson
+    // Load published workflow and inject nodes/edges/startNodeId from the published WorkflowVersion
     let startNodeId: string | undefined = undefined;
     try {
       const workflow = await this.prisma.workflow.findFirst({
         where: {
           agentId,
           workspaceId,
-          isPublished: true,
         },
         orderBy: { updatedAt: 'desc' },
+        include: { publishedVersion: true },
       });
 
-      if (workflow) {
-        let wfJson: any = (workflow as any).workflowJson;
+      if (workflow && (workflow as any).publishedVersion) {
+        let wfJson: any = (workflow as any).publishedVersion?.workflowJson;
         wfJson = typeof wfJson === 'string' ? JSON.parse(wfJson) : wfJson;
         const nodes = Array.isArray(wfJson?.nodes) ? wfJson.nodes : (wfJson?.nodes ? Object.values(wfJson.nodes) : []);
         const edges = Array.isArray(wfJson?.edges) ? wfJson.edges : (wfJson?.edges ? Object.values(wfJson.edges) : []);
@@ -112,19 +109,19 @@ export class AgentExecutionService {
       include: { agent: true },
     }) as unknown as AgentSession & { agent: Agent };
     
-    // Ensure agent has the necessary workflow properties; load from workflowJson if missing
+    // Ensure agent has the necessary workflow properties; load from published WorkflowVersion if missing
     if (session?.agent && (!('nodes' in (session.agent as any)) || !('edges' in (session.agent as any)))) {
       try {
         const workflow = await this.prisma.workflow.findFirst({
           where: {
             agentId: (session.agent as any).id,
             workspaceId: (session.agent as any).workspaceId,
-            isPublished: true,
           },
           orderBy: { updatedAt: 'desc' },
+          include: { publishedVersion: true },
         });
-        if (workflow) {
-          let wfJson: any = (workflow as any).workflowJson;
+        if (workflow && (workflow as any).publishedVersion) {
+          let wfJson: any = (workflow as any).publishedVersion?.workflowJson;
           wfJson = typeof wfJson === 'string' ? JSON.parse(wfJson) : wfJson;
           const nodes = Array.isArray(wfJson?.nodes) ? wfJson.nodes : (wfJson?.nodes ? Object.values(wfJson.nodes) : []);
           const edges = Array.isArray(wfJson?.edges) ? wfJson.edges : (wfJson?.edges ? Object.values(wfJson.edges) : []);
@@ -136,7 +133,7 @@ export class AgentExecutionService {
           (session.agent as any).edges = (session.agent as any).edges || [];
         }
       } catch (e) {
-        this.logger.warn(`[AGENT_EXEC] Failed to load workflowJson during continue for session ${sessionId}: ${e.message}`);
+        this.logger.warn(`[AGENT_EXEC] Failed to load published workflow during continue for session ${sessionId}: ${e.message}`);
         (session.agent as any).nodes = (session.agent as any).nodes || [];
         (session.agent as any).edges = (session.agent as any).edges || [];
       }
@@ -394,159 +391,9 @@ export class AgentExecutionService {
           break;
 
         case AgentNodeType.ASSISTANT:
-          // Handle assistant node execution
-          const assistantNodeData = currentNode.data as any;
-          
-          // Detailed logging of the ASSISTANT node data for debugging
-          this.logger.log(`[AGENT_EXEC] Processing ASSISTANT node with data: ${JSON.stringify(assistantNodeData)}`);
-          
-          // Workflow nodes store the assistantId in apiAssistantId field
-          const assistantId = assistantNodeData.apiAssistantId || assistantNodeData.assistantId;
-          const inputVariableName = assistantNodeData.inputVariableName;
-          
-          // Log what field we found the assistantId in
-          if (assistantNodeData.apiAssistantId) {
-            this.logger.log(`[AGENT_EXEC] Found assistantId in apiAssistantId field: ${assistantNodeData.apiAssistantId}`);
-          } else if (assistantNodeData.assistantId) {
-            this.logger.log(`[AGENT_EXEC] Found assistantId in assistantId field: ${assistantNodeData.assistantId}`);
-          } else {
-            this.logger.error(`[AGENT_EXEC] No assistantId found in ASSISTANT node data`);  
-          }
-          
-          if (!assistantId) {
-            this.logger.error(`[AGENT_EXEC] Assistant ID is required in ASSISTANT node data (as apiAssistantId or assistantId)`);
-            throw new BadRequestException('Assistant ID is required in ASSISTANT node data (as apiAssistantId or assistantId)');
-          }
-          
-          this.logger.log(`[AGENT_EXEC] Processing ASSISTANT node with assistantId: ${assistantId}`);
-          
-          // Verify the assistant exists
-          this.logger.log(`[AGENT_EXEC] Verifying assistant with ID ${assistantId} exists for workspace ${session.workspaceId}`);
-          
-          let assistantDetails: any;
-          try {
-            assistantDetails = await this.assistantsService.getAssistantById(assistantId, session.workspaceId);
-            
-            if (!assistantDetails) {
-              this.logger.error(`[AGENT_EXEC] Assistant with ID ${assistantId} not found for workspace ${session.workspaceId}`);
-              throw new BadRequestException(`Assistant with ID ${assistantId} not found`);
-            }
-            
-            this.logger.log(`[AGENT_EXEC] Assistant found: ${JSON.stringify({
-              id: assistantDetails.id,
-              workspaceId: assistantDetails.workspaceId,
-              hasKnowledgeBase: !!assistantDetails.knowledgeBaseId
-            })}`);
-          } catch (error) {
-            this.logger.error(`[AGENT_EXEC] Error verifying assistant: ${error.message}`);
-            throw error;
-          }
-          
-          try {
-            // Get the input from variables or session input
-            this.logger.log(`[AGENT_EXEC] Getting input for assistant from ${inputVariableName ? `variable '${inputVariableName}'` : 'previous node output'}`);
-            
-            const variables = (session.variables as unknown) as Record<string, any>;
-            this.logger.debug(`[AGENT_EXEC] Available variables: ${JSON.stringify(variables)}`);
-            
-            const userInput = inputVariableName
-              ? this.getNestedValue(variables, inputVariableName)
-              : previousNodeOutput || '';
-            
-            this.logger.log(`[AGENT_EXEC] Retrieved user input of length: ${userInput ? userInput.length : 0} characters`);
-            
-            if (!userInput) {
-              this.logger.error(`[AGENT_EXEC] No valid input for assistant node. Input variable "${inputVariableName || 'none'}" is empty or not found`);
-              throw new BadRequestException(`No valid input for assistant node. Input variable "${inputVariableName || 'none'}" is empty or not found`);
-            }
-            
-            this.logger.log(`[AGENT_EXEC] Assistant node input preview: ${userInput.substring(0, 100)}...`);
-            
-            let chatId: string;
-            
-            // Check if a chat already exists for this session
-            const existingChats = await this.prisma.chat.findMany({
-              where: {
-                sessionId: session.id,
-                assistantId: assistantId,
-                workspaceId: session.workspaceId,
-              }
-            });
-            
-            // Reuse existing chat or create a new one
-            if (existingChats && existingChats.length > 0) {
-              chatId = existingChats[0].id;
-              this.logger.log(`Using existing chat ${chatId} for session ${session.id}`);
-            } else {
-              const newChat = await this.chatsService.createChat({
-                assistantId,
-                workspaceId: session.workspaceId,
-                name: `Agent Session ${session.id}`,
-                sessionId: session.id,
-                sessionType: 'chat' // Must be 'chat' or 'call' according to type definition
-              });
-              
-              chatId = newChat.id;
-              this.logger.log(`Created new chat ${chatId} for session ${session.id}`);
-            }
-            
-            // Get existing messages to provide context
-            const existingMessages = await this.prisma.message.findMany({
-              where: { chatId },
-              orderBy: { sequenceId: 'asc' },
-            });
-            
-            // Get the next sequence ID for messages
-            const nextSequenceId = existingMessages.length > 0 
-              ? Math.max(...existingMessages.map(m => m.sequenceId || 0)) + 1 
-              : 1;
-            
-            this.logger.log(`Creating user message with sequence ID ${nextSequenceId}`);
-            
-            // Create a message for the user input
-            const message = await this.chatsService.createMessage(
-              chatId,
-              {
-                content: userInput,
-                role: 'user',
-                type: 'text',
-                sequenceId: nextSequenceId 
-              },
-              session.workspaceId
-            );
-            
-            this.logger.log(`[AGENT_EXEC] Delegating to assistant service with ID ${assistantId} - all RAG/context handled by assistant service`);
-            
-            // Call the assistantsService to generate a response - passing arguments separately
-            const assistantResponse = await this.assistantsService.generateAssistantResponse(
-              assistantId,
-              userInput,
-              session.workspaceId
-            );
-            
-            // Save the response as output
-            output = assistantResponse || 'No response generated';
-            
-            this.logger.log(`[AGENT_EXEC] Assistant response generated successfully (${output.length} chars)`);
-            
-            // Store the assistant response in the output variable if specified
-            if (assistantNodeData.outputVariableName) {
-              const updatedVariables = { ...((session.variables as unknown) as Record<string, any>), [assistantNodeData.outputVariableName]: output };
-              await this.prisma.agentSession.update({
-                where: { id: session.id },
-                data: {
-                  variables: updatedVariables,
-                },
-              });
-              session.variables = updatedVariables;
-              
-              this.logger.log(`Stored assistant response in variable: ${assistantNodeData.outputVariableName}`);
-            }
-          } catch (error) {
-            this.logger.error(`Error in ASSISTANT node: ${error.message}`, error.stack);
-            output = { error: error.message };
-          }
-          
+          // Assistants module has been removed. Skip node with a warning and continue.
+          this.logger.warn('[AGENT_EXEC] ASSISTANT node encountered but assistants module is removed. Skipping.');
+          output = { skipped: true, reason: 'assistants_removed' };
           nextNodeId = this.findNextNodeId(currentNodeId, agent, (session.variables as unknown) as Record<string, any>);
           break;
 

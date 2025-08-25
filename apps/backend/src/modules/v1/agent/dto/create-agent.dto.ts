@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsObject, ValidateNested, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FlowNode, FlowEdge } from '../../../../../../../libs/src';
 
@@ -13,19 +13,17 @@ export class CreateAgentDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => Object)
-  nodes: FlowNode[];
+  @IsOptional()
+  nodes?: FlowNode[];
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => Object)
-  edges: FlowEdge[];
+  @IsOptional()
+  edges?: FlowEdge[];
 
   @IsString()
   @IsOptional()
   startNodeId?: string;
-
-  @IsUUID()
-  @IsOptional()
-  assistantId?: string;
 
 }

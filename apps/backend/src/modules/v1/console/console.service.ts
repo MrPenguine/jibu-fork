@@ -104,7 +104,7 @@ export class ConsoleService {
    * Verify if the assistant exists in the workspace
    */
   async verifyAssistant(assistantId: string, workspaceId: string): Promise<boolean> {
-    const assistant = await this.prisma.assistant.findFirst({
+    const assistant = await this.prisma.agent.findFirst({
       where: {
         id: assistantId,
         workspaceId

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsObject, ValidateNested, IsUUID, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FlowNode, FlowEdge } from '../../../../../../../libs/src';
 
@@ -26,12 +26,4 @@ export class UpdateAgentDto {
   @IsString()
   @IsOptional()
   startNodeId?: string;
-
-  @IsUUID()
-  @IsOptional()
-  assistantId?: string;
-
-  @IsBoolean()
-  @IsOptional()
-  isPublished?: boolean;
 }
