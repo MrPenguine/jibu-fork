@@ -121,7 +121,7 @@ export function AgentNavSidebar({
         <NavItem href={`/agent/${agentId}/usage`} icon={<CreditCard />}>
           Credit Usage
         </NavItem>
-        <NavItem href={`/agent/${agentId}/content`} icon={<FileText />}>
+        <NavItem href={`/agent/${agentId}/cms/workflows`} icon={<FileText />}>
           Content
         </NavItem>
         <NavItem href={`/agent/${agentId}/info`} icon={<Info />}>
