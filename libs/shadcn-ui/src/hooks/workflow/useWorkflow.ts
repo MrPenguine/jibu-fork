@@ -17,7 +17,6 @@ import {
   Viewport,
   Node as ReactFlowNode // Import Node and alias to avoid conflict if FlowNode is used elsewhere as a specific type
 } from 'reactflow';
-import { debounce } from '../../components/agent/utils';
 import { useAssistants } from '../../../../../apps/frontend/src/utils/AssistantsApi'; // Added for backend calls
 import { KnowledgeBaseSearchNodeData } from '../../components/agent/nodes/KnowledgeBaseSearchNode'; // Added for type safety
 import { AssistantNodeData } from '../../components/agent/nodes/AssistantNode'; // Added for type safety
@@ -37,6 +36,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
   const [isPublished, setIsPublished] = useState<boolean>(false);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
   // Utility function to deduplicate edges
   const deduplicateEdges = useCallback((inputEdges: FlowEdge[]): FlowEdge[] => {
@@ -74,24 +74,50 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
 
         if (data) {
           setWorkflow(data);
-          setWorkflowName(data.name || 'Untitled Workflow');
+          // Prefer workflowJson fields for name when present
+          const wfName = (data as any)?.workflowJson?.name || data.name || 'Untitled Workflow';
+          setWorkflowName(wfName);
           setIsPublished(data.isPublished || false);
 
-          // Initialize nodes and edges from workflow data
-          const sanitizedData = sanitizeWorkflowData(data);
-          setNodes(sanitizedData.nodes);
-          setEdges(sanitizedData.edges);
-          console.log('[Workflow] Loaded workflow, nodes after sanitize:', sanitizedData.nodes);
+          // Prefer unified workflowJson for graph + ui
+          const wfJson = (data as any)?.workflowJson;
+          if (wfJson && wfJson.graph) {
+            const rawNodes = Array.isArray(wfJson.graph.nodes) ? wfJson.graph.nodes : [];
+            const rawEdges = Array.isArray(wfJson.graph.edges) ? wfJson.graph.edges : [];
+            const sanitizedData = sanitizeWorkflowData({ nodes: rawNodes, edges: rawEdges });
+            setNodes(sanitizedData.nodes);
+            setEdges(sanitizedData.edges);
+            console.log('[Workflow] Loaded workflow from workflowJson.graph');
 
-          // Set viewport if it exists in the data
-          if (data.viewport) {
-            try {
-              const viewportData = typeof data.viewport === 'string'
-                ? JSON.parse(data.viewport)
-                : data.viewport;
-              setViewport(viewportData);
-            } catch (err) {
-              console.error('Error parsing viewport data:', err);
+            // Viewport from wfJson.ui.viewport when present
+            const vp = wfJson?.ui?.viewport;
+            if (vp && typeof vp === 'object') {
+              setViewport(vp);
+            }
+            // Initialize lastSavedAt from persisted metadata if present
+            const lsa = wfJson?.ui?.lastSavedAt;
+            if (lsa) {
+              try {
+                setLastSavedAt(new Date(lsa));
+              } catch {}
+            }
+          } else {
+            // Fallback to legacy nodes/edges fields
+            const sanitizedData = sanitizeWorkflowData(data);
+            setNodes(sanitizedData.nodes);
+            setEdges(sanitizedData.edges);
+            console.log('[Workflow] Loaded workflow from legacy nodes/edges');
+
+            // Legacy viewport
+            if ((data as any).viewport) {
+              try {
+                const viewportData = typeof (data as any).viewport === 'string'
+                  ? JSON.parse((data as any).viewport)
+                  : (data as any).viewport;
+                setViewport(viewportData);
+              } catch (err) {
+                console.error('Error parsing viewport data:', err);
+              }
             }
           }
         } else {
@@ -204,7 +230,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
     return { nodes, edges: uniqueEdges };
   };
 
-  // Save workflow with current viewport state
+  // Save workflow with current viewport state as unified workflowJson
   const saveWorkflow = useCallback(async (currentViewport?: Viewport, isNewWorkflow?: boolean) => {
     if (!workflowId || isLoading) return;
     
@@ -218,19 +244,43 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       // For brand new secondary workflows, explicitly use empty arrays to ensure clean state
       const nodesToSave = isNewWorkflow ? [] : nodes;
       const edgesToSave = isNewWorkflow ? [] : edges;
-      
-      const workflowData = {
+
+      // Build connections map from edges (source -> out[])
+      const connections: Record<string, { out: { nodeId: string; handleId?: string }[] }> = {};
+      for (const e of edgesToSave) {
+        if (!e.source || !e.target) continue;
+        if (!connections[e.source]) connections[e.source] = { out: [] };
+        connections[e.source].out.push({ nodeId: e.target, handleId: (e as any).targetHandle });
+      }
+
+      const nowIso = new Date().toISOString();
+      const workflowJson = {
         id: workflowId,
         name: workflowName,
-        nodes: JSON.stringify(nodesToSave),
-        edges: JSON.stringify(edgesToSave),
-        isPublished,
-        viewport: viewportToSave ? JSON.stringify(viewportToSave) : undefined
+        description: (workflow as any)?.description ?? undefined,
+        organizationId: orgId ?? (workflow as any)?.organizationId ?? undefined,
+        status: (workflow as any)?.status ?? (isPublished ? 'published' : 'draft'),
+        version: (workflow as any)?.version ?? undefined,
+        publishedAt: (workflow as any)?.publishedAt ?? (isPublished ? nowIso : null),
+        assistantId: (workflow as any)?.assistantId ?? undefined,
+        modelDefaults: (workflow as any)?.modelDefaults ?? undefined,
+        ui: {
+          viewport: viewportToSave ?? undefined,
+          lastOpenedAt: (workflow as any)?.ui?.lastOpenedAt ?? nowIso,
+          lastSavedAt: nowIso,
+        },
+        graph: {
+          nodes: nodesToSave,
+          edges: edgesToSave,
+          connections,
+        },
       };
-      
-      console.log(`Saving workflow ${workflowId}${isNewWorkflow ? ' as new workflow with empty data' : ''}`);
-      await workflowApi.updateWorkflow(workflowId, workflowData, orgId);
-      setLastSavedAt(new Date());
+
+      console.log(`[Workflow] Saving workflow ${workflowId} with unified workflowJson`);
+      await workflowApi.updateWorkflow(workflowId, { workflowJson }, orgId);
+      const now = new Date();
+      setLastSavedAt(now);
+      setHasUnsavedChanges(false);
       console.log('Workflow saved successfully');
     } catch (error) {
       console.error('Error saving workflow:', error);
@@ -238,20 +288,22 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
     } finally {
       setIsSaving(false);
     }
-  }, [workflowId, workflowName, nodes, edges, isLoading, isPublished, viewport, workflowApi, orgId]);
+  }, [workflowId, workflowName, nodes, edges, isLoading, isPublished, viewport, workflowApi, orgId, workflow]);
 
-  // Debounced auto-save
-  const debouncedSave = useCallback(debounce(saveWorkflow, 2000), [saveWorkflow]);
-
-  // Schedule auto-save
+  // Schedule change tracking (no autosave). Update viewport and mark unsaved changes.
   const scheduleAutoSave = useCallback((currentViewport?: Viewport) => {
     if (workflowId && workflowId !== 'create') {
       if (currentViewport) {
         setViewport(currentViewport);
       }
-      debouncedSave(currentViewport);
+      setHasUnsavedChanges(true);
     }
-  }, [workflowId, debouncedSave]);
+  }, [workflowId]);
+
+  // Allow external callers to mark unsaved changes without triggering autosave
+  const markUnsavedChanges = useCallback(() => {
+    setHasUnsavedChanges(true);
+  }, []);
 
   // Publish workflow
   const publishWorkflow = useCallback(async () => {
@@ -539,6 +591,8 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
     viewport,
     updateViewport,
     lastSavedAt,
+    hasUnsavedChanges,
+    markUnsavedChanges,
     onNodesChange,
     onEdgesChange,
     onConnect,

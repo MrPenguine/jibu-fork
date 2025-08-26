@@ -1,4 +1,4 @@
-import { FlowNode, FlowEdge, WorkflowDefinition } from '../../../../libs/shadcn-ui/src/types';
+import { WorkflowDefinition } from '../../../../libs/shadcn-ui/src/types';
 import { AgentSessionOutput as WorkflowSessionOutput } from '../../../../libs/shadcn-ui/src/types';
 import { createClient } from './supabase/client';
 import { getActiveWorkspaceId } from './fileApi';
@@ -49,22 +49,20 @@ async function getAuthHeaders(workspaceId: string) {
 interface CreateWorkflowRequest {
   name: string;
   description?: string;
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-  startNodeId?: string;
   assistantId?: string; // This is the agentId
   masterWorkflowId?: string; // For creating a secondary workflow
+  // Unified JSON blob for persistence (preferred)
+  workflowJson?: any;
 }
 
 // Interface for workflow update
 interface UpdateWorkflowRequest {
   name?: string;
   description?: string;
-  nodes?: FlowNode[] | string;
-  edges?: FlowEdge[] | string;
-  startNodeId?: string;
   assistantId?: string;
   isPublished?: boolean;
+  // Unified JSON blob for persistence
+  workflowJson?: any;
 }
 
 // Interface for workflow execution
@@ -78,6 +76,21 @@ interface ExecuteWorkflowRequest {
 interface ContinueWorkflowRequest {
   userInput?: string;
   event?: Record<string, any>;
+}
+
+// Interface for workflow version metadata
+interface WorkflowVersionMeta {
+  id: string;
+  version: number;
+  status: 'draft' | 'published' | string;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt: string | null;
+}
+
+// Interface for workflow version detail with JSON
+interface WorkflowVersionDetail extends WorkflowVersionMeta {
+  workflowJson: any;
 }
 
 // Workflow API client
@@ -334,6 +347,58 @@ export const workflowApi = {
     }
   },
 
+  // List workflow versions (metadata only)
+  async getWorkflowVersions(workflowId: string, specificWorkspaceId?: string): Promise<WorkflowVersionMeta[]> {
+    try {
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
+      }
+
+      const headers = await getAuthHeaders(workspaceId);
+      const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}/versions`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch workflow versions: ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('[workflowApi] Error fetching workflow versions:', error);
+      throw error;
+    }
+  },
+
+  // Get a specific workflow version by number or tag (draft|published|live)
+  async getWorkflowVersion(workflowId: string, versionOrTag: number | string, specificWorkspaceId?: string): Promise<WorkflowVersionDetail> {
+    try {
+      const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+      if (!workspaceId) {
+        throw new Error('No workspace ID available');
+      }
+
+      const headers = await getAuthHeaders(workspaceId);
+      const versionPath = encodeURIComponent(String(versionOrTag));
+      const response = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}/versions/${versionPath}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Failed to fetch workflow version: ${response.status} ${response.statusText}. ${errorText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('[workflowApi] Error fetching workflow version:', error);
+      throw error;
+    }
+  },
+
   // Execute a workflow
   async executeWorkflow(workflowId: string, data: ExecuteWorkflowRequest, specificWorkspaceId?: string): Promise<WorkflowSessionOutput> {
     try {
@@ -344,8 +409,21 @@ export const workflowApi = {
       }
       
       const headers = await getAuthHeaders(workspaceId);
-      
-      const response = await fetch(`${API_BASE_URL}/v1/workflow-execution/workflows/${workflowId}/execute`, {
+      // Fetch workflow to determine associated agent (assistant)
+      const wfRes = await fetch(`${API_BASE_URL}/v1/workflows/${workflowId}`, {
+        method: 'GET',
+        headers,
+      });
+      if (!wfRes.ok) {
+        throw new Error(`Failed to load workflow before execution: ${wfRes.statusText}`);
+      }
+      const workflow: WorkflowDefinition & { agentId?: string; agent?: { id?: string } } = await wfRes.json();
+      const agentId = workflow.assistantId || (workflow as any).agentId || (workflow as any)?.agent?.id;
+      if (!agentId) {
+        throw new Error('Workflow has no associated assistantId (agentId). Cannot execute.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/v1/agent-execution/agents/${agentId}/execute`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
@@ -373,7 +451,7 @@ export const workflowApi = {
       
       const headers = await getAuthHeaders(workspaceId);
       
-      const response = await fetch(`${API_BASE_URL}/v1/workflow-execution/sessions/${sessionId}/continue`, {
+      const response = await fetch(`${API_BASE_URL}/v1/agent-execution/sessions/${sessionId}/continue`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data),

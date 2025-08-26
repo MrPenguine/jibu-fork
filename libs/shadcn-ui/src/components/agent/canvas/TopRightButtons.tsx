@@ -3,7 +3,7 @@
 import React from 'react';
 import { Button } from '../../ui/button';
 import { Avatar, AvatarFallback } from '../../ui/avatar';
-import { Share, Phone, Play, Upload, Plus, Loader2 } from 'lucide-react';
+import { Share, Phone, Play, Upload, Plus, Loader2, History, Save } from 'lucide-react';
 
 export type TopRightButtonsProps = {
   onRun?: () => void;
@@ -11,6 +11,10 @@ export type TopRightButtonsProps = {
   isPublishing?: boolean;
   isSaving?: boolean;
   isPublished?: boolean;
+  onOpenVersionHistory?: () => void;
+  onSave?: () => void;
+  hasUnsavedChanges?: boolean;
+  lastSavedAt?: Date | null;
 };
 
 export function TopRightButtons({
@@ -19,6 +23,10 @@ export function TopRightButtons({
   isPublishing = false,
   isSaving = false,
   isPublished = false,
+  onOpenVersionHistory,
+  onSave,
+  hasUnsavedChanges = false,
+  lastSavedAt = null,
 }: TopRightButtonsProps) {
   return (
     <div className="fixed top-4 right-4 flex items-center gap-2 z-30">
@@ -40,6 +48,37 @@ export function TopRightButtons({
       <Button variant="outline" size="sm" className="text-gray-700 bg-transparent">
         <Phone className="w-4 h-4 mr-2" />
         Call
+      </Button>
+
+      {/* Version History and Last Saved */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-gray-700 bg-transparent"
+        onClick={onOpenVersionHistory}
+      >
+        <History className="w-4 h-4 mr-2" />
+        History
+      </Button>
+      {lastSavedAt && (
+        <div className="text-xs text-gray-500 ml-1 mr-1 whitespace-nowrap">
+          Saved {lastSavedAt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+        </div>
+      )}
+
+      {/* Save Button */}
+      <Button
+        size="sm"
+        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+        onClick={onSave}
+        disabled={isSaving || !hasUnsavedChanges}
+      >
+        {isSaving ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Save className="w-4 h-4 mr-2" />
+        )}
+        Save
       </Button>
 
       <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={onRun}>

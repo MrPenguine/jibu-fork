@@ -232,6 +232,12 @@ export interface WorkflowDefinition {
   publishedAt?: Date;
   assistantId?: string; // Link to assistant if applicable
   viewport?: string | { x: number; y: number; zoom: number }; // Store viewport data for zoom and position
+  // Unified workflow JSON blob (new). When present, frontend should prefer this for load/save.
+  workflowJson?: any;
+  // Optional metadata aligned with unified JSON
+  status?: string;
+  ui?: any;
+  modelDefaults?: any;
 }
 
 // Agent session output interface

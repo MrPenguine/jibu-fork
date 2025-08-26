@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsJSON, IsBoolean, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateWorkflowDto {
@@ -42,4 +42,11 @@ export class CreateWorkflowDto {
   @IsUUID()
   @IsOptional()
   workspaceId?: string;
+
+  @ApiProperty({
+    description: 'Unified workflow JSON blob containing ui, graph (nodes/edges), metadata, etc.',
+    required: false,
+  })
+  @IsOptional()
+  workflowJson?: any;
 }

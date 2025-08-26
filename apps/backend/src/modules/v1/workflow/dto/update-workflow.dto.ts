@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsJSON, IsBoolean, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateWorkflowDto {
@@ -37,4 +37,28 @@ export class UpdateWorkflowDto {
   @IsUUID()
   @IsOptional()
   workspaceId?: string;
+
+  @ApiProperty({
+    description: 'Agent ID associated with this workflow (alias: assistantId on frontend)',
+    example: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+    required: false,
+  })
+  @IsUUID()
+  @IsOptional()
+  agentId?: string;
+
+  @ApiProperty({
+    description: 'Unified workflow JSON blob containing ui, graph (nodes/edges), metadata, etc.',
+    required: false,
+  })
+  @IsOptional()
+  workflowJson?: any;
+
+  @ApiProperty({
+    description: 'Publish state hint (publish via dedicated endpoint; accepted but not used here)',
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isPublished?: boolean;
 }

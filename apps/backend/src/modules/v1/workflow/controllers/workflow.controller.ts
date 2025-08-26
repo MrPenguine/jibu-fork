@@ -15,7 +15,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
 import { WorkflowService } from '../services/workflow.service';
-import { CreateWorkflowDto, UpdateWorkflowDto, CreateSecondaryWorkflowDto } from '../dto';
+import { CreateWorkflowDto, UpdateWorkflowDto } from '../dto';
 
 @ApiTags('workflows')
 @Controller('v1/workflows')
@@ -92,6 +92,36 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Unpublish a workflow' })
   async unpublishWorkflow(@Param('id') id: string) {
     return this.workflowService.unpublishWorkflow(id);
+  }
+
+  @Get(':id/versions')
+  @ApiOperation({ summary: 'List workflow versions (metadata only)' })
+  async listWorkflowVersions(@Param('id') id: string, @Req() req) {
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+    return this.workflowService.listVersions(id, workspaceId);
+  }
+
+  @Get(':id/versions/:version')
+  @ApiOperation({ summary: 'Get a specific workflow version (by number or tag: draft|published|live)' })
+  async getWorkflowVersion(
+    @Param('id') id: string,
+    @Param('version') version: string,
+    @Req() req,
+  ) {
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+    return this.workflowService.getVersion(id, version, workspaceId);
   }
 
   @Delete(':id')

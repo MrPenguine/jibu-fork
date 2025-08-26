@@ -29,6 +29,7 @@ import {
 import { nodeTypes, defaultEdgeOptions, edgeTypes } from '@libs/shadcn-ui/components/agent/constants';
 // (icons now encapsulated within TopRightButtons)
 import { TopRightButtons } from '@libs/shadcn-ui/components/agent/canvas/TopRightButtons';
+import VersionHistoryModal, { VersionItem } from '@libs/shadcn-ui/components/agent/canvas/VersionHistoryModal';
 import { ControlPanel } from '@libs/shadcn-ui/components/agent/canvas/ControlPanel';
 import { TestAgentButton } from '@libs/shadcn-ui/components/agent/canvas/TestAgentButton';
 import { ColorMenu } from '@libs/shadcn-ui/components/agent/canvas/ColorMenu';
@@ -79,6 +80,8 @@ function AgentCanvasContent() {
     viewport,
     updateViewport,
     lastSavedAt,
+    hasUnsavedChanges,
+    markUnsavedChanges,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -98,6 +101,11 @@ function AgentCanvasContent() {
   const [selectedAssistantData, setSelectedAssistantData] = useState<any>(null);
   const [selectedAssistantNodeId, setSelectedAssistantNodeId] = useState<string | null>(null);
   const [isPublishingAgent, setIsPublishingAgent] = useState(false);
+  // Version history modal state
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [versionItems, setVersionItems] = useState<VersionItem[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [versionsError, setVersionsError] = useState<string | null>(null);
   // Assistant inspector sidebar state
   const [inspectingAssistantNode, setInspectingAssistantNode] = useState<FlowNode | null>(null);
   // Guard to avoid duplicate client-side injection
@@ -309,6 +317,65 @@ function AgentCanvasContent() {
       startCenteredRef.current = true;
     });
   }, [nodes, reactFlowInstance, setNodes]);
+
+  // Helper to load versions (used on open and after actions)
+  const loadVersions = useCallback(async () => {
+    try {
+      setLoadingVersions(true);
+      setVersionsError(null);
+      const list = await workflowApi.getWorkflowVersions(workflowId);
+      const items: VersionItem[] = (list || []).map((v: any) => ({
+        id: String(v.version ?? v.id ?? ''),
+        timestamp: v.publishedAt || v.updatedAt || v.createdAt,
+        status: (v.status === 'published') ? 'live' : 'draft',
+        title: (v.status === 'published') ? `Published v${v.version}` : `Draft v${v.version}`,
+      }));
+      setVersionItems(items);
+    } catch (e: any) {
+      console.error('Failed to load workflow versions:', e);
+      setVersionsError(e?.message || 'Failed to load versions');
+    } finally {
+      setLoadingVersions(false);
+    }
+  }, [workflowApi, workflowId]);
+
+  // Load versions when the modal opens
+  useEffect(() => {
+    if (!isVersionHistoryOpen) return;
+    loadVersions();
+  }, [isVersionHistoryOpen, loadVersions]);
+
+  // Restore a selected version into the main canvas (creates a new working copy until saved)
+  const handleRestoreVersion = useCallback(async (v: VersionItem) => {
+    try {
+      const versionNumber = parseInt(String(v.id), 10);
+      if (!Number.isFinite(versionNumber)) return;
+      const detail = await workflowApi.getWorkflowVersion(workflowId, versionNumber);
+      const wfJson: any = (detail as any)?.workflowJson;
+      const graph = wfJson?.graph || {};
+      const rawNodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+      const rawEdges = Array.isArray(graph.edges) ? graph.edges : [];
+      // Apply to main canvas
+      setNodes(rawNodes as any);
+      setWorkflowEdges(rawEdges as any);
+      // Viewport restore
+      const vp = wfJson?.ui?.viewport && typeof wfJson.ui.viewport === 'object' ? wfJson.ui.viewport : null;
+      if (vp) {
+        try { setViewport(vp); } catch {}
+        updateViewport(vp);
+      } else {
+        try { rfFitView({ padding: 0.2 }); } catch {}
+      }
+      // Mark as unsaved so user can Save to persist as a new version
+      markUnsavedChanges();
+      // Close modal after restore for clarity
+      setIsVersionHistoryOpen(false);
+      // Optionally refresh versions list (no-op until saved creates a new version)
+      // await loadVersions();
+    } catch (e) {
+      console.error('Failed to restore version:', e);
+    }
+  }, [workflowApi, workflowId, setNodes, setWorkflowEdges, setViewport, updateViewport, rfFitView, markUnsavedChanges]);
 
   // Fetch agent details
   useEffect(() => {
@@ -667,6 +734,10 @@ function AgentCanvasContent() {
             isPublishing={isPublishingAgent}
             isSaving={isSaving}
             isPublished={isPublished}
+            onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
+            onSave={() => saveWorkflow()}
+            hasUnsavedChanges={!!hasUnsavedChanges}
+            lastSavedAt={lastSavedAt}
           />
 
           {/* Bottom-left control panel */}
@@ -696,6 +767,35 @@ function AgentCanvasContent() {
             setActivePopover={setActivePopover}
           />
         </ReactFlow>
+        {/* Version History Modal */}
+        <VersionHistoryModal
+          open={isVersionHistoryOpen}
+          onClose={() => setIsVersionHistoryOpen(false)}
+          versions={versionItems}
+          currentVersionId={(workflow as any)?.version ?? (workflow as any)?.workflowJson?.version}
+          loadVersionDetail={async (v) => {
+            // Return detail for read-only preview without applying to canvas
+            try {
+              const versionNumber = parseInt(String(v.id), 10);
+              if (!Number.isFinite(versionNumber)) {
+                return { nodes: [], edges: [], viewport: null };
+              }
+              const detail = await workflowApi.getWorkflowVersion(workflowId, versionNumber);
+              const wfJson: any = (detail as any)?.workflowJson;
+              if (wfJson?.graph) {
+                const rawNodes = Array.isArray(wfJson.graph.nodes) ? wfJson.graph.nodes : [];
+                const rawEdges = Array.isArray(wfJson.graph.edges) ? wfJson.graph.edges : [];
+                const vp = wfJson?.ui?.viewport && typeof wfJson?.ui?.viewport === 'object' ? wfJson.ui.viewport : null;
+                return { nodes: rawNodes as any[], edges: rawEdges as any[], viewport: vp };
+              }
+            } catch (e) {
+              console.error('Failed to load version detail for preview:', e);
+            }
+            return { nodes: [], edges: [], viewport: null };
+          }}
+          onRestore={handleRestoreVersion}
+        />
+        
         {/* Context Menus */}
         {contextMenu.visible && (
           <div

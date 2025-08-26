@@ -22,7 +22,10 @@ export class AgentExecutionController {
     @Body() executeAgentDto: ExecuteAgentDto,
     @Req() req,
   ): Promise<AgentSessionOutput> {
-    const workspaceId = req.user.lastWorkspaceId;
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
     if (!workspaceId) {
       throw new BadRequestException('No workspace selected');
     }
