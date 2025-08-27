@@ -3,17 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { AgentNodeType, FlowNode } from '../../../../src';
 // AgentNodeType.KNOWLEDGE_BASE_SEARCH is now properly defined in types.ts
-import { KnowledgeBaseSearchNode, KnowledgeBaseSearchNodeData } from './nodes/KnowledgeBaseSearchNode';
+import { KnowledgeBaseSearchNodeData } from './nodes/KnowledgeBaseSearchNode';
 import { KnowledgeBaseConfig } from '../assistants/KnowledgeBaseConfig';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { AssistantConfigModal } from './AssistantConfigModal';
-import { AssistantNodeData } from './nodes/AssistantNode';
+// Removed unused AssistantNodeData import
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
 interface AgentNodeInspectorProps {
   node: FlowNode;
@@ -28,7 +27,7 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
 }) => {
   const [localData, setLocalData] = useState<any>(node.data || {});
   const [activeTab, setActiveTab] = useState('general');
-  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
+  // Removed local AssistantConfigModal state; assistant editing is handled elsewhere
 
   // Update local data when node changes
   useEffect(() => {
@@ -765,8 +764,7 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
         );
         
       case AgentNodeType.ASSISTANT:
-        // For assistant nodes, we now only show basic information in the inspector
-        // since the ModelConfig is shown directly in the node when double-clicked
+        // For assistant nodes, only show basic information; configuration is edited via the main modal elsewhere
         return (
           <div className="space-y-4">
             <div>
@@ -785,30 +783,12 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
                 value={localData.apiAssistantId || ''}
                 onChange={(e) => handleChange('apiAssistantId', e.target.value)}
                 placeholder="OpenAI Assistant ID"
-                disabled={!!assistantId} // Disable if assistantId is provided from props
+                disabled={!!assistantId}
               />
             </div>
-            
             <div className="p-4 bg-blue-50 rounded-md text-blue-800">
-              <p>Double-click on the assistant node in the workspace to edit its configuration.</p>
-              <Button 
-                className="w-full mt-2" 
-                onClick={() => setIsConfigModalOpen(true)}
-              >
-                Edit Configuration
-              </Button>
+              <p>Double-click the assistant node in the canvas to edit its configuration.</p>
             </div>
-
-            {/* AssistantConfigModal */}
-            <AssistantConfigModal
-              isOpen={isConfigModalOpen}
-              onClose={() => setIsConfigModalOpen(false)}
-              assistantData={localData as any}
-              onSave={(updatedData) => {
-                setLocalData(updatedData);
-                onUpdate(node.id, updatedData);
-              }}
-            />
           </div>
         );
 

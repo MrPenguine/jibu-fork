@@ -463,6 +463,10 @@ function AgentCanvasContent() {
       isModalOpenRef.current = false;
     }, 1000);
     
+    // Close any open sidebars before opening modal
+    setSelectedNode(null);
+    setInspectingAssistantNode(null);
+    
     // Find the node by ID
     const node = nodes.find(n => n.id === nodeId);
     
@@ -473,8 +477,7 @@ function AgentCanvasContent() {
     
     console.log(`[WorkflowPage] Node data:`, node.data);
     
-    // Set the selected node and assistant node ID
-    setSelectedNode(node);
+    // Set the assistant node ID (do not set selectedNode to avoid showing NodeInspectorPanel)
     setSelectedAssistantNodeId(nodeId);
     
     // Cast node.data to AssistantNodeData to access assistant-specific properties
@@ -895,17 +898,16 @@ function AgentCanvasContent() {
         
       {/* Node inspector panel */}
       {selectedNode && (
-          <NodeInspectorPanel
-            node={selectedNode}
-            onClose={() => setSelectedNode(null)}
-            onUpdate={(data) => {
-              updateNodeData(selectedNode.id, data);
-              scheduleAutoSave();
-            }}
-            onOpenAssistantConfig={(event) => handleOpenAssistantConfigModal(event, selectedNode.id)}
-            onTest={() => handleTestNode(selectedNode.id)}
-          />
-        )}
+        <NodeInspectorPanel
+          selectedNode={selectedNode}
+          onNodeUpdate={(nodeId: string, data: any) => {
+            updateNodeData(nodeId, data);
+            scheduleAutoSave();
+          }}
+          onClose={() => setSelectedNode(null)}
+          assistantId={agentId}
+        />
+      )}
 
       {/* Assistant Inspector sidebar */}
       {inspectingAssistantNode && (
@@ -924,6 +926,7 @@ function AgentCanvasContent() {
                 updateNodeData(nodeId, data);
                 scheduleAutoSave();
               }}
+              onOpenAssistantConfig={(nodeId: string, e?: React.MouseEvent) => handleOpenAssistantConfigModal((e as any) || ({} as React.MouseEvent), nodeId)}
             />
           </div>
         </div>

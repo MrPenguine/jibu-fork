@@ -1,28 +1,35 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '../ui/dialog';
+import { Sheet, SheetContent } from '../ui/sheet';
 import { AssistantNodeData } from './nodes/AssistantNode';
 import { ModelConfig } from '../assistants/ModelConfig';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { Switch } from '../ui/switch';
-import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Input } from '../ui/input';
+import { Plus } from 'lucide-react';
+import PromptSettingsPanel from './nodes/PromptSettingsPanel';
 
 export interface AssistantConfigModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   assistantData: AssistantNodeData | null;
   onSave: (updatedData: AssistantNodeData) => void;
 }
 
 export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
-  isOpen,
-  onClose,
+  open,
+  onOpenChange,
   assistantData,
   onSave,
 }) => {
+  const [isPromptSettingsPanelOpen, setIsPromptSettingsPanelOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  // Keep local copy so typing doesn't trigger parent save/close
+  const [localData, setLocalData] = useState<AssistantNodeData | null>(assistantData);
   // Log when the modal receives new data
   React.useEffect(() => {
     if (assistantData) {
@@ -30,238 +37,312 @@ export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
     }
   }, [assistantData]);
   
-  if (!isOpen || !assistantData) {
-    console.warn(`[AssistantConfigModal] Modal not shown: isOpen=${isOpen}, assistantData=${!!assistantData}`);
-    return null;
-  }
+  // Warn (without breaking Hooks ordering) when modal is open but there's no data
+  useEffect(() => {
+    if (open && !assistantData) {
+      console.warn(`[AssistantConfigModal] Modal open but no assistantData`);
+    }
+  }, [open, assistantData]);
 
-  // Handle model configuration changes
+  // Sync local state when incoming data changes
+  useEffect(() => {
+    setLocalData(assistantData || null);
+  }, [assistantData]);
+
+  // Handle model configuration changes (local only)
   const handleModelConfigChange = (field: string, value: any) => {
-    if (!assistantData) return;
-
-    console.log(`[AssistantConfigModal] Handling field change: ${field} =`, value);
-    
-    // Create updated assistant data based on what field was changed
-    let updatedData;
-    
-    if (field === 'systemMessage') {
-      updatedData = { ...assistantData, systemMessage: value };
-    } else if (field === 'firstMessage') {
-      updatedData = { ...assistantData, firstMessage: value };
-    } else if (field === 'knowledgeBaseId') {
-      updatedData = { ...assistantData, knowledgeBaseId: value };
-    } else if (field === 'model') {
-      // For model changes, update the nested model object while preserving other properties
-      updatedData = {
-        ...assistantData,
-        model: {
-          ...(assistantData.model || {}),
-          ...value
-        }
-      };
-    }
-
-    // Save changes if updatedData was created
-    if (updatedData) {
-      console.log(`[AssistantConfigModal] Saving updated data:`, JSON.stringify(updatedData, null, 2));
-      onSave(updatedData);
-    }
+    setLocalData((prev) => {
+      const base = (prev || assistantData || {}) as AssistantNodeData;
+      let updated: AssistantNodeData = { ...base } as AssistantNodeData;
+      if (field === 'name') {
+        updated = { ...updated, name: value };
+      } else if (field === 'systemMessage') {
+        updated = { ...updated, systemMessage: value };
+      } else if (field === 'firstMessage') {
+        updated = { ...updated, firstMessage: value };
+      } else if (field === 'knowledgeBaseId') {
+        updated = { ...updated, knowledgeBaseId: value };
+      } else if (field === 'model') {
+        updated = {
+          ...updated,
+          model: {
+            ...(updated.model || {} as any),
+            ...value,
+          },
+        } as AssistantNodeData;
+      }
+      return updated;
+    });
   };
 
-  const [activeTab, setActiveTab] = useState('instructions');
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    'identity': true,
-    'voice': true,
-    'personality': true,
-    'conversation': true
-  });
-
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+  // Compute a user-friendly label for the selected model, matching PromptSettingsPanel labels
+  const getModelLabel = (): string => {
+    const provider = localData?.model?.provider ?? assistantData?.model?.provider;
+    const id = localData?.model?.model ?? assistantData?.model?.model;
+    if (!provider || !id) return 'Model';
+    const map: Record<string, Record<string, string>> = {
+      openai: {
+        'gpt-3.5-turbo': 'openai-gpt-3.5 turbo',
+        'gpt-4-turbo': 'openai-gpt-4 turbo',
+        'gpt-4': 'openai-gpt-4',
+        'gpt-4o': 'openai-gpt-4o',
+        'gpt-4o-mini': 'openai-gpt-4o mini',
+        'o1': 'openai-o1',
+        'o1-mini': 'openai-o1 mini',
+      },
+      anthropic: {
+        'claude-3.5-sonnet': 'anthropic-claude-3.5-sonnet',
+        'claude-3.5-haiku': 'anthropic-claude-3.5-haiku',
+        'claude-3-opus': 'anthropic-claude-3-opus',
+        'claude-3.7-sonnet': 'anthropic-claude-3.7-sonnet',
+        'claude-4-sonnet': 'anthropic-claude-4-sonnet',
+        'claude-4-opus': 'anthropic-claude-4-opus',
+      },
+      google: {
+        'gemini-2.0-flash': 'google-gemini-2.0-flash',
+        'gemini-2.5-pro': 'google-gemini-2.5-pro',
+        'gemini-2.5-flash': 'google-gemini-2.5-flash',
+      },
+      xai: {
+        'grok-3': 'xai-grok-3',
+        'grok-3-mini': 'xai-grok-3 mini',
+        'grok-2': 'xai-grok-2',
+      },
+      deepseek: {
+        'r1-distill-llama-70b': 'deepseek-r1 distill llama 70b',
+      },
+      meta: {
+        'llama-3.1-instant': 'meta-llama 3.1 instant',
+      },
+    };
+    return map[provider]?.[id] ?? `${provider}-${id.replace(/-/g, ' ')}`;
   };
+  
+  // Handle model selection from the panel
+  const handleModelSelect = (selectedModel: { provider: string; model: string }) => {
+    handleModelConfigChange('model', selectedModel);
+  };
+  
+  // Focus the name input when editing starts
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+  }, [isEditingName]);
+  
+  // Handle name edit completion
+  const handleNameEditComplete = () => {
+    setIsEditingName(false);
+  };
+
+  // Render a small provider badge for the selected model
+  const ProviderBadge: React.FC<{ provider?: string }> = ({ provider }) => {
+    const map: Record<string, { bg: string; text: string; label: string }> = {
+      openai: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'O' },
+      anthropic: { bg: 'bg-amber-100', text: 'text-amber-800', label: 'A' },
+      google: { bg: 'bg-green-100', text: 'text-green-800', label: 'G' },
+      xai: { bg: 'bg-slate-100', text: 'text-slate-800', label: 'X' },
+      deepseek: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'D' },
+      meta: { bg: 'bg-indigo-100', text: 'text-indigo-800', label: 'M' },
+    };
+    const s = provider ? map[provider] : undefined;
+    const bg = s?.bg ?? 'bg-slate-100';
+    const txt = s?.text ?? 'text-slate-800';
+    const ch = s?.label ?? '?';
+    return (
+      <span
+        className={`inline-flex items-center justify-center w-5 h-5 rounded ${bg} ${txt} text-xs font-semibold`}
+        aria-hidden="true"
+      >
+        {ch}
+      </span>
+    );
+  };
+
+  // Only Instructions are shown now; removed tabs and extra sections.
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-full max-w-[900px] h-[80vh] p-0 overflow-hidden border border-gray-200 rounded-xl">
-        <DialogHeader className="p-4 border-b">
-          <DialogTitle>Lead qualification specialist</DialogTitle>
-          <DialogClose onClick={onClose} className="absolute right-4 top-4" />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-[1280px] h-[85vh] p-0 overflow-hidden border border-gray-200 rounded-xl">
+        <DialogHeader className="p-4 border-b w-full flex items-center justify-between">
+          {isEditingName && (
+            // Visually hidden title to ensure a DialogTitle is always present for a11y
+            <DialogTitle className="sr-only">
+              {assistantData?.name || 'Assistant Configuration'}
+            </DialogTitle>
+          )}
+          {isEditingName ? (
+            <Input
+              ref={nameInputRef}
+              defaultValue={localData?.name || assistantData?.name || 'Sales helper'}
+              className="max-w-[300px] text-lg font-semibold"
+              onBlur={(e) => {
+                handleModelConfigChange('name', e.target.value);
+                handleNameEditComplete();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleModelConfigChange('name', e.currentTarget.value);
+                  handleNameEditComplete();
+                }
+              }}
+            />
+          ) : (
+            <DialogTitle 
+              className="cursor-pointer hover:text-blue-600 transition-colors"
+              onDoubleClick={() => setIsEditingName(true)}
+            >
+              {localData?.name || assistantData?.name || 'Sales helper'}
+            </DialogTitle>
+          )}
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Save stays on the right group but before the Model button */}
+            <Button
+              size="sm"
+              className="bg-blue-600 text-white hover:bg-blue-700"
+              onClick={() => {
+                if (localData) {
+                  onSave(localData);
+                }
+              }}
+            >
+              Save
+            </Button>
+            {/* Model button next to the close (X) - light primary pill */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsPromptSettingsPanelOpen(!isPromptSettingsPanelOpen)}
+              className="inline-flex items-center gap-2 h-8 px-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
+              aria-label="Model settings"
+              title="Model settings"
+            >
+              <ProviderBadge provider={localData?.model?.provider ?? assistantData?.model?.provider} />
+              <span className="ml-2 text-sm">{getModelLabel()}</span>
+            </Button>
+            <DialogClose />
+          </div>
         </DialogHeader>
         
-        <div className="grid grid-cols-[1fr_300px] h-[calc(100%-4rem)]">
-          {/* Left side - Main content */}
+        <div className={`grid grid-cols-[1fr_320px] h-[calc(100%-4rem)]`}>
+          {/* Left side - Main content: only Instructions */}
           <div className="p-6 overflow-y-auto border-r">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
-                <TabsTrigger value="instructions">Instructions</TabsTrigger>
-                <TabsTrigger value="tasks">Tasks</TabsTrigger>
-                <TabsTrigger value="knowledge">Knowledge base</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="instructions" className="space-y-6">
-                {/* Lead Qualification & Nurturing Section */}
-                <div className="space-y-2">
-                  <div className="text-blue-600 font-medium"># Lead Qualification & Nurturing Agent Prompt</div>
-                </div>
-                
-                {/* Identity & Purpose Section */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('identity')}>
-                    <div className="text-blue-600 font-medium">## Identity & Purpose</div>
-                    {expandedSections['identity'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                  
-                  {expandedSections['identity'] && (
-                    <Textarea 
-                      className="min-h-[100px] font-normal text-sm" 
-                      value="You are Avery, a business development voice assistant for AcmeFuture, a B2B software solutions provider. Your primary purpose is to identify qualified leads, understand their business challenges, and connect them with the appropriate sales representatives for solutions that match their needs."
-                      onChange={(e) => handleModelConfigChange('systemMessage', e.target.value)}
-                    />
-                  )}
-                </div>
-                
-                {/* Voice & Presence Section */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('voice')}>
-                    <div className="text-blue-600 font-medium">## Voice & Presence</div>
-                    {expandedSections['voice'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                  
-                  {expandedSections['voice'] && (
-                    <Textarea 
-                      className="min-h-[100px] font-normal text-sm" 
-                      value="- Warm, consultative, and genuinely interested in the prospect's business\n- Convey confidence and expertise without being pushy or aggressive\n- Maintain a helpful, solution-oriented approach rather than a traditional 'sales' persona\n- Balance professionalism with approachable warmth"
-                    />
-                  )}
-                </div>
-                
-                {/* Personality Section */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('personality')}>
-                    <div className="text-blue-600 font-medium">## Personality</div>
-                    {expandedSections['personality'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                </div>
-                
-                {/* Conversation Flow Section */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection('conversation')}>
-                    <div className="text-blue-600 font-medium">## Conversation Flow</div>
-                    {expandedSections['conversation'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="tasks" className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">Integrations</h3>
-                    <Button variant="ghost" size="sm" className="h-8 px-2">
-                      <Plus className="h-4 w-4 mr-1" /> Add
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="border rounded-md p-2 flex items-center justify-center text-center text-sm">
-                      <span>Zendesk</span>
-                    </div>
-                    <div className="border rounded-md p-2 flex items-center justify-center text-center text-sm">
-                      <span>Google Sheets</span>
-                    </div>
-                    <div className="border rounded-md p-2 flex items-center justify-center text-center text-sm">
-                      <span>Salesforce</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">Actions</h3>
-                    <Button variant="ghost" size="sm" className="h-8 px-2">
-                      <Plus className="h-4 w-4 mr-1" /> Add
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="border rounded-md p-2 flex items-center justify-center text-center text-sm">
-                      <span>Email</span>
-                    </div>
-                    <div className="border rounded-md p-2 flex items-center justify-center text-center text-sm">
-                      <span>Notes</span>
-                    </div>
-                    <div className="border rounded-md p-2 flex items-center justify-center text-center text-sm">
-                      <span>Tasks</span>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="knowledge" className="space-y-4">
-                <div className="space-y-2">
-                  <h3 className="font-medium">Knowledge base</h3>
-                  <p className="text-sm text-gray-600">Connect a knowledge base to this assistant</p>
-                  
-                  <div className="flex items-center justify-between mt-4">
-                    <Switch id="kb-enabled" />
-                    <span className="text-sm">Enabled</span>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium mb-2">Instructions</h3>
+                <Textarea 
+                  className="min-h-[500px] font-normal text-sm bg-slate-50 w-full" 
+                  value={(localData?.systemMessage ?? assistantData?.systemMessage) || `### Role
+The chat agent assists users by providing information and support related to sales. It is responsible for answering questions, offering product recommendations, and guiding users through the sales process to enhance their purchasing experience.
+
+### Personality
+The agent should be friendly, approachable, and professional, ensuring users feel comfortable and valued. It should convey enthusiasm about helping customers and demonstrate a strong understanding of sales strategies. The tone should be encouraging and supportive, fostering a positive interaction.
+
+### Goals
+The primary goal is to effectively address user inquiries and concerns regarding sales, leading to increased customer satisfaction and conversion rates. The agent should aim to build rapport with users by actively listening and responding to their needs. Ultimately, the agent seeks to facilitate smooth transactions and promote repeat business through exceptional service.`}
+                  onChange={(e) => handleModelConfigChange('systemMessage', e.target.value)}
+                />
+              </div>
+            </div>
           </div>
           
           {/* Right side - Sidebar */}
           <div className="p-4 bg-gray-50 overflow-y-auto">
             <div className="space-y-6">
               <div>
-                <h3 className="font-medium mb-2">Tasks</h3>
-                <div className="space-y-1">
-                  <div className="flex items-center text-sm">
-                    <div className="w-4 h-4 rounded-sm border mr-2 flex-shrink-0"></div>
-                    <span>Zendesk</span>
+                <h3 className="font-medium mb-2">Tools</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-blue-100 rounded text-blue-800 text-xs">Z</div>
+                    <span className="text-xs">Zendesk</span>
                   </div>
-                  <div className="flex items-center text-sm">
-                    <div className="w-4 h-4 rounded-sm border mr-2 flex-shrink-0"></div>
-                    <span>Google Sheets</span>
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-green-100 rounded text-green-800 text-xs">G</div>
+                    <span className="text-xs">Google Sheets</span>
                   </div>
-                  <div className="flex items-center text-sm">
-                    <div className="w-4 h-4 rounded-sm border mr-2 flex-shrink-0"></div>
-                    <span>Salesforce</span>
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-blue-100 rounded text-blue-800 text-xs">S</div>
+                    <span className="text-xs">Salesforce</span>
+                  </div>
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-red-100 rounded text-red-800 text-xs">G</div>
+                    <span className="text-xs">Gmail</span>
+                  </div>
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-purple-100 rounded text-purple-800 text-xs">A</div>
+                    <span className="text-xs">Airtable</span>
+                  </div>
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-indigo-100 rounded text-indigo-800 text-xs">M</div>
+                    <span className="text-xs">Make</span>
+                  </div>
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-cyan-100 rounded text-cyan-800 text-xs">T</div>
+                    <span className="text-xs">Twilio</span>
+                  </div>
+                  <div className="flex items-center gap-1 p-2 border rounded-md">
+                    <div className="w-5 h-5 flex items-center justify-center bg-orange-100 rounded text-orange-800 text-xs">H</div>
+                    <span className="text-xs">Hubspot</span>
                   </div>
                 </div>
               </div>
               
               <div>
                 <h3 className="font-medium mb-2">Knowledge base</h3>
-                <div className="flex items-center">
-                  <Switch id="kb-sidebar" className="mr-2" />
+                <div className="flex items-center justify-between">
                   <span className="text-sm">Enabled</span>
+                  <Switch id="kb-sidebar" />
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-medium mb-2">Buttons</h3>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Enabled</span>
+                  <Switch id="buttons-enabled" />
                 </div>
               </div>
               
               <div>
                 <h3 className="font-medium mb-2">Cards</h3>
-                <div className="text-sm text-gray-500">0</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Enabled</span>
+                  <Switch id="cards-enabled" />
+                </div>
               </div>
               
               <div>
-                <h3 className="font-medium mb-2">Commands</h3>
-                <div className="text-sm text-gray-500">0</div>
+                <h3 className="font-medium mb-2">Carousels</h3>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Enabled</span>
+                  <Switch id="carousels-enabled" />
+                </div>
               </div>
               
               <div>
                 <h3 className="font-medium mb-2">Exit conditions</h3>
-                <Button variant="outline" size="sm" className="w-full mt-1">
-                  <Plus className="h-4 w-4 mr-1" /> Add
-                </Button>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">New exit condition (inactive)</span>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </DialogContent>
+      {/* Slide-over prompt settings on top of the modal */}
+      <Sheet open={isPromptSettingsPanelOpen} onOpenChange={setIsPromptSettingsPanelOpen}>
+        <SheetContent side="right" className="h-full sm:max-w-md w-[420px] p-0 z-[60]">
+          <PromptSettingsPanel
+            currentModel={localData?.model ?? assistantData?.model}
+            onModelSelect={handleModelSelect}
+            onClose={() => setIsPromptSettingsPanelOpen(false)}
+            className="h-full"
+          />
+        </SheetContent>
+      </Sheet>
     </Dialog>
   );
 };

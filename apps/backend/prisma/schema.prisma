@@ -62,6 +62,9 @@ model Workspace {
   folders              Folder[] // Folders belonging to this workspace
   webhooks             Webhook[]
   webhookInvocations   WebhookInvocation[]
+  assistants           Assistant[] // Assistants belonging to this workspace
+
+  @@index([id])
 }
 
 model WorkspaceMembership {
@@ -196,6 +199,7 @@ model KnowledgeBase {
   workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sources        KnowledgeBaseSource[]
   chunks         ChunkMetadata[] // Relation to chunks
+  assistantLinks AssistantKnowledgeBase[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
@@ -307,6 +311,7 @@ model Tool {
   credential     Credential?     @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
+  assistantTools AssistantTool[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -423,6 +428,7 @@ model Agent {
   sessions       AgentSession[]
   apiKeys        ApiKey[]
   workflows      Workflow[]
+  assistants     Assistant[] // Added back-relation to Assistant
 
   // --- Primary Workflow Link ---
   primaryWorkflowId String?   @unique
@@ -430,6 +436,66 @@ model Agent {
 
   @@index([workspaceId])
   @@index([folderId])
+}
+
+// --- Assistant Models ---
+model Assistant {
+  id             String      @id @default(uuid())
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Ownership and isolation
+  agentId        String
+  agent          Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  // Denormalized for tenancy scoping and fast filters
+  workspaceId    String
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // Identity and settings (can override agent defaults)
+  name           String
+  description    String?
+  llmProvider    LlmProvider?
+  llmModel       String?
+  voiceId        String?
+  sttModel       String?
+  hipaaEnabled   Boolean     @default(false)
+  systemPrompt   String?
+  metadata       Json?
+
+  // Relations
+  tools          AssistantTool[]
+  knowledgeBases AssistantKnowledgeBase[]
+
+  @@unique([agentId, name])
+  @@index([agentId])
+  @@index([workspaceId])
+}
+
+model AssistantTool {
+  id           String    @id @default(uuid())
+  assistantId  String
+  toolId       String
+  // Optional per-assistant tool configuration
+  config       Json?
+
+  assistant    Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  tool         Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@unique([assistantId, toolId])
+  @@index([toolId])
+}
+
+model AssistantKnowledgeBase {
+  id               String        @id @default(uuid())
+  assistantId      String
+  knowledgeBaseId  String
+
+  assistant        Assistant     @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  knowledgeBase    KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@unique([assistantId, knowledgeBaseId])
+  @@index([knowledgeBaseId])
 }
 
 model AgentSession {
