@@ -17,7 +17,8 @@ import {
   applyEdgeChanges,
   Panel,
   OnConnectEnd,
-  Viewport
+  Viewport,
+  reconnectEdge // Added reconnectEdge import
 } from 'reactflow';
 
 import { toast, useToast } from '../../components/ui/use-toast';
@@ -26,7 +27,7 @@ import { AgentNodeType, AssistantNodeData, BaseNodeData, FlowNode, FlowEdge } fr
 import { FlowNode as InspectorFlowNode } from '../../../../src'; // Import for Inspector compatibility
 import { Button } from '../ui/button';
 import { AgentPalette } from './AgentPalette';
-import { StepEditableEdge, BezierEditableEdge } from './canvas/EditableEdge';
+import { edgeTypes, defaultEdgeOptions } from './constants';
 import { AgentNodeInspector } from './AgentNodeInspector';
 import { AssistantInspector } from './AssistantInspector';
 import { AssistantConfigModal } from './AssistantConfigModal'; 
@@ -58,25 +59,7 @@ const nodeTypes: any = {
   [AgentNodeType.KNOWLEDGE_BASE_SEARCH]: KnowledgeBaseSearchNode, // Use enum member
 };
 
-// Define edge types for React Flow (use our editable edges for all shapes)
-const edgeTypes: any = {
-  step: StepEditableEdge,
-  smoothstep: StepEditableEdge,
-  bezier: BezierEditableEdge,
-  default: BezierEditableEdge,
-  simplebezier: BezierEditableEdge,
-};
-
-// Default edge options
-const defaultEdgeOptions: any = {
-  type: 'smoothstep',
-  markerEnd: {
-    type: 'arrowclosed',
-  },
-  style: {
-    strokeWidth: 2,
-  },
-};
+// edgeTypes and defaultEdgeOptions are centralized in constants.ts
 
 // Type definition for API client - will be provided by the parent component
 export interface WorkflowApiClient {
@@ -171,37 +154,49 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
     }
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
-  // Normalize edge types so our custom edge components are always used
-  useEffect(() => {
-    setEdges((eds: any[]) => {
-      let changed = false;
-      const mappedKeys = new Set(['step', 'smoothstep', 'bezier', 'simplebezier']);
-      const next = eds.map((e: any) => {
-        let type = e.type;
-        if (type === 'default') {
-          type = 'simplebezier';
-          changed = true;
-        } else if (!type || !mappedKeys.has(type)) {
-          type = 'simplebezier'; // use our mapped bezier renderer
-          changed = true;
-        }
-        // ensure arrow marker exists for visibility
-        const markerEnd = e.markerEnd || { type: 'arrowclosed' };
-        if (!e.markerEnd) changed = true;
-        if (type !== e.type || markerEnd !== e.markerEnd) {
-          return { ...e, type, markerEnd };
-        }
-        return e;
-      });
-      return changed ? next : eds;
-    });
-  }, [setEdges]);
 
   // Handle node updates and track dirty state
   const onNodeUpdate = useCallback((nodeId: string, data: any) => {
     updateNodeData(nodeId, data);
     setIsDirty(true);
   }, [updateNodeData]);
+
+  // Handle edge data updates and track dirty state
+  const onEdgeUpdate = useCallback((edgeId: string, data: any) => {
+    setEdges((eds) =>
+      eds.map((edge) => {
+        if (edge.id === edgeId) {
+          return { ...edge, data: { ...edge.data, ...data } };
+        }
+        return edge;
+      })
+    );
+    setIsDirty(true);
+  }, [setEdges]);
+  
+  // Track edge reconnection state
+  const edgeReconnectSuccessful = useRef(true);
+  
+  // Handle reconnection start
+  const onReconnectStart = useCallback(() => {
+    edgeReconnectSuccessful.current = false;
+  }, []);
+
+  // Handle reconnection
+  const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+    edgeReconnectSuccessful.current = true;
+    setEdges((els) => reconnectEdge(oldEdge, newConnection, els) as FlowEdge[]);
+    scheduleAutoSave();
+  }, [setEdges, scheduleAutoSave]);
+
+  // Handle reconnection end
+  const onReconnectEnd = useCallback((_: any, edge: Edge) => {
+    if (!edgeReconnectSuccessful.current) {
+      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+      scheduleAutoSave();
+    }
+    edgeReconnectSuccessful.current = true;
+  }, [setEdges, scheduleAutoSave]);
 
   // Handle node click and highlight the selected node
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
@@ -446,28 +441,55 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
     }
   }, [nodes, handleOpenAssistantConfigModal, setNodes, setInspectingAssistantNode, setSelectedNode]);
 
+  // Add update handlers to edges
+  useEffect(() => {
+    const needsHandlers = edges.some(edge => typeof (edge.data as any)?.updateEdgeData !== 'function');
+    if (needsHandlers) {
+      const edgesWithHandlers = edges.map(edge => ({
+        ...edge,
+        data: {
+          ...edge.data,
+          updateEdgeData: onEdgeUpdate,
+        },
+      }));
+      setEdges(edgesWithHandlers);
+    }
+  }, [edges, onEdgeUpdate, setEdges]);
+
   return (
     <div className="flex h-full w-full bg-background text-foreground" ref={reactFlowWrapper}>
       {/* ReactFlow container */}
       <div className="flex-grow h-full" data-testid="rf-wrapper">
         <ReactFlow
-          nodes={nodes as any}
-          edges={edges as any}
-          onNodesChange={onNodesChangeWithDirty}
-          onEdgesChange={onEdgesChangeWithDirty}
-          onConnect={onConnectWithSpecialEdges}
-          onNodeClick={onNodeClick}
-          onNodeDoubleClick={onNodeDoubleClick}
+          ref={(instance) => {
+            reactFlowInstance.current = instance;
+          }}
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
-          onDragOver={onDragOver}
-          onDrop={onDrop}
-          onMove={onViewportChange}
+          onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
+          onPaneClick={() => {
+            setSelectedNode(null);
+            setInspectingAssistantNode(null);
+          }}
+          onReconnect={onReconnect}
+          onReconnectStart={onReconnectStart}
+          onReconnectEnd={onReconnectEnd}
+          fitView
+          attributionPosition="bottom-right"
+          minZoom={0.1}
+          maxZoom={2}
           defaultViewport={viewport || undefined}
-          fitView={!viewport}
-          className="agent-designer-flow"
-          ref={reactFlowInstance}
+          onMoveEnd={(event) => updateViewport(reactFlowInstance.current?.getViewport() || { x: 0, y: 0, zoom: 1 })}
+          proOptions={{ hideAttribution: true }}
+          deleteKeyCode={readOnly ? null : 'Delete'}
+          multiSelectionKeyCode={null} // Disable multi-selection
         >
           <Controls />
           <Background />
@@ -528,10 +550,12 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
       {/* Assistant Config Modal */}
       {isAssistantConfigModalOpen && editingAssistantNodeData && (
         <AssistantConfigModal
-          isOpen={isAssistantConfigModalOpen}
-          onClose={() => {
-            setIsAssistantConfigModalOpen(false);
-            setEditingAssistantNodeData(null);
+          open={isAssistantConfigModalOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsAssistantConfigModalOpen(false);
+              setEditingAssistantNodeData(null);
+            }
           }}
           assistantData={editingAssistantNodeData}
           onSave={handleSaveAssistantConfig}

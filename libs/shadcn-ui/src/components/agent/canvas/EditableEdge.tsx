@@ -1,29 +1,26 @@
-import React from 'react';
-import {
-  EdgeLabelRenderer,
-  getBezierPath,
-  getSmoothStepPath,
-  useReactFlow,
-  BaseEdge,
-  EdgeProps,
-} from 'reactflow';
+import * as React from 'react';
+import { EdgeLabelRenderer, BaseEdge, getBezierPath, getSmoothStepPath, useReactFlow } from 'reactflow';
+import type { EdgeProps } from 'reactflow';
 
-// Shared inline editor component
+// A simple inline editor for the edge label
 function InlineEditor({
   id,
   initial,
   color,
   onCommit,
   onCancel,
+  showPlaceholder,
 }: {
   id: string;
   initial: string;
   color: string;
   onCommit: (val: string) => void;
   onCancel: () => void;
+  showPlaceholder?: boolean;
 }) {
   const ref = React.useRef<HTMLSpanElement | null>(null);
   const [val, setVal] = React.useState<string>(initial || '');
+
   React.useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -50,15 +47,19 @@ function InlineEditor({
         style={{
           display: 'inline-block',
           minWidth: 120,
-          padding: '0px 4px',
+          padding: '4px 6px',
           color: color,
-          background: 'rgba(255,255,255,0.6)',
+          background: '#ffffff',
+          borderRadius: '3px',
           border: 'none',
           outline: 'none',
           cursor: 'text',
           userSelect: 'text',
           whiteSpace: 'nowrap',
           pointerEvents: 'all',
+          fontWeight: 500,
+          fontStyle: 'normal',
+          fontSize: 10,
         }}
         onInput={(e) => {
           const txt = (e.currentTarget as HTMLElement).innerText;
@@ -71,15 +72,13 @@ function InlineEditor({
         onPointerUp={(e) => e.stopPropagation()}
         onBlur={(ev) => {
           const value = ev.currentTarget.innerText.trim();
-          // If cleared, commit empty -> edge label becomes undefined (removed)
-          if (!value) onCommit(''); else onCommit(value);
+          if (!value) onCommit('');
+          else onCommit(value);
         }}
         onKeyDown={(ev) => {
           if (ev.key === 'Enter') {
             ev.preventDefault();
-            const value = (ev.currentTarget as HTMLElement).innerText.trim();
-            (ev.currentTarget as HTMLElement).blur();
-            onCommit(value);
+            ev.currentTarget.blur();
           } else if (ev.key === 'Escape') {
             ev.preventDefault();
             onCancel();
@@ -88,15 +87,17 @@ function InlineEditor({
       >
         {initial}
       </span>
-      {(!val || !val.trim()) && (
+      {showPlaceholder && val.length === 0 && (
         <span
           style={{
             position: 'absolute',
-            left: 4,
             top: 0,
-            lineHeight: '16px',
-            color: 'rgba(15,23,42,0.45)',
+            left: 4,
+            opacity: 0.5,
             pointerEvents: 'none',
+            userSelect: 'none',
+            fontStyle: 'normal',
+            color: 'gray',
             whiteSpace: 'nowrap',
           }}
         >
@@ -107,74 +108,77 @@ function InlineEditor({
   );
 }
 
-function useLabelEditing(id: string, data: any, label: React.ReactNode | undefined, x: number, y: number, color: string) {
+export function useLabelEditing(id: string, data: any, label: any, labelX: number, labelY: number, strokeColor: string) {
   const { setEdges } = useReactFlow();
-  const [isEditing, setIsEditing] = React.useState<boolean>(false);
+  const [isEditing, setIsEditing] = React.useState(!!data?.editingLabel);
+  const [startedByMenu, setStartedByMenu] = React.useState(!!data?.editingLabel);
 
-  // Trigger edit when context menu set data.editingLabel true
   React.useEffect(() => {
     if (data?.editingLabel) {
-      try { console.debug('[EditableEdge] enter edit', { id, label, data }); } catch {}
       setIsEditing(true);
-      // clear the flag so we don't loop
-      setEdges((eds: any[]) => eds.map((e: any) => e.id === id ? ({ ...e, data: { ...(e.data || {}), editingLabel: undefined } }) : e));
+      setStartedByMenu(true);
+      // Clear the flag to prevent re-triggering
+      setEdges((eds) =>
+        eds.map((edge) => {
+          if (edge.id === id) {
+            const { editingLabel, ...restData } = edge.data || {};
+            return { ...edge, data: restData };
+          }
+          return edge;
+        })
+      );
     }
   }, [data?.editingLabel, id, setEdges]);
 
-  const commit = React.useCallback((val: string) => {
-    setEdges((eds: any[]) => eds.map((e: any) => e.id === id ? ({ ...e, label: val || undefined }) : e));
-    setIsEditing(false);
-    window.dispatchEvent(new CustomEvent('edge:labelSaved', { detail: { id, text: val } }));
-  }, [id, setEdges]);
+  const commit = React.useCallback(
+    (val: string) => {
+      setEdges((eds) => eds.map((e) => (e.id === id ? { ...e, label: val || undefined } : e)));
+      setIsEditing(false);
+    },
+    [id, setEdges]
+  );
 
   const cancel = React.useCallback(() => {
-    // If label was empty/placeholder, remove it
-    const wasEmpty = typeof label !== 'string' || !label?.toString?.().trim();
-    setEdges((eds: any[]) => eds.map((e: any) => e.id === id ? ({ ...e, label: wasEmpty ? undefined : e.label }) : e));
     setIsEditing(false);
-  }, [id, label, setEdges]);
+  }, []);
 
-  // Only render when editing or when there is a non-empty label
-  const hasText = typeof label === 'string' && !!label.trim();
-  const wantsEditing = !!data?.editingLabel || isEditing;
-  const labelElement = (wantsEditing || hasText) ? (
+  const labelElement = isEditing ? (
     <div
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        if (!hasText) return; // don't enter edit unless text exists; use context menu to start
-        e.stopPropagation();
-        setIsEditing(true);
-      }}
       style={{
-        transform: `translate(-50%, -50%)`,
         position: 'absolute',
-        left: x,
-        top: y,
-        fontSize: 12,
-        pointerEvents: 'all',
-        zIndex: 1000,
+        transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+        fontSize: 10,
       }}
       className="nodrag nopan"
     >
-      {wantsEditing ? (
-        <InlineEditor id={id} initial={hasText ? (label as string) : ''} color={color} onCommit={commit} onCancel={cancel} />
-      ) : (
-        <span
-          style={{
-            display: 'inline-block',
-            padding: '0px 4px',
-            background: 'rgba(255,255,255,0.4)',
-            borderRadius: 3,
-            color: color,
-            userSelect: 'none',
-            whiteSpace: 'nowrap',
-            cursor: 'text',
-            pointerEvents: 'all',
-          }}
-        >
-          {label as string}
-        </span>
-      )}
+      <InlineEditor id={id} initial={label as string} color={strokeColor} onCommit={commit} onCancel={cancel} showPlaceholder={startedByMenu} />
+    </div>
+  ) : label ? (
+    <div
+      style={{
+        position: 'absolute',
+        transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+        fontSize: 10,
+        color: strokeColor,
+      }}
+      className="nodrag nopan"
+    >
+      <span
+        onClick={() => { setStartedByMenu(false); setIsEditing(true); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        style={{
+          display: 'inline-block',
+          padding: '4px 6px',
+          background: '#ffffff',
+          borderRadius: '3px',
+          cursor: 'text',
+          pointerEvents: 'all',
+          fontWeight: 500,
+          fontStyle: 'normal',
+        }}
+      >
+        {label as string}
+      </span>
     </div>
   ) : null;
 
@@ -182,8 +186,29 @@ function useLabelEditing(id: string, data: any, label: React.ReactNode | undefin
 }
 
 export function StepEditableEdge(props: EdgeProps<any>) {
+  const { id, sourceX, sourceY, targetX, targetY, label, data } = props;
+  // Build an orthogonal (right-angle) polyline path: horizontal to midX, vertical to targetY, horizontal to targetX
+  const midX = (sourceX + targetX) / 2;
+  const path = `M${sourceX},${sourceY} L${midX},${sourceY} L${midX},${targetY} L${targetX},${targetY}`;
+  // Place label at the middle of the vertical segment
+  const labelX = midX;
+  const labelY = (sourceY + targetY) / 2;
+  const strokeColor = (props.style && (props.style as any).stroke) || '#0f172a';
+  const { labelElement } = useLabelEditing(id, data, label, labelX, labelY, strokeColor);
+
+  return (
+    <>
+      <BaseEdge path={path} markerEnd={props.markerEnd} style={{ ...(props.style || {}), stroke: strokeColor }} />
+      <EdgeLabelRenderer>
+        {labelElement}
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+export function BezierEditableEdge(props: EdgeProps<any>) {
   const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, data } = props;
-  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
+  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const strokeColor = (props.style && (props.style as any).stroke) || '#0f172a';
   const { labelElement } = useLabelEditing(id, data, label, labelX, labelY, strokeColor);
 
@@ -197,9 +222,27 @@ export function StepEditableEdge(props: EdgeProps<any>) {
   );
 }
 
-export function BezierEditableEdge(props: EdgeProps<any>) {
+export function StraightEditableEdge(props: EdgeProps<any>) {
+  const { id, sourceX, sourceY, targetX, targetY, label, data } = props;
+  const edgePath = `M${sourceX},${sourceY} L${targetX},${targetY}`;
+  const labelX = (sourceX + targetX) / 2;
+  const labelY = (sourceY + targetY) / 2;
+  const strokeColor = (props.style && (props.style as any).stroke) || '#0f172a';
+  const { labelElement } = useLabelEditing(id, data, label, labelX, labelY, strokeColor);
+
+  return (
+    <>
+      <BaseEdge path={edgePath} markerEnd={props.markerEnd} style={{ ...(props.style || {}), stroke: strokeColor }} />
+      <EdgeLabelRenderer>
+        {labelElement}
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+export function SmoothStepEditableEdge(props: EdgeProps<any>) {
   const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, label, data } = props;
-  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
+  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const strokeColor = (props.style && (props.style as any).stroke) || '#0f172a';
   const { labelElement } = useLabelEditing(id, data, label, labelX, labelY, strokeColor);
 

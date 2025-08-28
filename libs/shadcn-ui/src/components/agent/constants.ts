@@ -20,7 +20,7 @@ import { JavaScriptNode } from './nodes/JavaScriptNode';
 import { NoteNode } from './nodes/NoteNode';
 import { KnowledgeBaseSearchNode } from './nodes/KnowledgeBaseSearchNode';
 import { CallForwardNode } from './nodes/CallForwardNode';
-import { StepEditableEdge, BezierEditableEdge } from './canvas/EditableEdge';
+import { StepEditableEdge, StraightEditableEdge, SmoothStepEditableEdge, BezierEditableEdge } from './canvas/EditableEdge';
 import { CustomActionNode } from './nodes/CustomActionNode';
 
 // Define node types for React Flow
@@ -65,17 +65,24 @@ export const nodeTypes = {
 // Custom edge types mapping for editable labels
 export const edgeTypes = {
   step: StepEditableEdge,
+  straight: StraightEditableEdge,
+  smoothstep: SmoothStepEditableEdge,
   bezier: BezierEditableEdge,
+  default: BezierEditableEdge,
 };
 
 // Default edge options
 export const defaultEdgeOptions = {
-  type: 'step',
+  type: 'bezier',
   markerEnd: {
     type: MarkerType.ArrowClosed,
+    // Ensure the arrowhead matches the default edge stroke color (first swatch)
+    color: '#94a3b8',
   },
   style: {
     strokeWidth: 2,
+    // Match the first swatch in the color picker menu (lighter slate)
+    stroke: '#94a3b8',
   },
 };
 

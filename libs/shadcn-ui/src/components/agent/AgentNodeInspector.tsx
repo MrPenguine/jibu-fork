@@ -188,13 +188,13 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
               <Label htmlFor="ttsProvider">TTS Provider (optional)</Label>
               <Select
                 value={localData.ttsProvider || ''}
-                onValueChange={(value) => handleChange('ttsProvider', value)}
+                onValueChange={(value) => handleChange('ttsProvider', value === 'none' ? '' : value)}
               >
                 <SelectTrigger id="ttsProvider">
                   <SelectValue placeholder="Select TTS provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   <SelectItem value="azure">Azure</SelectItem>
                   <SelectItem value="openai">OpenAI</SelectItem>
                   <SelectItem value="elevenlabs">ElevenLabs</SelectItem>

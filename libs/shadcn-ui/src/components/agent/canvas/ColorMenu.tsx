@@ -1,5 +1,7 @@
 import React from 'react';
 import type { FlowNode, FlowEdge } from '@libs/shadcn-ui';
+import { MarkerType } from 'reactflow';
+import { defaultEdgeOptions } from '../constants';
 
 export type ColorMenuKind = 'node' | 'edge' | undefined;
 
@@ -127,11 +129,15 @@ export function ColorMenu(props: ColorMenuProps) {
     rafRef.current = requestAnimationFrame(() => {
       (window as any).__edgeColors = (window as any).__edgeColors || {};
       (window as any).__edgeColors[id] = hex;
-      setEdges((eds: any[]) => eds.map((e: any) => e.id === id ? ({
-        ...e,
-        style: { ...(e.style || {}), stroke: hex },
-        markerEnd: e.markerEnd ? { ...(e.markerEnd as any), color: hex } : e.markerEnd,
-      }) : e));
+      setEdges((eds: any[]) => eds.map((e: any) => {
+        if (e.id !== id) return e;
+        const currentWidth = (e.style && (e.style as any).strokeWidth) ?? (defaultEdgeOptions.style as any)?.strokeWidth ?? 2;
+        const nextStyle = { ...(e.style || {}), stroke: hex, strokeWidth: currentWidth };
+        const nextMarkerEnd = e.markerEnd
+          ? { ...(e.markerEnd as any), color: hex }
+          : { type: MarkerType.ArrowClosed, color: hex } as any;
+        return { ...e, style: nextStyle, markerEnd: nextMarkerEnd };
+      }));
     });
   }, [kind, setEdges, state.edgeId]);
 
@@ -183,11 +189,15 @@ export function ColorMenu(props: ColorMenuProps) {
                 const id = state.edgeId!;
                 (window as any).__edgeColors = (window as any).__edgeColors || {};
                 (window as any).__edgeColors[id] = c;
-                setEdges((eds: any[]) => eds.map((e: any) => e.id === id ? ({
-                  ...e,
-                  style: { ...(e.style || {}), stroke: c },
-                  markerEnd: e.markerEnd ? { ...(e.markerEnd as any), color: c } : e.markerEnd,
-                }) : e));
+                setEdges((eds: any[]) => eds.map((e: any) => {
+                  if (e.id !== id) return e;
+                  const currentWidth = (e.style && (e.style as any).strokeWidth) ?? (defaultEdgeOptions.style as any)?.strokeWidth ?? 2;
+                  const nextStyle = { ...(e.style || {}), stroke: c, strokeWidth: currentWidth };
+                  const nextMarkerEnd = e.markerEnd
+                    ? { ...(e.markerEnd as any), color: c }
+                    : { type: MarkerType.ArrowClosed, color: c } as any;
+                  return { ...e, style: nextStyle, markerEnd: nextMarkerEnd };
+                }));
                 scheduleAutoSave();
                 setState({ visible: false, x: 0, y: 0, kind: undefined, nodeId: null, edgeId: null });
               } else {
@@ -219,11 +229,15 @@ export function ColorMenu(props: ColorMenuProps) {
                   const id = state.edgeId!;
                   (window as any).__edgeColors = (window as any).__edgeColors || {};
                   (window as any).__edgeColors[id] = c;
-                  setEdges((eds: any[]) => eds.map((e: any) => e.id === id ? ({
-                    ...e,
-                    style: { ...(e.style || {}), stroke: c },
-                    markerEnd: e.markerEnd ? { ...(e.markerEnd as any), color: c } : e.markerEnd,
-                  }) : e));
+                  setEdges((eds: any[]) => eds.map((e: any) => {
+                    if (e.id !== id) return e;
+                    const currentWidth = (e.style && (e.style as any).strokeWidth) ?? (defaultEdgeOptions.style as any)?.strokeWidth ?? 2;
+                    const nextStyle = { ...(e.style || {}), stroke: c, strokeWidth: currentWidth };
+                    const nextMarkerEnd = e.markerEnd
+                      ? { ...(e.markerEnd as any), color: c }
+                      : { type: MarkerType.ArrowClosed, color: c } as any;
+                    return { ...e, style: nextStyle, markerEnd: nextMarkerEnd };
+                  }));
                   scheduleAutoSave();
                   setState({ visible: false, x: 0, y: 0, kind: undefined, edgeId: null, nodeId: null });
                 } else {

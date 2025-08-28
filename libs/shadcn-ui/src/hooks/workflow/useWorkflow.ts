@@ -199,6 +199,14 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       ? parsedEdges.filter((edge: any) => edge.source && edge.target)
       : [];
       
+    // Normalize edge types: preserve valid types, default to 'bezier' if missing/invalid
+    const allowedEdgeTypes = new Set(['bezier', 'straight', 'step', 'smoothstep']);
+    rawEdges = rawEdges.map(edge => {
+      const incomingType = (edge as any).type as string | undefined;
+      const normalizedType = incomingType && allowedEdgeTypes.has(incomingType) ? incomingType : 'bezier';
+      return { ...edge, type: normalizedType } as FlowEdge;
+    });
+      
     // Deduplicate edges on initial load to prevent React key issues
     const uniqueEdges = deduplicateEdges(rawEdges);
     if (uniqueEdges.length !== rawEdges.length) {
@@ -404,7 +412,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       target: connection.target,
       sourceHandle: connection.sourceHandle ?? undefined,
       targetHandle: connection.targetHandle ?? undefined,
-      type: 'step',
+      type: 'bezier',
     };
     
     // Make sure we deduplicate when adding new edges too

@@ -216,20 +216,30 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                             <div className="text-xs text-gray-500 mt-1">{latest.author}</div>
                           )}
                         </div>
-                        <button
+                        <span
+                          role="button"
+                          tabIndex={0}
                           className="p-1 text-gray-500 hover:text-gray-700"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenGroups((s) => ({ ...s, [label]: !s[label] }));
                           }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenGroups((s) => ({ ...s, [label]: !s[label] }));
+                            }
+                          }}
                           aria-label={openGroups[label] ? 'Collapse' : 'Expand'}
+                          aria-pressed={openGroups[label]}
                         >
                           {openGroups[label] ? (
                             <ChevronDown className="w-4 h-4 mt-1 text-gray-500" />
                           ) : (
                             <ChevronRight className="w-4 h-4 mt-1 text-gray-500" />
                           )}
-                        </button>
+                        </span>
                       </div>
                     </button>
 
