@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default function AgentCmsIndex({ params }: { params: { agentId: string } }) {
-  return redirect(`/agent/${params.agentId}/cms/workflows`);
+export default async function AgentCmsIndex({ params }: { params: Promise<{ agentId: string }> }) {
+  const { agentId } = await params;
+  return redirect(`/agent/${agentId}/cms/workflows`);
 }

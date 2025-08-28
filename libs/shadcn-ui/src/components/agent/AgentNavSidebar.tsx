@@ -21,7 +21,6 @@ import {
   LayoutDashboard,
   MessageSquare,
   Settings,
-  Share2,
   CreditCard,
   Database,
   Layers,
@@ -64,17 +63,30 @@ function NavItem({
 
 export interface AgentNavSidebarProps extends React.ComponentProps<typeof Sidebar> {
   agentId: string;
+  masterWorkflowId?: string | null;
 }
 
 export function AgentNavSidebar({
   className,
   agentId,
+  masterWorkflowId,
   ...props
 }: AgentNavSidebarProps) {
+  const canvasHref = masterWorkflowId
+    ? `/agent/${agentId}/canvas/${masterWorkflowId}`
+    : `/agent/${agentId}/workflows`;
   return (
     <Sidebar
       collapsible="none"
-      className={cn("!border-0 !bg-gray-900 text-white w-16 h-screen fixed left-0 top-0 z-50", className)}
+      // Ensure the sidebar uses a compact icon rail width and matches the spacer via CSS var
+      style={{
+        // Override the provider default (16rem) to a compact 4rem icon rail
+        // This controls all w-[--sidebar-width] usages inside the Sidebar
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - CSS var type
+        "--sidebar-width": "4rem",
+      } as React.CSSProperties}
+      className={cn("!border-0 !bg-gray-900 text-white h-screen fixed left-0 top-0 z-50", className)}
       {...props}
     >
       <SidebarHeader className="border-0 flex-col !p-0">
@@ -91,8 +103,11 @@ export function AgentNavSidebar({
       <div className="border-0 pt-0">
         <SidebarGroup className="m-0 p-0">
           <SidebarMenu>
-            <NavItem href={`/agent/${agentId}/workflows`} icon={<LayoutDashboard />}>
-              Workflows
+            <NavItem href={canvasHref} icon={<LayoutDashboard />}>
+              Canvas
+            </NavItem>
+            <NavItem href={`/agent/${agentId}/cms/workflows`} icon={<FileText />}>
+              Content
             </NavItem>
             <NavItem href={`/agent/${agentId}/knowledge-base`} icon={<Database />}>
               Knowledge base
@@ -100,17 +115,11 @@ export function AgentNavSidebar({
             <NavItem href={`/agent/${agentId}/interfaces`} icon={<Layers />}>
               Interfaces
             </NavItem>
-            <NavItem href={`/agent/${agentId}/publish`} icon={<Share2 />}>
-              Publish
-            </NavItem>
             <NavItem href={`/agent/${agentId}/transcripts`} icon={<FileCheck />}>
               Transcripts & Evals
             </NavItem>
             <NavItem href={`/agent/${agentId}/analytics`} icon={<BarChart />}>
               Analytics
-            </NavItem>
-            <NavItem href={`/agent/${agentId}/settings`} icon={<Settings />}>
-              Settings
             </NavItem>
           </SidebarMenu>
         </SidebarGroup>
@@ -118,11 +127,11 @@ export function AgentNavSidebar({
 
       <SidebarFooter className="border-0 flex-col gap-2 mt-auto">
         <Separator className="my-2" />
+        <NavItem href={`/agent/${agentId}/settings`} icon={<Settings />}>
+          Settings
+        </NavItem>
         <NavItem href={`/agent/${agentId}/usage`} icon={<CreditCard />}>
           Credit Usage
-        </NavItem>
-        <NavItem href={`/agent/${agentId}/cms/workflows`} icon={<FileText />}>
-          Content
         </NavItem>
         <NavItem href={`/agent/${agentId}/info`} icon={<Info />}>
           Info

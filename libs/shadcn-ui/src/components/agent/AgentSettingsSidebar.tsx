@@ -12,7 +12,6 @@ import {
   Link2,
   Settings,
   Shield,
-  ArchiveRestore,
 } from "lucide-react";
 
 function SettingsItem({
@@ -56,7 +55,6 @@ export function AgentSettingsSidebar({ agentId }: { agentId: string }) {
           <SettingsItem href={`/agent/${agentId}/settings/integrations`} icon={<Link2 />} label="Integrations" />
           <SettingsItem href={`/agent/${agentId}/settings/environments`} icon={<Layers />} label="Environments" />
           <SettingsItem href={`/agent/${agentId}/settings/secrets`} icon={<KeyRound />} label="Secrets" />
-          <SettingsItem href={`/agent/${agentId}/settings/backups`} icon={<ArchiveRestore />} label="Backups" />
           <SettingsItem href={`/agent/${agentId}/settings/api`} icon={<BadgeHelp />} label="API" />
         </SidebarMenu>
       </div>

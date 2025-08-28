@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default function AgentSettingsIndex({ params }: { params: { agentId: string } }) {
-  return redirect(`/agent/${params.agentId}/settings/general`);
+export default async function AgentSettingsIndex({ params }: { params: Promise<{ agentId: string }> }) {
+  const { agentId } = await params;
+  return redirect(`/agent/${agentId}/settings/general`);
 }

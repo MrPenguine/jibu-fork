@@ -13,11 +13,19 @@ export default function AgentEvaluationsLayout({ children }: { children: ReactNo
   }
 
   return (
-    <div className="flex h-screen w-full bg-gray-950 text-gray-100">
-      <div className="fixed left-16 top-0 h-screen border-r border-gray-800">
+    <div className="flex min-h-screen w-full bg-white text-gray-900">
+      {/* Fixed Reports sidebar positioned immediately after the 4rem agent rail */}
+      <div
+        className="fixed top-0 bottom-0 z-40"
+        style={{ left: "var(--sidebar-width)", width: "16rem" }}
+      >
         <AgentReportsSidebar agentId={agentId} />
       </div>
-      <div className="flex-1 ml-[20rem] pl-0">
+      {/* Content starts after the agent rail (4rem) + Reports sidebar (16rem) */}
+      <div
+        className="flex-1 min-h-screen bg-white overflow-y-auto"
+        style={{ marginLeft: "calc(var(--sidebar-width) + 16rem)" }}
+      >
         {children}
       </div>
     </div>

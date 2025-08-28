@@ -7,7 +7,8 @@ import { Skeleton } from '@libs/shadcn-ui/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@libs/shadcn-ui/components/ui/tabs';
 // Simple visualization components instead of recharts
 
-export default function AgentAnalyticsPage({ params }: { params: { agentId: string } }) {
+export default function AgentAnalyticsPage({ params }: { params: Promise<{ agentId: string }> }) {
+  const { agentId } = React.use(params);
   const [isLoading, setIsLoading] = useState(true);
   const [agent, setAgent] = useState<any>(null);
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function AgentAnalyticsPage({ params }: { params: { agentId: stri
 
   useEffect(() => {
     const fetchAgentDetails = async () => {
-      if (!params.agentId) {
+            if (!agentId) {
         router.push('/workspace');
         return;
       }
@@ -40,7 +41,7 @@ export default function AgentAnalyticsPage({ params }: { params: { agentId: stri
         // Simulate API call with timeout
         setTimeout(() => {
           setAgent({
-            id: params.agentId,
+                        id: agentId,
             name: 'Sample Agent',
             description: 'This is a sample agent for analytics demonstration',
             totalRuns: 172,
@@ -56,7 +57,7 @@ export default function AgentAnalyticsPage({ params }: { params: { agentId: stri
     };
 
     fetchAgentDetails();
-  }, [params.agentId, router]);
+    }, [agentId, router]);
 
   if (isLoading) {
     return (
