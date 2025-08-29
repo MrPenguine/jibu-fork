@@ -92,7 +92,7 @@ export function AgentNavSidebar({
       <SidebarHeader className="border-0 flex-col !p-0">
         <div className="w-full flex items-center justify-center h-14 pt-4 pb-1">
           <img
-            src="/logo.svg"
+            src="/icon.svg"
             alt="Jibu.ai Logo"
             className="w-8 h-8"
           />

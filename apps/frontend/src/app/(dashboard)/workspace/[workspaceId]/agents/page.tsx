@@ -15,6 +15,7 @@ import { agentApiClient } from '../../../../../utils/AgentApi';
 import { fetchAPI } from "../../../../../utils/api";
 import { useWorkspace } from '../../../../../utils/workspaceContext';
 import { Skeleton } from '@libs/shadcn-ui/components/ui/skeleton';
+import { workflowApi } from '../../../../../utils/workflowApi';
 
 export default function AgentsPage() {
   const { activeWorkspace, loading } = useWorkspace();
@@ -51,9 +52,23 @@ export default function AgentsPage() {
       }
       setIsLoading(false);
     };
-    
+
     fetchAgents();
   }, [workspaceId]);
+
+  // Open the agent's master workflow canvas
+  const handleOpenAgentCanvas = async (agentId: string) => {
+    try {
+      // Fetch workflows for the agent and find the master/primary one
+      const workflows = await workflowApi.getWorkflowsByAssistant(agentId);
+      const master = (workflows || []).find((w: any) => w?.isPrimary || String(w?.workflowType).toUpperCase() === 'MASTER');
+      const workflowId = master?.id || agentId; // fallback to agentId if master not found
+      router.push(`/agent/${agentId}/canvas/${workflowId}`);
+    } catch (e) {
+      console.warn('[AgentsPage] Failed to resolve master workflow, falling back to agentId as workflowId', e);
+      router.push(`/agent/${agentId}/canvas/${agentId}`);
+    }
+  };
 
   const handleCreateAgent = async () => {
     if (!newAgentName.trim()) {
@@ -286,16 +301,19 @@ export default function AgentsPage() {
               </CardContent>
               <CardFooter className="flex flex-col gap-2 min-w-0 overflow-x-hidden">
                 <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full min-w-0">
-                  <Button variant="default" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" asChild>
-                    <Link href={`/agent/${agent.id}/workflows`} className="min-w-0">
-                      <Play className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Open Agent</span>
-                    </Link>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate"
+                    onClick={() => handleOpenAgentCanvas(agent.id)}
+                  >
+                    <Play className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Open Agent</span>
                   </Button>
                   <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => handleOpenEditModal(agent)}>
                     <Pencil className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Edit</span>
                   </Button>
                   <Button type="button" variant="destructive" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => openDeleteConfirm(agent.id)}>
-                  <Trash2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Delete</span>
+                    <Trash2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Delete</span>
                   </Button>
                 </div>
               </CardFooter>

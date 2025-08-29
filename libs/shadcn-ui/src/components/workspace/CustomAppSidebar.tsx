@@ -143,11 +143,11 @@ export function CustomAppSidebar({
           )}
         >
           <img
-            src="/logo.svg"
+            src="/logo-dark.svg"
             alt="Jibu.ai Logo"
             className={cn(
               "transition-all duration-200 ease-in-out",
-              isCollapsed ? "w-8 h-8" : "w-24 h-auto"
+              isCollapsed ? "w-8 h-8" : "w-40 h-auto"
             )}
           />
         </div>

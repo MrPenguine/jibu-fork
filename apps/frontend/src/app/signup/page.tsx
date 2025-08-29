@@ -8,10 +8,10 @@ export default function SignupPage() {
       <div className="w-full max-w-sm space-y-0">
         <div className="flex justify-center mb-[-16px]">
           <Image
-            src="/logo.svg"
+            src="/logo-light.svg"
             alt="Jibu AI Logo"
-            width={120}
-            height={40}
+            width={240}
+            height={80}
             priority
           />
         </div>
