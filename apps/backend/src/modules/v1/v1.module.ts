@@ -9,6 +9,7 @@ import { ConsoleModule } from './console/console.module';
 import { VoicesModule } from './voices/voices.module';
 import { FolderModule } from './folder/folder.module';
 import { InvitationModule } from './invitation/invitation.module';
+import { AssistantModule } from './assistant/assistant.module';
 
 
 @Module({
@@ -23,6 +24,7 @@ import { InvitationModule } from './invitation/invitation.module';
     VoicesModule,
     FolderModule,
     InvitationModule,
+    AssistantModule,
   ],
   exports: [
     FileModule,
@@ -35,6 +37,7 @@ import { InvitationModule } from './invitation/invitation.module';
     VoicesModule,
     FolderModule,
     InvitationModule,
+    AssistantModule,
   ],
 })
 export class V1Module {}

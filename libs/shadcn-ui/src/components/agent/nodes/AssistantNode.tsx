@@ -5,14 +5,14 @@ import { NodeProps } from 'reactflow';
 import { AgentNodeType } from '../../../types';
 import { User } from 'lucide-react';
 import { PillNodeShell } from './PillNodeShell';
-import { getAssistant as fetchAssistant } from '../../../../../../apps/frontend/src/utils/AssistantsApi';
+import { getAssistantById as fetchAssistant } from '../../../../../../apps/frontend/src/utils/assistants-min';
 
 // Define an Assistant interface to match what we get from the API
 interface Assistant {
   id: string;
   name: string;
   firstMessage?: string;
-  voicemailMessage?: string;
+  systemPrompt?: string;
   knowledgeBaseId?: string | null;
   model?: {
     provider?: string;
@@ -89,32 +89,39 @@ export const AssistantNode = memo<NodeProps<AssistantNodeData>>(({ id, data, sel
     setError(null);
 
     try {
-      const assistant = await fetchAssistant(apiAssistantId);
-      
-      if (!assistant || !assistant.id) {
+      const details = await fetchAssistant(apiAssistantId);
+
+      if (!details || !details.id) {
         throw new Error('Received invalid assistant data from API');
       }
-      
-      setAssistantData(assistant);
-      
+
+      // Map v1 assistant details (assistants-min) into node data
+      const mappedProvider = details.llmProvider ? String(details.llmProvider).toLowerCase() : model?.provider;
       const updatedData = {
-        name: assistant.name,
-        systemMessage: assistant.voicemailMessage || systemMessage,
-        firstMessage: assistant.firstMessage || firstMessage || '',
+        name: details.name || name,
+        systemMessage: details.systemPrompt || systemMessage,
+        firstMessage: (details as any).description || firstMessage || '',
         model: {
-          provider: assistant.model?.provider || model?.provider || 'openai',
-          model: assistant.model?.model || model?.model || 'gpt-4-turbo',
-          temperature: assistant.model?.temperature ?? model?.temperature ?? 0.7,
-          maxTokens: assistant.model?.maxTokens ?? model?.maxTokens ?? 2048,
-          preference: assistant.model?.preference || model?.preference || 'balance'
+          provider: mappedProvider || 'openai',
+          model: details.llmModel || model?.model || 'gpt-4-turbo',
+          temperature: details.metadata?.temperature ?? model?.temperature ?? 0.7,
+          maxTokens: details.metadata?.maxTokens ?? model?.maxTokens ?? 2048,
+          preference: model?.preference || 'balance'
         },
         apiAssistantId: apiAssistantId,
-        organizationId: (assistant as any)?.organizationId || ''
       };
-      
+
       if (onNodeDataChange) {
         onNodeDataChange(updatedData);
       }
+
+      // Store a minimal copy locally for display convenience, including systemPrompt
+      setAssistantData({
+        id: details.id,
+        name: details.name,
+        firstMessage: (details as any).description,
+        systemPrompt: (details as any).systemPrompt,
+      } as any);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(`Failed to load assistant: ${errorMessage}`);
@@ -135,7 +142,7 @@ export const AssistantNode = memo<NodeProps<AssistantNodeData>>(({ id, data, sel
   // Get data from either the fetched assistant or the local data
   const displayName = assistantData?.name || name;
   const displayFirstMessage = assistantData?.firstMessage || firstMessage || '';
-  const displaySystemMessage = assistantData?.voicemailMessage || systemMessage;
+  const displaySystemMessage = assistantData?.systemPrompt || systemMessage;
   
   // Calculate truncated first message for display
   const truncatedFirstMessage = displayFirstMessage && displayFirstMessage.length > 75

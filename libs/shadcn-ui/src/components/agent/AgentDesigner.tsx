@@ -542,6 +542,21 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
             <AssistantInspector
               node={inspectingAssistantNode as unknown as InspectorFlowNode}
               onUpdate={onNodeUpdate}
+              onOpenAssistantConfig={(nodeId: string) => {
+                const node = nodes.find(n => n.id === nodeId);
+                if (!node || !isAssistantNode(node)) return;
+                const data = node.data as AssistantNodeData;
+                if (!data?.apiAssistantId) {
+                  toastFn({
+                    title: 'Select an assistant first',
+                    description: 'Please choose an assistant from the dropdown before editing.',
+                    duration: 2500,
+                  });
+                  return;
+                }
+                setEditingAssistantNodeData(data);
+                setIsAssistantConfigModalOpen(true);
+              }}
             />
           </div>
         </div>
