@@ -737,6 +737,7 @@ function AgentCanvasContent() {
             isPublishing={isPublishingAgent}
             isSaving={isSaving}
             isPublished={isPublished}
+            hasDraft={workflow?.hasDraft}
             onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
             onSave={() => saveWorkflow()}
             hasUnsavedChanges={!!hasUnsavedChanges}

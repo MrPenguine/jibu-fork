@@ -11,6 +11,7 @@ export type TopRightButtonsProps = {
   isPublishing?: boolean;
   isSaving?: boolean;
   isPublished?: boolean;
+  hasDraft?: boolean;
   onOpenVersionHistory?: () => void;
   onSave?: () => void;
   hasUnsavedChanges?: boolean;
@@ -23,6 +24,7 @@ export function TopRightButtons({
   isPublishing = false,
   isSaving = false,
   isPublished = false,
+  hasDraft = false,
   onOpenVersionHistory,
   onSave,
   hasUnsavedChanges = false,
@@ -97,7 +99,7 @@ export function TopRightButtons({
         ) : (
           <Upload className="w-4 h-4 mr-2" />
         )}
-        {isPublished ? 'Published' : 'Publish'}
+        Publish
       </Button>
     </div>
   );

@@ -140,8 +140,16 @@ export class WorkflowService {
           },
         });
 
-        // Update workflow base fields and draft pointer
-        const updatedWorkflow = await tx.workflow.update({
+        // First explicitly update the workflow's draftVersionId field directly
+        await tx.workflow.update({
+          where: { id },
+          data: {
+            draftVersionId: createdVersion.id,
+          },
+        });
+        
+        // Then update other workflow fields and ensure the relation is connected
+        const finalWorkflow = await tx.workflow.update({
           where: { id },
           data: {
             name: data.name ?? existing.name,
@@ -150,6 +158,7 @@ export class WorkflowService {
             ...(data.agentId
               ? { agent: { connect: { id: data.agentId } } }
               : {}),
+            // Connect the draft version explicitly
             draftVersion: { connect: { id: createdVersion.id } },
           },
           include: {
@@ -159,7 +168,7 @@ export class WorkflowService {
           },
         });
 
-        return updatedWorkflow;
+        return finalWorkflow;
       });
 
       return this.buildWorkflowResponse(result);
@@ -197,16 +206,30 @@ export class WorkflowService {
       const toPublish = workflow.draftVersion ?? workflow.publishedVersion;
       if (!toPublish) throw new BadRequestException('No version available to publish');
 
+      // Update the version status to published
       const published = await tx.workflowVersion.update({
         where: { id: toPublish.id },
         data: { status: 'published', publishedAt: new Date() },
       });
 
+      // First explicitly update the workflow's publishedVersionId field directly
+      // and clear draftVersionId if it was the same version
+      await tx.workflow.update({
+        where: { id },
+        data: {
+          publishedVersionId: published.id,
+          ...(workflow.draftVersionId === published.id
+            ? { draftVersionId: null }
+            : {}),
+        },
+      });
+      
+      // Then update the relations to ensure consistency
       const updatedWorkflow = await tx.workflow.update({
         where: { id },
         data: {
           publishedVersion: { connect: { id: published.id } },
-          // Clear draft pointer if it was the same version
+          // Clear draft relation if it was the same version
           ...(workflow.draftVersionId === published.id
             ? { draftVersion: { disconnect: true } }
             : {}),
@@ -237,6 +260,16 @@ export class WorkflowService {
         data: { status: 'draft', publishedAt: null },
       });
 
+      // First explicitly update the workflow's fields directly
+      await tx.workflow.update({
+        where: { id },
+        data: {
+          publishedVersionId: null,
+          draftVersionId: unpublished.id,
+        },
+      });
+
+      // Then update the relations to ensure consistency
       const updatedWorkflow = await tx.workflow.update({
         where: { id },
         data: {
@@ -328,17 +361,22 @@ export class WorkflowService {
   }
 
   /**
-   * Build API response with effective workflowJson, version and isPublished
+   * Build API response with effective workflowJson, version, isPublished and hasDraft
    */
   private buildWorkflowResponse(workflow: any) {
     const effectiveVersion = workflow.draftVersion ?? workflow.publishedVersion ?? null;
     const isPublished = !!workflow.publishedVersionId || effectiveVersion?.status === 'published';
+    
+    // Check if there's a draft version that's different from the published version
+    const hasDraft = !!workflow.draftVersionId && 
+                    (workflow.draftVersionId !== workflow.publishedVersionId);
 
     return {
       ...workflow,
       workflowJson: effectiveVersion?.workflowJson ?? null,
       version: effectiveVersion?.version ?? null,
       isPublished,
+      hasDraft,
     };
   }
 }

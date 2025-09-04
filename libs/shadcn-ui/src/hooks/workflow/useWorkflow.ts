@@ -34,6 +34,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
   const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
   const [isRunDialogOpen, setIsRunDialogOpen] = useState<boolean>(false);
   const [isPublished, setIsPublished] = useState<boolean>(false);
+  const [hasDraft, setHasDraft] = useState<boolean>(false);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -78,6 +79,7 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
           const wfName = (data as any)?.workflowJson?.name || data.name || 'Untitled Workflow';
           setWorkflowName(wfName);
           setIsPublished(data.isPublished || false);
+          setHasDraft(data.hasDraft || false);
 
           // Prefer unified workflowJson for graph + ui
           const wfJson = (data as any)?.workflowJson;
@@ -318,12 +320,18 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
     if (!workflowId) return;
     
     try {
-      await workflowApi.publishWorkflow(workflowId, orgId);
+      const result = await workflowApi.publishWorkflow(workflowId, orgId);
       setIsPublished(true);
+      // After publishing, there should be no draft since it was promoted
+      setHasDraft(false);
+      // Update lastSavedAt to reflect the publish time
+      setLastSavedAt(new Date());
       console.log('Workflow published successfully');
+      return result;
     } catch (error) {
       console.error('Error publishing workflow:', error);
       setSaveError('Failed to publish workflow');
+      return null;
     }
   }, [workflowId, workflowApi, orgId]);
 

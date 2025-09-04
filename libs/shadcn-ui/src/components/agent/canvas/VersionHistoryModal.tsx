@@ -208,7 +208,8 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                           </div>
                           <div className="text-xs text-gray-500 flex items-center gap-2">
                             <span>{latest.title || "Saved version"}</span>
-                            {String(latest.id) === String(currentVersionId ?? '') && (
+                            {/* Mark as current version only if it's the first item in the filtered list */}
+                            {Object.values(grouped)[0] === list && list.indexOf(latest) === 0 && (
                               <span className="px-2 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Current version</span>
                             )}
                           </div>
@@ -262,9 +263,7 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                                   </div>
                                   <div className="text-xs text-gray-500 flex items-center gap-2">
                                     <span>{v.title || "Saved version"}</span>
-                                    {String(v.id) === String(currentVersionId ?? '') && (
-                                      <span className="px-2 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Current version</span>
-                                    )}
+                                    {/* Never show current version tag for older versions */}
                                   </div>
                                   {v.author && (
                                     <div className="text-xs text-gray-500 mt-1">{v.author}</div>
