@@ -253,7 +253,7 @@ export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
         className="w-[96vw] max-w-[1400px] h-[66vh] p-0 overflow-hidden rounded-2xl border-0"
         onInteractOutside={() => { allowCloseRef.current = true; }}
       >
-        <DialogHeader className="px-3 py-1 w-full bg-slate-300/60">
+        <DialogHeader className="px-4 py-2.5 w-full bg-slate-300/60">
           <div className="flex items-center gap-1.5 w-full">
             {isEditingName && (
               // Visually hidden for a11y to ensure a DialogTitle exists
@@ -287,7 +287,7 @@ export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
             )}
             {/* Right-aligned: only the X button */}
             <div className="flex-1" />
-            <div className="flex items-center pr-1">
+            <div className="flex items-center pr-2">
               <DialogClose className="ml-1" onClick={() => { allowCloseRef.current = true; }} />
             </div>
           </div>
@@ -327,14 +327,17 @@ The primary goal is to effectively address user inquiries and concerns regarding
                     <Select
                       value={(localData?.model?.provider && localData?.model?.model) ? `${localData.model.provider}::${localData.model.model}` : undefined}
                       onValueChange={(v) => {
-                        const [provider, model] = v.split('::');
+                        let [provider, model] = v.split('::');
+                        // Normalize provider keys explicitly for non-OpenAI vendors
+                        if (provider === 'xai') provider = 'xai';
+                        if (provider === 'deepseek') provider = 'deepseek';
                         handleModelConfigChange('model', { provider, model });
                       }}
                     >
                       <SelectTrigger className="h-8">
                         <SelectValue placeholder="Select a model" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="border-0 shadow-lg rounded-md">
                         <SelectItem value="openai::gpt-4o">openai-gpt-4o</SelectItem>
                         <SelectItem value="openai::gpt-4o-mini">openai-gpt-4o mini</SelectItem>
                         <SelectItem value="openai::gpt-4-turbo">openai-gpt-4 turbo</SelectItem>

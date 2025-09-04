@@ -364,6 +364,9 @@ enum LlmProvider {
   ANTHROPIC
   AZURE_OPENAI
   GOOGLE
+  DEEPSEEK
+  META
+  XAI
   CUSTOM
 }
 
