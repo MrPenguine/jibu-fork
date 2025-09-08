@@ -7,6 +7,7 @@ export const QUEUE_NAMES = {
   DEFAULT: 'default',
   INDEXING: 'indexing',
   WORKFLOW_EXECUTION: 'workflow-execution',
+  WORKFLOW_PUBLISH: 'workflow-publish',
 };
 
 // Job names
@@ -23,6 +24,9 @@ export const JOB_NAMES = {
   EXECUTE_WORKFLOW: 'execute-workflow',
   CANCEL_WORKFLOW: 'cancel-workflow',
   CHECK_WORKFLOW_STATUS: 'check-workflow-status',
+
+  // Workflow publish queue jobs
+  PUBLISH_WORKFLOW: 'publish-workflow',
 };
 
 // Job interfaces
@@ -69,4 +73,13 @@ export interface CancelWorkflowJobData {
   workflowId: string;
   organizationId: string;
   reason?: string;
+}
+
+// Workflow publish job payload
+export interface PublishWorkflowJobData {
+  workflowId: string;
+  workspaceId: string;
+  n8nWorkflowDbId?: string;
+  activate?: boolean;
+  force?: boolean;
 }

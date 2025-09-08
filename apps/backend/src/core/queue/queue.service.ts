@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue, JobOptions, JobStatusClean } from 'bull';
+
 import { 
   QUEUE_NAMES, 
   JOB_NAMES,
@@ -16,6 +17,7 @@ export class QueueService {
   constructor(
     @InjectQueue(QUEUE_NAMES.DEFAULT) private readonly defaultQueue: Queue,
     @InjectQueue(QUEUE_NAMES.INDEXING) private readonly indexingQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.WORKFLOW_PUBLISH) private readonly publishQueue: Queue,
   ) {}
 
   /**
@@ -88,6 +90,27 @@ export class QueueService {
    */
   async getJob(jobId: string) {
     return this.defaultQueue.getJob(jobId);
+  }
+
+  /**
+   * Add a publish workflow job to the publish queue
+   */
+  async addPublishWorkflowJob(data: any, options?: JobOptions) {
+    try {
+      const job = await this.publishQueue.add(JOB_NAMES.PUBLISH_WORKFLOW, data, options);
+      this.logger.debug(`Added publish job for workflow: ${data.workflowId}`);
+      return job;
+    } catch (error) {
+      this.logger.error(`Failed to add publish job: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a publish job by ID
+   */
+  async getPublishJob(jobId: string) {
+    return this.publishQueue.getJob(jobId);
   }
 
   /**

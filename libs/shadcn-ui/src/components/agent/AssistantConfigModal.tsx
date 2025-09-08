@@ -153,25 +153,25 @@ export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
     const map: Record<string, Record<string, string>> = {
       openai: {
         'gpt-3.5-turbo': 'openai-gpt-3.5 turbo',
-        'gpt-4-turbo': 'openai-gpt-4 turbo',
         'gpt-4': 'openai-gpt-4',
-        'gpt-4o': 'openai-gpt-4o',
-        'gpt-4o-mini': 'openai-gpt-4o mini',
-        'o1': 'openai-o1',
+        'gpt-4.1-mini': 'openai-gpt-4.1 mini',
+        'gpt-4.1-nano': 'openai-gpt-4.1 nano',
+        'gpt-5': 'openai-gpt-5',
+        'gpt-5-nano-2025-08-07': 'openai-gpt-5 nano 2025-08-07',
+        'o3-mini': 'openai-o3 mini',
         'o1-mini': 'openai-o1 mini',
       },
       anthropic: {
-        'claude-3.5-sonnet': 'anthropic-claude-3.5-sonnet',
-        'claude-3.5-haiku': 'anthropic-claude-3.5-haiku',
-        'claude-3-opus': 'anthropic-claude-3-opus',
-        'claude-3.7-sonnet': 'anthropic-claude-3.7-sonnet',
-        'claude-4-sonnet': 'anthropic-claude-4-sonnet',
-        'claude-4-opus': 'anthropic-claude-4-opus',
+        'claude-opus-4-1-20250805': 'anthropic-claude opus 4.1 (2025-08-05)',
+        'claude-opus-4-20250514': 'anthropic-claude opus 4 (2025-05-14)',
+        'claude-sonnet-4-20250514': 'anthropic-claude sonnet 4 (2025-05-14)',
+        'claude-3-7-sonnet-20250219': 'anthropic-claude 3.7 sonnet (2025-02-19)',
+        'claude-3-5-sonnet-20241022': 'anthropic-claude 3.5 sonnet (2024-10-22)',
       },
       google: {
-        'gemini-2.0-flash': 'google-gemini-2.0-flash',
-        'gemini-2.5-pro': 'google-gemini-2.5-pro',
-        'gemini-2.5-flash': 'google-gemini-2.5-flash',
+        'models/gemini-2.5-flash': 'google-gemini 2.5 flash',
+        'models/gemini-1.5-flash': 'google-gemini 1.5 flash',
+        'models/gemini-2.5-pro': 'google-gemini 2.5 pro',
       },
       xai: {
         'grok-3': 'xai-grok-3',
@@ -338,22 +338,25 @@ The primary goal is to effectively address user inquiries and concerns regarding
                         <SelectValue placeholder="Select a model" />
                       </SelectTrigger>
                       <SelectContent className="border-0 shadow-lg rounded-md">
-                        <SelectItem value="openai::gpt-4o">openai-gpt-4o</SelectItem>
-                        <SelectItem value="openai::gpt-4o-mini">openai-gpt-4o mini</SelectItem>
-                        <SelectItem value="openai::gpt-4-turbo">openai-gpt-4 turbo</SelectItem>
-                        <SelectItem value="openai::gpt-4">openai-gpt-4</SelectItem>
+                        {/* OpenAI */}
                         <SelectItem value="openai::gpt-3.5-turbo">openai-gpt-3.5 turbo</SelectItem>
-                        <SelectItem value="openai::o1">openai-o1</SelectItem>
+                        <SelectItem value="openai::gpt-4">openai-gpt-4</SelectItem>
+                        <SelectItem value="openai::gpt-4.1-mini">openai-gpt-4.1 mini</SelectItem>
+                        <SelectItem value="openai::gpt-4.1-nano">openai-gpt-4.1 nano</SelectItem>
+                        <SelectItem value="openai::gpt-5">openai-gpt-5</SelectItem>
+                        <SelectItem value="openai::gpt-5-nano-2025-08-07">openai-gpt-5 nano 2025-08-07</SelectItem>
+                        <SelectItem value="openai::o3-mini">openai-o3 mini</SelectItem>
                         <SelectItem value="openai::o1-mini">openai-o1 mini</SelectItem>
-                        <SelectItem value="anthropic::claude-3.5-sonnet">anthropic-claude-3.5-sonnet</SelectItem>
-                        <SelectItem value="anthropic::claude-3.5-haiku">anthropic-claude-3.5-haiku</SelectItem>
-                        <SelectItem value="anthropic::claude-3-opus">anthropic-claude-3-opus</SelectItem>
-                        <SelectItem value="anthropic::claude-3.7-sonnet">anthropic-claude-3.7-sonnet</SelectItem>
-                        <SelectItem value="anthropic::claude-4-sonnet">anthropic-claude-4-sonnet</SelectItem>
-                        <SelectItem value="anthropic::claude-4-opus">anthropic-claude-4-opus</SelectItem>
-                        <SelectItem value="google::gemini-2.5-pro">google-gemini-2.5-pro</SelectItem>
-                        <SelectItem value="google::gemini-2.5-flash">google-gemini-2.5-flash</SelectItem>
-                        <SelectItem value="google::gemini-2.0-flash">google-gemini-2.0-flash</SelectItem>
+                        {/* Anthropic */}
+                        <SelectItem value="anthropic::claude-opus-4-1-20250805">anthropic-claude opus 4.1 (2025-08-05)</SelectItem>
+                        <SelectItem value="anthropic::claude-opus-4-20250514">anthropic-claude opus 4 (2025-05-14)</SelectItem>
+                        <SelectItem value="anthropic::claude-sonnet-4-20250514">anthropic-claude sonnet 4 (2025-05-14)</SelectItem>
+                        <SelectItem value="anthropic::claude-3-7-sonnet-20250219">anthropic-claude 3.7 sonnet (2025-02-19)</SelectItem>
+                        <SelectItem value="anthropic::claude-3-5-sonnet-20241022">anthropic-claude 3.5 sonnet (2024-10-22)</SelectItem>
+                        {/* Google Gemini */}
+                        <SelectItem value="google::models/gemini-2.5-pro">google-gemini 2.5 pro</SelectItem>
+                        <SelectItem value="google::models/gemini-2.5-flash">google-gemini 2.5 flash</SelectItem>
+                        <SelectItem value="google::models/gemini-1.5-flash">google-gemini 1.5 flash</SelectItem>
                         <SelectItem value="xai::grok-3">xai-grok-3</SelectItem>
                         <SelectItem value="xai::grok-3-mini">xai-grok-3 mini</SelectItem>
                         <SelectItem value="xai::grok-2">xai-grok-2</SelectItem>

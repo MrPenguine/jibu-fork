@@ -32,10 +32,11 @@ import { QueueController } from './queue.controller';
     BullModule.registerQueue(
       { name: QUEUE_NAMES.DEFAULT },
       { name: QUEUE_NAMES.INDEXING },
+      { name: QUEUE_NAMES.WORKFLOW_PUBLISH },
     ),
   ],
   controllers: [QueueController],
   providers: [QueueService, QueueProcessor, IndexingProcessor],
   exports: [BullModule, QueueService],
 })
-export class QueueModule {} 
+export class QueueModule {}

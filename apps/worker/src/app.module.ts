@@ -65,6 +65,22 @@ import { ScheduleModule } from '@nestjs/schedule';
           max: 10, // Maximum number of workflow jobs processed in the duration
           duration: 1000, // Duration in milliseconds for rate limiting
         },
+      },
+      {
+        name: QUEUE_NAMES.WORKFLOW_PUBLISH,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000
+          },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+        limiter: {
+          max: 5,
+          duration: 1000,
+        },
       }
     ),
     DatabaseModule,

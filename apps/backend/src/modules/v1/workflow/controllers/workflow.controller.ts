@@ -15,6 +15,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
 import { WorkflowService } from '../services/workflow.service';
+import { OrchestratorService } from '../../../../core/n8n-orchestrator/orchestrator.service';
+import { QueueService } from '../../../../core/queue/queue.service';
+import { JOB_NAMES } from '@jibu/queue-definitions';
 import { CreateWorkflowDto, UpdateWorkflowDto } from '../dto';
 
 @ApiTags('workflows')
@@ -22,7 +25,11 @@ import { CreateWorkflowDto, UpdateWorkflowDto } from '../dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class WorkflowController {
-  constructor(private readonly workflowService: WorkflowService) {}
+  constructor(
+    private readonly workflowService: WorkflowService,
+    private readonly orchestrator: OrchestratorService,
+    private readonly queueService: QueueService,
+  ) {}
 
   @Get('agent/:agentId/workflows')
   @ApiOperation({ summary: 'Get all workflows for an agent' })
@@ -86,6 +93,36 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Publish a workflow' })
   async publishWorkflow(@Param('id') id: string) {
     return this.workflowService.publishWorkflow(id);
+  }
+
+  @Post(':id/publish-n8n')
+  @ApiOperation({ summary: 'Compile to n8n JSON and enqueue async publish to n8n (auto-activate)' })
+  async publishToN8n(@Param('id') id: string, @Req() req) {
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    // Compile and persist compiled JSON into N8nWorkflow
+    const { n8nWorkflowDbId, hash, compiled } = await this.orchestrator.compileAndPersist(id, workspaceId);
+
+    // Enqueue publish with auto-activate
+    const job = await this.queueService.addPublishWorkflowJob({
+      workflowId: id,
+      workspaceId,
+      n8nWorkflowDbId,
+      activate: true,
+    });
+
+    return {
+      accepted: true,
+      jobId: job.id,
+      n8nWorkflowDbId,
+      hash,
+    };
   }
 
   @Put(':id/unpublish')
