@@ -12,7 +12,7 @@ export class AssistantAiAgentAdapter implements NodeAdapter {
   compile(node: InternalNode, ctx: CompileContext): CompiledNode {
     const compiled = compileTemplate<any>(AiAgentTemplate, {
       MESSAGE: "={{ $json.Prompt || $json.body.prompt }}",
-      SYSTEM_PROMPT: ctx.assistant.systemPrompt ?? '',
+      SYSTEM_MESSAGE_EXPR: "={{ $json.systemmessage || $json.body.systemmessage }}",
     });
 
     const name = 'AI Agent';

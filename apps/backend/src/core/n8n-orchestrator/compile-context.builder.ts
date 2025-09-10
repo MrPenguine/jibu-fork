@@ -1,17 +1,21 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { CompileContext, InternalGraph } from 'libs/n8n-orchestrator/adapter-registry';
 
 // Credential UI names as they appear in n8n (per user's environment)
 const CREDENTIAL_NAMES = {
-  openai: 'OpenAi account',
+  openai: 'OpenAI account',
   anthropic: 'Anthropic account',
   google: 'Google Gemini(PaLM) Api account',
 };
 
 @Injectable()
 export class CompileContextBuilder {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   /**
    * Build CompileContext and InternalGraph for a workflow within a workspace.
@@ -98,6 +102,11 @@ export class CompileContextBuilder {
       throw new BadRequestException('Assistant is missing llmProvider or llmModel');
     }
 
+    // Read credential IDs from env (preferred), fallback to DB if missing
+    const envOpenAiId = this.config.get<string>('N8N_OPENAI_CREDENTIAL_ID');
+    const envAnthropicId = this.config.get<string>('N8N_ANTHROPIC_CREDENTIAL_ID');
+    const envGoogleId = this.config.get<string>('N8N_GOOGLE_CREDENTIAL_ID');
+
     // Build CompileContext
     const ctx: CompileContext = {
       workflowName: workflow.name,
@@ -111,9 +120,24 @@ export class CompileContextBuilder {
         systemPrompt: assistant.systemPrompt ?? undefined,
       },
       credentials: {
-        openai: openaiCred ? { id: openaiCred.id, name: openaiCred.name } : undefined,
-        anthropic: anthropicCred ? { id: anthropicCred.id, name: anthropicCred.name } : undefined,
-        google: googleCred ? { id: googleCred.id, name: googleCred.name } : undefined,
+        openai: (envOpenAiId || openaiCred)
+          ? {
+              id: envOpenAiId || openaiCred?.id!,
+              name: openaiCred?.name || CREDENTIAL_NAMES.openai,
+            }
+          : undefined,
+        anthropic: (envAnthropicId || anthropicCred)
+          ? {
+              id: envAnthropicId || anthropicCred?.id!,
+              name: anthropicCred?.name || CREDENTIAL_NAMES.anthropic,
+            }
+          : undefined,
+        google: (envGoogleId || googleCred)
+          ? {
+              id: envGoogleId || googleCred?.id!,
+              name: googleCred?.name || CREDENTIAL_NAMES.google,
+            }
+          : undefined,
       },
     };
 

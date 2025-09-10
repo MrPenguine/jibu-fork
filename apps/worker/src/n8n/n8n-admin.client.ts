@@ -34,7 +34,9 @@ export class N8nAdminClient {
       this.http.post(url, workflow, { headers: this.headers() }).pipe(
         map((r) => r.data),
         catchError((err) => {
-          this.logger.error(`Failed to create workflow: ${err.message}`, err.stack);
+          const status = err?.response?.status;
+          const data = err?.response?.data;
+          this.logger.error(`Failed to create workflow [POST ${url}] status=${status}: ${err.message} body=${JSON.stringify(data)}`);
           throw err;
         }),
       ),
@@ -45,10 +47,12 @@ export class N8nAdminClient {
   async updateWorkflow(id: string, workflow: any) {
     const url = `${this.apiBase}/workflows/${id}`;
     const res = await firstValueFrom(
-      this.http.patch(url, workflow, { headers: this.headers() }).pipe(
+      this.http.put(url, workflow, { headers: this.headers() }).pipe(
         map((r) => r.data),
         catchError((err) => {
-          this.logger.error(`Failed to update workflow ${id}: ${err.message}`, err.stack);
+          const status = err?.response?.status;
+          const data = err?.response?.data;
+          this.logger.error(`Failed to update workflow ${id} [PUT ${url}] status=${status}: ${err.message} body=${JSON.stringify(data)}`);
           throw err;
         }),
       ),
@@ -62,12 +66,28 @@ export class N8nAdminClient {
       this.http.get(url, { headers: this.headers() }).pipe(
         map((r) => r.data),
         catchError((err) => {
-          this.logger.error(`Failed to fetch workflow ${id}: ${err.message}`, err.stack);
+          const status = err?.response?.status;
+          const data = err?.response?.data;
+          this.logger.error(`Failed to fetch workflow ${id} [GET ${url}] status=${status}: ${err.message} body=${JSON.stringify(data)}`);
           throw err;
         }),
       ),
     );
     return res;
+  }
+
+  private isNotFound(err: any) {
+    return err?.response?.status === 404;
+  }
+
+  async workflowExists(id: string): Promise<boolean> {
+    try {
+      await this.getWorkflow(id);
+      return true;
+    } catch (err: any) {
+      if (this.isNotFound(err)) return false;
+      throw err;
+    }
   }
 
   async setActive(id: string, active: boolean) {
@@ -76,11 +96,39 @@ export class N8nAdminClient {
       this.http.post(url, {}, { headers: this.headers() }).pipe(
         map((r) => r.data),
         catchError((err) => {
-          this.logger.error(`Failed to set active=${active} for workflow ${id}: ${err.message}`, err.stack);
+          const status = err?.response?.status;
+          const data = err?.response?.data;
+          this.logger.error(`Failed to set active=${active} for workflow ${id} [POST ${url}] status=${status}: ${err.message} body=${JSON.stringify(data)}`);
           throw err;
         }),
       ),
     );
     return res;
+  }
+
+  async listWorkflows(params?: { name?: string; limit?: number }) {
+    const qp = new URLSearchParams();
+    if (params?.name) qp.set('name', params.name);
+    if (params?.limit) qp.set('limit', String(params.limit));
+    const url = `${this.apiBase}/workflows${qp.toString() ? `?${qp.toString()}` : ''}`;
+    const res = await firstValueFrom(
+      this.http.get(url, { headers: this.headers() }).pipe(
+        map((r) => r.data),
+        catchError((err) => {
+          const status = err?.response?.status;
+          const data = err?.response?.data;
+          this.logger.error(`Failed to list workflows [GET ${url}] status=${status}: ${err.message} body=${JSON.stringify(data)}`);
+          throw err;
+        }),
+      ),
+    );
+    return res; // { data: [...], nextCursor? }
+  }
+
+  async findWorkflowByName(name: string): Promise<any | null> {
+    const res = await this.listWorkflows({ name, limit: 5 });
+    const arr = Array.isArray(res?.data) ? res.data : [];
+    const found = arr.find((w: any) => (w?.name || '').toLowerCase() === name.toLowerCase());
+    return found || null;
   }
 }

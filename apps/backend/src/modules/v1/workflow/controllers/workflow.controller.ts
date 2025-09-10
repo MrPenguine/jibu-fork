@@ -44,6 +44,53 @@ export class WorkflowController {
     return this.workflowService.getAgentWorkflows(agentId, workspaceId);
   }
 
+  @Get(':id/publish-status')
+  @ApiOperation({ summary: 'Get publish job status and n8n workflow snapshot' })
+  async publishStatus(@Param('id') id: string, @Req() req, @Query('jobId') jobId?: string) {
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    let jobState: any = null;
+    if (jobId) {
+      const job = await this.queueService.getPublishJob(jobId);
+      if (job) {
+        jobState = {
+          id: job.id,
+          state: await job.getState(),
+          progress: job.progress(),
+          failedReason: job.failedReason,
+          returnvalue: job.returnvalue,
+        };
+      }
+    }
+
+    // Load DB snapshot
+    const wf = await this.workflowService.findById(id);
+    if (!wf) {
+      throw new BadRequestException('Workflow not found');
+    }
+
+    // Pull N8nWorkflow record if linked
+    // We can't import Prisma service here easily; reuse workflowService response if it includes linkage
+    // For a richer snapshot, the client can call a dedicated endpoint; this returns the basics
+    const snapshot = {
+      workflowId: id,
+      n8nWorkflowId: (wf as any).n8nWorkflowId || null,
+      isPublished: (wf as any).isPublished ?? null,
+      hasDraft: (wf as any).hasDraft ?? null,
+    };
+
+    return {
+      job: jobState,
+      workflow: snapshot,
+    };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get workflow by ID' })
   async getWorkflow(@Param('id') id: string) {
@@ -90,9 +137,40 @@ export class WorkflowController {
   }
 
   @Put(':id/publish')
-  @ApiOperation({ summary: 'Publish a workflow' })
-  async publishWorkflow(@Param('id') id: string) {
-    return this.workflowService.publishWorkflow(id);
+  @ApiOperation({ summary: 'Publish a workflow (also compiles to n8n and enqueues auto-activation)' })
+  async publishWorkflow(@Param('id') id: string, @Req() req) {
+    // First, set the workflow version to published using the existing service
+    const published = await this.workflowService.publishWorkflow(id);
+
+    // Resolve workspace context (same header resolution used elsewhere)
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    // Compile and persist compiled JSON into N8nWorkflow
+    const { n8nWorkflowDbId, hash } = await this.orchestrator.compileAndPersist(id, workspaceId);
+
+    // Enqueue publish with auto-activate
+    const job = await this.queueService.addPublishWorkflowJob({
+      workflowId: id,
+      workspaceId,
+      n8nWorkflowDbId,
+      activate: true,
+    });
+
+    return {
+      published,
+      enqueue: {
+        accepted: true,
+        jobId: job.id,
+        n8nWorkflowDbId,
+        hash,
+      },
+    };
   }
 
   @Post(':id/publish-n8n')

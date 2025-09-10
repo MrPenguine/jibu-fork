@@ -6,9 +6,11 @@ import { N8nWorkerConfig } from './n8n-worker.config';
 import { N8nWorkflowProcessor } from './n8n-workflow.processor';
 import { N8nAdminClient } from './n8n-admin.client';
 import { PublishWorkflowProcessor } from './publish-workflow.processor';
+import { DatabaseModule } from '../../../backend/src/core/database/database.module';
 
 @Module({
   imports: [
+    DatabaseModule,
     HttpModule.register({
       timeout: 10000,
       maxRedirects: 5,

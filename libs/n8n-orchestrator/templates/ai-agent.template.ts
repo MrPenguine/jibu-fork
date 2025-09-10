@@ -3,7 +3,7 @@ export const AiAgentTemplate = {
     promptType: 'define',
     text: '{{MESSAGE}}',
     options: {
-      systemMessage: '{{SYSTEM_PROMPT}}',
+      systemMessage: '{{SYSTEM_MESSAGE_EXPR}}',
     },
   },
   name: 'AI Agent',

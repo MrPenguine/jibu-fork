@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CompileContextBuilder } from './compile-context.builder';
 import { compileFromInternalGraph } from '../../../../../libs/n8n-orchestrator/node-mapping.service';
@@ -12,6 +12,7 @@ function computeHash(obj: unknown): string {
 
 @Injectable()
 export class OrchestratorService {
+  private readonly logger = new Logger(OrchestratorService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly ctxBuilder: CompileContextBuilder,
@@ -26,6 +27,12 @@ export class OrchestratorService {
 
     // Compile to n8n JSON
     const compiled = compileFromInternalGraph(graph, ctx);
+    // Log the compiled payload (trim if huge)
+    try {
+      const json = JSON.stringify(compiled);
+      const preview = json.length > 5000 ? json.slice(0, 5000) + '...<truncated>' : json;
+      this.logger.debug(`Compiled n8n workflow JSON (backend): ${preview}`);
+    } catch {}
     const hash = computeHash(compiled);
 
     // Ensure we have an N8nWorkflow row linked to this workflow

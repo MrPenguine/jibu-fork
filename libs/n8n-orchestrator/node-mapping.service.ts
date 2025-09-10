@@ -24,7 +24,44 @@ export function compileFromInternalGraph(
   ctx: CompileContext,
   registry?: AdapterRegistry,
 ): MappingOutput {
-  const wf = compileGraphToN8n(graph, ctx, { synthesizeAssistantAndProvider: true }, registry ?? buildDefaultAdapterRegistry());
+  const nodes = Array.isArray(graph?.nodes) ? [...graph.nodes] : [];
+  const edges = Array.isArray(graph?.edges) ? [...graph.edges] : [];
+
+  const hasAssistant = nodes.some((n) => String(n.type || '').toUpperCase() === 'ASSISTANT');
+  const hasProvider = nodes.some((n) => String(n.type || '').toUpperCase() === 'PROVIDER_MODEL');
+  const hasStart = nodes.some((n) => String(n.type || '').toUpperCase() === 'START');
+
+  // If there is an ASSISTANT but no PROVIDER_MODEL, inject a provider node and connect it
+  if (hasAssistant && !hasProvider) {
+    const assistantNode = nodes.find((n) => String(n.type || '').toUpperCase() === 'ASSISTANT')!;
+    const providerNodeId = 'provider-auto';
+    nodes.push({ id: providerNodeId, type: 'PROVIDER_MODEL', position: { x: (assistantNode.position?.x ?? -288), y: (assistantNode.position?.y ?? -272) + 200 } });
+    edges.push({ id: 'edge-provider-to-assistant', source: { nodeId: providerNodeId, port: 'model' }, target: { nodeId: assistantNode.id, port: 'ai_languageModel' } });
+  }
+
+  // Ensure a main connection into the ASSISTANT from START if not present
+  if (hasAssistant) {
+    const assistantNode = nodes.find((n) => String(n.type || '').toUpperCase() === 'ASSISTANT')!;
+    const hasInboundMain = edges.some((e) => e.target.nodeId === assistantNode.id && (e.target.port ?? 'main') === 'main');
+    if (!hasInboundMain) {
+      // If START node missing, synthesize one
+      let startId = nodes.find((n) => String(n.type || '').toUpperCase() === 'START')?.id;
+      if (!startId) {
+        startId = 'start';
+        nodes.push({ id: startId, type: 'START', position: { x: (assistantNode.position?.x ?? -288) - 240, y: assistantNode.position?.y ?? -272 } });
+      }
+      edges.push({ id: 'edge-start-to-assistant', source: { nodeId: String(startId), port: 'main' }, target: { nodeId: assistantNode.id, port: 'main' } });
+    }
+  }
+
+  const normalized: InternalGraph = { nodes, edges };
+
+  const wf = compileGraphToN8n(
+    normalized,
+    ctx,
+    { synthesizeAssistantAndProvider: !hasAssistant && !hasProvider },
+    registry ?? buildDefaultAdapterRegistry(),
+  );
   return wf as unknown as MappingOutput;
 }
 
