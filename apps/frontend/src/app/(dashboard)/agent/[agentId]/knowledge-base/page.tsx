@@ -16,6 +16,11 @@ import {
   type UploadFilePayload,
   PlainTextDialog,
   type PlainTextPayload,
+  KnowledgeBasePreviewDialog,
+  KnowledgeBaseSettingsDialog,
+  KnowledgeBaseTester,
+  ZendeskDialog,
+  KnowledgeApiDialog,
 } from "@libs/shadcn-ui";
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton";
 
@@ -33,6 +38,10 @@ export default function AgentKnowledgeBasePage() {
   const [openSitemap, setOpenSitemap] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
   const [openPlainText, setOpenPlainText] = useState(false);
+  const [openPreview, setOpenPreview] = useState(false);
+  const [openSettings, setOpenSettings] = useState(false);
+  const [openZendesk, setOpenZendesk] = useState(false);
+  const [openKnowledgeApi, setOpenKnowledgeApi] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -65,6 +74,12 @@ export default function AgentKnowledgeBasePage() {
 
   const openCreateFolderDialog = () => setOpenCreateFolder(true);
 
+  // When header toggles preview, open/close the preview dialog (UI only)
+  const handleTogglePreview = (v: boolean) => {
+    setPreview(v);
+    setOpenPreview(v);
+  };
+
   if (isLoading) {
     return (
       <div className="w-full px-6 pb-6 pt-0">
@@ -82,11 +97,14 @@ export default function AgentKnowledgeBasePage() {
         search={search}
         onSearchChange={setSearch}
         preview={preview}
-        onTogglePreview={setPreview}
+        onTogglePreview={handleTogglePreview}
         onPickUrls={() => setOpenUrl(true)}
         onPickSitemap={() => setOpenSitemap(true)}
         onPickUpload={() => setOpenUpload(true)}
         onPickPlainText={() => setOpenPlainText(true)}
+        onOpenSettings={() => setOpenSettings(true)}
+        onPickZendesk={() => setOpenZendesk(true)}
+        onOpenKnowledgeApi={() => setOpenKnowledgeApi(true)}
       />
 
       <div className="px-6 pb-6">
@@ -97,6 +115,8 @@ export default function AgentKnowledgeBasePage() {
             onPickSitemap={() => setOpenSitemap(true)}
             onPickUpload={() => setOpenUpload(true)}
             onPickPlainText={() => setOpenPlainText(true)}
+            onPickZendesk={() => setOpenZendesk(true)}
+            onOpenKnowledgeApi={() => setOpenKnowledgeApi(true)}
           />
         ) : (
           <KnowledgeBaseList sources={filtered} onCreateFolder={openCreateFolderDialog} />
@@ -124,6 +144,23 @@ export default function AgentKnowledgeBasePage() {
         console.log('Plain text import:', payload, 'agent', agentId);
         setOpenPlainText(false);
       }} />
+
+      {/* Preview and Settings (UI only) */}
+      <KnowledgeBasePreviewDialog
+        open={openPreview}
+        onOpenChange={(v) => { setOpenPreview(v); if (!v) setPreview(false); }}
+      />
+      <KnowledgeBaseSettingsDialog
+        open={openSettings}
+        onOpenChange={setOpenSettings}
+      />
+
+      {/* Floating tester button and right-sheet demo chat (UI only) */}
+      <KnowledgeBaseTester />
+
+      {/* Integrations & API (UI only) */}
+      <ZendeskDialog open={openZendesk} onOpenChange={setOpenZendesk} />
+      <KnowledgeApiDialog open={openKnowledgeApi} onOpenChange={setOpenKnowledgeApi} />
     </div>
   );
 }

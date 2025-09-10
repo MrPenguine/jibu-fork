@@ -6,6 +6,7 @@ import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
+import { ChunkingStrategySelect, type ChunkingStrategyKey } from "../ChunkingStrategySelect";
 
 export interface PlainTextPayload {
   text: string;
@@ -21,13 +22,13 @@ interface PlainTextDialogProps {
 
 export function PlainTextDialog({ open, onOpenChange, onImport }: PlainTextDialogProps) {
   const [text, setText] = useState("");
-  const [chunkingStrategy, setChunkingStrategy] = useState<string | undefined>();
+  const [chunking, setChunking] = useState<ChunkingStrategyKey[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
 
   useEffect(() => {
     if (!open) {
       setText("");
-      setChunkingStrategy(undefined);
+      setChunking([]);
       setFolderId(undefined);
     }
   }, [open]);
@@ -35,7 +36,7 @@ export function PlainTextDialog({ open, onOpenChange, onImport }: PlainTextDialo
   const handleImport = () => {
     onImport({
       text: text.trim(),
-      chunkingStrategy,
+      chunkingStrategy: chunking.join(","),
       folderId,
     });
   };
@@ -61,17 +62,10 @@ export function PlainTextDialog({ open, onOpenChange, onImport }: PlainTextDialo
             />
           </div>
 
-          {/* LLM Chunking Strategy */}
+          {/* LLM Chunking Strategy (multi-select in dropdown) */}
           <div className="grid gap-2">
             <Label htmlFor="kb-chunking-strategy">LLM chunking strategy</Label>
-            <Select value={chunkingStrategy} onValueChange={setChunkingStrategy}>
-              <SelectTrigger id="kb-chunking-strategy">
-                <SelectValue placeholder="Select strategy (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {/* Add strategy options here */}
-              </SelectContent>
-            </Select>
+            <ChunkingStrategySelect value={chunking} onChange={setChunking} />
           </div>
 
           {/* Folder */}
@@ -85,6 +79,16 @@ export function PlainTextDialog({ open, onOpenChange, onImport }: PlainTextDialo
                 <SelectItem value="all">All data sources</SelectItem>
               </SelectContent>
             </Select>
+            <button
+              type="button"
+              className="self-start text-sm text-blue-600 hover:underline"
+              onClick={() => {
+                const name = window.prompt("Enter folder name");
+                if (name) console.log("Create folder:", name);
+              }}
+            >
+              Create folder
+            </button>
           </div>
         </div>
         <DialogFooter>

@@ -3,9 +3,7 @@
 import React from 'react';
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Switch } from "../ui/switch";
-import { Label } from "../ui/label";
-import { Plus, Eye } from "lucide-react";
+import { Plus, Eye, SlidersHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 
 interface KnowledgeBaseHeaderProps {
@@ -18,6 +16,9 @@ interface KnowledgeBaseHeaderProps {
   onPickSitemap: () => void;
   onPickUpload: () => void;
   onPickPlainText: () => void;
+  onOpenSettings?: () => void;
+  onPickZendesk?: () => void;
+  onOpenKnowledgeApi?: () => void;
 }
 
 export function KnowledgeBaseHeader({
@@ -30,6 +31,9 @@ export function KnowledgeBaseHeader({
   onPickSitemap,
   onPickUpload,
   onPickPlainText,
+  onOpenSettings,
+  onPickZendesk,
+  onOpenKnowledgeApi,
 }: KnowledgeBaseHeaderProps) {
   return (
     <div className="w-full px-6 pb-4 pt-0">
@@ -41,14 +45,20 @@ export function KnowledgeBaseHeader({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search"
-              className="h-9 w-56 pl-3 pr-3"
+              className="h-9 w-56 pl-3 pr-10"
             />
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 select-none rounded border bg-slate-50 px-1.5 py-0.5 text-[10px] leading-none text-slate-500">
+              ⌘ K
+            </span>
           </div>
-          <div className="hidden md:flex items-center gap-2 px-2 py-1 rounded-md border bg-white">
-            <Eye className="h-4 w-4 text-slate-500" />
-            <Label htmlFor="kb-preview" className="text-xs text-slate-600">Preview</Label>
-            <Switch id="kb-preview" checked={preview} onCheckedChange={onTogglePreview} />
-          </div>
+          {/* Settings buttons (UI only) */}
+          <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Knowledge base settings" onClick={onOpenSettings}>
+            <SlidersHorizontal className="h-4 w-4" />
+          </Button>
+          {/* Preview button */}
+          <Button variant="outline" className="h-9" onClick={() => onTogglePreview(!preview)}>
+            <Eye className="h-4 w-4 mr-2" /> Preview
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className="h-9">
@@ -65,7 +75,15 @@ export function KnowledgeBaseHeader({
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onPickPlainText}>Plain text</DropdownMenuItem>
-              <div className="px-2 py-1.5 text-xs text-slate-500">Add sources with the Knowledge API</div>
+              <DropdownMenuItem onClick={onPickZendesk}>
+                <div className="flex w-full items-center gap-2">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm border text-[10px]">Z</span>
+                  <span>Zendesk</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenKnowledgeApi}>
+                <div className="w-full text-xs text-slate-600">Add sources with the Knowledge API</div>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

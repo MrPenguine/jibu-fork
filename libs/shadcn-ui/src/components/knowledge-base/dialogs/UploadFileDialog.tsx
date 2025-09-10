@@ -6,6 +6,7 @@ import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { useDropzone } from "react-dropzone";
+import { ChunkingStrategySelect, type ChunkingStrategyKey } from "../ChunkingStrategySelect";
 
 export interface UploadFilePayload {
   files: File[];
@@ -21,7 +22,7 @@ interface UploadFileDialogProps {
 
 export function UploadFileDialog({ open, onOpenChange, onImport }: UploadFileDialogProps) {
   const [files, setFiles] = useState<File[]>([]);
-  const [chunkingStrategy, setChunkingStrategy] = useState<string | undefined>();
+  const [chunking, setChunking] = useState<ChunkingStrategyKey[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -38,13 +39,13 @@ export function UploadFileDialog({ open, onOpenChange, onImport }: UploadFileDia
   useEffect(() => {
     if (!open) {
       setFiles([]);
-      setChunkingStrategy(undefined);
+      setChunking([]);
       setFolderId(undefined);
     }
   }, [open]);
 
   const handleImport = () => {
-    onImport({ files, chunkingStrategy, folderId });
+    onImport({ files, chunkingStrategy: chunking.join(","), folderId });
   };
 
   return (
@@ -75,14 +76,7 @@ export function UploadFileDialog({ open, onOpenChange, onImport }: UploadFileDia
           {/* LLM Chunking Strategy */}
           <div className="grid gap-2">
             <Label htmlFor="kb-chunking-strategy">LLM chunking strategy</Label>
-            <Select value={chunkingStrategy} onValueChange={setChunkingStrategy}>
-              <SelectTrigger id="kb-chunking-strategy">
-                <SelectValue placeholder="Select strategy (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {/* Add strategy options here */}
-              </SelectContent>
-            </Select>
+            <ChunkingStrategySelect value={chunking} onChange={setChunking} />
           </div>
 
           {/* Folder */}
@@ -96,6 +90,16 @@ export function UploadFileDialog({ open, onOpenChange, onImport }: UploadFileDia
                 <SelectItem value="all">All data sources</SelectItem>
               </SelectContent>
             </Select>
+            <button
+              type="button"
+              className="self-start text-sm text-blue-600 hover:underline"
+              onClick={() => {
+                const name = window.prompt("Enter folder name");
+                if (name) console.log("Create folder:", name);
+              }}
+            >
+              Create folder
+            </button>
           </div>
         </div>
         <DialogFooter>

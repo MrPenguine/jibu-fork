@@ -6,6 +6,7 @@ import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
+import { ChunkingStrategySelect, type ChunkingStrategyKey } from "../ChunkingStrategySelect";
 
 export interface UrlImportPayload {
   urls: string[];
@@ -23,14 +24,14 @@ interface UrlImportDialogProps {
 export function UrlImportDialog({ open, onOpenChange, onImport }: UrlImportDialogProps) {
   const [urlsText, setUrlsText] = useState("");
   const [refreshRate, setRefreshRate] = useState("never");
-  const [chunkingStrategy, setChunkingStrategy] = useState<string | undefined>();
+  const [chunking, setChunking] = useState<ChunkingStrategyKey[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
 
   useEffect(() => {
     if (!open) {
       setUrlsText("");
       setRefreshRate("never");
-      setChunkingStrategy(undefined);
+      setChunking([]);
       setFolderId(undefined);
     }
   }, [open]);
@@ -44,7 +45,7 @@ export function UrlImportDialog({ open, onOpenChange, onImport }: UrlImportDialo
     onImport({
       urls,
       refreshRate,
-      chunkingStrategy,
+      chunkingStrategy: chunking.join(","),
       folderId,
     });
   };
@@ -78,22 +79,18 @@ export function UrlImportDialog({ open, onOpenChange, onImport }: UrlImportDialo
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="never">Never</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-slate-500">How often will the data source sync.</p>
           </div>
 
-          {/* LLM Chunking Strategy */}
+          {/* LLM Chunking Strategy (multi-select in dropdown) */}
           <div className="grid gap-2">
             <Label htmlFor="kb-chunking-strategy">LLM chunking strategy</Label>
-            <Select value={chunkingStrategy} onValueChange={setChunkingStrategy}>
-              <SelectTrigger id="kb-chunking-strategy">
-                <SelectValue placeholder="Select strategy (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {/* Add strategy options here */}
-              </SelectContent>
-            </Select>
+            <ChunkingStrategySelect value={chunking} onChange={setChunking} />
           </div>
 
           {/* Folder */}
@@ -107,6 +104,16 @@ export function UrlImportDialog({ open, onOpenChange, onImport }: UrlImportDialo
                 <SelectItem value="all">All data sources</SelectItem>
               </SelectContent>
             </Select>
+            <button
+              type="button"
+              className="self-start text-sm text-blue-600 hover:underline"
+              onClick={() => {
+                const name = window.prompt("Enter folder name");
+                if (name) console.log("Create folder:", name);
+              }}
+            >
+              Create folder
+            </button>
           </div>
         </div>
         <DialogFooter>

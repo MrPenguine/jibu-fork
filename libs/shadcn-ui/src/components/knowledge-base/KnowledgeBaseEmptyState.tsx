@@ -12,9 +12,11 @@ interface KnowledgeBaseEmptyStateProps {
   onPickSitemap?: () => void;
   onPickUpload?: () => void;
   onPickPlainText?: () => void;
+  onPickZendesk?: () => void;
+  onOpenKnowledgeApi?: () => void;
 }
 
-export function KnowledgeBaseEmptyState({ onAddDataSource, onCreateFolder, onPickUrls, onPickSitemap, onPickUpload, onPickPlainText }: KnowledgeBaseEmptyStateProps) {
+export function KnowledgeBaseEmptyState({ onAddDataSource, onCreateFolder, onPickUrls, onPickSitemap, onPickUpload, onPickPlainText, onPickZendesk, onOpenKnowledgeApi }: KnowledgeBaseEmptyStateProps) {
   return (
     <div className="w-full">
       <div className="border rounded-xl bg-white shadow-sm">
@@ -54,7 +56,15 @@ export function KnowledgeBaseEmptyState({ onAddDataSource, onCreateFolder, onPic
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onPickPlainText || onAddDataSource}>Plain text</DropdownMenuItem>
-              <div className="px-2 py-1.5 text-xs text-slate-500">Add sources with the Knowledge API</div>
+              <DropdownMenuItem onClick={onPickZendesk || onAddDataSource}>
+                <div className="flex w-full items-center gap-2">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm border text-[10px]">Z</span>
+                  <span>Zendesk</span>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onOpenKnowledgeApi}>
+                <div className="w-full text-xs text-slate-600">Add sources with the Knowledge API</div>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
