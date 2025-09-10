@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@libs/shadcn-ui/components/ui/button';
 import { Input } from '@libs/shadcn-ui/components/ui/input';
@@ -9,6 +9,11 @@ import { Textarea } from '@libs/shadcn-ui/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@libs/shadcn-ui/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter as DialogFooterUI, DialogHeader, DialogTitle } from '@libs/shadcn-ui/components/ui/dialog';
 import { Skeleton } from '@libs/shadcn-ui/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@libs/shadcn-ui/components/ui/radio-group';
+import { Switch } from '@libs/shadcn-ui/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@libs/shadcn-ui/components/ui/tooltip';
+import { toast } from '@libs/shadcn-ui/components/ui/use-toast';
+import { Copy, Info } from 'lucide-react';
 import { agentApiClient } from '../../../../../../utils/AgentApi';
 
 export default function AgentGeneralSettingsPage({ params }: { params: Promise<{ agentId: string }> }) {
@@ -22,6 +27,21 @@ export default function AgentGeneralSettingsPage({ params }: { params: Promise<{
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmName, setConfirmName] = useState('');
   const router = useRouter();
+
+  // Local UI preferences (frontend-only)
+  type NavigationPref = 'trackpad' | 'mouse';
+  type ZoomPref = 'natural' | 'inverse';
+  type ConnectorPref = 'elbow' | 'curved';
+
+  const storageKeys = useMemo(() => ({
+    prefs: agentId ? `agent:${agentId}:canvas_prefs` : undefined,
+    priv: agentId ? `agent:${agentId}:private` : undefined,
+  }), [agentId]);
+
+  const [navigationPref, setNavigationPref] = useState<NavigationPref>('trackpad');
+  const [zoomPref, setZoomPref] = useState<ZoomPref>('natural');
+  const [connectorPref, setConnectorPref] = useState<ConnectorPref>('elbow');
+  const [isPrivate, setIsPrivate] = useState(false);
 
   useEffect(() => {
     const fetchAgentDetails = async () => {
@@ -46,9 +66,54 @@ export default function AgentGeneralSettingsPage({ params }: { params: Promise<{
     fetchAgentDetails();
   }, [agentId, router]);
 
+  // Load locally-stored preferences once agentId is available
+  useEffect(() => {
+    if (!storageKeys.prefs || !storageKeys.priv) return;
+    try {
+      const raw = localStorage.getItem(storageKeys.prefs);
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          navigation?: NavigationPref;
+          zoom?: ZoomPref;
+          connectors?: ConnectorPref;
+        };
+        if (parsed.navigation) setNavigationPref(parsed.navigation);
+        if (parsed.zoom) setZoomPref(parsed.zoom);
+        if (parsed.connectors) setConnectorPref(parsed.connectors);
+      }
+      const privRaw = localStorage.getItem(storageKeys.priv);
+      if (privRaw != null) setIsPrivate(privRaw === 'true');
+    } catch (e) {
+      console.warn('Failed to load local preferences', e);
+    }
+  }, [storageKeys.prefs, storageKeys.priv]);
+
+  // Persist preferences
+  useEffect(() => {
+    if (!storageKeys.prefs) return;
+    try {
+      localStorage.setItem(storageKeys.prefs, JSON.stringify({
+        navigation: navigationPref,
+        zoom: zoomPref,
+        connectors: connectorPref,
+      }));
+    } catch {}
+  }, [navigationPref, zoomPref, connectorPref, storageKeys.prefs]);
+
+  useEffect(() => {
+    if (!storageKeys.priv) return;
+    try {
+      localStorage.setItem(storageKeys.priv, String(isPrivate));
+    } catch {}
+  }, [isPrivate, storageKeys.priv]);
+
   const handleSave = async () => {
     if (!name.trim()) {
-      alert("Agent name cannot be empty.");
+      toast({
+        title: 'Validation error',
+        description: 'Agent name cannot be empty.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -65,10 +130,10 @@ export default function AgentGeneralSettingsPage({ params }: { params: Promise<{
       delete (updatedAgentData as any).id;
 
       await agentApiClient.updateAgentDefinition(agentId, updatedAgentData);
-      alert("Agent settings updated successfully!");
+      toast({ title: 'Settings saved', description: "Agent settings updated successfully." });
     } catch (error) {
       console.error("Failed to update agent settings:", error);
-      alert("Failed to update agent settings. Please try again.");
+      toast({ title: 'Error', description: 'Failed to update agent settings. Please try again.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -133,14 +198,122 @@ export default function AgentGeneralSettingsPage({ params }: { params: Promise<{
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-              <div className="space-y-1">
-                <div className="text-muted-foreground">Agent ID</div>
-                <div className="font-mono break-all">{agent?.id || agentId}</div>
+              <div className="space-y-2">
+                <Label htmlFor="agent-id">Project ID</Label>
+                <div className="relative">
+                  <Input id="agent-id" value={agent?.id || agentId} readOnly />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                    onClick={() => {
+                      navigator.clipboard.writeText(String(agent?.id || agentId));
+                      toast({ title: 'Copied', description: 'Project ID copied to clipboard.' });
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-muted-foreground">Version ID</div>
-                <div className="font-mono break-all">{agent?.versionId || agent?.version?.id || '—'}</div>
+              <div className="space-y-2">
+                <Label htmlFor="version-id">Version ID</Label>
+                <div className="relative">
+                  <Input id="version-id" value={agent?.versionId || agent?.version?.id || '—'} readOnly />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                    onClick={() => {
+                      const v = String(agent?.versionId || agent?.version?.id || '');
+                      if (!v) return;
+                      navigator.clipboard.writeText(v);
+                      toast({ title: 'Copied', description: 'Version ID copied to clipboard.' });
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Canvas preferences */}
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Canvas preferences</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="font-medium">Navigation</div>
+              </div>
+              <RadioGroup
+                className="grid grid-cols-2 gap-2"
+                value={navigationPref}
+                onValueChange={(v: NavigationPref) => setNavigationPref(v)}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="nav-trackpad" value="trackpad" />
+                  <Label htmlFor="nav-trackpad">Trackpad</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="nav-mouse" value="mouse" />
+                  <Label htmlFor="nav-mouse">Mouse</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="font-medium">Zoom direction</div>
+              </div>
+              <RadioGroup
+                className="grid grid-cols-2 gap-2"
+                value={zoomPref}
+                onValueChange={(v: ZoomPref) => setZoomPref(v)}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="zoom-natural" value="natural" />
+                  <Label htmlFor="zoom-natural">Natural</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="zoom-inverse" value="inverse" />
+                  <Label htmlFor="zoom-inverse">Inverse</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="font-medium">Connectors</div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Choose how nodes are visually connected on the canvas.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <RadioGroup
+                className="grid grid-cols-2 gap-2"
+                value={connectorPref}
+                onValueChange={(v: ConnectorPref) => setConnectorPref(v)}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="conn-elbow" value="elbow" />
+                  <Label htmlFor="conn-elbow">Elbow</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="conn-curved" value="curved" />
+                  <Label htmlFor="conn-curved">Curved</Label>
+                </div>
+              </RadioGroup>
             </div>
           </CardContent>
         </Card>
@@ -150,16 +323,26 @@ export default function AgentGeneralSettingsPage({ params }: { params: Promise<{
       <div className="mt-6">
         <Card className="border-red-200">
           <CardHeader>
-            <CardTitle className="text-red-600">Danger Zone</CardTitle>
-            <CardDescription>Delete this agent and all its data. This action cannot be undone.</CardDescription>
+            <CardTitle className="text-red-600">Danger zone</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Permanently delete this agent. You will be asked to confirm.
+              <div className="space-y-1">
+                <div className="font-medium">Private agent</div>
+                <p className="text-sm text-muted-foreground max-w-[60ch]">
+                  When ON, your agent is not accessible without an API key. The website widget and shareable prototype links will be disabled. (UI only)
+                </p>
+              </div>
+              <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="font-medium">Delete agent</div>
+                <p className="text-sm text-muted-foreground">Permanently delete this agent and all its content.</p>
               </div>
               <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-                Delete Agent
+                Delete agent
               </Button>
             </div>
           </CardContent>
@@ -197,7 +380,7 @@ export default function AgentGeneralSettingsPage({ params }: { params: Promise<{
                   router.push('/workspace');
                 } catch (err) {
                   console.error('Failed to delete agent:', err);
-                  alert('Failed to delete agent. Please try again.');
+                  toast({ title: 'Error', description: 'Failed to delete agent. Please try again.', variant: 'destructive' });
                 } finally {
                   setConfirmName('');
                 }
