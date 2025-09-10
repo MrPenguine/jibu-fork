@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
 import { WorkflowService } from '../services/workflow.service';
 import { OrchestratorService } from '../../../../core/n8n-orchestrator/orchestrator.service';
+import { CompileContextBuilder } from '../../../../core/n8n-orchestrator/compile-context.builder';
 import { QueueService } from '../../../../core/queue/queue.service';
 import { JOB_NAMES } from '@jibu/queue-definitions';
 import { CreateWorkflowDto, UpdateWorkflowDto } from '../dto';
@@ -29,6 +30,7 @@ export class WorkflowController {
     private readonly workflowService: WorkflowService,
     private readonly orchestrator: OrchestratorService,
     private readonly queueService: QueueService,
+    private readonly ctxBuilder: CompileContextBuilder,
   ) {}
 
   @Get('agent/:agentId/workflows')
@@ -207,6 +209,22 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Unpublish a workflow' })
   async unpublishWorkflow(@Param('id') id: string) {
     return this.workflowService.unpublishWorkflow(id);
+  }
+
+  @Get(':id/compiled-json')
+  @ApiOperation({ summary: 'Preview compiled n8n JSON (shared lib) without pushing to n8n' })
+  async compiledJson(@Param('id') id: string, @Req() req) {
+    const workspaceId =
+      req.user?.workspaceId ||
+      req.user?.lastWorkspaceId ||
+      (req.headers['x-workspace-id'] as string);
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    // Reuse OrchestratorService to compile and persist locally (no n8n call)
+    const { compiled, hash } = await this.orchestrator.compileAndPersist(id, workspaceId);
+    return { hash, compiled };
   }
 
   @Get(':id/versions')

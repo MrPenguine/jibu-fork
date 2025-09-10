@@ -23,7 +23,7 @@ export class OrchestratorService {
    * Returns compiled workflow JSON, hash, and the linked N8nWorkflow DB id.
    */
   async compileAndPersist(workflowId: string, workspaceId: string) {
-    const { ctx, graph, n8nWorkflowId: linkedN8nWorkflowId } = await this.ctxBuilder.build(workflowId, workspaceId);
+    const { ctx, graph } = await this.ctxBuilder.build(workflowId, workspaceId);
 
     // Compile to n8n JSON
     const compiled = compileFromInternalGraph(graph, ctx);
@@ -35,13 +35,15 @@ export class OrchestratorService {
     } catch {}
     const hash = computeHash(compiled);
 
-    // Ensure we have an N8nWorkflow row linked to this workflow
-    let n8nWorkflowRow = null as null | { id: string };
+    // Ensure we have an N8nWorkflow row linked to this workflow (local only; no n8n id here)
+    let n8nWorkflowRow = await this.prisma.n8nWorkflow.findFirst({
+      where: { workflows: { some: { id: workflowId } } },
+      select: { id: true },
+    });
 
-    if (linkedN8nWorkflowId) {
-      // Update existing
-      n8nWorkflowRow = await this.prisma.n8nWorkflow.update({
-        where: { id: linkedN8nWorkflowId },
+    if (n8nWorkflowRow) {
+      await this.prisma.n8nWorkflow.update({
+        where: { id: n8nWorkflowRow.id },
         data: {
           workflowJson: compiled as any,
           lastValidatedAt: new Date(),
@@ -49,11 +51,8 @@ export class OrchestratorService {
         select: { id: true },
       });
     } else {
-      // Create and link to workflow
       n8nWorkflowRow = await this.prisma.n8nWorkflow.create({
         data: {
-          // Provisional ID until we push to n8n and receive a real workflow id
-          n8nWorkflowId: `provisional:${workflowId}`,
           workflowJson: compiled as any,
           isActive: false,
           lastValidatedAt: new Date(),
@@ -61,8 +60,6 @@ export class OrchestratorService {
         },
         select: { id: true },
       });
-
-      // Link from workflow to this N8nWorkflow row
       await this.prisma.workflow.update({
         where: { id: workflowId },
         data: { n8nWorkflow: { connect: { id: n8nWorkflowRow.id } } },

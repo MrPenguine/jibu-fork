@@ -17,11 +17,13 @@ export class N8nAdminClient {
     const raw = (this.configService.get<string>('N8N_API_URL') || '').replace(/\/$/, '');
     // Ensure we hit the public API base (usually /api/v1)
     if (/\/api(\/v\d+)?$/.test(raw)) {
-      this.apiBase = raw;
+      // If ends with /api only, upgrade to /api/v1
+      this.apiBase = /\/api$/.test(raw) ? `${raw}/v1` : raw;
     } else {
       this.apiBase = `${raw}/api/v1`;
     }
     this.apiKey = this.configService.get<string>('N8N_API_KEY')!;
+    this.logger.log(`n8n apiBase resolved to: ${this.apiBase}`);
   }
 
   private headers() {

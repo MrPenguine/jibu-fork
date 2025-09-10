@@ -571,7 +571,7 @@ enum N8nWorkflowType {
 // N8nWorkflow model for managing n8n workflow integration
 model N8nWorkflow {
   id              String          @id @default(uuid())
-  n8nWorkflowId   String          @unique // The ID of the workflow in n8n
+  n8nWorkflowId   String?         @unique // The ID of the workflow in n8n (optional until worker creates it)
   webhookUrl      String? // The webhook URL for this workflow
   workflowJson    Json? // The complete workflow JSON definition
   isActive        Boolean         @default(false) // Whether the workflow is active in n8n

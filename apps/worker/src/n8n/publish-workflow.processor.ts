@@ -109,9 +109,8 @@ export class PublishWorkflowProcessor {
     const body = sanitizeWorkflow(payload);
 
     // Create vs Update in n8n
-    let liveId = workflow.n8nWorkflowId && !String(workflow.n8nWorkflowId).startsWith('provisional:')
-      ? workflow.n8nWorkflowId
-      : undefined;
+    // IMPORTANT: use the external id stored on the local N8nWorkflow row, NOT the Workflow FK
+    let liveId = n8nRow.n8nWorkflowId || undefined;
 
     // If we think we have a liveId, verify it exists in n8n first
     if (liveId) {
@@ -127,11 +126,13 @@ export class PublishWorkflowProcessor {
       const byName = body?.name ? await this.n8nAdmin.findWorkflowByName(body.name) : null;
       if (byName?.id) {
         liveId = String(byName.id);
+        this.logger.log(`Decision: UPDATE_BY_NAME -> ${liveId} for workflow ${workflowId}`);
         await this.n8nAdmin.updateWorkflow(liveId, body);
-        await this.prisma.workflow.update({ where: { id: workflowId }, data: { n8nWorkflowId: liveId } });
+        // Persist the external n8n id ONLY on the local N8nWorkflow row
         await this.prisma.n8nWorkflow.update({ where: { id: n8nRow.id }, data: { n8nWorkflowId: liveId } });
         this.logger.log(`UPDATE (by-name) n8n workflow ${liveId} for workflow ${workflowId}`);
       } else {
+        this.logger.log(`Decision: CREATE_STUB for workflow ${workflowId}`);
         // Create a minimal stub first to obtain a durable ID, then update with full body
         const stub = {
           name: body.name,
@@ -141,8 +142,7 @@ export class PublishWorkflowProcessor {
         } as any;
         const created = await this.n8nAdmin.createWorkflow(stub);
         liveId = String(created.id);
-        // Persist the real live id immediately to avoid duplicate creations on retries
-        await this.prisma.workflow.update({ where: { id: workflowId }, data: { n8nWorkflowId: liveId } });
+        // Persist the real external n8n id immediately on the local N8nWorkflow row to avoid duplicate creations on retries
         await this.prisma.n8nWorkflow.update({ where: { id: n8nRow.id }, data: { n8nWorkflowId: liveId } });
         this.logger.log(`CREATE (stub) n8n workflow ${liveId} for workflow ${workflowId}`);
         // Now populate with the full definition
@@ -151,6 +151,7 @@ export class PublishWorkflowProcessor {
       }
     } else {
       try {
+        this.logger.log(`Decision: UPDATE_BY_ID -> ${liveId} for workflow ${workflowId}`);
         await this.n8nAdmin.updateWorkflow(liveId, body);
         this.logger.log(`UPDATE n8n workflow ${liveId} for workflow ${workflowId}`);
       } catch (err: any) {
@@ -159,7 +160,7 @@ export class PublishWorkflowProcessor {
           this.logger.warn(`UPDATE failed with 404 for ${liveId}; falling back to CREATE.`);
           const created = await this.n8nAdmin.createWorkflow(body);
           liveId = String(created.id);
-          await this.prisma.workflow.update({ where: { id: workflowId }, data: { n8nWorkflowId: liveId } });
+          // Persist the external id on the local N8nWorkflow row
           await this.prisma.n8nWorkflow.update({ where: { id: n8nRow.id }, data: { n8nWorkflowId: liveId } });
           this.logger.log(`CREATE n8n workflow ${liveId} (after 404) for workflow ${workflowId}`);
         } else {
@@ -197,3 +198,5 @@ export class PublishWorkflowProcessor {
     };
   }
 }
+
+
