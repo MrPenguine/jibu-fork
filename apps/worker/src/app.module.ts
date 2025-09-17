@@ -18,7 +18,8 @@ import { ScheduleModule } from '@nestjs/schedule';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      // Load worker-specific env first (if present), then fall back to repo root envs
+      envFilePath: ['apps/worker/.env.local', 'apps/worker/.env', '.env.local', '.env'],
       cache: true,
     }),
     ScheduleModule.forRoot(),

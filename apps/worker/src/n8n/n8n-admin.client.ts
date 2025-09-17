@@ -23,7 +23,12 @@ export class N8nAdminClient {
       this.apiBase = `${raw}/api/v1`;
     }
     this.apiKey = this.configService.get<string>('N8N_API_KEY')!;
-    this.logger.log(`n8n apiBase resolved to: ${this.apiBase}`);
+    if (!this.apiKey) {
+      this.logger.error('N8N_API_KEY is missing; cannot call n8n API');
+      throw new Error('Missing N8N_API_KEY');
+    }
+    const mask = (k: string) => (k.length > 12 ? `${k.slice(0, 6)}...${k.slice(-4)}` : '***');
+    this.logger.log(`n8n apiBase resolved to: ${this.apiBase}; using key=${mask(this.apiKey)}`);
   }
 
   private headers() {

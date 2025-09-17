@@ -14,10 +14,12 @@ export class N8nIntegrationService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    this.apiUrl = this.configService.get<string>('N8N_API_URL');
+    const raw = (this.configService.get<string>('N8N_API_URL') || '').replace(/\/$/, '');
+    // Ensure we always target the public API base
+    this.apiUrl = /\/api(\/v\d+)?$/.test(raw) ? (/\/api$/.test(raw) ? `${raw}/v1` : raw) : `${raw}/api/v1`;
     this.apiKey = this.configService.get<string>('N8N_API_KEY');
 
-    if (!this.apiUrl) {
+    if (!raw) {
       this.logger.error('N8N_API_URL not found in environment variables');
       throw new Error('N8N_API_URL is required for n8n integration');
     }
@@ -26,6 +28,7 @@ export class N8nIntegrationService {
       this.logger.error('N8N_API_KEY not found in environment variables');
       throw new Error('N8N_API_KEY is required for n8n integration');
     }
+    this.logger.log(`Resolved n8n API base: ${this.apiUrl}`);
   }
 
   /**
