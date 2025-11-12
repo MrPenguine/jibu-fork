@@ -1,5 +1,5 @@
-import { Processor, Process } from '@nestjs/bull';
-import { Injectable, Logger } from '@nestjs/common';
+import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Job } from 'bull';
 import { PrismaService } from '../../../backend/src/core/database/prisma.service';
 import { QUEUE_NAMES, JOB_NAMES, PublishWorkflowJobData } from '@jibu/queue-definitions';
@@ -7,7 +7,7 @@ import { N8nAdminClient } from './n8n-admin.client';
 
 @Injectable()
 @Processor(QUEUE_NAMES.WORKFLOW_PUBLISH)
-export class PublishWorkflowProcessor {
+export class PublishWorkflowProcessor implements OnModuleInit {
   private readonly logger = new Logger(PublishWorkflowProcessor.name);
 
   constructor(
@@ -15,187 +15,187 @@ export class PublishWorkflowProcessor {
     private readonly n8nAdmin: N8nAdminClient,
   ) {}
 
+  onModuleInit() {
+    this.logger.log(`[DIAGNOSTIC] 🎯 PublishWorkflowProcessor initialized and registered for queue: ${QUEUE_NAMES.WORKFLOW_PUBLISH}`);
+    this.logger.log(`[DIAGNOSTIC] 📋 Listening for job: ${JOB_NAMES.PUBLISH_WORKFLOW}`);
+  }
+
+  @OnQueueActive()
+  onActive(job: Job) {
+    this.logger.log(`[DIAGNOSTIC] ⚡ Job ${job.id} is now active - Processing workflow ${job.data.workflowId}`);
+  }
+
+  @OnQueueCompleted()
+  onCompleted(job: Job, result: any) {
+    this.logger.log(`[DIAGNOSTIC] ✅ Job ${job.id} completed successfully for workflow ${job.data.workflowId}`);
+  }
+
+  @OnQueueFailed()
+  onFailed(job: Job, err: Error) {
+    this.logger.error(`[DIAGNOSTIC] ❌ Job ${job.id} failed for workflow ${job.data.workflowId}: ${err.message}`, err.stack);
+  }
+
   @Process(JOB_NAMES.PUBLISH_WORKFLOW)
   async handle(job: Job<PublishWorkflowJobData>) {
     const { workflowId, workspaceId, n8nWorkflowDbId, activate = false, force = false } = job.data;
-    this.logger.log(`Publishing workflow ${workflowId} (workspace ${workspaceId}), job ${job.id}`);
+    this.logger.log(`[DIAGNOSTIC] 🔄 Starting to process publish job ${job.id}`);
+    this.logger.log(`[DIAGNOSTIC] Publishing workflow ${workflowId} (workspace ${workspaceId}), activate=${activate}`);
 
-    // Load workflow with link and compiled JSON
-    const workflow = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, workspaceId },
-      include: { n8nWorkflow: true },
-    });
-    if (!workflow) throw new Error('Workflow not found for publish');
-
-    const n8nRowId = n8nWorkflowDbId || workflow.n8nWorkflowId;
-    const n8nRow = await this.prisma.n8nWorkflow.findFirst({
-      where: n8nRowId ? { id: n8nRowId } : { workflows: { some: { id: workflowId } } },
-    });
-    if (!n8nRow || !n8nRow.workflowJson) throw new Error('Compiled n8n JSON not found; run compile first');
-
-    const payload = n8nRow.workflowJson as any;
-    // Debug: print the payload we're pushing to n8n
     try {
-      const json = JSON.stringify(payload);
-      const preview = json.length > 5000 ? json.slice(0, 5000) + '...<truncated>' : json;
-      this.logger.debug(`n8n payload (worker): ${preview}`);
-    } catch {}
-
-    // Prepare sanitized payload for n8n API
-    const sanitizeWorkflow = (wf: any) => {
-      const allowedTop = ['name', 'nodes', 'connections', 'settings'];
-      // Deduplicate nodes by name (n8n requires unique node names)
-      const seen = new Set<string>();
-      const nodes = Array.isArray(wf.nodes)
-        ? wf.nodes.filter((n: any) => {
-            const name = n?.name ?? '';
-            if (seen.has(name)) return false;
-            seen.add(name);
-            return true;
-          }).map((n: any) => {
-            const allowedNode = ['id', 'name', 'type', 'typeVersion', 'position', 'parameters', 'credentials', 'webhookId', 'disabled', 'notes', 'alwaysOutputData', 'retryOnFail', 'maxTries', 'waitBetweenTries', 'onError'];
-            const pruned: any = {};
-            for (const k of allowedNode) if (k in n) pruned[k] = n[k];
-            return pruned;
-          })
-        : [];
-
-      const out: any = { nodes };
-      for (const k of allowedTop) {
-        if (k === 'nodes') continue;
-        if (k in wf) out[k] = wf[k];
+      // Step 1: Load workflow from database
+      this.logger.log(`[DIAGNOSTIC] Step 1: Loading workflow from database...`);
+      const workflow = await this.prisma.workflow.findFirst({
+        where: { id: workflowId, workspaceId },
+        include: { n8nWorkflow: true },
+      });
+      if (!workflow) {
+        throw new Error(`Workflow not found: ${workflowId} in workspace ${workspaceId}`);
       }
-      // Default settings
-      if (!out.settings) out.settings = { executionOrder: 'v1' };
-      // Do not include 'active' in body (read-only in n8n API). Activation handled separately.
-      // Copy connections as-is
-      if (wf.connections) out.connections = wf.connections;
+      this.logger.log(`[DIAGNOSTIC] ✅ Step 1 complete: Workflow loaded: ${workflow.name}`);
 
-      // Ensure required connections exist
-      const webhookName = nodes.find((n: any) => n.type === 'n8n-nodes-base.webhook')?.name || 'Webhook';
-      const agentName = nodes.find((n: any) => n.type === '@n8n/n8n-nodes-langchain.agent')?.name || 'AI Agent';
-      const providerNode = nodes.find((n: any) => typeof n.type === 'string' && n.type.startsWith('@n8n/n8n-nodes-langchain.lmChat'));
-      const providerName = providerNode?.name;
+      // Step 2: Load compiled JSON from N8nWorkflow row
+      this.logger.log(`[DIAGNOSTIC] Step 2: Loading N8nWorkflow row...`);
+      const n8nRowId = n8nWorkflowDbId || workflow.n8nWorkflowId;
+      const n8nRow = await this.prisma.n8nWorkflow.findFirst({
+        where: n8nRowId ? { id: n8nRowId } : { workflows: { some: { id: workflowId } } },
+      });
+      if (!n8nRow || !n8nRow.workflowJson) {
+        throw new Error('Compiled n8n JSON not found; run compile first');
+      }
+      this.logger.log(`[DIAGNOSTIC] ✅ Step 2 complete: N8nWorkflow row loaded`);
 
-      out.connections = out.connections || {};
+      const payload = n8nRow.workflowJson as any;
+      
+      // Step 3: Sanitize and prepare payload
+      this.logger.log(`[DIAGNOSTIC] Step 3: Sanitizing workflow payload...`);
+      const sanitizeWorkflow = (wf: any) => {
+        const allowedTop = ['name', 'nodes', 'connections', 'settings'];
+        const seen = new Set<string>();
+        const nodes = (wf.nodes || []).filter((n: any) => {
+          const name = n?.name ?? '';
+          if (seen.has(name)) return false;
+          seen.add(name);
+          return true;
+        }).map((n: any) => {
+          const allowedNode = ['id', 'name', 'type', 'typeVersion', 'position', 'parameters', 'credentials', 'webhookId', 'disabled', 'notes', 'alwaysOutputData', 'retryOnFail', 'maxTries', 'waitBetweenTries', 'onError'];
+          const pruned: any = {};
+          for (const k of allowedNode) if (k in n) pruned[k] = n[k];
+          return pruned;
+        });
 
-      // Webhook -> AI Agent (main)
-      if (webhookName && agentName) {
-        const hasMain = Array.isArray(out.connections[webhookName]?.main)
-          && out.connections[webhookName].main.some((arr: any[]) => Array.isArray(arr) && arr.some((c: any) => c?.node === agentName && c?.type === 'main'));
-        if (!hasMain) {
-          out.connections[webhookName] = out.connections[webhookName] || {};
-          out.connections[webhookName].main = out.connections[webhookName].main || [];
-          out.connections[webhookName].main.push([
-            { node: agentName, type: 'main', index: 0 },
-          ]);
+        const out: any = { nodes };
+        for (const k of allowedTop) {
+          if (k === 'nodes') continue;
+          if (k in wf) out[k] = wf[k];
+        }
+        if (!out.settings) out.settings = { executionOrder: 'v1' };
+        if (wf.connections) out.connections = wf.connections;
+
+        const webhookName = nodes.find((n: any) => n.type === 'n8n-nodes-base.webhook')?.name || 'Webhook';
+        const agentName = nodes.find((n: any) => n.type === '@n8n/n8n-nodes-langchain.agent')?.name || 'AI Agent';
+        const providerNode = nodes.find((n: any) => typeof n.type === 'string' && n.type.startsWith('@n8n/n8n-nodes-langchain.lmChat'));
+        const providerName = providerNode?.name;
+
+        out.connections = out.connections || {};
+        if (webhookName && agentName) {
+          const hasMain = Array.isArray(out.connections[webhookName]?.main) && out.connections[webhookName].main.some((arr: any[]) => Array.isArray(arr) && arr.some((c: any) => c?.node === agentName && c?.type === 'main'));
+          if (!hasMain) {
+            out.connections[webhookName] = out.connections[webhookName] || {};
+            out.connections[webhookName].main = out.connections[webhookName].main || [];
+            out.connections[webhookName].main.push([{ node: agentName, type: 'main', index: 0 }]);
+          }
+        }
+        if (providerName && agentName) {
+          const hasModel = Array.isArray(out.connections[providerName]?.ai_languageModel) && out.connections[providerName].ai_languageModel.some((arr: any[]) => Array.isArray(arr) && arr.some((c: any) => c?.node === agentName && c?.type === 'ai_languageModel'));
+          if (!hasModel) {
+            out.connections[providerName] = out.connections[providerName] || {};
+            out.connections[providerName].ai_languageModel = out.connections[providerName].ai_languageModel || [];
+            out.connections[providerName].ai_languageModel.push([{ node: agentName, type: 'ai_languageModel', index: 0 }]);
+          }
+        }
+        return out;
+      };
+      const body = sanitizeWorkflow(payload);
+      this.logger.log(`[DIAGNOSTIC] ✅ Step 3 complete: Payload sanitized`);
+
+      // Step 4: Create or Update workflow in n8n
+      let liveId = n8nRow.n8nWorkflowId || undefined;
+      this.logger.log(`[DIAGNOSTIC] Step 4: Checking if workflow exists in n8n (liveId: ${liveId})...`);
+      if (liveId) {
+        const exists = await this.n8nAdmin.workflowExists(liveId);
+        if (!exists) {
+          this.logger.warn(`[DIAGNOSTIC] ⚠️ Live n8n workflow ${liveId} not found; will create a new one.`);
+          liveId = undefined;
         }
       }
 
-      // Provider -> AI Agent (ai_languageModel)
-      if (providerName && agentName) {
-        const hasModel = Array.isArray(out.connections[providerName]?.ai_languageModel)
-          && out.connections[providerName].ai_languageModel.some((arr: any[]) => Array.isArray(arr) && arr.some((c: any) => c?.node === agentName && c?.type === 'ai_languageModel'));
-        if (!hasModel) {
-          out.connections[providerName] = out.connections[providerName] || {};
-          out.connections[providerName].ai_languageModel = out.connections[providerName].ai_languageModel || [];
-          out.connections[providerName].ai_languageModel.push([
-            { node: agentName, type: 'ai_languageModel', index: 0 },
-          ]);
-        }
-      }
-      return out;
-    };
-    const body = sanitizeWorkflow(payload);
-
-    // Create vs Update in n8n
-    // IMPORTANT: use the external id stored on the local N8nWorkflow row, NOT the Workflow FK
-    let liveId = n8nRow.n8nWorkflowId || undefined;
-
-    // If we think we have a liveId, verify it exists in n8n first
-    if (liveId) {
-      const exists = await this.n8nAdmin.workflowExists(liveId);
-      if (!exists) {
-        this.logger.warn(`Live n8n workflow ${liveId} not found; will create a new one.`);
-        liveId = undefined;
-      }
-    }
-
-    if (!liveId) {
-      // Idempotency by name to avoid duplicates
-      const byName = body?.name ? await this.n8nAdmin.findWorkflowByName(body.name) : null;
-      if (byName?.id) {
-        liveId = String(byName.id);
-        this.logger.log(`Decision: UPDATE_BY_NAME -> ${liveId} for workflow ${workflowId}`);
-        await this.n8nAdmin.updateWorkflow(liveId, body);
-        // Persist the external n8n id ONLY on the local N8nWorkflow row
-        await this.prisma.n8nWorkflow.update({ where: { id: n8nRow.id }, data: { n8nWorkflowId: liveId } });
-        this.logger.log(`UPDATE (by-name) n8n workflow ${liveId} for workflow ${workflowId}`);
-      } else {
-        this.logger.log(`Decision: CREATE_STUB for workflow ${workflowId}`);
-        // Create a minimal stub first to obtain a durable ID, then update with full body
-        const stub = {
-          name: body.name,
-          nodes: [],
-          connections: {},
-          settings: { executionOrder: 'v1' },
-        } as any;
-        const created = await this.n8nAdmin.createWorkflow(stub);
-        liveId = String(created.id);
-        // Persist the real external n8n id immediately on the local N8nWorkflow row to avoid duplicate creations on retries
-        await this.prisma.n8nWorkflow.update({ where: { id: n8nRow.id }, data: { n8nWorkflowId: liveId } });
-        this.logger.log(`CREATE (stub) n8n workflow ${liveId} for workflow ${workflowId}`);
-        // Now populate with the full definition
-        await this.n8nAdmin.updateWorkflow(liveId, body);
-        this.logger.log(`POPULATE n8n workflow ${liveId} for workflow ${workflowId}`);
-      }
-    } else {
-      try {
-        this.logger.log(`Decision: UPDATE_BY_ID -> ${liveId} for workflow ${workflowId}`);
-        await this.n8nAdmin.updateWorkflow(liveId, body);
-        this.logger.log(`UPDATE n8n workflow ${liveId} for workflow ${workflowId}`);
-      } catch (err: any) {
-        // If update fails with 404, fallback to create
-        if (err?.response?.status === 404) {
-          this.logger.warn(`UPDATE failed with 404 for ${liveId}; falling back to CREATE.`);
-          const created = await this.n8nAdmin.createWorkflow(body);
-          liveId = String(created.id);
-          // Persist the external id on the local N8nWorkflow row
-          await this.prisma.n8nWorkflow.update({ where: { id: n8nRow.id }, data: { n8nWorkflowId: liveId } });
-          this.logger.log(`CREATE n8n workflow ${liveId} (after 404) for workflow ${workflowId}`);
+      if (!liveId) {
+        this.logger.log(`[DIAGNOSTIC] No liveId. Checking for existing workflow by name: "${body.name}"`);
+        const byName = body?.name ? await this.n8nAdmin.findWorkflowByName(body.name) : null;
+        if (byName?.id) {
+          liveId = String(byName.id);
+          this.logger.log(`[DIAGNOSTIC] Found by name. Decision: UPDATE_BY_NAME -> ${liveId}`);
+          await this.n8nAdmin.updateWorkflow(liveId, body);
         } else {
-          throw err;
+          this.logger.log(`[DIAGNOSTIC] Not found by name. Decision: CREATE_STUB`);
+          const stub = { name: body.name, nodes: [], connections: {}, settings: { executionOrder: 'v1' } };
+          const created = await this.n8nAdmin.createWorkflow(stub);
+          liveId = String(created.id);
+          this.logger.log(`[DIAGNOSTIC] Created stub with ID: ${liveId}. Populating with full definition...`);
+          await this.n8nAdmin.updateWorkflow(liveId, body);
+        }
+      } else {
+        this.logger.log(`[DIAGNOSTIC] Found liveId. Decision: UPDATE_BY_ID -> ${liveId}`);
+        try {
+          await this.n8nAdmin.updateWorkflow(liveId, body);
+        } catch (err: any) {
+          if (err?.response?.status === 404) {
+            this.logger.warn(`[DIAGNOSTIC] ⚠️ UPDATE failed with 404 for ${liveId}; falling back to CREATE.`);
+            const created = await this.n8nAdmin.createWorkflow(body);
+            liveId = String(created.id);
+          } else {
+            throw err;
+          }
         }
       }
+      this.logger.log(`[DIAGNOSTIC] ✅ Step 4 complete: n8n workflow created/updated. Live ID: ${liveId}`);
+
+      // Step 5: Persist n8n's live ID to our database
+      this.logger.log(`[DIAGNOSTIC] Step 5: Persisting n8n live ID to database...`);
+      await this.prisma.n8nWorkflow.update({ where: { id: n8nRow.id }, data: { n8nWorkflowId: liveId } });
+      this.logger.log(`[DIAGNOSTIC] ✅ Step 5 complete: Persisted live ID`);
+
+      // Step 6: Activation policy
+      this.logger.log(`[DIAGNOSTIC] Step 6: Handling activation...`);
+      if (activate) {
+        await this.n8nAdmin.setActive(liveId!, true);
+        this.logger.log(`[DIAGNOSTIC] ✅ Step 6 complete: Workflow activated in n8n`);
+      } else {
+        this.logger.log(`[DIAGNOSTIC] Step 6 complete: Workflow activation skipped`);
+      }
+
+      // Step 7: Persist final status and webhook URL
+      this.logger.log(`[DIAGNOSTIC] Step 7: Persisting final status to database...`);
+      const webhookNode = (payload.nodes || []).find((n: any) => n.type === 'n8n-nodes-base.webhook');
+      const webhookPath = webhookNode?.parameters?.path ? String(webhookNode.parameters.path) : undefined;
+      const baseEnv = process.env.N8N_WEBHOOK_URL || process.env.N8N_PUBLIC_URL || process.env.N8N_API_URL || '';
+      const baseUrl = String(baseEnv).replace(/\/$/, '').replace(/\/?api(?:\/v\d+)?$/, '');
+      const webhookUrl = webhookPath ? `${baseUrl}/webhook/${webhookPath}` : undefined;
+
+      await this.prisma.n8nWorkflow.update({
+        where: { id: n8nRow.id },
+        data: { isActive: !!activate, webhookUrl, lastValidatedAt: new Date() },
+      });
+      this.logger.log(`[DIAGNOSTIC] ✅ Step 7 complete: Final status persisted`);
+
+      const result = { n8nWorkflowId: liveId, activated: activate, webhookUrl };
+      this.logger.log(`[DIAGNOSTIC] 🎉 Publish completed successfully! Result: ${JSON.stringify(result)}`);
+      return result;
+
+    } catch (error) {
+      this.logger.error(`[DIAGNOSTIC] ❌ Fatal error in publish workflow processor: ${error.message}`, error.stack);
+      throw error;
     }
-
-    // Activation policy
-    if (activate) {
-      await this.n8nAdmin.setActive(liveId!, true);
-    }
-
-    // Persist status
-    const webhookNode = (payload.nodes || []).find((n: any) => n.type === 'n8n-nodes-base.webhook');
-    const webhookPath = webhookNode?.parameters?.path ? String(webhookNode.parameters.path) : undefined;
-    // Priority: N8N_WEBHOOK_URL > N8N_PUBLIC_URL > derived from N8N_API_URL
-    const baseEnv = process.env.N8N_WEBHOOK_URL || process.env.N8N_PUBLIC_URL || process.env.N8N_API_URL || '';
-    const baseUrl = String(baseEnv).replace(/\/$/, '').replace(/\/?api(?:\/v\d+)?$/, '');
-    const webhookUrl = webhookPath ? `${baseUrl}/webhook/${webhookPath}` : undefined;
-
-    await this.prisma.n8nWorkflow.update({
-      where: { id: n8nRow.id },
-      data: {
-        isActive: !!activate,
-        webhookUrl,
-        lastValidatedAt: new Date(),
-      },
-    });
-
-    return {
-      n8nWorkflowId: liveId,
-      activated: activate,
-      webhookUrl,
-    };
   }
 }
 

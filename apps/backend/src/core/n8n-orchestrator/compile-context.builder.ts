@@ -1,13 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { CompileContext, InternalGraph } from 'libs/n8n-orchestrator/adapter-registry';
 
 // Credential UI names as they appear in n8n (per user's environment)
+// Make this robust to minor UI label changes across n8n versions.
 const CREDENTIAL_NAMES = {
   openai: 'OpenAI account',
   anthropic: 'Anthropic account',
   google: 'Google Gemini(PaLM) Api account',
+};
+
+// Accepted aliases (case-insensitive match) for each provider
+const CREDENTIAL_ALIASES: Record<string, string[]> = {
+  openai: ['OpenAI account', 'OpenAi account'],
+  anthropic: ['Anthropic account'],
+  google: ['Google Gemini(PaLM) Api account', 'Google Gemini Api account'],
 };
 
 @Injectable()
@@ -16,6 +24,22 @@ export class CompileContextBuilder {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
+
+  private readonly logger = new Logger(CompileContextBuilder.name);
+
+  /**
+   * Try resolve a credential by a list of possible UI names (case-insensitive) within a workspace.
+   * If not found, returns null.
+   */
+  private async resolveCredentialByAliases(workspaceId: string, aliases: string[]) {
+    if (!Array.isArray(aliases) || aliases.length === 0) return null as any;
+    return this.prisma.credential.findFirst({
+      where: {
+        workspaceId,
+        OR: aliases.map((name) => ({ name: { equals: name, mode: 'insensitive' as const } })),
+      },
+    });
+  }
 
   /**
    * Build CompileContext and InternalGraph for a workflow within a workspace.
@@ -51,10 +75,10 @@ export class CompileContextBuilder {
     }
     const versionLabel = String(version.version ?? 'draft');
 
-    // Resolve provider credential by name within workspace
-    const openaiCred = await this.prisma.credential.findFirst({ where: { workspaceId, name: CREDENTIAL_NAMES.openai } });
-    const anthropicCred = await this.prisma.credential.findFirst({ where: { workspaceId, name: CREDENTIAL_NAMES.anthropic } });
-    const googleCred = await this.prisma.credential.findFirst({ where: { workspaceId, name: CREDENTIAL_NAMES.google } });
+    // Resolve provider credential by aliases within workspace (case-insensitive)
+    const openaiCred = await this.resolveCredentialByAliases(workspaceId, CREDENTIAL_ALIASES.openai);
+    const anthropicCred = await this.resolveCredentialByAliases(workspaceId, CREDENTIAL_ALIASES.anthropic);
+    const googleCred = await this.resolveCredentialByAliases(workspaceId, CREDENTIAL_ALIASES.google);
 
     // Normalize/derive internal graph from stored workflowJson (if present)
     // Expecting structure: { graph: { nodes: [], edges: [] } }
@@ -106,6 +130,12 @@ export class CompileContextBuilder {
     const envOpenAiId = this.config.get<string>('N8N_OPENAI_CREDENTIAL_ID');
     const envAnthropicId = this.config.get<string>('N8N_ANTHROPIC_CREDENTIAL_ID');
     const envGoogleId = this.config.get<string>('N8N_GOOGLE_CREDENTIAL_ID');
+
+    // Diagnostic logging of resolution (do not log secrets)
+    this.logger.log(`[DIAGNOSTIC] Credential resolution: ` +
+      `openai=${envOpenAiId ? 'env:'+envOpenAiId : (openaiCred?.id || 'none')} ` +
+      `anthropic=${envAnthropicId ? 'env:'+envAnthropicId : (anthropicCred?.id || 'none')} ` +
+      `google=${envGoogleId ? 'env:'+envGoogleId : (googleCred?.id || 'none')}`);
 
     // Build CompileContext
     const ctx: CompileContext = {

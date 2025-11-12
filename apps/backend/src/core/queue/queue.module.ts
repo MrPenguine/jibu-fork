@@ -6,6 +6,8 @@ import { QueueService } from './queue.service';
 import { QueueProcessor } from './queue.processor';
 import { IndexingProcessor } from './indexing.processor';
 import { QueueController } from './queue.controller';
+import { QueueMonitorController } from './queue-monitor.controller';
+import { QueueHealthController } from './queue-health.controller';
 
 @Module({
   imports: [
@@ -35,7 +37,7 @@ import { QueueController } from './queue.controller';
       { name: QUEUE_NAMES.WORKFLOW_PUBLISH },
     ),
   ],
-  controllers: [QueueController],
+  controllers: [QueueController, QueueMonitorController, QueueHealthController],
   providers: [QueueService, QueueProcessor, IndexingProcessor],
   exports: [BullModule, QueueService],
 })

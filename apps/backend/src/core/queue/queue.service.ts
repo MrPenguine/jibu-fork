@@ -97,11 +97,22 @@ export class QueueService {
    */
   async addPublishWorkflowJob(data: any, options?: JobOptions) {
     try {
+      this.logger.log(`[DIAGNOSTIC] Attempting to enqueue publish job for workflow: ${data.workflowId}`);
+      this.logger.debug(`[DIAGNOSTIC] Job data: ${JSON.stringify(data)}`);
+      this.logger.debug(`[DIAGNOSTIC] Job options: ${JSON.stringify(options || {})}`);
+      
+      // Check queue health
+      const queueHealth = await this.publishQueue.isReady();
+      this.logger.log(`[DIAGNOSTIC] Publish queue ready status: ${queueHealth}`);
+      
       const job = await this.publishQueue.add(JOB_NAMES.PUBLISH_WORKFLOW, data, options);
-      this.logger.debug(`Added publish job for workflow: ${data.workflowId}`);
+      
+      this.logger.log(`[DIAGNOSTIC] ✅ Successfully added publish job. Job ID: ${job.id}, Workflow: ${data.workflowId}`);
+      this.logger.debug(`[DIAGNOSTIC] Job details: ${JSON.stringify({ id: job.id, name: job.name, timestamp: job.timestamp })}`);
+      
       return job;
     } catch (error) {
-      this.logger.error(`Failed to add publish job: ${error.message}`, error.stack);
+      this.logger.error(`[DIAGNOSTIC] ❌ Failed to add publish job for workflow ${data?.workflowId}: ${error.message}`, error.stack);
       throw error;
     }
   }

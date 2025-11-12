@@ -11,6 +11,7 @@ import {
   UseGuards,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
@@ -141,38 +142,57 @@ export class WorkflowController {
   @Put(':id/publish')
   @ApiOperation({ summary: 'Publish a workflow (also compiles to n8n and enqueues auto-activation)' })
   async publishWorkflow(@Param('id') id: string, @Req() req) {
-    // First, set the workflow version to published using the existing service
-    const published = await this.workflowService.publishWorkflow(id);
+    const logger = new Logger('WorkflowController');
+    logger.log(`[DIAGNOSTIC] 🚀 Starting publish workflow for ID: ${id}`);
+    
+    try {
+      // First, set the workflow version to published using the existing service
+      logger.log(`[DIAGNOSTIC] Step 1: Publishing workflow version...`);
+      const published = await this.workflowService.publishWorkflow(id);
+      logger.log(`[DIAGNOSTIC] ✅ Step 1 complete: Workflow version published`);
 
-    // Resolve workspace context (same header resolution used elsewhere)
-    const workspaceId =
-      req.user?.workspaceId ||
-      req.user?.lastWorkspaceId ||
-      (req.headers['x-workspace-id'] as string);
-    if (!workspaceId) {
-      throw new BadRequestException('No workspace selected');
-    }
+      // Resolve workspace context (same header resolution used elsewhere)
+      const workspaceId =
+        req.user?.workspaceId ||
+        req.user?.lastWorkspaceId ||
+        (req.headers['x-workspace-id'] as string);
+      if (!workspaceId) {
+        logger.error(`[DIAGNOSTIC] ❌ No workspace ID found in request`);
+        throw new BadRequestException('No workspace selected');
+      }
+      logger.log(`[DIAGNOSTIC] Workspace ID resolved: ${workspaceId}`);
 
-    // Compile and persist compiled JSON into N8nWorkflow
-    const { n8nWorkflowDbId, hash } = await this.orchestrator.compileAndPersist(id, workspaceId);
+      // Compile and persist compiled JSON into N8nWorkflow
+      logger.log(`[DIAGNOSTIC] Step 2: Compiling and persisting to N8nWorkflow...`);
+      const { n8nWorkflowDbId, hash } = await this.orchestrator.compileAndPersist(id, workspaceId);
+      logger.log(`[DIAGNOSTIC] ✅ Step 2 complete: Compiled. N8nWorkflowDbId: ${n8nWorkflowDbId}, Hash: ${hash}`);
 
-    // Enqueue publish with auto-activate
-    const job = await this.queueService.addPublishWorkflowJob({
-      workflowId: id,
-      workspaceId,
-      n8nWorkflowDbId,
-      activate: true,
-    });
-
-    return {
-      published,
-      enqueue: {
-        accepted: true,
-        jobId: job.id,
+      // Enqueue publish with auto-activate
+      logger.log(`[DIAGNOSTIC] Step 3: Enqueueing publish job to worker...`);
+      const job = await this.queueService.addPublishWorkflowJob({
+        workflowId: id,
+        workspaceId,
         n8nWorkflowDbId,
-        hash,
-      },
-    };
+        activate: true,
+      });
+      logger.log(`[DIAGNOSTIC] ✅ Step 3 complete: Job enqueued with ID: ${job.id}`);
+
+      const result = {
+        published,
+        enqueue: {
+          accepted: true,
+          jobId: job.id,
+          n8nWorkflowDbId,
+          hash,
+        },
+      };
+      
+      logger.log(`[DIAGNOSTIC] 🎉 Publish workflow completed successfully. Job ID: ${job.id}`);
+      return result;
+    } catch (error) {
+      logger.error(`[DIAGNOSTIC] ❌ Publish workflow failed for ID ${id}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   @Post(':id/publish-n8n')
