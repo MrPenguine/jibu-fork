@@ -253,8 +253,8 @@ export function WorkspaceSwitcher() {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton size="lg" className="p-0 bg-violet-50/80 rounded-xl">
-            <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300">
+          <SidebarMenuButton size="lg" className="p-0 bg-[#E6F7F0] rounded-xl">
+            <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-[#009959]/10 text-[#009959]">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight max-w-[160px] ml-3">
@@ -276,9 +276,9 @@ export function WorkspaceSwitcher() {
           <SidebarMenuButton 
             size="lg"
             onClick={handleCreateWorkspace}
-            className="p-0 bg-violet-50/80 rounded-xl"
+            className="p-0 bg-[#E6F7F0] rounded-xl"
           >
-            <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300">
+            <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-[#009959]/10 text-[#009959]">
               <Plus className="size-5" />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight max-w-[160px] ml-3">
@@ -299,9 +299,9 @@ export function WorkspaceSwitcher() {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="data-[state=open]:bg-violet-100 data-[state=open]:text-foreground p-0 bg-violet-50/80 rounded-xl"
+                className="data-[state=open]:bg-[#E6F7F0] data-[state=open]:text-foreground p-0 bg-[#E6F7F0] rounded-xl"
               >
-                <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 font-medium">
+                <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-[#009959]/10 text-[#009959] font-medium">
                   {activeWorkspace.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight max-w-[160px] ml-3">
@@ -316,7 +316,7 @@ export function WorkspaceSwitcher() {
                       {totalPendingCount}
                     </span>
                   )}
-                  <ChevronsUpDown className="h-4 w-4 text-violet-600/70 dark:text-violet-400/70 mr-1" />
+                  <ChevronsUpDown className="h-4 w-4 text-[#009959]/70 mr-1" />
                 </div>
               </SidebarMenuButton>
             </DropdownMenuTrigger>
@@ -334,11 +334,11 @@ export function WorkspaceSwitcher() {
               {activeWorkspace && (
                 <DropdownMenuItem
                   key={`active-${activeWorkspace.id}`}
-                  className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer bg-violet-100 dark:bg-violet-900/20 hover:bg-violet-200 dark:hover:bg-violet-900/30 rounded-xl mb-1"
+                  className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer bg-[#E6F7F0] hover:bg-[#009959]/20 rounded-xl mb-1"
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300 font-medium">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-[#009959]/20 text-[#009959] font-medium">
                         {activeWorkspace.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="max-w-[140px]">
@@ -348,7 +348,7 @@ export function WorkspaceSwitcher() {
                     </div>
                     <div className="flex items-center">
                       <Settings 
-                        className="h-4 w-4 text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300" 
+                        className="h-4 w-4 text-[#009959] hover:text-[#009959]/80" 
                         onClick={(e) => handleWorkspaceSettings(e, activeWorkspace.id)}
                       />
                     </div>
@@ -382,7 +382,7 @@ export function WorkspaceSwitcher() {
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-gray-100 dark:bg-gray-800 text-violet-600 dark:text-violet-400 font-medium">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-gray-100 text-[#009959] font-medium">
                           {ws.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="max-w-[140px]">
@@ -391,7 +391,7 @@ export function WorkspaceSwitcher() {
                         </div>
                       </div>
                       <div className="flex items-center">
-                        <ChevronRight className="h-4 w-4 text-violet-600/70 dark:text-violet-400/70" />
+                        <ChevronRight className="h-4 w-4 text-[#009959]/70" />
                       </div>
                     </div>
                   </DropdownMenuItem>
@@ -538,7 +538,7 @@ export function WorkspaceSwitcher() {
                 className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
                 onClick={handleCreateWorkspace}
               >
-                <div className="flex size-8 items-center justify-center rounded-xl border-0 bg-gray-100 dark:bg-gray-800 text-violet-600 dark:text-violet-400">
+                <div className="flex size-8 items-center justify-center rounded-xl border-0 bg-gray-100 text-[#009959]">
                   <Plus className="size-3.5" />
                 </div>
                 <div className="font-medium text-sm truncate">Create workspace</div>

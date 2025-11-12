@@ -117,17 +117,17 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="relative flex min-h-screen w-full flex-row">
+    <div className="relative flex h-screen w-full flex-row overflow-hidden">
       <SidebarProvider>
         <WorkspaceProvider>
           <CustomAppSidebar navUserProps={{ onLogout: handleLogout }} />
-          <SidebarInset className="bg-white flex-1 flex flex-col">
+          <SidebarInset className="bg-white flex-1 flex flex-col overflow-hidden">
             <header className="flex h-16 w-full shrink-0 items-center gap-2 px-4">
               <div className="flex items-center gap-2">
                 {/* Removed breadcrumb navigation */}
               </div>
             </header>
-            <main className="flex-1 w-full">
+            <main className="flex-1 w-full overflow-y-auto">
               {children}
             </main>
           </SidebarInset>

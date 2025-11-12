@@ -52,22 +52,27 @@ function NavItem({
   icon, 
   children,
   counter,
-  badge
+  badge,
+  isHome
 }: {
   href: string;
   icon: React.ReactElement<{ className?: string }>;
   children: React.ReactNode;
   counter?: number;
   badge?: string;
+  isHome?: boolean;
 }) {
   const pathname = usePathname();
-  const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+  // For home, only match exact path. For others, match if path starts with href
+  const isActive = isHome 
+    ? pathname === href 
+    : pathname === href || pathname?.startsWith(`${href}/`);
   
   return (
     <SidebarMenuItem>
       <div className={cn(
         "w-full flex items-center gap-2 text-sm px-3 py-2 rounded-md transition-colors",
-        isActive ? "bg-gray-800 text-white" : "text-gray-300 hover:bg-gray-800 hover:text-white"
+        isActive ? "bg-[#E6F7F0] text-[#009959] font-medium" : "text-[#22262A] hover:bg-gray-100 hover:text-[#009959]"
       )}>
         <Link href={href} className="w-full flex items-center gap-2">
           {React.cloneElement(icon, {
@@ -75,12 +80,12 @@ function NavItem({
           })}
           <span className="flex-1">{children}</span>
           {counter !== undefined && (
-            <Badge variant="outline" className="ml-auto text-xs py-0 h-5 px-2 bg-gray-800">
+            <Badge variant="outline" className="ml-auto text-xs py-0 h-5 px-2 bg-[#CBF3FC] text-[#222E50] border-[#CBF3FC]">
               {counter}
             </Badge>
           )}
           {badge && (
-            <Badge variant="outline" className="ml-auto text-xs py-0 h-5 px-2 bg-gray-800">
+            <Badge variant="outline" className="ml-auto text-xs py-0 h-5 px-2 bg-[#F9C116] text-[#22262A] border-[#F9C116]">
               {badge}
             </Badge>
           )}
@@ -130,7 +135,7 @@ export function CustomAppSidebar({
   return (
     <Sidebar
       collapsible="none"
-      className={cn("!border-0 !bg-gray-900 text-white", className)}
+      className={cn("!border-0 !bg-[#FAFAFA] text-[#22262A]", className)}
       {...sidebarProps}
     >
       <SidebarHeader className="border-0 flex-col !p-0">
@@ -153,7 +158,7 @@ export function CustomAppSidebar({
         </div>
         {!isCollapsed && (
           <div className="px-4 py-2 mt-1 mb-2">
-            <div className="p-1 bg-violet-50/50 dark:bg-gray-800/50 rounded-xl">
+            <div className="p-1 bg-gray-50 rounded-xl">
               <WorkspaceSwitcher />
             </div>
           </div>
@@ -165,7 +170,7 @@ export function CustomAppSidebar({
             {/* Main Navigation */}
             <SidebarGroup>
               <SidebarMenu>
-                <NavItem href={`${wsBase}`} icon={<LayoutDashboard />}>
+                <NavItem href={`${wsBase}`} icon={<LayoutDashboard />} isHome={true}>
                   {t("Home")}
                 </NavItem>
                 <NavItem 
@@ -178,7 +183,7 @@ export function CustomAppSidebar({
               </SidebarMenu>
             </SidebarGroup>
 
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-gray-200" />
 
             {/* Management */}
             <SidebarGroup>
@@ -214,7 +219,7 @@ export function CustomAppSidebar({
               </SidebarMenu>
             </SidebarGroup>
 
-            <Separator className="my-2" />
+            <Separator className="my-2 bg-gray-200" />
 
             {/* Learn & Support */}
             <SidebarGroup>
@@ -242,9 +247,9 @@ export function CustomAppSidebar({
       <SidebarFooter className="border-0 flex-col gap-2">
         {/* Payment Widget */}
         <div className="px-4 mb-2">
-          <div className="bg-violet-50 dark:bg-gray-800 rounded-lg p-3 text-sm">
-            <div className="font-medium mb-1">Payment Widget</div>
-            <div className="text-xs text-muted-foreground">Manage your subscription and billing</div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
+            <div className="font-medium mb-1 text-[#22262A]">Payment Widget</div>
+            <div className="text-xs text-gray-600">Manage your subscription and billing</div>
           </div>
         </div>
         <NavItem href={`${wsBase}/settings`} icon={<Settings />}>

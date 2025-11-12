@@ -56,18 +56,12 @@ export default function AgentsPage() {
     fetchAgents();
   }, [workspaceId]);
 
-  // Open the agent's master workflow canvas
-  const handleOpenAgentCanvas = async (agentId: string) => {
-    try {
-      // Fetch workflows for the agent and find the master/primary one
-      const workflows = await workflowApi.getWorkflowsByAssistant(agentId);
-      const master = (workflows || []).find((w: any) => w?.isPrimary || String(w?.workflowType).toUpperCase() === 'MASTER');
-      const workflowId = master?.id || agentId; // fallback to agentId if master not found
-      router.push(`/agent/${agentId}/canvas/${workflowId}`);
-    } catch (e) {
-      console.warn('[AgentsPage] Failed to resolve master workflow, falling back to agentId as workflowId', e);
-      router.push(`/agent/${agentId}/canvas/${agentId}`);
-    }
+  // Open the agent's content page (CMS workflows)
+  const handleOpenAgent = async (agentId: string) => {
+    // Store workspace ID in localStorage for the back button
+    localStorage.setItem('currentWorkspaceId', workspaceId);
+    // Navigate to content page
+    router.push(`/agent/${agentId}/cms/workflows`);
   };
 
   const handleCreateAgent = async () => {
@@ -92,7 +86,8 @@ export default function AgentsPage() {
       setIsCreateModalOpen(false);
       setNewAgentName('');
       setNewAgentDescription('');
-      router.push(`/agent/${newAgent.id}/canvas/${newAgent.id}`);
+      localStorage.setItem('currentWorkspaceId', workspaceId);
+      router.push(`/agent/${newAgent.id}/cms/workflows`);
     } catch (error) {
       console.error("Failed to create agent:", error);
       alert("Failed to create agent. Please try again.");
@@ -181,23 +176,23 @@ export default function AgentsPage() {
     <div className="w-full px-6 pb-6 pt-0">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Agents</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight">Agents</h1>
+          <p className="text-gray-600">
             Create and manage automated conversation flows
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => alert('Create folder functionality coming soon')}>
+          <Button variant="outline" className="rounded-xl" onClick={() => alert('Create folder functionality coming soon')}>
             <FolderPlus className="mr-2 h-4 w-4" />
             New Folder
           </Button>
-          <Button variant="outline" onClick={() => alert('Import functionality coming soon')}>
+          <Button variant="outline" className="rounded-xl" onClick={() => alert('Import functionality coming soon')}>
             <Upload className="mr-2 h-4 w-4" />
             Import
           </Button>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Button className="bg-[#009959] hover:bg-[#007a47] rounded-xl" onClick={() => setIsCreateModalOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Create Agent
             </Button>
@@ -244,12 +239,12 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-6">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input 
             placeholder="Search agents..." 
-            className="pl-10" 
+            className="pl-10 rounded-xl border-gray-200 focus:border-[#009959] focus:ring-[#009959]" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -268,7 +263,7 @@ export default function AgentsPage() {
               <p className="text-sm text-muted-foreground">
                 Get started by creating your first agent
               </p>
-              <Button onClick={() => setIsCreateModalOpen(true)}>
+              <Button className="bg-[#009959] hover:bg-[#007a47] rounded-xl" onClick={() => setIsCreateModalOpen(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Create Agent
               </Button>
@@ -276,49 +271,68 @@ export default function AgentsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAgents.map((agent) => (
-            <Card key={agent.id} className="rounded-xl border shadow-sm bg-primary/5 transition-all duration-200 hover:shadow-md hover:border-primary/30 hover:bg-primary/10 overflow-hidden">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="truncate">{agent.name}</CardTitle>
-                  <Badge variant={agent.isPublished ? 'default' : 'outline'}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredAgents.map((agent, index) => {
+            // Cycle through Palatinate, Saffron, and Cinnabar
+            const colors = [
+              { bg: 'bg-[#491344]', hover: 'hover:bg-[#3a0f37]', text: 'text-white' }, // Palatinate
+              { bg: 'bg-[#F9C116]', hover: 'hover:bg-[#e0ad13]', text: 'text-[#22262A]' }, // Saffron
+              { bg: 'bg-[#F45A10]', hover: 'hover:bg-[#d94d0d]', text: 'text-white' }, // Cinnabar
+            ];
+            const colorScheme = colors[index % colors.length];
+            
+            return (
+            <Card key={agent.id} className={`rounded-2xl border-0 ${colorScheme.bg} ${colorScheme.hover} ${colorScheme.text} shadow-md transition-all duration-200 hover:shadow-xl hover:scale-105 cursor-pointer overflow-hidden`}
+              onClick={() => handleOpenAgent(agent.id)}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start mb-2">
+                  <CardTitle className="text-xl font-bold">{agent.name}</CardTitle>
+                  <Badge 
+                    variant={agent.isPublished ? 'default' : 'outline'}
+                    className={`${colorScheme.text === 'text-white' ? 'bg-white/20 text-white border-white/30' : 'bg-[#222E50]/10 text-[#222E50] border-[#222E50]/20'}`}
+                  >
                     {agent.isPublished ? 'Published' : 'Draft'}
                   </Badge>
                 </div>
-                <CardDescription className="truncate">{agent.description || 'No description'}</CardDescription>
+                <CardDescription className={`${colorScheme.text === 'text-white' ? 'text-white/80' : 'text-inherit opacity-80'} line-clamp-2`}>
+                  {agent.description || 'No description'}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-sm">
+              <CardContent className="pb-3">
+                <div className={`text-sm space-y-1 ${colorScheme.text === 'text-white' ? 'text-white/70' : 'opacity-70'}`}>
                   <div>
-                    <span className="text-muted-foreground">Version:</span> {agent.version || '1.0'}
+                    <span className="font-medium">Version:</span> {agent.version || '1.0'}
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Last updated:</span>{' '}
+                    <span className="font-medium">Updated:</span>{' '}
                     {agent.updatedAt ? new Date(agent.updatedAt).toLocaleDateString() : 'N/A'}
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex flex-col gap-2 min-w-0 overflow-x-hidden">
-                <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full min-w-0">
+              <CardFooter className={`pt-3 border-t ${colorScheme.text === 'text-white' ? 'border-white/20' : 'border-black/10'}`}>
+                <div className="flex gap-2 w-full">
                   <Button
-                    variant="default"
+                    variant="ghost"
                     size="sm"
-                    className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate"
-                    onClick={() => handleOpenAgentCanvas(agent.id)}
+                    className={`flex-1 ${colorScheme.text === 'text-white' ? 'hover:bg-white/20 text-white' : 'hover:bg-black/10'}`}
+                    onClick={(e) => { e.stopPropagation(); handleOpenEditModal(agent); }}
                   >
-                    <Play className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Open Agent</span>
+                    <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => handleOpenEditModal(agent)}>
-                    <Pencil className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Edit</span>
-                  </Button>
-                  <Button type="button" variant="destructive" size="sm" className="basis-full sm:basis-auto w-full sm:w-auto max-w-full shrink text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4 whitespace-normal break-words overflow-hidden truncate" onClick={() => openDeleteConfirm(agent.id)}>
-                    <Trash2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Delete</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`flex-1 ${colorScheme.text === 'text-white' ? 'hover:bg-white/20 text-white' : 'hover:bg-black/10'}`}
+                    onClick={(e) => { e.stopPropagation(); openDeleteConfirm(agent.id); }}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardFooter>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
