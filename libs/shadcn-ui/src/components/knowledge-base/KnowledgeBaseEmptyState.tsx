@@ -23,8 +23,8 @@ export function KnowledgeBaseEmptyState({ onAddDataSource, onCreateFolder, onPic
         <div className="p-4 border-b flex items-center justify-between">
           <div className="text-sm text-slate-700 font-medium">All data sources (0)</div>
           {onCreateFolder && (
-            <Button variant="outline" size="sm" onClick={onCreateFolder} className="h-8">
-              <FolderPlus className="h-4 w-4 mr-1.5" /> Create folder
+            <Button variant="ghost" size="icon" onClick={onCreateFolder} className="h-8 w-8" aria-label="Create folder">
+              <FolderPlus className="h-4 w-4" />
             </Button>
           )}
         </div>
