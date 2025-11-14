@@ -189,8 +189,29 @@ export class WorkflowController {
       
       logger.log(`[DIAGNOSTIC] 🎉 Publish workflow completed successfully. Job ID: ${job.id}`);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       logger.error(`[DIAGNOSTIC] ❌ Publish workflow failed for ID ${id}: ${error.message}`, error.stack);
+      
+      // Check if this is the missing LLM configuration error
+      // NestJS BadRequestException wraps the response in error.response
+      const errorResponse = error?.response || error;
+      
+      logger.log(`[DIAGNOSTIC] Error response structure: ${JSON.stringify({ 
+        hasResponse: !!error?.response, 
+        responseError: error?.response?.error,
+        directError: error?.error,
+        message: error?.message 
+      })}`);
+      
+      if (errorResponse?.error === 'MISSING_LLM_CONFIGURATION') {
+        logger.log(`[DIAGNOSTIC] Detected MISSING_LLM_CONFIGURATION, re-throwing as ASSISTANT_SETUP_INCOMPLETE`);
+        throw new BadRequestException({
+          message: 'Assistant setup incomplete',
+          error: 'ASSISTANT_SETUP_INCOMPLETE',
+          details: errorResponse.details,
+        });
+      }
+      
       throw error;
     }
   }

@@ -17,6 +17,7 @@
     "paths": {
       "@backend/*": ["apps/backend/src/*"],
       "@frontend/*": ["apps/frontend/src/*"],
+      "@jibu/cache-utils": ["libs/cache-utils/src/index.ts"],
       "@jibu/core/chunking": ["libs/core/chunking/src/index.ts"],
       "@jibu/core/embedding": ["libs/core/embedding/src/index.ts"],
       "@jibu/core/vector-db": ["libs/core/vector-db/src/index.ts"],

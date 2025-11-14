@@ -113,13 +113,20 @@ export class AgentService {
         id,
         workspaceId,
       },
+      include: {
+        workflows: true,
+      },
     });
 
     if (!agent) {
       throw new NotFoundException(`Agent with ID ${id} not found in this workspace`);
     }
 
-    return agent as unknown as ExtendedAgent;
+    // Calculate isPublished based on whether any workflow has a publishedVersionId
+    return {
+      ...agent,
+      isPublished: agent.workflows?.some((w: any) => !!w.publishedVersionId) ?? false,
+    } as unknown as ExtendedAgent;
   }
 
   async update(id: string, updateAgentDto: UpdateAgentDto, workspaceId: string): Promise<ExtendedAgent> {

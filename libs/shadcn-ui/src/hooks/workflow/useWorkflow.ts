@@ -328,9 +328,16 @@ export function useWorkflow(workflowId: string, workflowApi: any, orgId?: string
       setLastSavedAt(new Date());
       console.log('Workflow published successfully');
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error publishing workflow:', error);
-      setSaveError('Failed to publish workflow');
+      
+      // Check if this is the missing LLM configuration error
+      const errorData = error?.response?.data;
+      if (errorData?.error === 'MISSING_LLM_CONFIGURATION' || errorData?.error === 'ASSISTANT_SETUP_INCOMPLETE') {
+        setSaveError(errorData.details?.userMessage || 'Please complete your assistant setup (select LLM provider and model) before publishing.');
+      } else {
+        setSaveError('Failed to publish workflow');
+      }
       return null;
     }
   }, [workflowId, workflowApi, orgId]);

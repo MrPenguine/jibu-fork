@@ -123,7 +123,15 @@ export class CompileContextBuilder {
     }
 
     if (!assistant.llmProvider || !assistant.llmModel) {
-      throw new BadRequestException('Assistant is missing llmProvider or llmModel');
+      throw new BadRequestException({
+        message: 'Assistant configuration incomplete',
+        error: 'MISSING_LLM_CONFIGURATION',
+        details: {
+          missingProvider: !assistant.llmProvider,
+          missingModel: !assistant.llmModel,
+          userMessage: 'Please select an LLM provider and model for your assistant before publishing the workflow.',
+        },
+      });
     }
 
     // Read credential IDs from env (preferred), fallback to DB if missing

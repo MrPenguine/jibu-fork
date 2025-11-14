@@ -10,9 +10,14 @@ import { N8nModule } from '../n8n/n8n.module';
   imports: [
     ConfigModule,
     ScheduleModule.forRoot(),
-    BullModule.registerQueue({
-      name: QUEUE_NAMES.WORKFLOW_EXECUTION,
-    }),
+    BullModule.registerQueue(
+      {
+        name: QUEUE_NAMES.WORKFLOW_EXECUTION,
+      },
+      {
+        name: QUEUE_NAMES.WEBHOOK_DELIVERY,
+      }
+    ),
     N8nModule,
   ],
   providers: [ScalingService],

@@ -310,7 +310,17 @@ export const workflowApi = {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to publish workflow: ${response.statusText}`);
+        // Parse error response body to get structured error
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { message: response.statusText };
+        }
+        
+        const error: any = new Error(`Failed to publish workflow: ${response.statusText}`);
+        error.response = { data: errorData };
+        throw error;
       }
       
       return response.json();

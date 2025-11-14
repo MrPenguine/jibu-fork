@@ -4,7 +4,8 @@
     "declaration": false,
     "outDir": "../../dist/apps/backend",
     "paths": {
-      "@jibu/queue-definitions": ["libs/queue-definitions/src"]
+      "@jibu/queue-definitions": ["libs/queue-definitions/src"],
+      "@jibu/cache-utils": ["libs/cache-utils/src/index.ts"]
     },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

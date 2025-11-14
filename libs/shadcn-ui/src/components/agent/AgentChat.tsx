@@ -139,6 +139,9 @@ export default function AgentChat({
   const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
 
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   // State
   const [userInput, setUserInput] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);

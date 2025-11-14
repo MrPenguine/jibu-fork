@@ -18,6 +18,7 @@ export class QueueService {
     @InjectQueue(QUEUE_NAMES.DEFAULT) private readonly defaultQueue: Queue,
     @InjectQueue(QUEUE_NAMES.INDEXING) private readonly indexingQueue: Queue,
     @InjectQueue(QUEUE_NAMES.WORKFLOW_PUBLISH) private readonly publishQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.WEBHOOK_DELIVERY) private readonly webhookQueue: Queue,
   ) {}
 
   /**
@@ -151,5 +152,31 @@ export class QueueService {
    */
   async cleanQueue(grace = 5000, limit = 1000, status?: JobStatusClean) {
     return this.defaultQueue.clean(grace, status, limit);
+  }
+
+  /**
+   * Get webhook delivery queue statistics
+   */
+  async getWebhookQueueState() {
+    const [waiting, active, completed, failed] = await Promise.all([
+      this.webhookQueue.getWaitingCount(),
+      this.webhookQueue.getActiveCount(),
+      this.webhookQueue.getCompletedCount(),
+      this.webhookQueue.getFailedCount(),
+    ]);
+
+    return {
+      waiting,
+      active,
+      completed,
+      failed,
+    };
+  }
+
+  /**
+   * Get a webhook delivery job by ID
+   */
+  async getWebhookJob(jobId: string) {
+    return this.webhookQueue.getJob(jobId);
   }
 } 

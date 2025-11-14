@@ -14,6 +14,7 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@libs/shadcn-ui/components/ui/button';
+import { useToast } from '@libs/shadcn-ui/components/ui/use-toast';
 import {
   AgentNodeType,
   FlowNode,
@@ -60,6 +61,7 @@ function AgentCanvasContent() {
   const router = useRouter();
   const [, setAgent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
   
   // Use our custom hook for workflow management
   const {
@@ -733,7 +735,16 @@ function AgentCanvasContent() {
           {/* Top-right action buttons */}
           <TopRightButtons
             onRun={() => setIsRunDialogOpen(true)}
-            onPublish={() => publishWorkflow()}
+            onPublish={async () => {
+              const result = await publishWorkflow();
+              if (!result && saveError) {
+                toast({
+                  title: "Cannot Publish Workflow",
+                  description: saveError,
+                  variant: "destructive",
+                });
+              }
+            }}
             isPublishing={isPublishingAgent}
             isSaving={isSaving}
             isPublished={isPublished}

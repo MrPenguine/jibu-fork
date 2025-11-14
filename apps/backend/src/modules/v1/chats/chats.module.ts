@@ -2,11 +2,16 @@ import { Module } from '@nestjs/common';
 import { ChatsController } from './chats.controller';
 import { ChatsService } from './chats.service';
 import { DatabaseModule } from '../../../core/database/database.module';
-import { RedisModule } from '../../../core/redis/redis.module';
-// N8N orchestrator import removed
 
+/**
+ * ChatsModule - Minimal chat management module
+ * 
+ * Provides basic CRUD operations for chats and messages.
+ * All complex integrations (Redis, N8N, webhooks) have been removed.
+ * Future chat processing will be handled by n8n workflows.
+ */
 @Module({
-  imports: [DatabaseModule, RedisModule], // N8N orchestrator module removed
+  imports: [DatabaseModule],
   controllers: [ChatsController],
   providers: [ChatsService],
   exports: [ChatsService]

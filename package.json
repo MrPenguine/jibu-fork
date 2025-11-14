@@ -4,7 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "nx run-many --target=test --all",
+    "test:watch": "nx run-many --target=test --all --watch",
+    "test:coverage": "nx run-many --target=test --all --coverage",
+    "test:backend": "nx test backend",
+    "test:worker": "nx test worker",
+    "test:libs": "nx run-many --target=test --projects=cache-utils,queue-definitions",
+    "test:cache-utils": "nx test cache-utils",
+    "test:queue-definitions": "nx test queue-definitions",
     "worker:start": "nx run worker:worker",
     "worker:build": "nx build worker",
     "db:migrate:dev": "pnpm dlx dotenv-cli -e apps/backend/.env -- prisma migrate dev --schema=./apps/backend/prisma/schema.prisma"

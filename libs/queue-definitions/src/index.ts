@@ -8,6 +8,7 @@ export const QUEUE_NAMES = {
   INDEXING: 'indexing',
   WORKFLOW_EXECUTION: 'workflow-execution',
   WORKFLOW_PUBLISH: 'workflow-publish',
+  WEBHOOK_DELIVERY: 'webhook-delivery',
 };
 
 // Job names
@@ -27,6 +28,9 @@ export const JOB_NAMES = {
 
   // Workflow publish queue jobs
   PUBLISH_WORKFLOW: 'publish-workflow',
+
+  // Webhook delivery queue jobs
+  DELIVER_WEBHOOK: 'deliver-webhook',
 };
 
 // Job interfaces
@@ -82,4 +86,25 @@ export interface PublishWorkflowJobData {
   n8nWorkflowDbId?: string;
   activate?: boolean;
   force?: boolean;
+}
+
+// Webhook delivery job payload
+export interface WebhookDeliveryJobData {
+  workflowId: string;
+  sessionId: string;
+  payload: any;
+  isVoice: boolean;
+  connectionId?: string; // Optional connection ID for voice calls
+  priority?: number; // Priority level (higher = more urgent)
+}
+
+// Connection context for active voice calls
+export interface ConnectionContext {
+  workflowId: string;
+  sessionId: string;
+  callSid?: string;
+  startTime: number;
+  lastHeartbeat: number;
+  isActive: boolean;
+  metadata?: Record<string, any>;
 }

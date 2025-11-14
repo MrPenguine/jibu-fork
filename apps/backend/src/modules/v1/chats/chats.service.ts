@@ -1,34 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger, HttpException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { RedisService } from '../../../core/redis/redis.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
-import { ConfigService } from '@nestjs/config';
-import { Agent, Chat, Message, Prisma } from '@prisma/client';
+import { Chat, Prisma } from '@prisma/client';
 
-// Extended chat type to include system prompt
-interface ChatWithSystemPrompt extends Chat {
-  systemPrompt?: string;
-}
-
-// Type for message in Redis chat history
-interface ChatHistoryMessage {
-  role: string;
-  content: string;
-  id: string;
-  timestamp: Date;
-}
-
+/**
+ * ChatsService - Minimal CRUD service for chat management
+ * 
+ * This service provides basic database operations for chats and messages.
+ * All complex chat logic, AI integrations, and webhook handling have been removed.
+ * Future implementations will use n8n workflows for chat processing.
+ */
 @Injectable()
 export class ChatsService {
   private readonly logger = new Logger(ChatsService.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
-    private readonly configService: ConfigService
-    // N8N services removed
   ) {}
 
   async createChat(createChatDto: CreateChatDto & { workspaceId: string }) {
@@ -242,9 +231,9 @@ export class ChatsService {
   async createMessage(chatId: string, createMessageDto: CreateMessageDto, workspaceId: string) {
     this.logger.log(`Creating new message for chat ${chatId}`);
     
-    const chat = await this.getChat(chatId, workspaceId);
+    await this.getChat(chatId, workspaceId);
 
-    const userMessage = await this.prisma.message.create({
+    const message = await this.prisma.message.create({
       data: {
         chatId,
         content: createMessageDto.content,
@@ -255,117 +244,24 @@ export class ChatsService {
       }
     });
 
-    this.logger.log(`Successfully created user message ${userMessage.id} for chat ${chatId}`);
+    this.logger.log(`Successfully created message ${message.id} for chat ${chatId}`);
 
-    await this.updateChatInRedis(chat, userMessage);
-
+    // Update chat timestamp
     await this.prisma.chat.update({
       where: { id: chatId },
       data: { updatedAt: new Date() }
     });
 
-    let systemPrompt: string | undefined = undefined;
-    const temperature = 0.7; // Default temperature
-
-    if (createMessageDto.role === 'user') {
-      if (chat.agentId) {
-        // Simplified agent handling without N8N integration
-        try {
-          // Attempt to get system prompt from agent metadata if needed
-          const agent = await this.prisma.agent.findUnique({ where: { id: chat.agentId } });
-          if (agent && agent.metadata) {
-            try {
-              const metadata = agent.metadata as Record<string, any>;
-              if (metadata.systemPrompt) {
-                systemPrompt = metadata.systemPrompt;
-                this.logger.log(`Using system prompt from agent metadata: ${systemPrompt?.substring(0, 50)}...`);
-              }
-            } catch (error) {
-              this.logger.error('Failed to parse agent metadata parameters', error);
-            }
-          }
-        } catch (e) {
-          this.logger.warn(`Error extracting system prompt from agent ${chat.agentId}: ${e.message}`);
-        }
-      }
-
-      if (!systemPrompt) {
-        const chatWithPrompt = chat as ChatWithSystemPrompt;
-        systemPrompt = chatWithPrompt.systemPrompt || 'You are a helpful assistant.';
-      }
-      
-      // Create assistant message directly
-      const assistantMessage = await this.prisma.message.create({
-        data: {
-          chat: { connect: { id: chatId } },
-          role: 'assistant',
-          content: 'This message would normally be processed by an external service. Service integration has been removed.',
-          type: 'text',
-          sequenceId: createMessageDto.sequenceId + 1,
-          metadata: {}
-        }
-      });
-
-      await this.updateChatInRedis(chat, assistantMessage);
-      return { userMessage, assistantMessage };
-    }
-
-    return { userMessage, assistantMessage: null };
+    return message;
   }
 
-  // N8N webhook method has been removed
-
-  private getRedisKey(chat: Chat): string {
-    const { id: chatId, agentId, sessionId } = chat;
-    if (agentId) return `chat:agent:${agentId}:${sessionId}`;
-    return `chat:${chatId}:${sessionId}`;
+  // All Redis and webhook integration methods have been removed
+  // Future chat processing will be handled by n8n workflows
+  private async initChatInRedis(_chat: Chat): Promise<void> {
+    // Placeholder - will be replaced with n8n webhook integration
   }
 
-  private async initChatInRedis(chat: Chat): Promise<void> {
-    const redisKey = this.getRedisKey(chat);
-    try {
-      await this.redis.set(redisKey, JSON.stringify([]));
-      this.logger.log(`Initialized Redis chat history for ${redisKey}`);
-    } catch (error) {
-      this.logger.error(`Failed to initialize Redis chat history for ${redisKey}: ${(error as Error).message}`);
-    }
-  }
-
-  private async updateChatInRedis(chat: Chat, message: Message): Promise<void> {
-    const redisKey = this.getRedisKey(chat);
-    try {
-      const existingChatHistory = await this.redis.get(redisKey);
-      let chatHistory: ChatHistoryMessage[] = [];
-      
-      if (existingChatHistory) {
-        chatHistory = JSON.parse(existingChatHistory);
-      }
-      
-      chatHistory.push({
-        role: message.role,
-        content: message.content,
-        id: message.id,
-        timestamp: message.createdAt
-      });
-      
-      if (chatHistory.length > 2000) {
-        chatHistory = chatHistory.slice(-2000);
-      }
-      
-      await this.redis.set(redisKey, JSON.stringify(chatHistory));
-      this.logger.log(`Updated Redis chat history for ${redisKey}`);
-    } catch (error) {
-      this.logger.error(`Failed to update Redis chat history for ${redisKey}: ${(error as Error).message}`);
-    }
-  }
-
-  private async removeChatFromRedis(chat: Chat): Promise<void> {
-    const redisKey = this.getRedisKey(chat);
-    try {
-      await this.redis.del(redisKey);
-      this.logger.log(`Removed Redis chat history for ${redisKey}`);
-    } catch (error) {
-      this.logger.error(`Failed to remove Redis chat history for ${redisKey}: ${(error as Error).message}`);
-    }
+  private async removeChatFromRedis(_chat: Chat): Promise<void> {
+    // Placeholder - will be replaced with n8n webhook integration
   }
 }

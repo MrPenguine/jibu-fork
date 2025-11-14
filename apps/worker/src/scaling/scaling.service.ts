@@ -19,6 +19,7 @@ export class ScalingService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly n8nWorkerConfig: N8nWorkerConfig,
     @InjectQueue(QUEUE_NAMES.WORKFLOW_EXECUTION) private workflowQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.WEBHOOK_DELIVERY) private webhookQueue: Queue,
   ) {
     this.minWorkers = this.n8nWorkerConfig.getMinWorkers();
     this.maxWorkers = this.n8nWorkerConfig.getMaxWorkers();
@@ -47,17 +48,30 @@ export class ScalingService implements OnModuleInit {
     }
 
     try {
-      // Get queue metrics
-      const queueLength = await this.getQueueLength();
-      const activeJobs = await this.getActiveJobCount();
-      const waitingJobs = await this.getWaitingJobCount();
+      // Get queue metrics for both queues
+      const workflowMetrics = await this.getWorkflowQueueMetrics();
+      const webhookMetrics = await this.getWebhookQueueMetrics();
       
-      this.logger.debug(`Queue metrics: length=${queueLength}, active=${activeJobs}, waiting=${waitingJobs}, workers=${this.currentWorkers}`);
+      const totalWaiting = workflowMetrics.waiting + webhookMetrics.waiting;
+      const totalActive = workflowMetrics.active + webhookMetrics.active;
+      const totalLength = workflowMetrics.length + webhookMetrics.length;
+      
+      this.logger.debug(
+        `Queue metrics: ` +
+        `workflow(length=${workflowMetrics.length}, active=${workflowMetrics.active}, waiting=${workflowMetrics.waiting}), ` +
+        `webhook(length=${webhookMetrics.length}, active=${webhookMetrics.active}, waiting=${webhookMetrics.waiting}), ` +
+        `workers=${this.currentWorkers}`
+      );
       
       // Determine if we need to scale
-      if (waitingJobs > this.queueThreshold && this.currentWorkers < this.maxWorkers) {
+      // Scale up if webhook queue has more than 50 waiting jobs (voice-critical)
+      // or if total waiting jobs exceed threshold
+      if ((webhookMetrics.waiting > 50 || totalWaiting > this.queueThreshold) && this.currentWorkers < this.maxWorkers) {
         await this.scaleUp();
-      } else if (waitingJobs < this.queueThreshold / 2 && activeJobs < this.currentWorkers / 2 && this.currentWorkers > this.minWorkers) {
+      } 
+      // Scale down if webhook queue has less than 20 waiting jobs for 5 minutes
+      // and total active jobs are low
+      else if (webhookMetrics.waiting < 20 && totalWaiting < this.queueThreshold / 2 && totalActive < this.currentWorkers / 2 && this.currentWorkers > this.minWorkers) {
         await this.scaleDown();
       }
     } catch (error) {
@@ -66,27 +80,54 @@ export class ScalingService implements OnModuleInit {
   }
 
   /**
-   * Get the total number of jobs in the queue
+   * Get workflow queue metrics
+   */
+  private async getWorkflowQueueMetrics(): Promise<{ length: number; active: number; waiting: number }> {
+    const counts = await this.workflowQueue.getJobCounts();
+    return {
+      length: counts.waiting + counts.active + counts.delayed,
+      active: counts.active,
+      waiting: counts.waiting,
+    };
+  }
+
+  /**
+   * Get webhook delivery queue metrics
+   */
+  private async getWebhookQueueMetrics(): Promise<{ length: number; active: number; waiting: number }> {
+    const counts = await this.webhookQueue.getJobCounts();
+    return {
+      length: counts.waiting + counts.active + counts.delayed,
+      active: counts.active,
+      waiting: counts.waiting,
+    };
+  }
+
+  /**
+   * Get the total number of jobs in the queue (legacy method)
    */
   private async getQueueLength(): Promise<number> {
-    const counts = await this.workflowQueue.getJobCounts();
-    return counts.waiting + counts.active + counts.delayed;
+    const workflowMetrics = await this.getWorkflowQueueMetrics();
+    const webhookMetrics = await this.getWebhookQueueMetrics();
+    return workflowMetrics.length + webhookMetrics.length;
   }
 
   /**
-   * Get the number of active jobs
+   * Get the number of active jobs (legacy method)
    */
   private async getActiveJobCount(): Promise<number> {
-    const counts = await this.workflowQueue.getJobCounts();
-    return counts.active;
+    const workflowMetrics = await this.getWorkflowQueueMetrics();
+    const webhookMetrics = await this.getWebhookQueueMetrics();
+    return workflowMetrics.active + webhookMetrics.active;
   }
 
   /**
-   * Get the number of waiting jobs
+   * Get the number of waiting jobs (legacy method)
    */
   private async getWaitingJobCount(): Promise<number> {
-    const counts = await this.workflowQueue.getJobCounts();
-    return counts.waiting;
+    const workflowMetrics = await this.getWorkflowQueueMetrics();
+    const webhookMetrics = await this.getWebhookQueueMetrics();
+    return workflowMetrics.waiting + webhookMetrics.waiting;
   }
 
   /**

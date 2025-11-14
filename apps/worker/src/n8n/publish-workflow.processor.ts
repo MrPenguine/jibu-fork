@@ -4,6 +4,7 @@ import { Job } from 'bull';
 import { PrismaService } from '../../../backend/src/core/database/prisma.service';
 import { QUEUE_NAMES, JOB_NAMES, PublishWorkflowJobData } from '@jibu/queue-definitions';
 import { N8nAdminClient } from './n8n-admin.client';
+import { WebhookCacheService } from '@jibu/cache-utils';
 
 @Injectable()
 @Processor(QUEUE_NAMES.WORKFLOW_PUBLISH)
@@ -13,6 +14,7 @@ export class PublishWorkflowProcessor implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly n8nAdmin: N8nAdminClient,
+    private readonly webhookCache: WebhookCacheService,
   ) {}
 
   onModuleInit() {
@@ -188,14 +190,70 @@ export class PublishWorkflowProcessor implements OnModuleInit {
       });
       this.logger.log(`[DIAGNOSTIC] ✅ Step 7 complete: Final status persisted`);
 
+      // Step 8: Invalidate webhook cache and populate with fresh data
+      this.logger.log(`[DIAGNOSTIC] Step 8: Invalidating webhook cache...`);
+      await this.webhookCache.invalidate(workflowId);
+      
+      if (webhookUrl) {
+        // Check if this is a voice workflow
+        const isVoiceWorkflow = await this.isVoiceWorkflow(workflowId);
+        
+        // Add delay for voice workflows to ensure n8n propagation
+        if (isVoiceWorkflow) {
+          this.logger.log(`[DIAGNOSTIC] Voice workflow detected, adding 100ms delay for n8n propagation`);
+          await this.delay(100);
+        }
+        
+        // Populate cache with fresh webhook URL
+        await this.webhookCache.setWebhookUrl(workflowId, webhookUrl, isVoiceWorkflow);
+        this.logger.log(`[DIAGNOSTIC] ✅ Step 8 complete: Cache invalidated and refreshed`);
+      } else {
+        this.logger.log(`[DIAGNOSTIC] ✅ Step 8 complete: Cache invalidated (no webhook URL to cache)`);
+      }
+
       const result = { n8nWorkflowId: liveId, activated: activate, webhookUrl };
       this.logger.log(`[DIAGNOSTIC] 🎉 Publish completed successfully! Result: ${JSON.stringify(result)}`);
       return result;
 
     } catch (error) {
-      this.logger.error(`[DIAGNOSTIC] ❌ Fatal error in publish workflow processor: ${error.message}`, error.stack);
-      throw error;
+      const err = error as Error;
+      this.logger.error(`[DIAGNOSTIC] ❌ Fatal error in publish workflow processor: ${err.message}`, err.stack);
+      throw err;
     }
+  }
+
+  /**
+   * Check if a workflow is voice-enabled
+   */
+  private async isVoiceWorkflow(workflowId: string): Promise<boolean> {
+    try {
+      const workflow = await this.prisma.workflow.findUnique({
+        where: { id: workflowId },
+        include: { 
+          agent: {
+            select: {
+              ttsProvider: true,
+              sttProvider: true,
+            }
+          }
+        },
+      });
+
+      // A workflow is considered voice-enabled if the agent has TTS or STT providers configured
+      return !!(workflow?.agent?.ttsProvider || workflow?.agent?.sttProvider);
+    } catch (error) {
+      this.logger.error(
+        `Failed to check if workflow ${workflowId} is voice-enabled: ${error.message}`
+      );
+      return false; // Default to non-voice on error
+    }
+  }
+
+  /**
+   * Delay helper for voice workflow propagation
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 

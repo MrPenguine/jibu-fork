@@ -1,5 +1,6 @@
 export const WebhookTemplate = {
   parameters: {
+    httpMethod: 'POST', // IMPORTANT: Must be POST for webhook delivery
     path: '{{WEBHOOK_PATH}}',
     options: {},
   },
