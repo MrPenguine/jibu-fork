@@ -6,8 +6,9 @@
     "baseUrl": "../../",
     "paths": {
       "@jibu/queue-definitions": ["libs/queue-definitions/src/index.ts"],
+      "@jibu/cache-utils": ["libs/cache-utils/src/index.ts"],
       "@backend/*": ["apps/backend/src/*"],
       "@worker/*": ["apps/worker/src/*"]
     }
   }
-} 
+}
