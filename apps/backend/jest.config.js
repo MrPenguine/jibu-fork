@@ -3,16 +3,14 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: '<rootDir>/tsconfig.json',
+    }],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
   moduleNameMapper: {
     '^@jibu/cache-utils$': '<rootDir>/../../libs/cache-utils/src/index.ts',
-  },
-  globals: {
-    'ts-jest': {
-      tsConfig: '<rootDir>/tsconfig.json',
-    },
+    '^@jibu/queue-definitions$': '<rootDir>/../../libs/queue-definitions/src/index.ts',
   },
 };

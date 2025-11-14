@@ -2,7 +2,12 @@ import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } fr
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Job } from 'bull';
 import { ConfigService } from '@nestjs/config';
-import { QUEUE_NAMES, JOB_NAMES, WebhookDeliveryJobData } from '@jibu/queue-definitions';
+import { 
+  QUEUE_NAMES, 
+  JOB_NAMES, 
+  WebhookDeliveryJobData,
+  WebhookPayload,
+} from '@jibu/queue-definitions';
 import { WebhookCacheService } from '@jibu/cache-utils';
 import axios, { AxiosError } from 'axios';
 
@@ -76,9 +81,26 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
     const { workflowId, sessionId, payload, isVoice, connectionId, priority } = job.data;
 
     try {
+      // Log payload structure for debugging
       this.logger.log(
-        `Processing webhook delivery job ${job.id} for workflow ${workflowId}, session ${sessionId}, isVoice: ${isVoice}, priority: ${priority}`
+        `Processing webhook delivery job ${job.id} for workflow ${workflowId}, session ${sessionId}, ` +
+        `eventType: ${payload.eventType}, isVoice: ${isVoice}, priority: ${priority}`
       );
+      
+      // Log additional context for voice events
+      if (isVoice && payload.eventType === 'message' && payload.voiceMetadata) {
+        this.logger.debug(
+          `Voice metadata - confidence: ${payload.voiceMetadata.confidence.toFixed(2)}, ` +
+          `language: ${payload.voiceMetadata.language}, duration: ${payload.voiceMetadata.duration}ms`
+        );
+      }
+      
+      if (payload.eventType === 'call' && payload.callEvent) {
+        this.logger.debug(
+          `Call event - type: ${payload.callEvent.type}, from: ${payload.callEvent.from || 'N/A'}, ` +
+          `to: ${payload.callEvent.to || 'N/A'}`
+        );
+      }
 
       // Step 1: Check circuit breaker
       if (this.shouldTriggerCircuitBreaker(workflowId)) {
@@ -108,10 +130,19 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
         throw new Error(`No webhook URL found for workflow ${workflowId}`);
       }
 
-      // Step 3: Deliver payload to webhook
+      // Step 3: Deliver complete structured payload to webhook
       const deliveryStartTime = Date.now();
       const response = await this.deliverWebhook(webhookUrl, payload, isVoice);
       const deliveryDuration = Date.now() - deliveryStartTime;
+      
+      // Log AI context presence for debugging
+      if (payload.aiContext) {
+        this.logger.debug(
+          `AI context included - systemPrompt: ${payload.aiContext.systemPrompt ? 'yes' : 'no'}, ` +
+          `conversationHistory: ${payload.aiContext.conversationHistory.length} messages, ` +
+          `ragContext: ${payload.aiContext.ragContext.results.length} results`
+        );
+      }
 
       // Step 4: Track metrics
       this.deliveryCount++;
@@ -193,17 +224,23 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
   }
 
   /**
-   * Deliver payload to webhook endpoint
+   * Deliver structured payload to webhook endpoint
    * 
    * IMPORTANT: This uses POST method for webhook delivery.
    * Ensure your n8n webhook node is configured to accept POST requests:
    * - HTTP Method: POST (or ALL)
    * - Path: /webhook/your-webhook-id
    * - Webhook must be activated (not in test mode)
+   * 
+   * Payload structure includes:
+   * - Core event data (eventType, sessionId, workflowId, timestamp)
+   * - Message data (text, isVoice, voiceMetadata) OR call event data
+   * - AI context (systemPrompt, conversationHistory, RAG context)
+   * - Connection context (for active voice calls)
    */
   private async deliverWebhook(
     webhookUrl: string,
-    payload: any,
+    payload: WebhookPayload,
     isVoice: boolean
   ): Promise<any> {
     try {
@@ -216,6 +253,8 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
           'Content-Type': 'application/json',
           'User-Agent': 'Jibu-Webhook-Delivery/1.0',
           'X-Jibu-Voice': isVoice ? 'true' : 'false',
+          'X-Jibu-Event-Type': payload.eventType,
+          'X-Jibu-Session-Id': payload.sessionId,
         },
         validateStatus: (status) => status >= 200 && status < 300,
       });

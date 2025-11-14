@@ -1,22 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue, JobOptions } from 'bull';
-import { QUEUE_NAMES, JOB_NAMES, WebhookDeliveryJobData } from '@jibu/queue-definitions';
+import { 
+  QUEUE_NAMES, 
+  JOB_NAMES, 
+  WebhookDeliveryJobData,
+  WebhookPayload,
+  WebhookPriority,
+  VoiceMetadata,
+  CallEventData,
+  AiContext,
+  ConversationMessage,
+  ConnectionContextData,
+} from '@jibu/queue-definitions';
 import { WebhookCacheService } from '@jibu/cache-utils';
 import { ConnectionService } from './connection.service';
-
-/**
- * Priority levels for webhook delivery jobs
- */
-export enum WebhookPriority {
-  VOICE_HIGH = 10, // Voice events (highest priority)
-  VOICE_NORMAL = 5, // Voice events (normal priority)
-  NON_VOICE = 1, // Non-voice workflows
-}
+import { RagContextService } from './rag-context.service';
 
 /**
  * Service for enqueuing webhook delivery jobs
- * Implements voice-specific optimizations and priority handling
+ * Phase 3: Implements complete payload structure with conversation context
+ * Optimized for voice workflows with sub-500ms delivery targets
  */
 @Injectable()
 export class MessageQueueService {
@@ -26,20 +30,23 @@ export class MessageQueueService {
     @InjectQueue(QUEUE_NAMES.WEBHOOK_DELIVERY) private readonly webhookQueue: Queue,
     private readonly cacheService: WebhookCacheService,
     private readonly connectionService: ConnectionService,
+    private readonly ragContextService: RagContextService,
   ) {}
 
   /**
-   * Send a message to a workflow via webhook
-   * This is the primary method for non-voice workflows
+   * Send a text message to a workflow via webhook
+   * Builds complete payload with conversation context
    * @param workflowId - The workflow ID
    * @param sessionId - The session ID
-   * @param payload - The message payload
+   * @param text - The user's message text
+   * @param aiContext - Optional AI context (system prompt, conversation history, etc.)
    * @param options - Optional job options
    */
   async sendMessageToWorkflow(
     workflowId: string,
     sessionId: string,
-    payload: any,
+    text: string,
+    aiContext?: Partial<AiContext>,
     options?: JobOptions
   ): Promise<void> {
     const startTime = Date.now();
@@ -62,24 +69,34 @@ export class MessageQueueService {
         throw new Error(`Circuit breaker open for workflow ${workflowId}`);
       }
 
+      // Build complete webhook payload
+      const payload: WebhookPayload = await this.buildMessagePayload(
+        workflowId,
+        sessionId,
+        text,
+        false, // isVoice
+        undefined, // voiceMetadata
+        aiContext
+      );
+
       // Prepare job data
       const jobData: WebhookDeliveryJobData = {
         workflowId,
         sessionId,
         payload,
         isVoice: false,
-        priority: WebhookPriority.NON_VOICE,
+        priority: WebhookPriority.CHAT_MESSAGES,
       };
 
-      // Enqueue with low priority
+      // Enqueue with chat priority
       const job = await this.webhookQueue.add(JOB_NAMES.DELIVER_WEBHOOK, jobData, {
-        priority: WebhookPriority.NON_VOICE,
+        priority: WebhookPriority.CHAT_MESSAGES,
         ...options,
       });
 
       const duration = Date.now() - startTime;
       this.logger.log(
-        `Message enqueued for workflow ${workflowId}, session ${sessionId}, job ${job.id} in ${duration}ms`
+        `Chat message enqueued for workflow ${workflowId}, session ${sessionId}, job ${job.id} in ${duration}ms`
       );
 
       // Log warning if enqueuing took too long
@@ -99,27 +116,135 @@ export class MessageQueueService {
   }
 
   /**
-   * Send a call event to a voice workflow via webhook
-   * This method has higher priority and stricter latency requirements
+   * Send a voice message to a workflow via webhook
+   * Includes voice metadata and optimized for sub-500ms delivery
    * @param workflowId - The workflow ID
    * @param sessionId - The session ID
-   * @param payload - The call event payload
+   * @param text - The transcribed text
+   * @param voiceMetadata - Voice quality metrics
+   * @param aiContext - Optional AI context
    * @param connectionId - Optional connection ID for tracking
-   * @param highPriority - Whether this is a high-priority event (default true)
+   * @param options - Optional job options
+   */
+  async sendVoiceMessageToWorkflow(
+    workflowId: string,
+    sessionId: string,
+    text: string,
+    voiceMetadata: VoiceMetadata,
+    aiContext?: Partial<AiContext>,
+    connectionId?: string,
+    options?: JobOptions
+  ): Promise<void> {
+    const startTime = Date.now();
+
+    try {
+      // Pre-warm cache for voice workflow
+      const webhookUrl = await this.cacheService.getWebhookUrl(workflowId, true);
+      
+      if (!webhookUrl) {
+        this.logger.warn(
+          `Webhook URL not in cache for voice workflow ${workflowId}, will be fetched by worker`
+        );
+      }
+
+      // Check circuit breaker
+      if (this.cacheService.shouldTriggerCircuitBreaker(workflowId)) {
+        this.logger.error(
+          `Circuit breaker triggered for voice workflow ${workflowId}, rejecting message`
+        );
+        throw new Error(`Circuit breaker open for workflow ${workflowId}`);
+      }
+
+      // Validate connection context if provided
+      let connectionContext: ConnectionContextData | undefined;
+      if (connectionId) {
+        const connection = await this.connectionService.getConnection(connectionId);
+        if (connection && connection.isActive) {
+          connectionContext = {
+            startTime: connection.startTime,
+            callSid: connection.callSid || '',
+          };
+        }
+      }
+
+      // Build complete webhook payload
+      const payload: WebhookPayload = await this.buildMessagePayload(
+        workflowId,
+        sessionId,
+        text,
+        true, // isVoice
+        voiceMetadata,
+        aiContext,
+        connectionContext
+      );
+
+      // Prepare job data with voice priority
+      const jobData: WebhookDeliveryJobData = {
+        workflowId,
+        sessionId,
+        payload,
+        isVoice: true,
+        connectionId,
+        priority: WebhookPriority.VOICE_MESSAGES,
+      };
+
+      // Enqueue with voice message priority
+      const job = await this.webhookQueue.add(JOB_NAMES.DELIVER_WEBHOOK, jobData, {
+        priority: WebhookPriority.VOICE_MESSAGES,
+        attempts: 2, // Only 2 attempts for voice
+        timeout: 5000, // 5-second timeout
+        ...options,
+      });
+
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `Voice message enqueued for workflow ${workflowId}, session ${sessionId}, job ${job.id} in ${duration}ms`
+      );
+
+      // Log warning if enqueuing exceeded voice threshold
+      if (duration > 50) {
+        this.logger.warn(
+          `Voice message enqueuing exceeded target latency: ${duration}ms (target < 50ms)`
+        );
+      }
+
+      // Update connection heartbeat if provided
+      if (connectionId) {
+        await this.connectionService.updateHeartbeat(connectionId);
+      }
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `Failed to enqueue voice message for workflow ${workflowId}: ${err.message}`,
+        err.stack
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Send a call event to a voice workflow via webhook
+   * Highest priority for call lifecycle events (incoming, answered, hangup)
+   * @param workflowId - The workflow ID
+   * @param sessionId - The session ID
+   * @param callEvent - The call event data
+   * @param aiContext - Optional AI context
+   * @param connectionId - Optional connection ID for tracking
    * @param options - Optional job options
    */
   async sendCallEventToWorkflow(
     workflowId: string,
     sessionId: string,
-    payload: any,
+    callEvent: CallEventData,
+    aiContext?: Partial<AiContext>,
     connectionId?: string,
-    highPriority: boolean = true,
     options?: JobOptions
   ): Promise<void> {
     const startTime = Date.now();
 
     try {
       // Validate connection context if provided
+      let connectionContext: ConnectionContextData | undefined;
       if (connectionId) {
         const connection = await this.connectionService.getConnection(connectionId);
         
@@ -131,6 +256,11 @@ export class MessageQueueService {
           this.logger.warn(
             `Connection ${connectionId} is not active, event may be rejected`
           );
+        } else {
+          connectionContext = {
+            startTime: connection.startTime,
+            callSid: connection.callSid || '',
+          };
         }
       }
 
@@ -151,20 +281,28 @@ export class MessageQueueService {
         throw new Error(`Circuit breaker open for workflow ${workflowId}`);
       }
 
-      // Prepare job data with high priority
-      const priority = highPriority ? WebhookPriority.VOICE_HIGH : WebhookPriority.VOICE_NORMAL;
+      // Build complete webhook payload for call event
+      const payload: WebhookPayload = await this.buildCallEventPayload(
+        workflowId,
+        sessionId,
+        callEvent,
+        aiContext,
+        connectionContext
+      );
+
+      // Prepare job data with highest priority
       const jobData: WebhookDeliveryJobData = {
         workflowId,
         sessionId,
         payload,
         isVoice: true,
         connectionId,
-        priority,
+        priority: WebhookPriority.VOICE_EVENTS,
       };
 
-      // Enqueue with high priority
+      // Enqueue with highest priority
       const job = await this.webhookQueue.add(JOB_NAMES.DELIVER_WEBHOOK, jobData, {
-        priority,
+        priority: WebhookPriority.VOICE_EVENTS,
         attempts: 2, // Only 2 attempts for voice
         timeout: 5000, // 5-second timeout
         ...options,
@@ -172,13 +310,13 @@ export class MessageQueueService {
 
       const duration = Date.now() - startTime;
       this.logger.log(
-        `Voice event enqueued for workflow ${workflowId}, session ${sessionId}, job ${job.id} in ${duration}ms`
+        `Call event (${callEvent.type}) enqueued for workflow ${workflowId}, session ${sessionId}, job ${job.id} in ${duration}ms`
       );
 
       // Log warning if enqueuing exceeded voice threshold
       if (duration > 50) {
         this.logger.warn(
-          `Voice event enqueuing exceeded target latency: ${duration}ms (target < 50ms)`
+          `Call event enqueuing exceeded target latency: ${duration}ms (target < 50ms)`
         );
       }
 
@@ -189,11 +327,99 @@ export class MessageQueueService {
     } catch (error) {
       const err = error as Error;
       this.logger.error(
-        `Failed to enqueue voice event for workflow ${workflowId}: ${err.message}`,
+        `Failed to enqueue call event for workflow ${workflowId}: ${err.message}`,
         err.stack
       );
       throw error;
     }
+  }
+
+  /**
+   * Build complete message payload with conversation context
+   * Private helper method for payload assembly
+   */
+  private async buildMessagePayload(
+    workflowId: string,
+    sessionId: string,
+    text: string,
+    isVoice: boolean,
+    voiceMetadata?: VoiceMetadata,
+    aiContext?: Partial<AiContext>,
+    connectionContext?: ConnectionContextData
+  ): Promise<WebhookPayload> {
+    // Get RAG context (currently returns empty placeholder)
+    const ragContext = await this.ragContextService.getRagContext(text);
+
+    // Build complete AI context
+    const completeAiContext: AiContext = {
+      systemPrompt: aiContext?.systemPrompt || '',
+      systemMessage: aiContext?.systemMessage || '',
+      conversationHistory: aiContext?.conversationHistory || [],
+      ragContext,
+    };
+
+    // Assemble complete payload
+    const payload: WebhookPayload = {
+      eventType: 'message',
+      sessionId,
+      workflowId,
+      timestamp: Date.now(),
+      text,
+      isVoice,
+      aiContext: completeAiContext,
+    };
+
+    // Add voice metadata if provided
+    if (voiceMetadata) {
+      payload.voiceMetadata = voiceMetadata;
+    }
+
+    // Add connection context if provided
+    if (connectionContext) {
+      payload.connectionContext = connectionContext;
+    }
+
+    return payload;
+  }
+
+  /**
+   * Build complete call event payload
+   * Private helper method for call event assembly
+   */
+  private async buildCallEventPayload(
+    workflowId: string,
+    sessionId: string,
+    callEvent: CallEventData,
+    aiContext?: Partial<AiContext>,
+    connectionContext?: ConnectionContextData
+  ): Promise<WebhookPayload> {
+    // Get RAG context (currently returns empty placeholder)
+    const ragContext = await this.ragContextService.getRagContext('');
+
+    // Build complete AI context
+    const completeAiContext: AiContext = {
+      systemPrompt: aiContext?.systemPrompt || '',
+      systemMessage: aiContext?.systemMessage || '',
+      conversationHistory: aiContext?.conversationHistory || [],
+      ragContext,
+    };
+
+    // Assemble complete payload
+    const payload: WebhookPayload = {
+      eventType: 'call',
+      sessionId,
+      workflowId,
+      timestamp: Date.now(),
+      callEvent,
+      aiContext: completeAiContext,
+    };
+
+    // Add connection context if provided
+    if (connectionContext) {
+      payload.connectionContext = connectionContext;
+    }
+
+    return payload;
   }
 
   /**
