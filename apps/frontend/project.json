@@ -35,6 +35,11 @@
         "production": {
           "buildTarget": "frontend:build:production",
           "dev": false
+        },
+        "admin": {
+          "buildTarget": "frontend:build:development",
+          "dev": true,
+          "port": 3005
         }
       }
     },

@@ -84,9 +84,17 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If user is signed in and they're trying to access the login or signup page, redirect to workspace
+  // SKIP this redirect for admin routes (they're on a separate port for testing)
   if (
     user &&
-    (path === '/' || path === '/login' || path === '/signup')
+    (path === '/' || path === '/login' || path === '/signup') &&
+    !path.startsWith('/credentials') &&
+    !path.startsWith('/users') &&
+    !path.startsWith('/workspaces') &&
+    !path.startsWith('/billing') &&
+    !path.startsWith('/analytics') &&
+    !path.startsWith('/logs') &&
+    !path.startsWith('/settings')
   ) {
     const redirectUrl = request.nextUrl.clone()
     try {
