@@ -31,6 +31,34 @@ describe('Webhook Payload Structure Integration Tests', () => {
   const TEST_WEBHOOK_URL = 'http://localhost:5678/webhook/api/n8n/hooks/c3c8482b-e019-483f-b5fa-86ac25fa9889/4';
   const TEST_WORKFLOW_URL = 'http://localhost:5678/workflow/WLEvJsev2IeGThNc';
 
+  // Mock Redis in-memory storage
+  const mockRedisData: Record<string, string> = {};
+
+  // Mock RedisService for tests
+  class MockRedisService {
+    async get(key: string): Promise<string | null> {
+      return mockRedisData[key] || null;
+    }
+
+    async set(key: string, value: string, expirySeconds?: number): Promise<boolean> {
+      mockRedisData[key] = value;
+      return true;
+    }
+
+    async del(key: string): Promise<boolean> {
+      delete mockRedisData[key];
+      return true;
+    }
+
+    async exists(key: string): Promise<boolean> {
+      return key in mockRedisData;
+    }
+
+    async disconnect(): Promise<void> {
+      // No-op for mock
+    }
+  }
+
   beforeAll(async () => {
     module = await Test.createTestingModule({
       imports: [
@@ -51,8 +79,14 @@ describe('Webhook Payload Structure Integration Tests', () => {
         RagContextService,
         ConnectionService,
         WebhookCacheService,
-        RedisService,
-        { provide: REDIS_SERVICE_TOKEN, useExisting: RedisService },
+        {
+          provide: RedisService,
+          useClass: MockRedisService,
+        },
+        {
+          provide: REDIS_SERVICE_TOKEN,
+          useExisting: RedisService,
+        },
       ],
     }).compile();
 
@@ -64,6 +98,21 @@ describe('Webhook Payload Structure Integration Tests', () => {
 
     // Pre-warm webhook URL cache
     await webhookCacheService.setWebhookUrl(TEST_WORKFLOW_ID, TEST_WEBHOOK_URL, true);
+  });
+
+  beforeEach(() => {
+    // Clear mock Redis data between tests to avoid cross-test contamination
+    Object.keys(mockRedisData).forEach(key => delete mockRedisData[key]);
+    
+    // Re-set webhook URL for each test as JSON string (WebhookCacheService expects CachedWebhookUrl object)
+    const cachedWebhookUrl = {
+      webhookUrl: TEST_WEBHOOK_URL,
+      workflowId: TEST_WORKFLOW_ID,
+      resolvedAt: Date.now(),
+      isVoiceWorkflow: true,
+    };
+    mockRedisData[`webhook:url:${TEST_WORKFLOW_ID}`] = JSON.stringify(cachedWebhookUrl);
+    mockRedisData[`voice:webhook:url:${TEST_WORKFLOW_ID}`] = JSON.stringify(cachedWebhookUrl);
   });
 
   afterAll(async () => {
