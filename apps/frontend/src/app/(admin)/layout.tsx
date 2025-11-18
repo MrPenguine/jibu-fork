@@ -23,8 +23,13 @@ export default function AdminLayout({
   
   // Get current page title from pathname
   const pageTitle = useMemo(() => {
+    if (!pathname) return 'Cockpit View';
+
     const parts = pathname.split('/').filter(Boolean);
+    if (parts.length === 0) return 'Cockpit View';
+
     const lastPart = parts[parts.length - 1];
+    if (!lastPart) return 'Cockpit View';
     
     if (lastPart === 'admin') return 'Cockpit View';
     if (lastPart === 'credentials') return 'Platform Credentials';

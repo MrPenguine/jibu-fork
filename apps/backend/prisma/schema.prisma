@@ -35,6 +35,14 @@ model User {
   onboardingStatus OnboardingStatus? // Relation to onboarding status
   apiKeys          ApiKey[]
 
+  isAdmin          Boolean                  @default(false)
+  adminRole        String?
+  isSuspended      Boolean                  @default(false)
+  suspendedAt      DateTime?
+  suspensionReason String?
+
+  adminAuditLogs   AdminAuditLog[]          @relation("AdminActions")
+
   @@index([lastWorkspaceId])
 }
 
@@ -63,6 +71,14 @@ model Workspace {
   webhooks             Webhook[]
   webhookInvocations   WebhookInvocation[]
   assistants           Assistant[] // Assistants belonging to this workspace
+
+  subscription         Subscription?
+  usageRecords         UsageRecord[]
+
+  isSuspended          Boolean   @default(false)
+  suspendedAt          DateTime?
+  suspendedBy          String?
+  suspensionReason     String?
 
   @@index([id])
 }
@@ -429,6 +445,7 @@ model Agent {
   n8nWorkflow    N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
   chats          Chat[]
   sessions       AgentSession[]
+  usageRecords   UsageRecord[]
   apiKeys        ApiKey[]
   workflows      Workflow[]
   assistants     Assistant[] // Added back-relation to Assistant
@@ -653,4 +670,90 @@ model WebhookInvocation {
   @@index([webhookId])
   @@index([workspaceId])
   @@index([status])
+}
+
+model Plan {
+  id              String         @id @default(cuid())
+  name            String         // "Starter", "Pro", "Enterprise"
+  priceMonthly    Float?         // null for custom enterprise plans
+  priceYearly     Float?
+  creditsIncluded Int            // e.g., 10_000 credits per month
+  features        Json           // { "apiAccess": true, "customVoices": false }
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  subscriptions   Subscription[]
+}
+
+model Subscription {
+  id               String     @id @default(cuid())
+  workspaceId      String     @unique
+  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  planId           String
+  plan             Plan       @relation(fields: [planId], references: [id])
+
+  status           String     // "active", "trialing", "past_due", "canceled"
+  stripeCustomerId String?    @unique
+  stripeSubId      String?    @unique
+
+  currentPeriodEnd DateTime
+
+  // Credits / limits
+  creditsUsed      Int        @default(0)
+  creditsLimit     Int?
+
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([workspaceId])
+  @@index([planId])
+  @@index([status])
+}
+
+model UsageRecord {
+  id             String     @id @default(cuid())
+
+  workspaceId    String
+  workspace      Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  agentId        String?
+  agent          Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  type           String     // "LLM_TOKENS" | "TTS_CHARACTERS" | "STT_SECONDS" | "CALL_MINUTES"
+  provider       String     // "OPENAI", "ELEVENLABS", "DEEPGRAM", etc.
+  modelUsed      String?    // "gpt-4o", "eleven_turbo_v2", etc.
+  unitsConsumed  Float      // 1500 (tokens), 2500 (characters), 60 (seconds)
+  costInMicroUSD Int        // Cost in millionths of USD (e.g., $0.01 = 10000)
+
+  sessionId      String?    // Link to AgentSession or Chat for debugging
+
+  timestamp      DateTime   @default(now())
+
+  @@index([workspaceId, timestamp])
+  @@index([type, timestamp])
+  @@index([agentId, timestamp])
+  @@index([provider, timestamp])
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+
+  adminUserId String
+  adminUser   User     @relation("AdminActions", fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  action      String   // "SUSPEND_USER", "VIEW_WORKSPACE", "UPDATE_PLAN", etc.
+  targetType  String?  // "User" | "Workspace" | "Plan" | ...
+  targetId    String?
+  details     Json?    // Additional context about the action
+  ipAddress   String?
+  userAgent   String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@index([action])
 }

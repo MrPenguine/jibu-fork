@@ -9,6 +9,7 @@ import { JwtAuthGuard } from '../core/auth/guards/jwt-auth.guard';
 import { V1Module } from '../modules/v1/v1.module';
 import { EncryptionModule } from '../core/encryption/encryption.module';
 import { RedisModule } from '../core/redis/redis.module';
+import { AdminModule } from '../modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { RedisModule } from '../core/redis/redis.module';
     AuthModule,
     V1Module,
     RedisModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

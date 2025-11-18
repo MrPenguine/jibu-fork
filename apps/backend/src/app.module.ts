@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { V1Module } from './modules/v1/v1.module';
 import { RedisModule } from './core/redis/redis.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { ChatModule } from './modules/chat/chat.module';
     RedisModule,
     V1Module,
     ChatModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

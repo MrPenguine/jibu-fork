@@ -4,7 +4,10 @@ import { createServerClient } from '@supabase/ssr'
 import { API_BASE_URL } from '../../../../utils/api'
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const url = new URL(request.url)
+  const { searchParams, origin } = url
+  const host = url.host
+  const isAdminHost = host.includes('3005') || host.startsWith('admin.')
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
 
@@ -59,6 +62,9 @@ export async function GET(request: Request) {
         const data = await resp.json()
         const workspaceId = data?.organization?.id
         if (workspaceId) {
+          if (isAdminHost) {
+            return NextResponse.redirect(`${origin}/`)
+          }
           return NextResponse.redirect(`${origin}/workspace/${workspaceId}`)
         }
       }

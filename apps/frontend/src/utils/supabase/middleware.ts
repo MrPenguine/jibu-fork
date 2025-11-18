@@ -45,6 +45,15 @@ export async function updateSession(request: NextRequest) {
 
   // Get the pathname from the URL
   const path = request.nextUrl.pathname
+  const host = request.headers.get('host') || request.nextUrl.host
+  const isAdminHost = !!host && (host.includes('3005') || host.startsWith('admin.'))
+
+  // Hard-separate admin host from workspace UI: on admin host, never serve /workspace routes
+  if (isAdminHost && (path === '/workspace' || path.startsWith('/workspace/'))) {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = '/'
+    return NextResponse.redirect(redirectUrl)
+  }
 
   // Legacy redirects for removed /auth routes
   if (path === '/auth' || path === '/auth/') {
@@ -87,6 +96,7 @@ export async function updateSession(request: NextRequest) {
   // SKIP this redirect for admin routes (they're on a separate port for testing)
   if (
     user &&
+    !isAdminHost &&
     (path === '/' || path === '/login' || path === '/signup') &&
     !path.startsWith('/credentials') &&
     !path.startsWith('/users') &&
