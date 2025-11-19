@@ -349,11 +349,12 @@ export class KnowledgeBaseController {
     
       // Call service method to link the file
       const source = await this.knowledgeBaseService.linkFileSource(
-      id,
-      linkFileSourceDto.fileId,
-      orgId,
-      userId,
-    );
+        id,
+        linkFileSourceDto.fileId,
+        orgId,
+        userId,
+        linkFileSourceDto.folderId,
+      );
       
       this.logger.log(`Successfully linked file to KB: ${JSON.stringify({
         sourceId: source.id,
@@ -396,12 +397,26 @@ export class KnowledgeBaseController {
     @Req() req, 
     @Param('sourceId') sourceId: string,
   ) {
-    const orgId = req.user.orgId;
-    const userId = req.user.userId;
+    // Get orgId from headers first, then fallback to user token
+    let orgId = req.headers['x-workspace-id'] || req.headers['organization-id'];
+    const userId = req.user.userId || req.user.id;
+    
+    // Fallback to user token
+    if (!orgId) {
+      orgId = req.user.orgId;
+      if (orgId) {
+        this.logger.log(`Using orgId from user token (fallback): ${orgId}`);
+      }
+    } else {
+      this.logger.log(`Using orgId from header: ${orgId}`);
+    }
     
     if (!orgId) {
-      throw new Error('Organization ID is required');
+      this.logger.error('No organization ID provided in request');
+      throw new NotFoundException('Organization ID is required');
     }
+    
+    this.logger.log(`Unlinking source ${sourceId} for workspace ${orgId}`);
     
     return this.knowledgeBaseService.unlinkFileSource(sourceId, orgId, userId);
   }
@@ -470,6 +485,102 @@ export class KnowledgeBaseController {
       
       throw error; // Let NestJS handle the error
     }
+  }
+
+  @Post(':kbId/folders')
+  @ApiOperation({ summary: 'Create a folder in workspace for knowledge base organization' })
+  @ApiResponse({ status: 201, description: 'Folder created' })
+  @ApiResponse({ status: 404, description: 'Knowledge base not found' })
+  @ApiParam({ name: 'kbId', description: 'Knowledge Base ID' })
+  async createFolder(
+    @Req() req,
+    @Param('kbId') kbId: string,
+    @Body() body: { name: string },
+  ) {
+    const name = body?.name;
+    if (!name || typeof name !== 'string') {
+      throw new NotFoundException('Folder name is required');
+    }
+
+    let orgId = req.headers['x-workspace-id'] || req.headers['organization-id'] || req.headers['x-force-organization-id'] || req.user.orgId;
+
+    if (!orgId) {
+      throw new NotFoundException('Organization ID is required');
+    }
+
+    // @ts-ignore - PrismaClient models are not properly typed
+    const knowledgeBase = await this.prisma.knowledgeBase.findFirst({ where: { id: kbId, workspaceId: orgId } });
+    if (!knowledgeBase) {
+      throw new NotFoundException(`Knowledge base with ID ${kbId} not found for organization ${orgId}`);
+    }
+
+    // @ts-ignore - PrismaClient models are not properly typed
+    const folder = await this.prisma.folder.create({ data: { name, workspaceId: orgId } });
+    return { id: folder.id, name: folder.name, workspaceId: folder.workspaceId };
+  }
+
+  @Get(':kbId/folders')
+  @ApiOperation({ summary: 'List folders in workspace for knowledge base organization' })
+  @ApiResponse({ status: 200, description: 'Folders list' })
+  @ApiResponse({ status: 404, description: 'Knowledge base not found' })
+  @ApiParam({ name: 'kbId', description: 'Knowledge Base ID' })
+  async listFolders(
+    @Req() req,
+    @Param('kbId') kbId: string,
+  ) {
+    let orgId = req.headers['x-workspace-id'] || req.headers['organization-id'] || req.headers['x-force-organization-id'] || req.user.orgId;
+
+    if (!orgId) {
+      throw new NotFoundException('Organization ID is required');
+    }
+
+    // @ts-ignore - PrismaClient models are not properly typed
+    const knowledgeBase = await this.prisma.knowledgeBase.findFirst({ where: { id: kbId, workspaceId: orgId } });
+    if (!knowledgeBase) {
+      throw new NotFoundException(`Knowledge base with ID ${kbId} not found for organization ${orgId}`);
+    }
+
+    // @ts-ignore - PrismaClient models are not properly typed
+    const folders = await this.prisma.folder.findMany({ where: { workspaceId: orgId }, select: { id: true, name: true } });
+    return folders;
+  }
+
+  @Delete(':kbId/folders/:folderId')
+  @ApiOperation({ summary: 'Delete a folder' })
+  @ApiResponse({ status: 200, description: 'Folder deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Folder or knowledge base not found' })
+  @ApiParam({ name: 'kbId', description: 'Knowledge Base ID' })
+  @ApiParam({ name: 'folderId', description: 'Folder ID' })
+  async deleteFolder(
+    @Req() req,
+    @Param('kbId') kbId: string,
+    @Param('folderId') folderId: string,
+  ) {
+    let orgId = req.headers['x-workspace-id'] || req.headers['organization-id'] || req.headers['x-force-organization-id'] || req.user.orgId;
+
+    if (!orgId) {
+      throw new NotFoundException('Organization ID is required');
+    }
+
+    // Verify KB exists and belongs to workspace
+    // @ts-ignore - PrismaClient models are not properly typed
+    const knowledgeBase = await this.prisma.knowledgeBase.findFirst({ where: { id: kbId, workspaceId: orgId } });
+    if (!knowledgeBase) {
+      throw new NotFoundException(`Knowledge base with ID ${kbId} not found for organization ${orgId}`);
+    }
+
+    // Verify folder exists and belongs to workspace
+    // @ts-ignore - PrismaClient models are not properly typed
+    const folder = await this.prisma.folder.findFirst({ where: { id: folderId, workspaceId: orgId } });
+    if (!folder) {
+      throw new NotFoundException(`Folder with ID ${folderId} not found for organization ${orgId}`);
+    }
+
+    // Delete the folder (cascade will handle related records if configured)
+    // @ts-ignore - PrismaClient models are not properly typed
+    await this.prisma.folder.delete({ where: { id: folderId } });
+
+    return { success: true, message: 'Folder deleted successfully' };
   }
 
   @Post(':id/sources/:sourceId/index')

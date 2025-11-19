@@ -513,4 +513,52 @@ export async function deleteFile(fileId: string, specificWorkspaceId?: string, s
     console.error('[deleteFile] Error deleting file:', error);
     throw error;
   }
-} 
+}
+
+/**
+ * Get download URL for a file
+ * @param fileId The ID of the file to get download URL for
+ * @param specificWorkspaceId Optional workspace ID to override the auto-detection
+ */
+export async function getFileDownloadUrl(fileId: string, specificWorkspaceId?: string): Promise<string> {
+  try {
+    console.log('[getFileDownloadUrl] Getting download URL for file:', fileId);
+    
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      throw new Error('No active session');
+    }
+    
+    // Get workspace ID using our helper function
+    const workspaceId = getActiveWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      throw new Error('No active workspace');
+    }
+    
+    console.log('[getFileDownloadUrl] Using workspace ID:', workspaceId);
+    
+    const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+        'X-Workspace-ID': workspaceId,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[getFileDownloadUrl] Error response:', errorText);
+      throw new Error(`Failed to get download URL: ${response.status}`);
+    }
+
+    const { downloadUrl } = await response.json();
+    console.log('[getFileDownloadUrl] Got download URL');
+    return downloadUrl;
+  } catch (error) {
+    console.error('[getFileDownloadUrl] Error:', error);
+    throw error;
+  }
+}

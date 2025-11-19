@@ -172,6 +172,7 @@ model Folder {
   agents         Agent[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  knowledgeBaseSources KnowledgeBaseSource[]
 }
 
 model ApiKey {
@@ -230,9 +231,11 @@ model KnowledgeBaseSource {
   sourcePointer     String // Stores File ID for sourceType='file'
   indexingStatus    String          @default("PENDING")
   hasIndexedContent Boolean         @default(false)
+  folderId          String?
   knowledgeBase     KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   file              File            @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
+  folder            Folder?         @relation(fields: [folderId], references: [id])
   chunks            ChunkMetadata[] // Relation to chunks
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -240,6 +243,7 @@ model KnowledgeBaseSource {
   @@index([knowledgeBaseId])
   @@index([workspaceId])
   @@index([sourcePointer])
+  @@index([folderId])
 }
 
 model ChunkMetadata {

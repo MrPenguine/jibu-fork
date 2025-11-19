@@ -1,6 +1,7 @@
 export * from './KnowledgeBaseHeader';
 export * from './KnowledgeBaseList';
 export * from './KnowledgeBaseEmptyState';
+export * from './FolderCard';
 export * from './dialogs/CreateFolderDialog';
 export * from './dialogs/UrlImportDialog';
 export * from './dialogs/SitemapImportDialog';

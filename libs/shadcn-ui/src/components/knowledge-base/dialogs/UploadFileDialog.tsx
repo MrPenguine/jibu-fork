@@ -18,9 +18,12 @@ interface UploadFileDialogProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onImport: (payload: UploadFilePayload) => void;
+  folders?: { id: string; name: string }[];
+  onOpenCreateFolder?: () => void;
+  preselectedFolderId?: string;
 }
 
-export function UploadFileDialog({ open, onOpenChange, onImport }: UploadFileDialogProps) {
+export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], onOpenCreateFolder, preselectedFolderId }: UploadFileDialogProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [chunking, setChunking] = useState<ChunkingStrategyKey[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
@@ -41,10 +44,24 @@ export function UploadFileDialog({ open, onOpenChange, onImport }: UploadFileDia
       setFiles([]);
       setChunking([]);
       setFolderId(undefined);
+    } else if (preselectedFolderId) {
+      // Set the preselected folder when dialog opens
+      setFolderId(preselectedFolderId);
     }
-  }, [open]);
+  }, [open, preselectedFolderId]);
+
+  useEffect(() => {
+    console.log('[UploadFileDialog] Folders prop updated:', folders);
+  }, [folders]);
+
+  const handleFolderChange = (value: string) => {
+    console.log('[UploadFileDialog] Folder selected:', value);
+    setFolderId(value);
+  };
 
   const handleImport = () => {
+    console.log('[UploadFileDialog] Importing with folderId:', folderId);
+    console.log('[UploadFileDialog] Available folders:', folders);
     onImport({ files, chunkingStrategy: chunking.join(","), folderId });
   };
 
@@ -81,22 +98,25 @@ export function UploadFileDialog({ open, onOpenChange, onImport }: UploadFileDia
 
           {/* Folder */}
           <div className="grid gap-2">
-            <Label htmlFor="kb-folder">Folder</Label>
-            <Select value={folderId} onValueChange={setFolderId}>
+            <Label htmlFor="kb-folder">Folder ({folders?.length || 0} available)</Label>
+            <Select value={folderId} onValueChange={handleFolderChange}>
               <SelectTrigger id="kb-folder">
                 <SelectValue placeholder="Select folder" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All data sources</SelectItem>
+                {folders && folders.length > 0 ? (
+                  folders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">No folders available</div>
+                )}
               </SelectContent>
             </Select>
             <button
               type="button"
               className="self-start text-sm text-blue-600 hover:underline"
-              onClick={() => {
-                const name = window.prompt("Enter folder name");
-                if (name) console.log("Create folder:", name);
-              }}
+              onClick={() => onOpenCreateFolder?.()}
             >
               Create folder
             </button>

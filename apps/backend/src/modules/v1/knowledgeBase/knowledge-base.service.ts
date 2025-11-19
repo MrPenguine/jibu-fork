@@ -154,7 +154,7 @@ export class KnowledgeBaseService {
   /**
    * Link a file as a source to a knowledge base
    */
-  async linkFileSource(knowledgeBaseId: string, fileId: string, workspaceId: string, userId: string) {
+  async linkFileSource(knowledgeBaseId: string, fileId: string, workspaceId: string, userId: string, folderId?: string) {
     try {
       await this.findKnowledgeBaseById(knowledgeBaseId, workspaceId);
 
@@ -181,7 +181,18 @@ export class KnowledgeBaseService {
 
       this.logger.log(`Found file: ${JSON.stringify(file)}`);
 
-      const source = await this.createSourceForFile(knowledgeBaseId, workspaceId, file);
+      // Optional folder validation
+      if (folderId) {
+        const folder = await this.prisma.folder.findFirst({
+          where: { id: folderId, workspaceId },
+        });
+        if (!folder) {
+          this.logger.warn(`Folder with ID ${folderId} not found for workspace ${workspaceId}`);
+          throw new NotFoundException(`Folder ${folderId} not found`);
+        }
+      }
+
+      const source = await this.createSourceForFile(knowledgeBaseId, workspaceId, file, folderId);
 
       this.logger.log(`Created source: ${JSON.stringify(source)}`);
 
@@ -195,7 +206,7 @@ export class KnowledgeBaseService {
   /**
    * Helper to create a source for a file
    */
-  private async createSourceForFile(knowledgeBaseId: string, workspaceId: string, file: any) {
+  private async createSourceForFile(knowledgeBaseId: string, workspaceId: string, file: any, folderId?: string) {
     try {
       this.logger.log(`Creating source for file ${file.id} in knowledge base ${knowledgeBaseId}`);
 
@@ -206,6 +217,7 @@ export class KnowledgeBaseService {
           sourcePointer: file.id,
           workspaceId: workspaceId,
           indexingStatus: 'PENDING',
+          ...(folderId && { folderId }),
         },
       });
 
@@ -298,6 +310,7 @@ export class KnowledgeBaseService {
             sizeBytes: true,
           },
         },
+        folder: { select: { id: true, name: true } },
       },
     });
   }

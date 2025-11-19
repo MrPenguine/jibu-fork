@@ -15,6 +15,85 @@ export interface KnowledgeBase {
   workspaceId: string;
 }
 
+export async function listFoldersForKb(knowledgeBaseId: string, specificWorkspaceId?: string): Promise<{ id: string; name: string }[]> {
+  try {
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      return [];
+    }
+    const headers = await getAuthHeaders(workspaceId);
+    const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/folders`, {
+      method: 'GET',
+      headers,
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function createFolderForKb(knowledgeBaseId: string, name: string, specificWorkspaceId?: string): Promise<{ id: string; name: string; workspaceId: string } | null> {
+  try {
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      return null;
+    }
+    const headers = await getAuthHeaders(workspaceId);
+    const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/folders`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name }),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function deleteFolderForKb(knowledgeBaseId: string, folderId: string, specificWorkspaceId?: string): Promise<boolean> {
+  try {
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      return false;
+    }
+    const headers = await getAuthHeaders(workspaceId);
+    const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/folders/${folderId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    return response.ok;
+  } catch (e) {
+    console.error('Error deleting folder:', e);
+    return false;
+  }
+}
+
+export async function deleteSourceFromKb(knowledgeBaseId: string, sourceId: string, specificWorkspaceId?: string): Promise<boolean> {
+  try {
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    if (!workspaceId) {
+      return false;
+    }
+    const headers = await getAuthHeaders(workspaceId);
+    // Note: The backend endpoint is /v1/knowledge-bases/sources/:sourceId (without kbId in path)
+    const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/sources/${sourceId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    return response.ok;
+  } catch (e) {
+    console.error('Error deleting source:', e);
+    return false;
+  }
+}
+
 export interface KnowledgeBaseSource {
   id: string;
   sourceId: string;
@@ -320,7 +399,8 @@ export async function listKnowledgeBaseSources(knowledgeBaseId: string, specific
 export async function linkFileToKnowledgeBase(
   knowledgeBaseId: string,
   fileId: string,
-  specificWorkspaceId?: string
+  specificWorkspaceId?: string,
+  folderId?: string
 ): Promise<KnowledgeBaseSource> {
   try {
     // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
@@ -342,20 +422,44 @@ export async function linkFileToKnowledgeBase(
     }
     
             console.log(`[linkFileToKnowledgeBase] Linking file ${fileId} to knowledge base ${knowledgeBaseId} in workspace ${workspaceId}`);
+    if (folderId) {
+      console.log(`[linkFileToKnowledgeBase] With folder ID: ${folderId}`);
+    }
     
     // Get auth headers with the workspace ID
         const headers = await getAuthHeaders(workspaceId);
+    
+    // Build request body - only include folderId if it's a non-empty string
+    const requestBody: any = {
+      fileId,
+      workspaceId: workspaceId,
+      sourceType: 'file',
+      indexingStatus: 'PENDING',
+    };
+    
+    // Only add folderId if it's a valid non-empty string and matches expected format
+    if (folderId && folderId.trim() !== '') {
+      const trimmedFolderId = folderId.trim();
+      // UUID format: 8-4-4-4-12 characters
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      // CUID format: c + alphanumeric
+      const cuidRegex = /^c[a-z0-9]{24,}$/i;
+      
+      if (uuidRegex.test(trimmedFolderId) || cuidRegex.test(trimmedFolderId)) {
+        requestBody.folderId = trimmedFolderId;
+        console.log(`[linkFileToKnowledgeBase] Including folderId in request: ${trimmedFolderId}`);
+      } else {
+        console.warn(`[linkFileToKnowledgeBase] Invalid folderId format, excluding from request: ${trimmedFolderId}`);
+      }
+    }
+    
+    console.log(`[linkFileToKnowledgeBase] Request body:`, requestBody);
     
     // Call the backend API directly
     const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/sources`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        fileId,
-        workspaceId: workspaceId,
-        sourceType: 'file',
-        indexingStatus: 'PENDING'
-      })
+      body: JSON.stringify(requestBody)
     });
     
     if (!response.ok) {

@@ -20,4 +20,13 @@ export class LinkFileSourceDto {
   @IsOptional()
   @IsUUID()
   workspaceId?: string;
-} 
+
+  @ApiProperty({
+    description: 'Optional folder ID to associate the source with (supports UUID and CUID formats)',
+    example: 'cmi5m9t9m0001v1xchem3dxdd',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  folderId?: string;
+}

@@ -18,12 +18,16 @@ export class WorkspaceMemberGuard implements CanActivate {
     
     // Extract workspace/organization ID from various possible locations
     const workspaceId = 
-      request.params.workspaceId || 
-      request.params.organizationId || 
-      request.body.workspaceId || 
-      request.body.organizationId ||
+      request.params?.workspaceId || 
+      request.params?.organizationId || 
+      request.body?.workspaceId || 
+      request.body?.organizationId ||
+      request.query?.workspaceId ||
       request.headers['x-workspace-id'] ||
-      request.headers['x-organization-id'];
+      request.headers['x-organization-id'] ||
+      request.headers['workspace-id'] ||
+      request.headers['organization-id'] ||
+      user?.lastWorkspaceId; // final fallback
 
     // If no user or workspace ID, deny access
     if (!user || !workspaceId) {
