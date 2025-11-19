@@ -302,3 +302,29 @@ Add Prometheus metrics:
 5. **Create Dashboard**: Visualize metrics
 
 This phase enables monetization and cost visibility.
+
+## Implementation Status (Phase 3)
+
+**Completed**
+
+- Plan management service and controller (`AdminPlansService`, `AdminPlansController`) with full CRUD + soft deactivate.
+- Subscription management service and controller (`AdminSubscriptionsService`, `AdminSubscriptionsController`) including list/filter, create, update, and cancel.
+- Usage and analytics services (`AdminUsageService`, `AdminAnalyticsService`) with endpoints for revenue, costs, margins, and top workspaces.
+- Next.js admin API proxy routes for plans, subscriptions, and analytics (revenue, costs, margins, top-workspaces).
+- Admin Billing dashboard page with tabs for Revenue, Costs, and Plans, including:
+  - Revenue tab wired to `/api/admin/analytics/revenue` and showing MRR, ARR, active subscriptions, and by-plan breakdown.
+  - Costs tab wired to `/api/admin/analytics/costs` and `/api/admin/analytics/top-workspaces`, showing provider/type breakdown and top spenders.
+  - Plans tab with live plan list and create/edit/deactivate flows.
+  - Basic subscriptions table (first 50 subscriptions) under the Revenue tab.
+- Cost calculation helpers in `admin/utils/cost-calculator.ts` for LLM, TTS, STT, and call minutes.
+
+**Remaining / Follow-ups**
+
+- Wire **usage instrumentation** into existing services:
+  - LLM calls (token usage and cost).
+  - TTS (characters and cost).
+  - STT (seconds and cost).
+  - Call minutes (duration and cost).
+- Add a `prisma/seed` script (or extend existing seeding) to create default plans (Starter/Pro/Enterprise) using the examples above.
+- (Optional) Implement **Stripe webhook controller** and background sync service to keep `Subscription` rows aligned with Stripe.
+- (Optional) Add Prometheus metrics for usage, revenue, costs, and active subscriptions as outlined in the Monitoring section.
