@@ -161,7 +161,7 @@ export default function UsersPage() {
                   <tr
                     key={user.id}
                     className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/users/${user.id}`)}
+                    onClick={() => router.push(`/admin/users/${user.id}`)}
                   >
                     <td className="px-4 py-2">
                       <div className="flex flex-col">

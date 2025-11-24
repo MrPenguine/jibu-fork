@@ -161,7 +161,7 @@ export default function WorkspacesPage() {
                   <tr
                     key={ws.id}
                     className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/workspaces/${ws.id}`)}
+                    onClick={() => router.push(`/admin/workspaces/${ws.id}`)}
                   >
                     <td className="px-4 py-2">
                       <div className="flex flex-col">
