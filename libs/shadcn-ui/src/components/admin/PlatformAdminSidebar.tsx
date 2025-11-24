@@ -115,7 +115,7 @@ export function PlatformAdminSidebar({
         {/* Back to Workspace Link */}
         {!isCollapsed && (
           <div className="px-4 py-2 mt-2">
-            <Link href="/workspace">
+            <Link href="/workspaces">
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs">
                 <ArrowLeft className="h-3 w-3" />
                 Back to Workspace
@@ -129,7 +129,7 @@ export function PlatformAdminSidebar({
         {/* Main Navigation */}
         <SidebarGroup>
           <SidebarMenu>
-            <NavItem href="/" icon={<LayoutDashboard />}>
+            <NavItem href="/admin" icon={<LayoutDashboard />}>
               Cockpit View
             </NavItem>
           </SidebarMenu>
@@ -145,13 +145,13 @@ export function PlatformAdminSidebar({
             </p>
           </div>
           <SidebarMenu>
-            <NavItem href="/users" icon={<Users />}>
+            <NavItem href="/admin/users" icon={<Users />}>
               Users
             </NavItem>
-            <NavItem href="/workspaces" icon={<Building2 />}>
+            <NavItem href="/admin/workspaces" icon={<Building2 />}>
               Workspaces
             </NavItem>
-            <NavItem href="/billing" icon={<DollarSign />}>
+            <NavItem href="/admin/billing" icon={<DollarSign />}>
               Billing & Finance
             </NavItem>
           </SidebarMenu>
@@ -167,13 +167,13 @@ export function PlatformAdminSidebar({
             </p>
           </div>
           <SidebarMenu>
-            <NavItem href="/credentials" icon={<Key />}>
+            <NavItem href="/admin/credentials" icon={<Key />}>
               Credentials
             </NavItem>
-            <NavItem href="/analytics" icon={<BarChart3 />}>
+            <NavItem href="/admin/analytics" icon={<BarChart3 />}>
               Analytics
             </NavItem>
-            <NavItem href="/logs" icon={<FileText />}>
+            <NavItem href="/admin/logs" icon={<FileText />}>
               System Logs
             </NavItem>
           </SidebarMenu>
@@ -184,7 +184,7 @@ export function PlatformAdminSidebar({
         {/* Settings */}
         <SidebarGroup>
           <SidebarMenu>
-            <NavItem href="/settings" icon={<Settings />}>
+            <NavItem href="/admin/settings" icon={<Settings />}>
               Settings
             </NavItem>
           </SidebarMenu>
@@ -194,7 +194,7 @@ export function PlatformAdminSidebar({
       <SidebarFooter className="border-0 flex-col gap-2">
         <NavUser 
           user={userInfo ?? { name: 'Admin', email: '', avatar: '' }} 
-          profileHref="/settings"
+          profileHref="/admin/settings"
           onLogout={onLogout}
         />
       </SidebarFooter>

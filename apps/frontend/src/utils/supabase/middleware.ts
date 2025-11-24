@@ -45,14 +45,31 @@ export async function updateSession(request: NextRequest) {
 
   // Get the pathname from the URL
   const path = request.nextUrl.pathname
-  const host = request.headers.get('host') || request.nextUrl.host
-  const isAdminHost = !!host && (host.includes('3005') || host.startsWith('admin.'))
 
-  // Hard-separate admin host from workspace UI: on admin host, never serve /workspace routes
-  if (isAdminHost && (path === '/workspace' || path.startsWith('/workspace/'))) {
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = '/'
-    return NextResponse.redirect(redirectUrl)
+  const isAdminPath = path === '/admin' || path.startsWith('/admin/')
+
+  if (isAdminPath && user) {
+    const apiUrl = new URL('/api/auth/get-user-context', request.nextUrl)
+    try {
+      const wsResp = await fetch(apiUrl.toString(), {
+        headers: { cookie: request.headers.get('cookie') ?? '' },
+      })
+      if (wsResp.ok) {
+        const data = await wsResp.json()
+        const isPlatformAdmin = Boolean(
+          data?.isPlatformAdmin ??
+          data?.isAdmin ??
+          data?.user?.isPlatformAdmin ??
+          data?.user?.isAdmin ??
+          false
+        )
+        if (!isPlatformAdmin) {
+          const redirectUrl = request.nextUrl.clone()
+          redirectUrl.pathname = '/workspaces'
+          return NextResponse.redirect(redirectUrl)
+        }
+      }
+    } catch (_) {}
   }
 
   // Legacy redirects for removed /auth routes
@@ -93,18 +110,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If user is signed in and they're trying to access the login or signup page, redirect to workspace
-  // SKIP this redirect for admin routes (they're on a separate port for testing)
   if (
     user &&
-    !isAdminHost &&
-    (path === '/' || path === '/login' || path === '/signup') &&
-    !path.startsWith('/credentials') &&
-    !path.startsWith('/users') &&
-    !path.startsWith('/workspaces') &&
-    !path.startsWith('/billing') &&
-    !path.startsWith('/analytics') &&
-    !path.startsWith('/logs') &&
-    !path.startsWith('/settings')
+    (path === '/' || path === '/login' || path === '/signup')
   ) {
     const redirectUrl = request.nextUrl.clone()
     try {
@@ -115,6 +123,17 @@ export async function updateSession(request: NextRequest) {
       })
       if (wsResp.ok) {
         const data = await wsResp.json()
+        const isPlatformAdmin = Boolean(
+          data?.isPlatformAdmin ??
+          data?.isAdmin ??
+          data?.user?.isPlatformAdmin ??
+          data?.user?.isAdmin ??
+          false
+        )
+        if (isPlatformAdmin) {
+          redirectUrl.pathname = '/admin'
+          return NextResponse.redirect(redirectUrl)
+        }
         // Be flexible with response shapes
         const workspaceId =
           data?.workspace?.id ||

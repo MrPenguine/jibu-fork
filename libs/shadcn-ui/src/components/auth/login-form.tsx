@@ -135,66 +135,13 @@ export function LoginForm({
           }
         }
         
-        // If login is successful, resolve workspace and redirect
+        // If login is successful, let middleware and server decide where to go
         if (mode === "login") {
           setIsLoggingIn(true)
           try {
-            // 1) Try to get workspace from storage first (fast path)
-            let workspaceId: string | null = null
-            try {
-              workspaceId =
-                localStorage.getItem("activeWorkspaceId") ||
-                sessionStorage.getItem("activeWorkspaceId")
-              // Back-compat: migrate old organization keys if present
-              if (!workspaceId) {
-                workspaceId =
-                  localStorage.getItem("activeOrganizationId") ||
-                  sessionStorage.getItem("activeOrganizationId") ||
-                  localStorage.getItem("activeOrgId") ||
-                  sessionStorage.getItem("activeOrgId")
-                if (workspaceId) {
-                  try {
-                    localStorage.setItem("activeWorkspaceId", workspaceId)
-                    sessionStorage.setItem("activeWorkspaceId", workspaceId)
-                  } catch (_) {
-                    // ignore storage errors
-                  }
-                }
-              }
-            } catch (_) {
-              // ignore storage errors (e.g., disabled storage)
-            }
-
-            // 2) If not found, fetch user context from server to resolve workspace
-            if (!workspaceId) {
-              const ctxRes = await fetch("/api/auth/get-user-context", { method: "GET", credentials: "include" })
-              if (ctxRes.ok) {
-                const ctxData = await ctxRes.json()
-                const resolvedId =
-                  ctxData?.workspace?.id ||
-                  ctxData?.activeWorkspace?.id ||
-                  ctxData?.lastWorkspace?.id ||
-                  ctxData?.workspaceId ||
-                  null
-                workspaceId = resolvedId
-                if (workspaceId) {
-                  try {
-                    localStorage.setItem("activeWorkspaceId", workspaceId)
-                    sessionStorage.setItem("activeWorkspaceId", workspaceId)
-                  } catch (_) {
-                    // ignore storage errors
-                  }
-                }
-              }
-            }
-
-            // 3) Navigate
-            if (workspaceId) {
-              router.push(`/workspace/${workspaceId}`)
-            } else {
-              // Fallback if no workspace found
-              router.push("/workspaces")
-            }
+            // Send the user to the root; middleware will use get-user-context
+            // to decide between /admin and the appropriate workspace route.
+            router.push("/")
           } catch (e) {
             console.error("Post-login redirect failed:", e)
             router.push("/workspaces")

@@ -18,6 +18,7 @@ interface ApiContextType {
   token: string | null;
   loading: boolean;
   error: string | null;
+  isPlatformAdmin: boolean;
   refreshContext: () => Promise<void>;
   apiRequest: (endpoint: string, options?: RequestInit) => Promise<any>;
 }
@@ -28,6 +29,7 @@ const ApiContext = createContext<ApiContextType>({
   token: null,
   loading: true,
   error: null,
+  isPlatformAdmin: false,
   refreshContext: async () => {},
   apiRequest: async () => ({}),
 });
@@ -41,6 +43,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   // Standard API request function with auth token
   const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
@@ -78,9 +81,11 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       if (!sessionData.session) {
         setUser(null);
         setToken(null);
+        setIsPlatformAdmin(false);
         setLoading(false);
         return;
       }
+
       setToken(sessionData.session.access_token);
       // Option 1: Get user from Supabase directly
       // const { data: { user: supabaseUser } } = await supabase.auth.getUser();
@@ -90,10 +95,21 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         const response = await fetch('/api/auth/get-user-context');
         if (response.ok) {
           const context = await response.json();
-          setUser(context.user);
+          setUser(context.user ?? null);
+          const ctx: any = context.user ?? context;
+          setIsPlatformAdmin(
+            Boolean(
+              ctx?.isPlatformAdmin ??
+              ctx?.isAdmin ??
+              context?.isPlatformAdmin ??
+              context?.isAdmin ??
+              false
+            )
+          );
         } else {
           console.warn("Failed to fetch user context");
         }
+
       } catch (fetchErr) {
         console.error("Error fetching user context", fetchErr);
       }
@@ -102,6 +118,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       setError(err instanceof Error ? err.message : 'Failed to refresh context');
       setUser(null);
       setToken(null);
+      setIsPlatformAdmin(false);
+
     } finally {
       setLoading(false);
     }
@@ -125,6 +143,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     token,
     loading,
     error,
+    isPlatformAdmin,
     refreshContext,
     apiRequest,
   };
@@ -134,4 +153,4 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       {children}
     </ApiContext.Provider>
   );
-} 
+}

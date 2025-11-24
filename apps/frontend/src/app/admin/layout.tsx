@@ -10,6 +10,7 @@ import { useMemo, useEffect, useState } from "react"
 import { Shield, AlertTriangle } from "lucide-react"
 import { fetchAPI } from "../../utils/api"
 import { logout } from "../../utils/auth/actions"
+import { useApi } from "../../utils/apiContext"
 
 export default function AdminLayout({
   children,
@@ -18,6 +19,7 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, loading: apiLoading, isPlatformAdmin } = useApi();
   const [userInfo, setUserInfo] = useState<{ name: string; email: string; avatar: string; isPlatformAdmin: boolean } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -81,15 +83,49 @@ export default function AdminLayout({
     //   mounted = false;
     // };
 
-    // TEMPORARY: Mock admin user for frontend-only testing
-    setUserInfo({ 
-      name: 'Platform Admin', 
-      email: 'admin@jibu.ai', 
-      avatar: '', 
-      isPlatformAdmin: true 
-    });
-    setIsLoading(false);
-  }, [router]);
+    let mounted = true;
+
+    const checkAdminAccess = () => {
+      if (!mounted) return;
+
+      // Wait for API context to finish loading
+      if (apiLoading) return;
+
+      // If there is no authenticated user, send to login
+      if (!user) {
+        setIsLoading(false);
+        router.push('/login');
+        return;
+      }
+
+      const ctx: any = user || {};
+      const name =
+        ctx.fullName ||
+        (ctx.firstName && ctx.lastName
+          ? `${ctx.firstName} ${ctx.lastName}`
+          : ctx.firstName) ||
+        ctx.email ||
+        'Admin';
+      const avatar = ctx.imageUrl || ctx.avatar || '';
+      const email = ctx.email || '';
+
+      setUserInfo({ name, email, avatar, isPlatformAdmin });
+
+      if (!isPlatformAdmin) {
+        setIsLoading(false);
+        router.push('/workspaces');
+        return;
+      }
+
+      setIsLoading(false);
+    };
+
+    checkAdminAccess();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router, user, apiLoading, isPlatformAdmin]);
 
   const handleLogout = () => {
     logout(new FormData());
