@@ -6,8 +6,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 
 // Polyfill global crypto.randomUUID for @nestjs/schedule which expects a global crypto object
-(global as any).crypto = (global as any).crypto || {};
-(global as any).crypto.randomUUID = (global as any).crypto.randomUUID || randomUUID;
+const g: any = global as any;
+
+if (!('crypto' in g)) {
+  g.crypto = {};
+}
+
+if (!g.crypto.randomUUID) {
+  g.crypto.randomUUID = randomUUID;
+}
 
 async function bootstrap() {
   // Set NODE_ENV to development if not set
