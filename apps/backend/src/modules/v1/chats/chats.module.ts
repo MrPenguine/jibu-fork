@@ -1,19 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ChatsController } from './chats.controller';
 import { ChatsService } from './chats.service';
-import { DatabaseModule } from '../../../core/database/database.module';
+import { WebhookUrlModule } from '../../../core/webhook/webhook-url.module';
+import { ServicesModule } from '../../../core/services/services.module';
 
 /**
- * ChatsModule - Minimal chat management module
- * 
- * Provides basic CRUD operations for chats and messages.
- * All complex integrations (Redis, N8N, webhooks) have been removed.
- * Future chat processing will be handled by n8n workflows.
+ * ChatsModule now only exposes empty controller/service shells so we can
+ * repurpose the route for webhook experiments without legacy behavior.
  */
 @Module({
-  imports: [DatabaseModule],
+  imports: [WebhookUrlModule, ServicesModule],
   controllers: [ChatsController],
   providers: [ChatsService],
-  exports: [ChatsService]
+  exports: [ChatsService],
 })
 export class ChatsModule {}

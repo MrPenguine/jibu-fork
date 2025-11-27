@@ -7,6 +7,7 @@ import { Input } from '../ui/input';
 import { Card } from '../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { useToast } from '../ui/use-toast';
+import * as chatApi from '../../../../../apps/frontend/src/utils/chatApi';
 
 interface Message {
   id: string;
@@ -20,19 +21,22 @@ interface AgentExecutionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   agentApi: any;
+  workflowId?: string;
 }
 
 export function AgentExecutionDialog({ 
   agentId, 
   isOpen, 
   onClose,
-  agentApi 
+  agentApi,
+  workflowId,
 }: AgentExecutionDialogProps) {
   const [agent, setAgent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showChatBubble, setShowChatBubble] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -97,11 +101,24 @@ export function AgentExecutionDialog({
       setError(null);
       setAgent(null);
       setShowChatBubble(false);
+      setChatId(null);
     }
   }, [isOpen]);
 
-  const handleStartChat = () => {
-    // Initialize chat with welcome message
+  const handleStartChat = async () => {
+    // Lazily create a backend Chat bound to this agent (and workflow if provided)
+    try {
+      if (!chatId) {
+        const created = await chatApi.createChat(agentId, undefined, undefined, true, workflowId);
+        if (created) {
+          setChatId(created.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create diagnostic chat session:', error);
+    }
+
+    // Initialize UI with welcome message
     setMessages([{
       id: '1',
       text: `Hey! I'm ${agent?.name || 'your assistant'}. How can I help you today?`,
@@ -124,7 +141,7 @@ export function AgentExecutionDialog({
     setInputValue('');
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     // Add user message
@@ -136,9 +153,32 @@ export function AgentExecutionDialog({
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue('');
 
-    // Simulate assistant response (replace with actual API call later)
+    // Ensure we have a backend Chat for diagnostics
+    let currentChatId = chatId;
+    try {
+      if (!currentChatId) {
+        const created = await chatApi.createChat(agentId, undefined, undefined, true, workflowId);
+        if (created) {
+          currentChatId = created.id;
+          setChatId(created.id);
+        }
+      }
+
+      if (currentChatId) {
+        try {
+          await chatApi.sendChatMessage(currentChatId, currentInput, 'user');
+        } catch (diagError) {
+          console.error('Error sending diagnostic chat message to backend:', diagError);
+        }
+      }
+    } catch (error) {
+      console.error('Error ensuring diagnostic chat session:', error);
+    }
+
+    // Existing simulated assistant response (UI only)
     setTimeout(() => {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),

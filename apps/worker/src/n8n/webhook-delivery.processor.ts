@@ -117,9 +117,9 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
       }
 
       // Step 2: Retrieve webhook URL from cache
-      const webhookUrl = await this.getWebhookUrl(workflowId, isVoice);
+      const rawWebhookUrl = await this.getWebhookUrl(workflowId, isVoice);
       
-      if (!webhookUrl) {
+      if (!rawWebhookUrl) {
         this.logger.error(`No webhook URL found for workflow ${workflowId}`);
         
         if (isVoice) {
@@ -129,6 +129,24 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
         
         throw new Error(`No webhook URL found for workflow ${workflowId}`);
       }
+
+      // Normalize the webhook URL to avoid accidental double slashes in the path
+      const webhookUrl = this.normalizeWebhookUrl(rawWebhookUrl);
+
+      // Log the resolved webhook URL and a compact view of the payload structure
+      const payloadSummary = {
+        eventType: payload.eventType,
+        hasText: !!(payload as any).text,
+        hasVoiceMetadata: !!(payload as any).voiceMetadata,
+        hasCallEvent: !!(payload as any).callEvent,
+        hasAiContext: !!payload.aiContext,
+        conversationHistoryLength: payload.aiContext?.conversationHistory?.length ?? 0,
+        ragResultsLength: payload.aiContext?.ragContext?.results?.length ?? 0,
+      };
+      this.logger.log(
+        `Resolved webhook URL for workflow ${workflowId}: ${webhookUrl} | ` +
+        `Payload summary: ${JSON.stringify(payloadSummary)}`,
+      );
 
       // Step 3: Deliver complete structured payload to webhook
       const deliveryStartTime = Date.now();
@@ -279,6 +297,18 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
       }
 
       throw new Error(`Webhook delivery error: ${axiosError.message}`);
+    }
+  }
+
+  private normalizeWebhookUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      // Collapse multiple slashes in the pathname to a single slash
+      parsed.pathname = parsed.pathname.replace(/\/+/, '/').replace(/\/{2,}/g, '/');
+      return parsed.toString();
+    } catch {
+      // Fallback: collapse repeated slashes that are not part of the protocol separator
+      return url.replace(/([^:])\/{2,}/g, '$1/');
     }
   }
 

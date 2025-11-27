@@ -1,267 +1,178 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../core/database/prisma.service';
-import { CreateChatDto } from './dto/create-chat.dto';
+import { Injectable, Logger } from '@nestjs/common';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { UpdateChatDto } from './dto/update-chat.dto';
-import { Chat, Prisma } from '@prisma/client';
+import { WebhookUrlService } from '../../../core/webhook/webhook-url.service';
+import { MessageQueueService } from '../../../core/services/message-queue.service';
+import { PrismaService } from '../../../core/database/prisma.service';
 
-/**
- * ChatsService - Minimal CRUD service for chat management
- * 
- * This service provides basic database operations for chats and messages.
- * All complex chat logic, AI integrations, and webhook handling have been removed.
- * Future implementations will use n8n workflows for chat processing.
- */
+type DiagnosticMessage = {
+  id: string;
+  chatId: string;
+  content: string;
+  role: 'assistant';
+  sequenceId: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 @Injectable()
 export class ChatsService {
   private readonly logger = new Logger(ChatsService.name);
+  private readonly memoryChats = new Map<string, DiagnosticMessage[]>();
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly webhookUrlService: WebhookUrlService,
+    private readonly messageQueueService: MessageQueueService,
   ) {}
 
-  async createChat(createChatDto: CreateChatDto & { workspaceId: string }) {
-    if (createChatDto.agentId) {
-      this.logger.log(`Creating chat for agent ${createChatDto.agentId} in workspace ${createChatDto.workspaceId}`);
-    }
-    
-    this.logger.log(`Session ID: ${createChatDto.sessionId}, Session Type: ${createChatDto.sessionType || 'chat'}`);
-
-    if (createChatDto.agentId) {
-      const agent = await this.prisma.agent.findFirst({
-        where: {
-          id: createChatDto.agentId,
-          workspaceId: createChatDto.workspaceId
-        }
-      });
-
-      if (!agent) {
-        this.logger.error(`Agent ${createChatDto.agentId} not found in workspace ${createChatDto.workspaceId}`);
-        throw new NotFoundException(`Agent not found or not accessible in this workspace`);
-      }
-    }
-
-    if (createChatDto.workflowId) {
-      const workflow = await this.prisma.workflow.findFirst({
-        where: {
-          id: createChatDto.workflowId,
-          workspaceId: createChatDto.workspaceId
-        }
-      });
-
-      if (!workflow) {
-        this.logger.error(`Workflow ${createChatDto.workflowId} not found in workspace ${createChatDto.workspaceId}`);
-        throw new NotFoundException(`Workflow not found or not accessible in this workspace`);
-      }
-    }
-
-    const chatData: Prisma.ChatCreateInput = {
-      name: createChatDto.name || 'New Chat',
-      workspace: { connect: { id: createChatDto.workspaceId } },
-      sessionId: createChatDto.sessionId,
-      sessionType: createChatDto.sessionType || 'chat',
-      metadata: createChatDto.metadata || {},
-      ...(createChatDto.agentId && { agent: { connect: { id: createChatDto.agentId } } }),
-      ...(createChatDto.workflowId && { workflow: { connect: { id: createChatDto.workflowId } } }),
-      ...(createChatDto.nodeType && { nodeType: createChatDto.nodeType }),
-    };
-    
-    const chat = await this.prisma.chat.create({ data: chatData });
-
-    this.logger.log(`Successfully created chat with ID: ${chat.id}`);
-
-    await this.initChatInRedis(chat);
-
-    return chat;
+  private normalizeWebhookUrl(url: string | null): string | null {
+    if (!url) return url;
+    const parts = url.split('://');
+    if (parts.length !== 2) return url;
+    const [scheme, rest] = parts;
+    const normalizedRest = rest.replace(/\/+/, '/').replace(/\/+/g, '/');
+    return `${scheme}://${normalizedRest}`;
   }
 
-  async updateChat(id: string, updateChatDto: UpdateChatDto, workspaceId: string) {
-    this.logger.log(`Updating chat ${id} in workspace ${workspaceId}`);
-    
-    await this.getChat(id, workspaceId);
-
-    const updatedChat = await this.prisma.chat.update({
-      where: { id },
-      data: {
-        ...(updateChatDto.name && { name: updateChatDto.name }),
-        ...(updateChatDto.sessionType && { sessionType: updateChatDto.sessionType }),
-        ...(updateChatDto.metadata && { metadata: updateChatDto.metadata }),
-        updatedAt: new Date()
-      }
-    });
-
-    this.logger.log(`Successfully updated chat ${id}`);
-    return updatedChat;
-  }
-
-  
-  async getChatsByAgentId(workspaceId: string, agentId: string, filters?: { sessionType?: string, sessionId?: string, workflowId?: string }) {
-    this.logger.log(`Getting chats for agent ${agentId} in workspace ${workspaceId}`);
-    if (filters) {
-      this.logger.log(`Filters: ${JSON.stringify(filters)}`);
-    }
-    
-    const agent = await this.prisma.agent.findFirst({
-      where: { id: agentId, workspaceId }
-    });
-
-    if (!agent) {
-      this.logger.error(`Agent ${agentId} not found in workspace ${workspaceId}`);
-      throw new NotFoundException(`Agent not found or not accessible in this workspace`);
-    }
-
-    const where: Prisma.ChatWhereInput = {
-      workspaceId,
+  async getChatsByAgentId(_workspaceId: string, agentId: string) {
+    this.logger.log(`[DIAGNOSTIC][ChatsService] Listing diagnostic chats for agent ${agentId}`);
+    return Array.from(this.memoryChats.entries()).map(([chatId, messages]) => ({
+      id: chatId,
       agentId,
-      ...(filters?.sessionType && { sessionType: filters.sessionType }),
-      ...(filters?.sessionId && { sessionId: filters.sessionId }),
-      ...(filters?.workflowId && { workflowId: filters.workflowId }),
-    };
-
-    const chats = await this.prisma.chat.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        messages: {
-          orderBy: { sequenceId: 'desc' },
-          take: 1,
-        }
-      }
-    });
-
-    this.logger.log(`Found ${chats.length} chats for agent ${agentId}`);
-
-    return chats.map(chat => ({
-      ...chat,
-      lastMessage: chat.messages[0]?.content || null
+      name: `Diagnostics ${chatId}`,
+      sessionId: chatId,
+      sessionType: 'chat',
+      lastMessage: messages.at(-1)?.content ?? null,
+      createdAt: messages[0]?.createdAt ?? new Date(),
+      updatedAt: messages.at(-1)?.updatedAt ?? new Date(),
     }));
   }
   
-  async getChatsByWorkflowId(workspaceId: string, workflowId: string, filters?: { sessionType?: string, sessionId?: string, agentId?: string }) {
-    this.logger.log(`Getting chats for workflow ${workflowId} in workspace ${workspaceId}`);
-    if (filters) {
-      this.logger.log(`Filters: ${JSON.stringify(filters)}`);
-    }
-    
-    const workflow = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, workspaceId }
-    });
-
-    if (!workflow) {
-      this.logger.error(`Workflow ${workflowId} not found in workspace ${workspaceId}`);
-      throw new NotFoundException(`Workflow not found or not accessible in this workspace`);
-    }
-
-    const where: Prisma.ChatWhereInput = {
-      workspaceId,
-      workflowId,
-      ...(filters?.sessionType && { sessionType: filters.sessionType }),
-      ...(filters?.sessionId && { sessionId: filters.sessionId }),
-      ...(filters?.agentId && { agentId: filters.agentId }),
-    };
-
-    const chats = await this.prisma.chat.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        messages: {
-          orderBy: { sequenceId: 'desc' },
-          take: 1,
-        }
-      }
-    });
-
-    this.logger.log(`Found ${chats.length} chats for workflow ${workflowId}`);
-
-    return chats.map(chat => ({
-      ...chat,
-      lastMessage: chat.messages[0]?.content || null
-    }));
+  async getChatMessages(chatId: string, _workspaceId: string) {
+    return this.memoryChats.get(chatId) ?? [];
   }
 
-  async getChat(id: string, workspaceId: string) {
-    this.logger.log(`Getting chat ${id} for workspace ${workspaceId}`);
-    
-    const chat = await this.prisma.chat.findUnique({
-      where: { id }
+  async createMessage(chatId: string, message: CreateMessageDto, workspaceId: string) {
+    // Resolve the workflow directly from the Chat record so we always
+    // use the workflow linked in Prisma (Chat -> Workflow -> N8nWorkflow).
+    this.logger.log(
+      `[DIAGNOSTIC][ChatsService] Starting diagnostic createMessage for chat ${chatId} in workspace ${workspaceId}`,
+    );
+
+    const chat = await this.prisma.chat.findFirst({
+      where: {
+        workspaceId,
+        OR: [
+          { id: chatId },
+          { sessionId: chatId },
+        ],
+      },
+      include: {
+        workflow: {
+          include: {
+            n8nWorkflow: true,
+          },
+        },
+      },
     });
+
+    const workflowId = chat?.workflowId || null;
+
+    const diagnosticLines: string[] = [];
+    diagnosticLines.push(`Chat ${chatId} (workspace ${workspaceId})`);
 
     if (!chat) {
-      this.logger.error(`Chat ${id} not found`);
-      throw new NotFoundException(`Chat with ID ${id} not found`);
+      const msg =
+        '⚠️ No Chat record found for this chatId/sessionId. Workflow cannot be resolved from schema.';
+      diagnosticLines.push(msg);
+      this.logger.warn(`[DIAGNOSTIC][ChatsService] ${msg}`);
+    } else if (!workflowId) {
+      const msg =
+        `⚠️ Chat is not linked to any Workflow (chat.id=${chat.id}, sessionId=${chat.sessionId}).`;
+      diagnosticLines.push(msg);
+      this.logger.warn(`[DIAGNOSTIC][ChatsService] ${msg}`);
+    } else {
+      const wf = chat.workflow;
+      const n8n = wf?.n8nWorkflow;
+      const msg =
+        `Linked Workflow: workflowId=${workflowId}, workflowName=${wf?.name ?? 'n/a'}, ` +
+        `n8nWorkflowDbId=${n8n?.id ?? 'n/a'}, n8nWorkflowLiveId=${n8n?.n8nWorkflowId ?? 'n/a'}, ` +
+        `dbWebhookUrl=${n8n?.webhookUrl ?? 'null'}`;
+      diagnosticLines.push(msg);
+      this.logger.log(`[DIAGNOSTIC][ChatsService] ${msg}`);
     }
 
-    if (chat.workspaceId !== workspaceId) {
-      this.logger.error(`Chat ${id} not accessible in workspace ${workspaceId}`);
-      throw new ForbiddenException(`Chat not accessible in this workspace`);
+    this.logger.log(
+      `[DIAGNOSTIC][ChatsService] Step 1: Resolving webhook URL for workflow ${workflowId ?? 'unknown'}`,
+    );
+
+    let webhookUrl: string | null = null;
+    if (workflowId) {
+      webhookUrl = await this.webhookUrlService.getWebhookUrl(workflowId, false);
+      webhookUrl = this.normalizeWebhookUrl(webhookUrl);
     }
 
-    this.logger.log(`Successfully retrieved chat ${id}`);
-    return chat;
-  }
+    if (webhookUrl) {
+      const msg = `✅ Webhook URL found: ${webhookUrl}`;
+      diagnosticLines.push(msg);
+      this.logger.log(`[DIAGNOSTIC][ChatsService] ${msg}`);
+    } else {
+      const msg = `❌ Webhook URL not found for workflow ${workflowId ?? 'unknown'}`;
+      diagnosticLines.push(msg);
+      this.logger.warn(`[DIAGNOSTIC][ChatsService] ${msg}`);
+    }
 
-  async deleteChat(id: string, workspaceId: string) {
-    this.logger.log(`Deleting chat ${id} from workspace ${workspaceId}`);
-    
-    const chat = await this.getChat(id, workspaceId);
+    const payload = {
+      eventType: 'message',
+      sessionId: chatId,
+      workflowId: workflowId ?? 'unknown',
+      timestamp: Date.now(),
+      text: message.content,
+      metadata: message.metadata ?? {},
+    };
 
-    await this.prisma.chat.delete({ where: { id } });
+    const payloadLog = `[DIAGNOSTIC][ChatsService] Step 2: Payload prepared -> ${JSON.stringify(payload)}`;
+    diagnosticLines.push('Payload prepared (see server logs for full JSON)');
+    this.logger.log(payloadLog);
 
-    this.logger.log(`Successfully deleted chat ${id}`);
-
-    await this.removeChatFromRedis(chat);
-
-    return { success: true };
-  }
-
-  async getChatMessages(chatId: string, workspaceId: string) {
-    this.logger.log(`Getting messages for chat ${chatId} in workspace ${workspaceId}`);
-    
-    await this.getChat(chatId, workspaceId);
-
-    const messages = await this.prisma.message.findMany({
-      where: { chatId },
-      orderBy: { sequenceId: 'asc' }
-    });
-
-    this.logger.log(`Found ${messages.length} messages for chat ${chatId}`);
-    return messages;
-  }
-
-  async createMessage(chatId: string, createMessageDto: CreateMessageDto, workspaceId: string) {
-    this.logger.log(`Creating new message for chat ${chatId}`);
-    
-    await this.getChat(chatId, workspaceId);
-
-    const message = await this.prisma.message.create({
-      data: {
-        chatId,
-        content: createMessageDto.content,
-        role: createMessageDto.role,
-        type: createMessageDto.type || 'text',
-        sequenceId: createMessageDto.sequenceId,
-        metadata: createMessageDto.metadata || {},
+    if (workflowId) {
+      try {
+        await this.messageQueueService.sendMessageToWorkflow(
+          workflowId,
+          chatId,
+          message.content,
+        );
+        const msg = `✅ Queue enqueue succeeded for workflow ${workflowId}`;
+        diagnosticLines.push(msg);
+        this.logger.log(`[DIAGNOSTIC][ChatsService] ${msg}`);
+      } catch (error) {
+        const errMsg = `❌ Queue enqueue failed: ${(error as Error).message}`;
+        diagnosticLines.push(errMsg);
+        this.logger.error(
+          `[DIAGNOSTIC][ChatsService] ${errMsg}`,
+          (error as Error).stack,
+        );
       }
-    });
+    } else {
+      const msg = '⚠️ Queue enqueue skipped: no workflowId provided in metadata';
+      diagnosticLines.push(msg);
+      this.logger.warn(`[DIAGNOSTIC][ChatsService] ${msg}`);
+    }
 
-    this.logger.log(`Successfully created message ${message.id} for chat ${chatId}`);
+    const diagMessage: DiagnosticMessage = {
+      id: `diag-${Date.now()}`,
+      chatId,
+      content: diagnosticLines.join(' | '),
+      role: 'assistant',
+      sequenceId: message.sequenceId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-    // Update chat timestamp
-    await this.prisma.chat.update({
-      where: { id: chatId },
-      data: { updatedAt: new Date() }
-    });
+    const history = this.memoryChats.get(chatId) ?? [];
+    history.push(diagMessage);
+    this.memoryChats.set(chatId, history);
 
-    return message;
-  }
-
-  // All Redis and webhook integration methods have been removed
-  // Future chat processing will be handled by n8n workflows
-  private async initChatInRedis(_chat: Chat): Promise<void> {
-    // Placeholder - will be replaced with n8n webhook integration
-  }
-
-  private async removeChatFromRedis(_chat: Chat): Promise<void> {
-    // Placeholder - will be replaced with n8n webhook integration
+    return diagMessage;
   }
 }

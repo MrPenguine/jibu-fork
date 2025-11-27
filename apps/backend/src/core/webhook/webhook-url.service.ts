@@ -65,13 +65,19 @@ export class WebhookUrlService {
         return null;
       }
 
-      const webhookPath = String(webhookNode.parameters.path);
+      let webhookPath = String(webhookNode.parameters.path);
 
-      // Step 3: Rebuild URL using environment priority
+      // Step 3: Normalize the webhook path so we do not end up with
+      // a double slash when concatenating with the base URL.
+      // n8n paths are often configured with a leading '/', e.g. '/my-hook'.
+      // We always want baseUrl + '/webhook/' + '<path-without-leading-slash>'.
+      webhookPath = webhookPath.replace(/^\/+/, '');
+
+      // Step 4: Rebuild URL using environment priority
       const baseUrl = this.resolveBaseUrl();
       const webhookUrl = `${baseUrl}/webhook/${webhookPath}`;
 
-      // Step 4: Update N8nWorkflow table with new webhookUrl and lastValidatedAt
+      // Step 5: Update N8nWorkflow table with new webhookUrl and lastValidatedAt
       await this.prisma.n8nWorkflow.update({
         where: { id: workflow.n8nWorkflow.id },
         data: {
@@ -80,7 +86,7 @@ export class WebhookUrlService {
         },
       });
 
-      // Step 5: Invalidate cache and populate with fresh data
+      // Step 6: Invalidate cache and populate with fresh data
       await this.cacheService.invalidate(workflowId);
       
       // Determine if this is a voice workflow based on agent settings

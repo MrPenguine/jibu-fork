@@ -958,6 +958,7 @@ function AgentCanvasContent() {
         onClose={() => setIsRunDialogOpen(false)}
         agentId={agentId}
         agentApi={agentApiClient}
+        workflowId={workflowId}
       />
     </div>
   );

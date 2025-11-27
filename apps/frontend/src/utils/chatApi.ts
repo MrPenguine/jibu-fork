@@ -1,6 +1,4 @@
-import { createClient } from './supabase/client';
-import { getActiveWorkspaceId } from './fileApi';
-import { fetchAPI, API_BASE_URL } from './api';
+import { fetchAPI } from './api';
 
 export interface ChatMessage {
   id: string;
@@ -9,7 +7,7 @@ export interface ChatMessage {
   sequenceId: number;
   createdAt: string;
   updatedAt: string;
-  type: string;
+  type?: string;
 }
 
 export interface Chat {
@@ -17,53 +15,12 @@ export interface Chat {
   name?: string;
   sessionId: string;
   sessionType: string;
-  assistantId: string;
-  userId: string;
-  workspaceId: string;
+  assistantId?: string;
+  agentId?: string;
+  workflowId?: string;
+  workspaceId?: string;
   createdAt: string;
   updatedAt: string;
-  lastMessage?: string;
-}
-
-/**
- * Get authorization headers with token and organization ID
- */
-async function getAuthHeaders(workspaceId: string) {
-  const supabase = createClient();
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
-  
-  if (!token) {
-    throw new Error('No authentication token available');
-  }
-  
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'X-Workspace-Id': workspaceId
-  };
-}
-
-/**
- * Get the current organization ID or use the provided one
- */
-function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
-  // Prioritize the specificWorkspaceId if provided
-  if (specificWorkspaceId) {
-    console.log(`[getCurrentWorkspaceId] Using provided specific workspace ID: ${specificWorkspaceId}`);
-    return specificWorkspaceId;
-  }
-  
-  // Try to get workspace ID from local storage or other sources
-  const workspaceId = getActiveWorkspaceId();
-  
-  if (workspaceId) {
-    console.log(`[getCurrentWorkspaceId] Using workspace ID from active context: ${workspaceId}`);
-  } else {
-    console.warn('[getCurrentWorkspaceId] No workspace ID available from any source');
-  }
-  
-  return workspaceId;
 }
 
 /**
@@ -74,53 +31,19 @@ function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
  * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
  */
 export async function listChats(
-  id: string, 
+  id: string,
   entityType: 'assistant' | 'agent' = 'assistant',
   sessionType: string = 'chat',
-  specificWorkspaceId?: string
+  _specificWorkspaceId?: string
 ): Promise<Chat[]> {
-  try {
-    // Use the provided specificWorkspaceId or get from getCurrentWorkspaceId
-    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
-    
-    if (!workspaceId) {
-      console.warn('[listChats] No workspace ID available, results may be limited');
-      return [];
-    }
-    
-    console.log(`[listChats] Fetching chats for ${entityType}: ${id} with workspace: ${workspaceId}`);
-    
-    try {
-      // Request based on entity type
-      const queryParam = entityType === 'agent' ? 'agentId' : 'assistantId';
-      const response = await fetchAPI(`/v1/chats?${queryParam}=${id}`);
-      
-      if (!Array.isArray(response)) {
-        console.error('[listChats] Expected array of chats but got:', typeof response);
-        return [];
-      }
-      
-      // Ensure we're getting only chats for this entity
-      const filteredChats = response.filter(chat => 
-        chat && (entityType === 'agent' ? chat.agentId === id : chat.assistantId === id)
-      );
-      
-      console.log(`[listChats] Found ${filteredChats.length} chats for ${entityType} ${id}`);
-      return filteredChats;
-    } catch (error) {
-      // If we get a 404, it might mean that no chats exist yet, which is not an error
-      if (error instanceof Error && error.message.includes('404')) {
-        console.log('[listChats] No chats found for this assistant - This is normal for new assistants');
-        return [];
-      }
-      
-      console.error(`[listChats] Failed to fetch chats:`, error);
-      return [];
-    }
-  } catch (error) {
-    console.error('[listChats] Error listing chats:', error);
-    return [];
+  if (entityType === 'agent') {
+    // Backend chats are keyed by agentId and workspace via auth headers
+    const params = new URLSearchParams({ agentId: id, sessionType });
+    return fetchAPI(`/v1/chats?${params.toString()}`);
   }
+
+  // Assistant-scoped chats are not used in the canvas flow; return empty for now
+  return [];
 }
 
 /**
@@ -128,75 +51,22 @@ export async function listChats(
  * @param chatId The ID of the chat
  * @param specificOrgId Optional: Provide a specific organization ID, otherwise uses active org
  */
-export async function getChatMessages(
-  chatId: string,
-  specificWorkspaceId?: string
-): Promise<ChatMessage[]> {
-  try {
-    // Don't try to fetch messages for fallback chats
-    if (!chatId || (chatId && chatId.startsWith('chat-'))) {
-      console.log('[getChatMessages] Using fallback chat ID, skipping message fetch');
-      
-      // For fallback chats, we might have stored messages in localStorage
-      const localMessages = localStorage.getItem(`chat_messages_${chatId}`);
-      if (localMessages) {
-        try {
-          return JSON.parse(localMessages);
-        } catch (e) {
-          console.error('[getChatMessages] Error parsing local messages:', e);
-          return [];
-        }
-      }
-      
-      return [];
-    }
-    
-    try {
-      // Add a cache buster to prevent browser caching issues
-      const cacheBuster = Date.now();
-      const messagesData = await fetchAPI(`/v1/chats/${chatId}/messages?_=${cacheBuster}`);
-      
-      if (!Array.isArray(messagesData)) {
-        console.error('[getChatMessages] Expected array of messages but got:', typeof messagesData);
-        return [];
-      }
-      
-      console.log(`[getChatMessages] Fetched ${messagesData.length} messages for chat ${chatId}`);
-      
-      // Deduplicate messages by ID to prevent duplicates
-      const messagesMap: Record<string, ChatMessage> = {};
-      messagesData.forEach((msg: any) => {
-        if (msg && msg.id) {
-          messagesMap[msg.id] = msg as ChatMessage;
-        }
-      });
-      
-      const uniqueMessages: ChatMessage[] = Object.values(messagesMap);
-      
-      // Store a backup copy in localStorage
-      if (uniqueMessages.length > 0) {
-        localStorage.setItem(`chat_messages_${chatId}`, JSON.stringify(uniqueMessages));
-      }
-      
-      return uniqueMessages;
-    } catch (error) {
-      // Handle specific error cases
-      if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('403')) {
-          console.warn('[getChatMessages] Authentication required to fetch chat messages');
-        } else if (error.message.includes('500')) {
-          console.error('[getChatMessages] Server error when fetching messages. Database might be disconnected.');
-        } else {
-          console.error(`[getChatMessages] Failed to fetch chat messages:`, error);
-        }
-      }
-      
-      return [];
-    }
-  } catch (error) {
-    console.error('[getChatMessages] Error fetching chat messages:', error);
-    return [];
-  }
+export async function getChatMessages(chatId: string): Promise<ChatMessage[]> {
+  if (!chatId) return [];
+  const result = await fetchAPI(`/v1/chats/${chatId}/messages`, {
+    method: 'GET',
+  });
+  return Array.isArray(result)
+    ? result.map((m: any) => ({
+        id: String(m.id),
+        content: m.content,
+        role: m.role,
+        sequenceId: m.sequenceId,
+        createdAt: new Date(m.createdAt).toISOString(),
+        updatedAt: new Date(m.updatedAt).toISOString(),
+        type: m.type || 'text',
+      }))
+    : [];
 }
 
 /**
@@ -209,76 +79,46 @@ export async function getChatMessages(
 export async function createChat(
   assistantId: string,
   name?: string,
-  specificWorkspaceId?: string,
-  isAgent: boolean = false
+  _specificWorkspaceId?: string,
+  isAgent: boolean = false,
+  workflowId?: string
 ): Promise<Chat | null> {
-  try {
-    // Use provided workspaceId, or get the current one consistently
-    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
-    
-    if (!workspaceId) {
-      console.error('[createChat] No workspace ID available');
-      return null;
-    }
-    
-    // Get user ID from Supabase
-    const supabase = createClient();
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id || 'anonymous';
-    
-    // Clear any old chat references first
-    localStorage.removeItem('currentChatId');
-    localStorage.removeItem('currentSessionId');
-    
-    // Create a consistent sessionId format
-    const timestamp = Date.now();
-    const sessionId = `${workspaceId}-${userId}-${timestamp}`;
-    console.log(`[createChat] Creating new chat with sessionId: ${sessionId} for assistant: ${assistantId}`);
-    
-    // Create a name if not provided
-    const chatName = name || `Chat ${new Date().toLocaleString()}`;
-    
-    try {
-      // Use fetchAPI instead of direct fetch
-      const chatData = await fetchAPI('/v1/chats', {
-        method: 'POST',
-        body: JSON.stringify({
-          // For agent-based chats, we only send agentId
-          // For assistant-based chats, we send assistantId
-          ...(isAgent ? { agentId: assistantId } : { assistantId }),
-          sessionId,
-          sessionType: 'chat',
-          name: chatName,
-          userId
-        }),
-      });
-      
-      if (!chatData || !chatData.id) {
-        console.error('[createChat] Failed to create chat: Invalid response data');
-        return null;
-      }
-      
-      console.log(`[createChat] Successfully created chat with ID: ${chatData.id}`);
-      
-      // Store the sessionId and chatId in localStorage for redundancy
-      localStorage.setItem('currentSessionId', sessionId);
-      localStorage.setItem('currentChatId', chatData.id);
-      
-      return chatData;
-    } catch (error) {
-      console.error('[createChat] Failed to create chat:', error);
-      return null;
-    }
-  } catch (error) {
-    console.error('[createChat] Error creating chat:', error);
-    
-    // Create a fallback chat ID for offline use
-    const timestamp = Date.now();
-    const fallbackChatId = `chat-${timestamp}-network-error`;
-    localStorage.setItem('currentChatId', fallbackChatId);
-    
-    return null;
+  const body: any = {
+    name,
+    sessionType: 'chat',
+  };
+
+  if (isAgent) {
+    body.agentId = assistantId;
+  } else {
+    body.assistantId = assistantId;
   }
+
+  if (workflowId) {
+    body.workflowId = workflowId;
+  }
+
+  const created = await fetchAPI('/v1/chats', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+  if (!created) return null;
+
+  const chat: Chat = {
+    id: String(created.id),
+    name: created.name || name,
+    sessionId: created.sessionId,
+    sessionType: created.sessionType,
+    assistantId: created.assistantId || undefined,
+    agentId: created.agentId || undefined,
+    workflowId: created.workflowId || undefined,
+    workspaceId: created.workspaceId || undefined,
+    createdAt: new Date(created.createdAt).toISOString(),
+    updatedAt: new Date(created.updatedAt).toISOString(),
+  };
+
+  return chat;
 }
 
 /**
@@ -291,104 +131,42 @@ export async function createChat(
 export async function sendChatMessage(
   chatId: string,
   content: string,
-  role: 'user' | 'assistant',
-  specificWorkspaceId?: string
+  role: 'user' | 'assistant'
 ): Promise<ChatMessage | null> {
-  // Skip if using fallback chat ID that starts with 'chat-'
-  if (!chatId || (chatId.startsWith('chat-') && !chatId.includes('-'))) {
-    console.log(`[sendChatMessage] Not saving message to database - using temporary chat ID: ${chatId}`);
-    
-    // For fallback chats, store messages in localStorage
-    try {
-      const existingMessages = localStorage.getItem(`chat_messages_${chatId}`);
-      let messages = existingMessages ? JSON.parse(existingMessages) : [];
-      
-      // Add the new message
-      const newMessage = {
-        id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        content,
-        role,
-        sequenceId: messages.length,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        type: 'text'
-      };
-      
-      messages.push(newMessage);
-      
-      // Store back in localStorage
-      localStorage.setItem(`chat_messages_${chatId}`, JSON.stringify(messages));
-      console.log(`[sendChatMessage] Saved ${role} message to localStorage for chat ${chatId}`);
-      
-      return newMessage;
-    } catch (e) {
-      console.error('[sendChatMessage] Error saving message to localStorage:', e);
-      return null;
-    }
-  }
-  
-  try {
-    // Get existing messages to determine the next sequence ID
-    let sequenceId = 0;
-    try {
-      const messages = await getChatMessages(chatId, specificWorkspaceId);
-      if (messages.length > 0) {
-        // Find the highest sequence ID and add 1
-        sequenceId = Math.max(...messages.map(m => m.sequenceId || 0)) + 1;
-      }
-    } catch (e) {
-      console.error('[sendChatMessage] Error determining sequence ID:', e);
-      // Fall back to timestamp-based ID if we can't determine the sequence
-      sequenceId = Math.floor(Date.now() / 1000) % 10000; // Convert to seconds and keep only last 4 digits
-    }
-    
-    // Create the message data
-    const messageData = {
-      content,
-      role,
-      sequenceId,
-      type: 'text'
-    };
-    
-    try {
-      // Use fetchAPI instead of direct fetch
-      const messageResponse = await fetchAPI(`/v1/chats/${chatId}/messages`, {
-        method: 'POST',
-        body: JSON.stringify(messageData),
-      });
-      
-      console.log(`[sendChatMessage] Successfully saved ${role} message to database for chat ${chatId}`);
-      return messageResponse;
-    } catch (error) {
-      // If we get a 400 error, it might be due to a duplicate sequenceId
-      if (error instanceof Error && error.message.includes('400') && error.message.includes('sequenceId')) {
-        console.log('[sendChatMessage] Retrying with incremented sequence ID');
-        
-        // Increment the sequence ID and try again
-        try {
-          const retryData = await fetchAPI(`/v1/chats/${chatId}/messages`, {
-            method: 'POST',
-            body: JSON.stringify({
-              ...messageData,
-              sequenceId: sequenceId + 1
-            }),
-          });
-          
-          console.log(`[sendChatMessage] Successfully saved ${role} message to database on retry`);
-          return retryData;
-        } catch (retryError) {
-          console.error(`[sendChatMessage] Failed to save message on retry:`, retryError);
-          return null;
-        }
-      }
-      
-      console.error(`[sendChatMessage] Failed to save message:`, error);
-      return null;
-    }
-  } catch (error) {
-    console.error('[sendChatMessage] Error saving message to database:', error);
+  if (!chatId) {
+    console.warn('[sendChatMessage] Missing chatId, skipping');
     return null;
   }
+
+  // Fetch existing messages to compute next sequenceId for diagnostics
+  const existing = await getChatMessages(chatId);
+  const sequenceId = existing.length;
+
+  const body = {
+    content,
+    role,
+    sequenceId,
+    type: 'text',
+  };
+
+  const created = await fetchAPI(`/v1/chats/${chatId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+  if (!created) return null;
+
+  const message: ChatMessage = {
+    id: String(created.id),
+    content: created.content,
+    role: created.role,
+    sequenceId: created.sequenceId,
+    createdAt: new Date(created.createdAt).toISOString(),
+    updatedAt: new Date(created.updatedAt).toISOString(),
+    type: created.type || 'text',
+  };
+
+  return message;
 }
 
 /**
@@ -399,22 +177,14 @@ export async function sendChatMessage(
  */
 export async function updateChatName(
   chatId: string,
-  name: string,
-  specificWorkspaceId?: string
+  name: string
 ): Promise<boolean> {
-  try {
-    // Use fetchAPI instead of direct fetch
-    await fetchAPI(`/v1/chats/${chatId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ name }),
-    });
-    
-    console.log(`[updateChatName] Successfully updated chat name for ${chatId}`);
-    return true;
-  } catch (error) {
-    console.error(`[updateChatName] Failed to update chat name:`, error);
-    return false;
-  }
+  if (!chatId) return false;
+  await fetchAPI(`/v1/chats/${chatId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  });
+  return true;
 }
 
 /**
@@ -422,28 +192,10 @@ export async function updateChatName(
  * @param chatId The ID of the chat
  * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  */
-export async function deleteChat(
-  chatId: string,
-  specificWorkspaceId?: string
-): Promise<boolean> {
-  try {
-    // Use fetchAPI instead of direct fetch
-    await fetchAPI(`/v1/chats/${chatId}`, {
-      method: 'DELETE',
-    });
-        
-    
-    console.log(`[deleteChat] Successfully deleted chat ${chatId}`);
-    
-    // Remove from localStorage if it was the current chat
-    if (localStorage.getItem('currentChatId') === chatId) {
-      localStorage.removeItem('currentChatId');
-      localStorage.removeItem('currentSessionId');
-    }
-    
-    return true;
-  } catch (error) {
-    console.error(`[deleteChat] Failed to delete chat:`, error);
-    return false;
-  }
-} 
+export async function deleteChat(chatId: string): Promise<boolean> {
+  if (!chatId) return false;
+  await fetchAPI(`/v1/chats/${chatId}`, {
+    method: 'DELETE',
+  });
+  return true;
+}

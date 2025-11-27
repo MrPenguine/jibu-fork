@@ -1,133 +1,170 @@
 import { 
-  Body, 
-  Controller, 
-  Get, 
-  Post, 
-  Param, 
-  Delete, 
-  Query, 
-  UseGuards,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
   Req,
-  Patch
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { PrismaService } from '../../../core/database/prisma.service';
 import { ChatsService } from './chats.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { UpdateChatDto } from './dto/update-chat.dto';
-import { WorkspaceRoleGuard } from '../../../core/auth/guards/workspace-role.guard';
-import { Request } from 'express';
-import { Public } from '../../../core/auth/decorators/public.decorator';
 
+/**
+ * ChatsController handles REST endpoints for chats, delegating to Prisma for chat rows and ChatsService for message diagnostics.
+ */
 @ApiTags('chats')
 @Controller('v1/chats')
-@UseGuards(AuthGuard('jwt'), WorkspaceRoleGuard)
-@ApiBearerAuth()
 export class ChatsController {
   constructor(
-    private readonly chatsService: ChatsService
+    private readonly prisma: PrismaService,
+    private readonly chatsService: ChatsService,
   ) {}
 
-  @Post()
-  @Public()
-  @ApiOperation({ summary: 'Create a new chat' })
-  async createChat(@Body() createChatDto: CreateChatDto, @Req() req: Request) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
-    const userId = req.user?.['id'] as string || 'anonymous-user';
-    
-    return this.chatsService.createChat({
-      ...createChatDto,
-      workspaceId,
-      sessionId: createChatDto.sessionId || userId, // Use provided sessionId or fallback to userId
+  @Get()
+  @ApiOperation({ summary: 'List chats for an agent' })
+  async listChats(
+    @Req() req,
+    @Query('agentId') agentId?: string,
+    @Query('sessionType') sessionType: string = 'chat',
+  ) {
+    const workspaceId =
+      req.user?.lastWorkspaceId ||
+      req.user?.workspaceId ||
+      (req.headers['x-workspace-id'] as string);
+
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    const where: any = { workspaceId, sessionType };
+    if (agentId) {
+      where.agentId = agentId;
+    }
+
+    return this.prisma.chat.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
     });
   }
 
-  @Get()
-  @Public()
-  @ApiOperation({ summary: 'Get chats by assistantId (treated as agentId), agentId, or workflowId' })
-  @ApiQuery({ name: 'assistantId', required: false })
-  @ApiQuery({ name: 'agentId', required: false })
-  @ApiQuery({ name: 'workflowId', required: false })
-  @ApiQuery({ name: 'sessionType', required: false })
-  @ApiQuery({ name: 'sessionId', required: false })
-  async getChats(
-    @Req() req: Request,
-    @Query('assistantId') assistantId?: string,
-    @Query('agentId') agentId?: string,
-    @Query('workflowId') workflowId?: string,
-    @Query('sessionType') sessionType?: string,
-    @Query('sessionId') sessionId?: string
-  ) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
-    
-    const filters: { sessionType?: string; sessionId?: string; agentId?: string; workflowId?: string } = {};
-    if (sessionType) filters.sessionType = sessionType;
-    if (sessionId) filters.sessionId = sessionId;
-    
-    // Handle multiple possible filter types
-    if (assistantId) {
-      // Back-compat: treat assistantId as agentId
-      if (agentId) filters.agentId = agentId;
-      if (workflowId) filters.workflowId = workflowId;
-      return this.chatsService.getChatsByAgentId(workspaceId, assistantId, filters);
-    } else if (agentId) {
-      // Filtering by agentId
-      if (workflowId) filters.workflowId = workflowId;
-      return this.chatsService.getChatsByAgentId(workspaceId, agentId, filters);
-    } else if (workflowId) {
-      // Filtering by workflowId
-      return this.chatsService.getChatsByWorkflowId(workspaceId, workflowId, filters);
-    } else {
-      // No filter provided
-      throw new Error('At least one of assistantId, agentId, or workflowId must be provided');
+  @Post()
+  @ApiOperation({ summary: 'Create a new chat session' })
+  async createChat(@Req() req, @Body() dto: CreateChatDto) {
+    const workspaceId =
+      req.user?.lastWorkspaceId ||
+      req.user?.workspaceId ||
+      (req.headers['x-workspace-id'] as string);
+
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
     }
+
+    const sessionId = dto.sessionId || `session-${Date.now()}`;
+    const sessionType = dto.sessionType || 'chat';
+
+    let workflowId = dto.workflowId || null;
+
+    // If no workflowId provided but we have an agent, try to infer from agent.primaryWorkflow
+    if (!workflowId && dto.agentId) {
+      const agent = await this.prisma.agent.findFirst({
+        where: { id: dto.agentId, workspaceId },
+        select: { primaryWorkflowId: true },
+      });
+      workflowId = agent?.primaryWorkflowId || null;
+    }
+
+    const chat = await this.prisma.chat.create({
+      data: {
+        name: dto.name,
+        workspaceId,
+        agentId: dto.agentId,
+        workflowId: workflowId || undefined,
+        sessionId,
+        sessionType,
+        nodeType: dto.nodeType,
+        metadata: dto.metadata,
+      },
+    });
+
+    return chat;
   }
 
-  @Get(':id')
-  @Public()
-  @ApiOperation({ summary: 'Get a chat by ID' })
-  async getChat(@Param('id') id: string, @Req() req: Request) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
-    return this.chatsService.getChat(id, workspaceId);
+  @Get(':id/messages')
+  @ApiOperation({ summary: 'Get diagnostic messages for a chat' })
+  async getChatMessages(@Param('id') chatId: string, @Req() req) {
+    const workspaceId =
+      req.user?.lastWorkspaceId ||
+      req.user?.workspaceId ||
+      (req.headers['x-workspace-id'] as string);
+
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    return this.chatsService.getChatMessages(chatId, workspaceId);
+  }
+
+  @Post(':id/messages')
+  @ApiOperation({ summary: 'Create a diagnostic message and enqueue webhook job' })
+  async createMessage(
+    @Param('id') chatId: string,
+    @Req() req,
+    @Body() dto: CreateMessageDto,
+  ) {
+    const workspaceId =
+      req.user?.lastWorkspaceId ||
+      req.user?.workspaceId ||
+      (req.headers['x-workspace-id'] as string);
+
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    return this.chatsService.createMessage(chatId, dto, workspaceId);
   }
 
   @Patch(':id')
-  @Public()
-  @ApiOperation({ summary: 'Update a chat' })
+  @ApiOperation({ summary: 'Update chat name' })
   async updateChat(
-    @Param('id') id: string, 
-    @Body() updateChatDto: UpdateChatDto,
-    @Req() req: Request
+    @Param('id') chatId: string,
+    @Req() req,
+    @Body('name') name: string,
   ) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
-    return this.chatsService.updateChat(id, updateChatDto, workspaceId);
+    const workspaceId =
+      req.user?.lastWorkspaceId ||
+      req.user?.workspaceId ||
+      (req.headers['x-workspace-id'] as string);
+
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    return this.prisma.chat.update({
+      where: { id: chatId },
+      data: { name },
+    });
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a chat' })
-  async deleteChat(@Param('id') id: string, @Req() req: Request) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
-    return this.chatsService.deleteChat(id, workspaceId);
-  }
+  async deleteChat(@Param('id') chatId: string, @Req() req) {
+    const workspaceId =
+      req.user?.lastWorkspaceId ||
+      req.user?.workspaceId ||
+      (req.headers['x-workspace-id'] as string);
 
-  @Get(':chatId/messages')
-  @Public()
-  @ApiOperation({ summary: 'Get all messages for a chat' })
-  async getChatMessages(@Param('chatId') chatId: string, @Req() req: Request) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
-    return this.chatsService.getChatMessages(chatId, workspaceId);
-  }
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
 
-  @Post(':chatId/messages')
-  @Public()
-  @ApiOperation({ summary: 'Create a new message in a chat' })
-  async createMessage(
-    @Param('chatId') chatId: string, 
-    @Body() createMessageDto: CreateMessageDto,
-    @Req() req: Request
-  ) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
-    return this.chatsService.createMessage(chatId, createMessageDto, workspaceId);
+    await this.prisma.chat.delete({ where: { id: chatId } });
+    return { success: true };
   }
-} 
+}

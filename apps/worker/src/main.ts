@@ -2,6 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
 import * as os from 'os';
+import { randomUUID } from 'crypto';
+
+// Polyfill global crypto.randomUUID for @nestjs/schedule which expects a global crypto object
+(global as any).crypto = (global as any).crypto || {};
+(global as any).crypto.randomUUID = (global as any).crypto.randomUUID || randomUUID;
 
 async function bootstrap() {
   const logger = new Logger('Worker');

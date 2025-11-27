@@ -302,6 +302,14 @@ export default function AgentChat({
         fetchUserChats();
       }
 
+      // Always send the user message through the backend chat diagnostics pipeline
+      // so that ChatsService.createMessage runs and triggers webhook/queue logging.
+      try {
+        await chatApi.sendChatMessage(chatId!, currentInput, 'user');
+      } catch (diagError) {
+        console.error('Error sending diagnostic chat message to backend:', diagError);
+      }
+
       const assistantMessage: Message = {
         id: assistantMessageId,
         text: '',
