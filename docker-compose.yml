@@ -127,7 +127,7 @@ services:
       - monitoring
 
   n8n:
-    image: n8nio/n8n:1.106.3
+    image: n8nio/n8n:1.123.4
     container_name: n8n
     restart: always
     cpus: "2.0"
