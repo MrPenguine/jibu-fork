@@ -5,11 +5,11 @@ import { ConfigService } from '@nestjs/config';
 import { 
   QUEUE_NAMES, 
   JOB_NAMES, 
-  WebhookDeliveryJobData,
   WebhookPayload,
 } from '@jibu/queue-definitions';
 import { WebhookCacheService } from '@jibu/cache-utils';
 import axios, { AxiosError } from 'axios';
+import { WebhookUrlService } from '../../../backend/src/core/webhook/webhook-url.service';
 
 /**
  * Processor for webhook delivery jobs
@@ -35,8 +35,9 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
   private totalDeliveryTime = 0;
 
   constructor(
-    private readonly cacheService: WebhookCacheService,
+    private readonly webhookCacheService: WebhookCacheService,
     private readonly configService: ConfigService,
+    private readonly webhookUrlService: WebhookUrlService,
   ) {}
 
   onModuleInit() {
@@ -50,24 +51,30 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
   }
 
   @OnQueueActive()
-  onActive(job: Job<WebhookDeliveryJobData>) {
-    const { workflowId, sessionId, isVoice } = job.data;
+  onActive(job: Job<WebhookPayload>) {
+    const payload = job.data;
+    const { workflowId, sessionId } = payload;
+    const isVoice = payload.eventType === 'call' || (payload as any).isVoice === true;
     this.logger.debug(
       `Job ${job.id} active - Delivering ${isVoice ? 'voice' : 'non-voice'} webhook for workflow ${workflowId}, session ${sessionId}`
     );
   }
 
   @OnQueueCompleted()
-  onCompleted(job: Job<WebhookDeliveryJobData>, result: any) {
-    const { workflowId, isVoice } = job.data;
+  onCompleted(job: Job<WebhookPayload>, result: any) {
+    const payload = job.data;
+    const { workflowId } = payload;
+    const isVoice = payload.eventType === 'call' || (payload as any).isVoice === true;
     this.logger.log(
       `Job ${job.id} completed - ${isVoice ? 'Voice' : 'Non-voice'} webhook delivered for workflow ${workflowId}`
     );
   }
 
   @OnQueueFailed()
-  onFailed(job: Job<WebhookDeliveryJobData>, err: Error) {
-    const { workflowId, sessionId, isVoice } = job.data;
+  onFailed(job: Job<WebhookPayload>, err: Error) {
+    const payload = job.data;
+    const { workflowId, sessionId } = payload;
+    const isVoice = payload.eventType === 'call' || (payload as any).isVoice === true;
     this.logger.error(
       `Job ${job.id} failed - ${isVoice ? 'Voice' : 'Non-voice'} webhook delivery failed for workflow ${workflowId}, session ${sessionId}: ${err.message}`,
       err.stack
@@ -76,11 +83,19 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
   }
 
   @Process(JOB_NAMES.DELIVER_WEBHOOK)
-  async handle(job: Job<WebhookDeliveryJobData>) {
+  async handle(job: Job<WebhookPayload>) {
     const startTime = Date.now();
-    const { workflowId, sessionId, payload, isVoice, connectionId, priority } = job.data;
+    const payload = job.data;
+    const { workflowId, sessionId } = payload;
+    const isVoice = payload.eventType === 'call' || (payload as any).isVoice === true;
+    const priority = job.opts.priority;
 
     try {
+      // Validate critical fields — prevent silent failures
+      if (!sessionId || !workflowId) {
+        throw new Error('Invalid webhook payload: missing sessionId or workflowId');
+      }
+
       // Log payload structure for debugging
       this.logger.log(
         `Processing webhook delivery job ${job.id} for workflow ${workflowId}, session ${sessionId}, ` +
@@ -149,6 +164,10 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
       );
 
       // Step 3: Deliver complete structured payload to webhook
+      // Sending canonical WebhookPayload — no transformation
+      this.logger.debug(
+        `Delivering ${payload.eventType} for session ${sessionId} (workflow ${workflowId})`,
+      );
       const deliveryStartTime = Date.now();
       const response = await this.deliverWebhook(webhookUrl, payload, isVoice);
       const deliveryDuration = Date.now() - deliveryStartTime;
@@ -217,7 +236,7 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
   private async getWebhookUrl(workflowId: string, isVoice: boolean): Promise<string | null> {
     try {
       // Try cache first
-      const cachedUrl = await this.cacheService.getWebhookUrl(workflowId, isVoice);
+      const cachedUrl = await this.webhookCacheService.getWebhookUrl(workflowId, isVoice);
       
       if (cachedUrl) {
         return cachedUrl;
@@ -228,8 +247,20 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
         `Cache miss for ${isVoice ? 'voice' : 'non-voice'} workflow ${workflowId}`
       );
 
-      // For now, return null and let the job fail
-      // In production, you might want to query the database here
+      // Phase 1 100% complete — clean URLs + real DB fallback
+      const dbUrl = await this.webhookUrlService.getWebhookUrl(workflowId, isVoice);
+
+      if (dbUrl) {
+        this.logger.log(
+          `Webhook URL resolved from database for ${isVoice ? 'voice' : 'non-voice'} workflow ${workflowId}`
+        );
+        return dbUrl;
+      }
+
+      this.logger.error(
+        `Webhook URL not found in database for workflow ${workflowId}`
+      );
+
       return null;
 
     } catch (error) {
@@ -281,7 +312,31 @@ export class WebhookDeliveryProcessor implements OnModuleInit {
 
     } catch (error) {
       const axiosError = error as AxiosError;
-      
+
+      if (axiosError.response && axiosError.response.status === 404) {
+        const workflowId = payload.workflowId;
+
+        if (workflowId) {
+          try {
+            await this.webhookCacheService.refreshAndInvalidate(workflowId);
+            await this.webhookUrlService.refreshWebhookUrl(workflowId);
+            this.logger.warn(
+              `Detected stale webhook URL (404) — refreshed from n8n (workflow ${workflowId})`,
+            );
+          } catch (refreshError) {
+            const refreshErr = refreshError as Error;
+            this.logger.error(
+              `Failed to refresh webhook URL after 404 for workflow ${workflowId}: ${refreshErr.message}`,
+              refreshErr.stack,
+            );
+          }
+        } else {
+          this.logger.warn(
+            'Detected stale webhook URL (404) but payload.workflowId is missing; unable to refresh',
+          );
+        }
+      }
+
       if (axiosError.code === 'ECONNABORTED') {
         throw new Error(`Webhook delivery timeout after ${this.WEBHOOK_TIMEOUT_MS}ms`);
       }

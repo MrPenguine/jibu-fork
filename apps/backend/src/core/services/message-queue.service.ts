@@ -4,18 +4,16 @@ import { Queue, JobOptions } from 'bull';
 import { 
   QUEUE_NAMES, 
   JOB_NAMES, 
-  WebhookDeliveryJobData,
   WebhookPayload,
   WebhookPriority,
   VoiceMetadata,
   CallEventData,
   AiContext,
-  ConversationMessage,
   ConnectionContextData,
 } from '@jibu/queue-definitions';
 import { WebhookCacheService } from '@jibu/cache-utils';
 import { ConnectionService } from './connection.service';
-import { RagContextService } from './rag-context.service';
+import { PayloadBuilderService } from '@jibu/payload-builder';
 
 /**
  * Service for enqueuing webhook delivery jobs
@@ -30,7 +28,7 @@ export class MessageQueueService {
     @InjectQueue(QUEUE_NAMES.WEBHOOK_DELIVERY) private readonly webhookQueue: Queue,
     private readonly cacheService: WebhookCacheService,
     private readonly connectionService: ConnectionService,
-    private readonly ragContextService: RagContextService,
+    private readonly payloadBuilder: PayloadBuilderService,
   ) {}
 
   /**
@@ -47,7 +45,8 @@ export class MessageQueueService {
     sessionId: string,
     text: string,
     aiContext?: Partial<AiContext>,
-    options?: JobOptions
+    options?: JobOptions,
+    prebuiltPayload?: WebhookPayload,
   ): Promise<void> {
     const startTime = Date.now();
 
@@ -69,24 +68,19 @@ export class MessageQueueService {
         throw new Error(`Circuit breaker open for workflow ${workflowId}`);
       }
 
-      // Build complete webhook payload
-      const payload: WebhookPayload = await this.buildMessagePayload(
-        workflowId,
-        sessionId,
-        text,
-        false, // isVoice
-        undefined, // voiceMetadata
-        aiContext
-      );
+      // Build canonical webhook payload via shared factory (chat path matches voice)
+      const payload: WebhookPayload =
+        prebuiltPayload ??
+        (await this.payloadBuilder.buildMessagePayload({
+          workflowId,
+          sessionId,
+          text,
+          isVoice: false,
+          aiContextOverride: aiContext,
+        }));
 
       // Prepare job data
-      const jobData: WebhookDeliveryJobData = {
-        workflowId,
-        sessionId,
-        payload,
-        isVoice: false,
-        priority: WebhookPriority.CHAT_MESSAGES,
-      };
+      const jobData: WebhookPayload = payload;
 
       // Enqueue with chat priority
       const job = await this.webhookQueue.add(JOB_NAMES.DELIVER_WEBHOOK, jobData, {
@@ -167,26 +161,19 @@ export class MessageQueueService {
         }
       }
 
-      // Build complete webhook payload
-      const payload: WebhookPayload = await this.buildMessagePayload(
+      // Build canonical webhook payload via shared factory (chat path matches voice)
+      const payload: WebhookPayload = await this.payloadBuilder.buildMessagePayload({
         workflowId,
         sessionId,
         text,
-        true, // isVoice
+        isVoice: true,
         voiceMetadata,
-        aiContext,
-        connectionContext
-      );
+        aiContextOverride: aiContext,
+        connectionContext,
+      });
 
       // Prepare job data with voice priority
-      const jobData: WebhookDeliveryJobData = {
-        workflowId,
-        sessionId,
-        payload,
-        isVoice: true,
-        connectionId,
-        priority: WebhookPriority.VOICE_MESSAGES,
-      };
+      const jobData: WebhookPayload = payload;
 
       // Enqueue with voice message priority
       const job = await this.webhookQueue.add(JOB_NAMES.DELIVER_WEBHOOK, jobData, {
@@ -281,24 +268,17 @@ export class MessageQueueService {
         throw new Error(`Circuit breaker open for workflow ${workflowId}`);
       }
 
-      // Build complete webhook payload for call event
-      const payload: WebhookPayload = await this.buildCallEventPayload(
+      // Build canonical webhook payload for call event via shared factory
+      const payload: WebhookPayload = await this.payloadBuilder.buildCallPayload({
         workflowId,
         sessionId,
         callEvent,
-        aiContext,
-        connectionContext
-      );
+        aiContextOverride: aiContext,
+        connectionContext,
+      });
 
       // Prepare job data with highest priority
-      const jobData: WebhookDeliveryJobData = {
-        workflowId,
-        sessionId,
-        payload,
-        isVoice: true,
-        connectionId,
-        priority: WebhookPriority.VOICE_EVENTS,
-      };
+      const jobData: WebhookPayload = payload;
 
       // Enqueue with highest priority
       const job = await this.webhookQueue.add(JOB_NAMES.DELIVER_WEBHOOK, jobData, {
@@ -332,94 +312,6 @@ export class MessageQueueService {
       );
       throw error;
     }
-  }
-
-  /**
-   * Build complete message payload with conversation context
-   * Private helper method for payload assembly
-   */
-  private async buildMessagePayload(
-    workflowId: string,
-    sessionId: string,
-    text: string,
-    isVoice: boolean,
-    voiceMetadata?: VoiceMetadata,
-    aiContext?: Partial<AiContext>,
-    connectionContext?: ConnectionContextData
-  ): Promise<WebhookPayload> {
-    // Get RAG context (currently returns empty placeholder)
-    const ragContext = await this.ragContextService.getRagContext(text);
-
-    // Build complete AI context
-    const completeAiContext: AiContext = {
-      systemPrompt: aiContext?.systemPrompt || '',
-      systemMessage: aiContext?.systemMessage || '',
-      conversationHistory: aiContext?.conversationHistory || [],
-      ragContext,
-    };
-
-    // Assemble complete payload
-    const payload: WebhookPayload = {
-      eventType: 'message',
-      sessionId,
-      workflowId,
-      timestamp: Date.now(),
-      text,
-      isVoice,
-      aiContext: completeAiContext,
-    };
-
-    // Add voice metadata if provided
-    if (voiceMetadata) {
-      payload.voiceMetadata = voiceMetadata;
-    }
-
-    // Add connection context if provided
-    if (connectionContext) {
-      payload.connectionContext = connectionContext;
-    }
-
-    return payload;
-  }
-
-  /**
-   * Build complete call event payload
-   * Private helper method for call event assembly
-   */
-  private async buildCallEventPayload(
-    workflowId: string,
-    sessionId: string,
-    callEvent: CallEventData,
-    aiContext?: Partial<AiContext>,
-    connectionContext?: ConnectionContextData
-  ): Promise<WebhookPayload> {
-    // Get RAG context (currently returns empty placeholder)
-    const ragContext = await this.ragContextService.getRagContext('');
-
-    // Build complete AI context
-    const completeAiContext: AiContext = {
-      systemPrompt: aiContext?.systemPrompt || '',
-      systemMessage: aiContext?.systemMessage || '',
-      conversationHistory: aiContext?.conversationHistory || [],
-      ragContext,
-    };
-
-    // Assemble complete payload
-    const payload: WebhookPayload = {
-      eventType: 'call',
-      sessionId,
-      workflowId,
-      timestamp: Date.now(),
-      callEvent,
-      aiContext: completeAiContext,
-    };
-
-    // Add connection context if provided
-    if (connectionContext) {
-      payload.connectionContext = connectionContext;
-    }
-
-    return payload;
   }
 
   /**

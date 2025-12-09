@@ -1,5 +1,13 @@
 import { fetchAPI } from './api';
 
+const safeISO = (date: any) => {
+  if (!date) {
+    return new Date().toISOString();
+  }
+  const d = new Date(date);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+};
+
 export interface ChatMessage {
   id: string;
   content: string;
@@ -62,8 +70,8 @@ export async function getChatMessages(chatId: string): Promise<ChatMessage[]> {
         content: m.content,
         role: m.role,
         sequenceId: m.sequenceId,
-        createdAt: new Date(m.createdAt).toISOString(),
-        updatedAt: new Date(m.updatedAt).toISOString(),
+        createdAt: safeISO(m.createdAt),
+        updatedAt: safeISO(m.updatedAt),
         type: m.type || 'text',
       }))
     : [];
@@ -114,8 +122,8 @@ export async function createChat(
     agentId: created.agentId || undefined,
     workflowId: created.workflowId || undefined,
     workspaceId: created.workspaceId || undefined,
-    createdAt: new Date(created.createdAt).toISOString(),
-    updatedAt: new Date(created.updatedAt).toISOString(),
+    createdAt: safeISO(created.createdAt),
+    updatedAt: safeISO(created.updatedAt),
   };
 
   return chat;
@@ -161,8 +169,8 @@ export async function sendChatMessage(
     content: created.content,
     role: created.role,
     sequenceId: created.sequenceId,
-    createdAt: new Date(created.createdAt).toISOString(),
-    updatedAt: new Date(created.updatedAt).toISOString(),
+    createdAt: safeISO(created.createdAt),
+    updatedAt: safeISO(created.updatedAt),
     type: created.type || 'text',
   };
 

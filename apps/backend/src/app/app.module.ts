@@ -10,6 +10,7 @@ import { V1Module } from '../modules/v1/v1.module';
 import { EncryptionModule } from '../core/encryption/encryption.module';
 import { RedisModule } from '../core/redis/redis.module';
 import { AdminModule } from '../modules/admin/admin.module';
+import { VoiceModule } from '../modules/voice/voice.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AdminModule } from '../modules/admin/admin.module';
     EncryptionModule,
     AuthModule,
     V1Module,
+    VoiceModule,
     RedisModule,
     AdminModule,
   ],

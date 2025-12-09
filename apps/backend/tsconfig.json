@@ -5,7 +5,8 @@
     "outDir": "../../dist/apps/backend",
     "paths": {
       "@jibu/queue-definitions": ["libs/queue-definitions/src"],
-      "@jibu/cache-utils": ["libs/cache-utils/src/index.ts"]
+      "@jibu/cache-utils": ["libs/cache-utils/src/index.ts"],
+      "@jibu/payload-builder": ["libs/payload-builder/src/index.ts"]
     },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,

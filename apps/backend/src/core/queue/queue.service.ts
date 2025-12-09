@@ -7,7 +7,8 @@ import {
   JOB_NAMES,
   IndexFileSourceJobData,
   DeindexSourceJobData,
-  EmailJobData
+  EmailJobData,
+  WebhookPayload,
 } from '@jibu/queue-definitions';
 
 @Injectable()
@@ -108,12 +109,12 @@ export class QueueService {
       
       const job = await this.publishQueue.add(JOB_NAMES.PUBLISH_WORKFLOW, data, options);
       
-      this.logger.log(`[DIAGNOSTIC] ✅ Successfully added publish job. Job ID: ${job.id}, Workflow: ${data.workflowId}`);
+      this.logger.log(`[DIAGNOSTIC] Successfully added publish job. Job ID: ${job.id}, Workflow: ${data.workflowId}`);
       this.logger.debug(`[DIAGNOSTIC] Job details: ${JSON.stringify({ id: job.id, name: job.name, timestamp: job.timestamp })}`);
       
       return job;
     } catch (error) {
-      this.logger.error(`[DIAGNOSTIC] ❌ Failed to add publish job for workflow ${data?.workflowId}: ${error.message}`, error.stack);
+      this.logger.error(`[DIAGNOSTIC] Failed to add publish job for workflow ${data?.workflowId}: ${error.message}`, error.stack);
       throw error;
     }
   }
@@ -174,9 +175,28 @@ export class QueueService {
   }
 
   /**
+   * Add a webhook delivery job to the WEBHOOK_DELIVERY queue
+   */
+  async addWebhookDeliveryJob(payload: WebhookPayload, options?: JobOptions) {
+    try {
+      const job = await this.webhookQueue.add(JOB_NAMES.DELIVER_WEBHOOK, payload, options);
+      this.logger.debug(
+        `Added webhook delivery job for workflow: ${(payload as any).workflowId}, session: ${(payload as any).sessionId}`,
+      );
+      return job;
+    } catch (error) {
+      this.logger.error(
+        `Failed to add webhook delivery job: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Get a webhook delivery job by ID
    */
   async getWebhookJob(jobId: string) {
     return this.webhookQueue.getJob(jobId);
   }
-} 
+}

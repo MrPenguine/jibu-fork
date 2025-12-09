@@ -22,6 +22,7 @@
       "@jibu/core/embedding": ["libs/core/embedding/src/index.ts"],
       "@jibu/core/vector-db": ["libs/core/vector-db/src/index.ts"],
       "@jibu/queue-definitions": ["libs/queue-definitions/src/index.ts"],
+      "@jibu/payload-builder": ["libs/payload-builder/src/index.ts"],
       "@libs/shadcn-ui": ["libs/shadcn-ui/src/index.ts"],
       "@libs/shadcn-ui/components/*": ["libs/shadcn-ui/src/components/*"],
       "@libs/shadcn-ui/hooks/*": ["libs/shadcn-ui/src/hooks/*"],

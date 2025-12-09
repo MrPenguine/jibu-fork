@@ -8,8 +8,9 @@ import { N8nAdminClient } from './n8n-admin.client';
 import { PublishWorkflowProcessor } from './publish-workflow.processor';
 import { WebhookDeliveryProcessor } from './webhook-delivery.processor';
 import { DatabaseModule } from '../../../backend/src/core/database/database.module';
-import { WebhookCacheService, REDIS_SERVICE_TOKEN } from '@jibu/cache-utils';
+import { WebhookCacheService, REDIS_SERVICE_TOKEN, IRedisService } from '@jibu/cache-utils';
 import { RedisService } from '../../../backend/src/core/redis/redis.service';
+import { WebhookUrlService } from '../../../backend/src/core/webhook/webhook-url.service';
 
 @Module({
   imports: [
@@ -27,10 +28,15 @@ import { RedisService } from '../../../backend/src/core/redis/redis.service';
     N8nAdminClient, 
     PublishWorkflowProcessor,
     WebhookDeliveryProcessor,
-    WebhookCacheService,
     RedisService,
+    WebhookUrlService,
     // Bind shared Redis token to the concrete RedisService in worker
     { provide: REDIS_SERVICE_TOKEN, useExisting: RedisService },
+    {
+      provide: WebhookCacheService,
+      useFactory: (redisService: IRedisService) => new WebhookCacheService(redisService),
+      inject: [REDIS_SERVICE_TOKEN],
+    },
   ],
   exports: [N8nIntegrationService, N8nWorkerConfig, N8nAdminClient, WebhookCacheService],
 })

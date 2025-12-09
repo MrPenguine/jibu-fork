@@ -182,7 +182,25 @@ export class PublishWorkflowProcessor implements OnModuleInit {
       const webhookPath = webhookNode?.parameters?.path ? String(webhookNode.parameters.path) : undefined;
       const baseEnv = process.env.N8N_WEBHOOK_URL || process.env.N8N_PUBLIC_URL || process.env.N8N_API_URL || '';
       const baseUrl = String(baseEnv).replace(/\/$/, '').replace(/\/?api(?:\/v\d+)?$/, '');
-      const webhookUrl = webhookPath ? `${baseUrl}/webhook/${webhookPath}` : undefined;
+
+      let webhookId = webhookPath ? webhookPath.trim() : undefined;
+
+      if (webhookId) {
+        // Remove any leading slashes
+        webhookId = webhookId.replace(/^\/+/, '');
+
+        const segments = webhookId.split('/');
+
+        // Legacy form: api/n8n/hooks/<workflowId>/<versionLabel> -> keep only <workflowId>
+        if (segments.length >= 4 && segments[0] === 'api' && segments[1] === 'n8n' && segments[2] === 'hooks') {
+          webhookId = segments[3];
+        } else if (segments.length > 1) {
+          // Generic safety: keep only the last segment as the clean id
+          webhookId = segments[segments.length - 1];
+        }
+      }
+
+      const webhookUrl = webhookId ? `${baseUrl}/webhook/${webhookId}` : undefined;
 
       await this.prisma.n8nWorkflow.update({
         where: { id: n8nRow.id },

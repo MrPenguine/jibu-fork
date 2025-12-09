@@ -149,7 +149,9 @@ export class CompileContextBuilder {
     const ctx: CompileContext = {
       workflowName: workflow.name,
       webhook: {
-        path: `/api/n8n/hooks/${workflowId}/${versionLabel}`,
+        // Use clean webhook identifier without API prefixes; final URL will be
+        // constructed as <base>/webhook/<id> by the publish workflow processor.
+        path: workflowId,
         id: workflowId, // deterministic for now
       },
       assistant: {
