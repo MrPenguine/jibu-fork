@@ -1,0 +1,26 @@
+{
+    "name": "livekit-agent",
+    "$schema": "../../node_modules/nx/schemas/project-schema.json",
+    "projectType": "application",
+    "sourceRoot": "apps/livekit-agent/src",
+    "targets": {
+        "serve": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "python src/main.py",
+                "cwd": "apps/livekit-agent"
+            }
+        },
+        "install": {
+            "executor": "nx:run-commands",
+            "options": {
+                "command": "pip install -r requirements.txt",
+                "cwd": "apps/livekit-agent"
+            }
+        }
+    },
+    "tags": [
+        "type:app",
+        "language:python"
+    ]
+}

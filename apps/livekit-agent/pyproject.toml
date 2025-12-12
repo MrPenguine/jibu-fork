@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "livekit-agent"
+version = "0.1.0"
+description = "Universal Voice Gateway for n8n"
+authors = ["Jibu Console"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.109.0"
+uvicorn = "^0.27.0"
+livekit-agents = "^0.7.0"
+livekit-api = "^0.5.0"
+python-dotenv = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
