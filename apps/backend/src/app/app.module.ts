@@ -11,6 +11,7 @@ import { EncryptionModule } from '../core/encryption/encryption.module';
 import { RedisModule } from '../core/redis/redis.module';
 import { AdminModule } from '../modules/admin/admin.module';
 import { VoiceModule } from '../modules/voice/voice.module';
+import { LiveKitModule } from '../modules/livekit/livekit.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { VoiceModule } from '../modules/voice/voice.module';
     AuthModule,
     V1Module,
     VoiceModule,
+    LiveKitModule,
     RedisModule,
     AdminModule,
   ],

@@ -56,6 +56,15 @@ const nextConfig = {
 
     return config;
   },
+  // API Proxy
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:4000/api/:path*',
+      },
+    ];
+  },
 };
 
 const plugins = [
