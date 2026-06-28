@@ -375,7 +375,9 @@ export class AgentController {
       
       const messageDto: CreateMessageDto = { content: cleanedContent, role, sequenceId, type: 'text' };
       
-      await this.chatsService.createMessage(chatId, messageDto, workspaceId);
+      // Persistence-only: the brain already produced the reply in this flow, so
+      // do not trigger another runTurn from within createMessage.
+      await this.chatsService.createMessage(chatId, messageDto, workspaceId, { generateReply: false });
       this.logger.log(`Successfully saved ${role} message to database for chat ${chatId}`);
     } catch (error) {
       this.logger.error(`Error saving message to database: ${error.message}`);

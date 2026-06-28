@@ -4,6 +4,17 @@ import { WebhookUrlService } from '../../../core/webhook/webhook-url.service';
 import { MessageQueueService } from '../../../core/services/message-queue.service';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { PayloadBuilderService } from '@jibu/payload-builder';
+import { AgentRuntimeService } from '../../../integrations/agent/agent-runtime.service';
+
+export interface CreateMessageOptions {
+  /**
+   * When true (default), a user turn on an agent-backed chat is answered by the
+   * single-brain runtime and the reply is persisted. Internal persistence-only
+   * callers (e.g. AgentController saving messages) pass false to avoid a second
+   * brain run.
+   */
+  generateReply?: boolean;
+}
 
 @Injectable()
 export class ChatsService {
@@ -14,6 +25,7 @@ export class ChatsService {
     private readonly webhookUrlService: WebhookUrlService,
     private readonly messageQueueService: MessageQueueService,
     private readonly payloadBuilder: PayloadBuilderService,
+    private readonly agentRuntime: AgentRuntimeService,
   ) {}
 
   private normalizeWebhookUrl(url: string | null): string | null {
@@ -69,7 +81,13 @@ export class ChatsService {
     return chat?.messages ?? [];
   }
 
-  async createMessage(chatId: string, message: CreateMessageDto, workspaceId: string) {
+  async createMessage(
+    chatId: string,
+    message: CreateMessageDto,
+    workspaceId: string,
+    options: CreateMessageOptions = {},
+  ) {
+    const generateReply = options.generateReply ?? true;
     // Resolve the workflow directly from the Chat record so we always
     // use the workflow linked in Prisma (Chat -> Workflow -> N8nWorkflow).
     this.logger.log(
@@ -101,6 +119,7 @@ export class ChatsService {
     }
 
     const workflowId = chat.workflowId || null;
+    const agentId = chat.agentId || null;
     const sessionId = chat.sessionId || chatId;
 
     // Persist the message to the database
@@ -116,8 +135,48 @@ export class ChatsService {
     });
 
     this.logger.log(
-      `[DIAGNOSTIC][ChatsService] Message persisted to DB for chat ${chat.id} with workflowId=${workflowId ?? 'unknown'}`,
+      `[DIAGNOSTIC][ChatsService] Message persisted to DB for chat ${chat.id} with agentId=${agentId ?? 'none'} workflowId=${workflowId ?? 'unknown'}`,
     );
+
+    // Persistence-only callers (or non-user turns) stop here.
+    if (!generateReply || message.role !== 'user') {
+      return createdMessage;
+    }
+
+    // Single-brain path: an agent-backed chat is answered directly by the runtime.
+    if (agentId) {
+      try {
+        const result = await this.agentRuntime.runTurn({
+          agentId,
+          channel: 'chat',
+          sessionId: chat.id,
+          input: message.content,
+          workspaceId,
+        });
+
+        const assistantMessage = await this.prisma.message.create({
+          data: {
+            chatId: chat.id,
+            content: result.output,
+            role: 'assistant',
+            type: 'text',
+            sequenceId: (message.sequenceId ?? 0) + 1,
+            metadata: result.meta as any,
+          },
+        });
+
+        this.logger.log(
+          `[ChatsService] ✅ Single-brain reply generated for agent ${agentId}, chat ${chat.id}`,
+        );
+        return { ...createdMessage, assistantMessage };
+      } catch (error) {
+        this.logger.error(
+          `[ChatsService] ❌ Single-brain runTurn failed for agent ${agentId}: ${(error as Error).message}`,
+          (error as Error).stack,
+        );
+        return createdMessage;
+      }
+    }
 
     if (workflowId) {
       try {

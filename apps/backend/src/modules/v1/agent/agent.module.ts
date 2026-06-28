@@ -12,9 +12,7 @@ import { AgentExecutionService } from './execution/agent-execution.service';
 import { AgentService as IntegrationsAgentService } from '../../../integrations/agent/agent.service';
 import { LangchainAgentService } from '../../../integrations/agent/providers/langchain/langchain-agent.service';
 import { RagService } from '../../../integrations/agent/providers/langchain/rag.service';
-import { AgentRuntimeService } from '../../../integrations/agent/agent-runtime.service';
-import { ToolExecutorService } from '../../../integrations/agent/tool-executor.service';
-import { CredentialModule } from '../credential/credential.module';
+import { AgentRuntimeModule } from '../../../integrations/agent/agent-runtime.module';
 
 @Module({
   imports: [
@@ -23,7 +21,7 @@ import { CredentialModule } from '../credential/credential.module';
     RedisModule,
     ChatsModule,
     WorkflowModule,
-    CredentialModule
+    AgentRuntimeModule
   ],
   controllers: [AgentController],
   providers: [
@@ -31,8 +29,6 @@ import { CredentialModule } from '../credential/credential.module';
     IntegrationsAgentService,
     LangchainAgentService,
     RagService,
-    AgentRuntimeService,
-    ToolExecutorService,
     AgentExecutionService
   ],
   exports: [
@@ -40,8 +36,6 @@ import { CredentialModule } from '../credential/credential.module';
     IntegrationsAgentService,
     LangchainAgentService,
     RagService,
-    AgentRuntimeService,
-    ToolExecutorService,
     AgentExecutionService
   ],
 })
