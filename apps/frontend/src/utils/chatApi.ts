@@ -194,6 +194,10 @@ export async function sendUserMessageWithReply(
     body: JSON.stringify({ content, role: 'user', sequenceId, type: 'text' }),
   });
 
+  if (!created) {
+    throw new Error('No response received from the server when sending message.');
+  }
+
   const toMsg = (m: any): ChatMessage => ({
     id: String(m.id),
     content: m.content,
