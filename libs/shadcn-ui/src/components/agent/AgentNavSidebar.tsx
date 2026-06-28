@@ -15,16 +15,12 @@ import {
 import { Separator } from "../ui/separator"
 import {
   BarChart,
-  BookOpen,
   FileText,
-  Info,
   LayoutDashboard,
   MessageSquare,
   Settings,
-  CreditCard,
   Database,
   Layers,
-  FileCode,
   FileCheck,
   ArrowLeft,
   SlidersHorizontal,
@@ -146,13 +142,18 @@ export function AgentNavSidebar({
             <NavItem href={`/agent/${agentId}/config`} icon={<SlidersHorizontal />} isExpanded={isExpanded}>
               Configure
             </NavItem>
-            <NavItem href={`/agent/${agentId}/cms/workflows`} icon={<FileText />} isExpanded={isExpanded}>
-              Content
+            <NavItem href={`/agent/${agentId}/playground`} icon={<MessageSquare />} isExpanded={isExpanded}>
+              Playground
             </NavItem>
             {CANVAS_ENABLED && (
-              <NavItem href={canvasHref} icon={<LayoutDashboard />} isExpanded={isExpanded}>
-                Canvas (beta)
-              </NavItem>
+              <>
+                <NavItem href={`/agent/${agentId}/cms/workflows`} icon={<FileText />} isExpanded={isExpanded}>
+                  Content (beta)
+                </NavItem>
+                <NavItem href={canvasHref} icon={<LayoutDashboard />} isExpanded={isExpanded}>
+                  Canvas (beta)
+                </NavItem>
+              </>
             )}
             <NavItem href={`/agent/${agentId}/knowledge-base`} icon={<Database />} isExpanded={isExpanded}>
               Knowledge base
@@ -174,12 +175,6 @@ export function AgentNavSidebar({
         <Separator className="my-2 bg-gray-600" />
         <NavItem href={`/agent/${agentId}/settings`} icon={<Settings />} isExpanded={isExpanded}>
           Settings
-        </NavItem>
-        <NavItem href={`/agent/${agentId}/usage`} icon={<CreditCard />} isExpanded={isExpanded}>
-          Credit Usage
-        </NavItem>
-        <NavItem href={`/agent/${agentId}/info`} icon={<Info />} isExpanded={isExpanded}>
-          Info
         </NavItem>
       </SidebarFooter>
     </Sidebar>

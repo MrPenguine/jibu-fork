@@ -18,7 +18,7 @@ export class EmbeddingService {
     this.logger.log('Initializing embedding service');
 
     const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY');
-    this.modelName = this.configService.get<string>('EMBEDDING_MODEL', 'text-embedding-004');
+    this.modelName = this.configService.get<string>('EMBEDDING_MODEL', 'gemini-embedding-001');
     this.vectorDimension = parseInt(this.configService.get<string>('VECTOR_DIMENSION', '768'), 10);
 
     if (!geminiApiKey) {
@@ -71,6 +71,10 @@ export class EmbeddingService {
       const requests = validDocumentsToEmbed.map(doc => ({
         content: { parts: [{ text: doc.text }] },
         taskType: 'RETRIEVAL_DOCUMENT', // Specify for indexing documents
+        // Request the exact configured dimension. Models like gemini-embedding-001
+        // default to 3072 but honor Matryoshka truncation, so this keeps the
+        // returned vector length consistent with the Qdrant collection size.
+        outputDimensionality: this.vectorDimension,
         // Optionally include title if available and relevant:
         // title: doc.title || undefined,
       }));
@@ -129,6 +133,7 @@ export class EmbeddingService {
       const result = await this.generativeModel.embedContent({
         content: { parts: [{ text: queryText.trim() }] },
         taskType: 'RETRIEVAL_QUERY', // Specify for search queries
+        outputDimensionality: this.vectorDimension,
       });
 
       if (result && result.embedding && result.embedding.values) {

@@ -36,6 +36,7 @@ const PROVIDERS = [
   { value: "google", label: "Google (Gemini)" },
   { value: "xai", label: "xAI (Grok)" },
   { value: "mistral", label: "Mistral" },
+  { value: "openrouter", label: "OpenRouter" },
 ];
 
 const MODELS: Record<string, string[]> = {
@@ -43,6 +44,21 @@ const MODELS: Record<string, string[]> = {
   xai: ["grok-3-latest", "grok-2-latest"],
   mistral: ["mistral-large-latest", "mistral-small-latest"],
 };
+
+// OpenRouter exposes hundreds of models under `vendor/model` ids. We offer a
+// curated shortlist as suggestions but allow any id to be typed.
+const OPENROUTER_SUGGESTED_MODELS = [
+  "openai/gpt-4o",
+  "openai/gpt-4o-mini",
+  "anthropic/claude-3.5-sonnet",
+  "anthropic/claude-3.5-haiku",
+  "google/gemini-2.0-flash-001",
+  "google/gemini-flash-1.5",
+  "meta-llama/llama-3.3-70b-instruct",
+  "mistralai/mistral-large",
+  "deepseek/deepseek-chat",
+  "x-ai/grok-2-1212",
+];
 
 const TTS_PROVIDERS = ["ELEVENLABS", "AZURE", "OPENAI"];
 const STT_PROVIDERS = ["DEEPGRAM", "WHISPER", "AZURE", "GOOGLE"];
@@ -176,15 +192,35 @@ export default function AgentConfigPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Model</Label>
-              <Select value={config.model} onValueChange={(v) => update("model", v)}>
-                <SelectTrigger><SelectValue placeholder="Select model" /></SelectTrigger>
-                <SelectContent>
-                  {modelOptions.map((m) => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="model">Model</Label>
+              {config.provider === "openrouter" ? (
+                <>
+                  <Input
+                    id="model"
+                    list="openrouter-models"
+                    value={config.model}
+                    onChange={(e) => update("model", e.target.value)}
+                    placeholder="vendor/model e.g. openai/gpt-4o-mini"
+                  />
+                  <datalist id="openrouter-models">
+                    {OPENROUTER_SUGGESTED_MODELS.map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-gray-400">
+                    Any OpenRouter model id works. Browse them at openrouter.ai/models.
+                  </p>
+                </>
+              ) : (
+                <Select value={config.model} onValueChange={(v) => update("model", v)}>
+                  <SelectTrigger><SelectValue placeholder="Select model" /></SelectTrigger>
+                  <SelectContent>
+                    {modelOptions.map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
         </CardContent>
