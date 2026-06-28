@@ -27,7 +27,13 @@ import {
   FileCode,
   FileCheck,
   ArrowLeft,
+  SlidersHorizontal,
 } from "lucide-react"
+
+// Canvas (ReactFlow) is deprecated as the primary editor and hidden by default.
+// Re-enable the advanced canvas route by setting NEXT_PUBLIC_ENABLE_CANVAS=true.
+const CANVAS_ENABLED =
+  typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ENABLE_CANVAS === "true";
 
 function NavItem({ 
   href, 
@@ -137,12 +143,17 @@ export function AgentNavSidebar({
             <div className="my-2">
               <Separator className="bg-gray-600" />
             </div>
+            <NavItem href={`/agent/${agentId}/config`} icon={<SlidersHorizontal />} isExpanded={isExpanded}>
+              Configure
+            </NavItem>
             <NavItem href={`/agent/${agentId}/cms/workflows`} icon={<FileText />} isExpanded={isExpanded}>
               Content
             </NavItem>
-            <NavItem href={canvasHref} icon={<LayoutDashboard />} isExpanded={isExpanded}>
-              Canvas
-            </NavItem>
+            {CANVAS_ENABLED && (
+              <NavItem href={canvasHref} icon={<LayoutDashboard />} isExpanded={isExpanded}>
+                Canvas (beta)
+              </NavItem>
+            )}
             <NavItem href={`/agent/${agentId}/knowledge-base`} icon={<Database />} isExpanded={isExpanded}>
               Knowledge base
             </NavItem>

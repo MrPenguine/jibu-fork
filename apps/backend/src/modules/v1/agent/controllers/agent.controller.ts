@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ExtendedAgent } from '../interfaces/agent.interface';
 import { AgentService } from '../services/agent.service';
 import { AgentService as IntegrationsAgentService } from '../../../../integrations/agent/agent.service';
-import { CreateAgentDto, UpdateAgentDto } from '../dto';
+import { CreateAgentDto, UpdateAgentDto, UpdateAgentConfigDto } from '../dto';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
 import { WorkspaceMemberGuard } from '../../../../core/auth/guards/workspace-member.guard';
 import { Public } from '../../../../core/auth/decorators/public.decorator';
@@ -72,6 +72,34 @@ export class AgentController {
       throw new BadRequestException('No workspace selected');
     }
     return this.agentService.findAllByAssistant(assistantId, workspaceId);
+  }
+
+  @Get(':id/config')
+  @ApiOperation({ summary: 'Get an agent runtime config (config form)' })
+  async getConfig(@Param('id') id: string, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.getConfig(id, workspaceId);
+  }
+
+  @Put(':id/config')
+  @ApiOperation({ summary: 'Update an agent runtime config (config form)' })
+  async updateConfig(
+    @Param('id') id: string,
+    @Body() dto: UpdateAgentConfigDto,
+    @Req() req,
+  ) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.updateConfig(id, dto, workspaceId);
+  }
+
+  @Get(':id/available-tools')
+  @ApiOperation({ summary: 'List workspace tools available to attach to the agent' })
+  async availableTools(@Param('id') id: string, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.listWorkspaceTools(workspaceId);
   }
 
   @Get(':id')
