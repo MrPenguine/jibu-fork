@@ -12,6 +12,7 @@ import { AgentExecutionService } from './execution/agent-execution.service';
 import { AgentService as IntegrationsAgentService } from '../../../integrations/agent/agent.service';
 import { LangchainAgentService } from '../../../integrations/agent/providers/langchain/langchain-agent.service';
 import { RagService } from '../../../integrations/agent/providers/langchain/rag.service';
+import { AgentRuntimeModule } from '../../../integrations/agent/agent-runtime.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { RagService } from '../../../integrations/agent/providers/langchain/rag.
     HttpModule,
     RedisModule,
     ChatsModule,
-    WorkflowModule
+    WorkflowModule,
+    AgentRuntimeModule
   ],
   controllers: [AgentController],
   providers: [

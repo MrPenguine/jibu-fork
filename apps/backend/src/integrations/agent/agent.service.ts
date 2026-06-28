@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { IAgentService, AgentRequest, AgentResponse } from './interfaces/agent.interface';
 import { LangchainAgentService } from './providers/langchain/langchain-agent.service';
+import { AgentRuntimeService } from './agent-runtime.service';
 // Import needed services
 import { AgentExecutionService } from '../../modules/v1/agent/execution/agent-execution.service';
 import { PrismaService } from '../../core/database/prisma.service';
@@ -12,6 +13,7 @@ export class AgentService {
 
   constructor(
     private langchainAgentService: LangchainAgentService,
+    private readonly agentRuntime: AgentRuntimeService,
     private modulesRef: ModuleRef,
     @Inject(forwardRef(() => AgentExecutionService))
     private agentExecutionService: AgentExecutionService,
@@ -51,9 +53,22 @@ export class AgentService {
     return this.langchainAgentService.checkConnection();
   }
 
-  async processRequest(request: AgentRequest): Promise<AgentResponse> {
+  async processRequest(request: AgentRequest & { workspaceId?: string }): Promise<AgentResponse> {
     try {
-      return await this.langchainAgentService.processRequest(request);
+      // Single-brain path: delegate to the channel-agnostic runtime.
+      const agentId = request.config?.assistantId;
+      if (!agentId) {
+        throw new Error('Agent ID is required');
+      }
+      const result = await this.agentRuntime.runTurn({
+        agentId,
+        channel: 'chat',
+        sessionId: request.sessionId,
+        input: request.input,
+        workspaceId: request.workspaceId,
+        knowledgeBaseId: request.config?.knowledgeBaseId,
+      });
+      return { output: result.output, sessionId: request.sessionId, metadata: result.meta };
     } catch (error) {
       this.logger.error(`Error processing agent request: ${error.message}`);
       throw error;
@@ -62,29 +77,21 @@ export class AgentService {
 
   async *processStreamingRequest(request: AgentRequest & { workspaceId?: string }): AsyncIterable<AgentResponse> {
     try {
-      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Processing streaming request with input: ${request.input?.substring(0, 50)}...`);
-      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Full request config: ${JSON.stringify(request.config)}`);
-      
-      // If this is a workflow agent and assistantId is present, treat assistantId as agentId
-      if (request.config?.assistantId && request.config?.workflowAgent) {
-        this.logger.log(`[AGENT_ASSISTANT_DEBUG] Workflow agent request received. Treating assistantId=${request.config.assistantId} as agentId (back-compat).`);
-        // No translation needed here; LangchainAgentService will resolve assistantId as agentId
-      } else if (request.config?.assistantId) {
-        this.logger.log(`[AGENT_ASSISTANT_DEBUG] Processing request with assistantId (interpreted as agentId): ${request.config.assistantId}`);
-      } else {
-        this.logger.warn(`[AGENT_ASSISTANT_DEBUG] Request has no assistantId in config`);
+      const agentId = request.config?.assistantId;
+      if (!agentId) {
+        throw new Error('Agent ID is required');
       }
-      
-      // Standard processing path
-      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Using standard processing path for request`);
-      for await (const chunk of this.langchainAgentService.processStreamingRequest(request)) {
-        // Log metadata about the chunk to trace assistantId usage
-        if (chunk.metadata) {
-          this.logger.log(`[AGENT_ASSISTANT_DEBUG] Chunk metadata from standard path: ${JSON.stringify(chunk.metadata)}`);
-        }
-        yield chunk;
+      // Single-brain path: delegate streaming to the channel-agnostic runtime.
+      for await (const chunk of this.agentRuntime.streamTurn({
+        agentId,
+        channel: 'chat',
+        sessionId: request.sessionId,
+        input: request.input,
+        workspaceId: request.workspaceId,
+        knowledgeBaseId: request.config?.knowledgeBaseId,
+      })) {
+        yield { output: chunk.output, sessionId: request.sessionId, metadata: chunk.meta };
       }
-      this.logger.log(`[AGENT_ASSISTANT_DEBUG] Completed streaming standard request`);
     } catch (error) {
       this.logger.error(`[AGENT_ASSISTANT_DEBUG] Error processing streaming agent request: ${error.message}`, error.stack);
       throw error;

@@ -12,6 +12,7 @@ import { RedisModule } from '../core/redis/redis.module';
 import { AdminModule } from '../modules/admin/admin.module';
 import { VoiceModule } from '../modules/voice/voice.module';
 import { LiveKitModule } from '../modules/livekit/livekit.module';
+import { WhatsAppModule } from '../modules/channels/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { LiveKitModule } from '../modules/livekit/livekit.module';
     V1Module,
     VoiceModule,
     LiveKitModule,
+    WhatsAppModule,
     RedisModule,
     AdminModule,
   ],

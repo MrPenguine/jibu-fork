@@ -217,6 +217,7 @@ model KnowledgeBase {
   sources        KnowledgeBaseSource[]
   chunks         ChunkMetadata[] // Relation to chunks
   assistantLinks AssistantKnowledgeBase[]
+  agentLinks     AgentKnowledgeBase[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
@@ -332,6 +333,7 @@ model Tool {
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
   assistantTools AssistantTool[]
+  agentTools     AgentTool[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -347,12 +349,12 @@ model ToolExecution {
   input        Json? // Input parameters for the execution
   output       Json? // Output result of the execution
   errorMessage String?
-  executedById String
+  executedById String?
   executedAt   DateTime  @default(now())
   completedAt  DateTime?
 
-  tool       Tool @relation(fields: [toolId], references: [id], onDelete: Cascade)
-  executedBy User @relation(fields: [executedById], references: [id])
+  tool       Tool  @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  executedBy User? @relation(fields: [executedById], references: [id])
 
   @@index([toolId])
   @@index([executedById])
@@ -454,6 +456,10 @@ model Agent {
   workflows      Workflow[]
   assistants     Assistant[] // Added back-relation to Assistant
 
+  // --- Single-brain config links (source of truth for runtime) ---
+  tools          AgentTool[]
+  knowledgeBases AgentKnowledgeBase[]
+
   // --- Primary Workflow Link ---
   primaryWorkflowId String?   @unique
   primaryWorkflow   Workflow? @relation("PrimaryAgentWorkflow", fields: [primaryWorkflowId], references: [id], onDelete: SetNull)
@@ -519,6 +525,33 @@ model AssistantKnowledgeBase {
   knowledgeBase    KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
 
   @@unique([assistantId, knowledgeBaseId])
+  @@index([knowledgeBaseId])
+}
+
+// --- Single-brain join models: Agent is the source of truth for runtime ---
+model AgentTool {
+  id      String @id @default(uuid())
+  agentId String
+  toolId  String
+  // Optional per-agent tool configuration
+  config  Json?
+
+  agent   Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tool    Tool  @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, toolId])
+  @@index([toolId])
+}
+
+model AgentKnowledgeBase {
+  id              String @id @default(uuid())
+  agentId         String
+  knowledgeBaseId String
+
+  agent           Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, knowledgeBaseId])
   @@index([knowledgeBaseId])
 }
 

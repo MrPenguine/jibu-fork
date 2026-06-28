@@ -139,6 +139,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Delete one or more hash fields from Redis
+   */
+  async hdel(key: string, field: string): Promise<boolean> {
+    try {
+      await this.redisClient.hdel(key, field);
+      return true;
+    } catch (error) {
+      console.error(`Error deleting hash field ${field} for key ${key}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Disconnect from Redis
    */
   disconnect() {
