@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 import { UserSyncService } from '../../sync/sync.service';
 import type { Request } from 'express';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -21,27 +22,52 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly prismaService: PrismaService,
     private readonly userSyncService: UserSyncService,
   ) {
-    const secret = configService.get<string>('SUPABASE_JWT_SECRET');
-    if (!secret) {
-      // Fail fast with a clear error to avoid silent 401s during verification
-      const msg = 'SUPABASE_JWT_SECRET is not configured. JWT verification will fail.';
-      // Can't use this.logger before super; use console instead
-      // This helps surface misconfiguration immediately on startup
-      // eslint-disable-next-line no-console
-      console.error(msg);
-      throw new Error(msg);
+    const jwtKeyStr = configService.get<string>('SUPABASE_JWT_KEY');
+    let secretOrKey: string | Buffer | undefined;
+    let algorithms: any[] = ['HS256'];
+
+    if (jwtKeyStr) {
+      try {
+        const jwkContainer = JSON.parse(jwtKeyStr);
+        const jwk = jwkContainer.keys?.[0] || jwkContainer;
+        const keyObject = crypto.createPublicKey({
+          format: 'jwk',
+          key: jwk,
+        });
+        // Export to SPKI PEM format to satisfy string | Buffer type constraints
+        secretOrKey = keyObject.export({
+          type: 'spki',
+          format: 'pem',
+        }) as string;
+        algorithms = ['ES256'];
+        // eslint-disable-next-line no-console
+        console.log('JWT Strategy: Loaded JWK for ES256 verification.');
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('JWT Strategy: Failed to load SUPABASE_JWT_KEY, falling back to SUPABASE_JWT_SECRET:', err);
+      }
+    }
+
+    if (!secretOrKey) {
+      secretOrKey = configService.get<string>('SUPABASE_JWT_SECRET');
+      if (!secretOrKey) {
+        const msg = 'Neither SUPABASE_JWT_KEY nor SUPABASE_JWT_SECRET is configured. JWT verification will fail.';
+        // eslint-disable-next-line no-console
+        console.error(msg);
+        throw new Error(msg);
+      }
     }
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
-      algorithms: ['HS256'],
+      secretOrKey,
+      algorithms,
       passReqToCallback: true,
     });
 
     // Now it's safe to use the logger
-    this.logger.log(`Supabase JWT secret loaded (length=${secret.length}).`);
+    this.logger.log(`Supabase JWT secret/key loaded (length=${secretOrKey.length}).`);
     this.cacheTtlMs = Number(this.configService.get('AUTH_CACHE_TTL_MS') ?? 10_000);
   }
 
