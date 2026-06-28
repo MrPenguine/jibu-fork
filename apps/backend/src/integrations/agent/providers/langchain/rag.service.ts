@@ -55,9 +55,11 @@ export class RagService {
         return JSON.parse(cachedEmbeddingJson);
       }
       
-      // Use the embedding service directly
+      // Use the embedding service directly. Use the RETRIEVAL_QUERY task type
+      // (embedQuery) so query embeddings are optimized for search rather than
+      // the RETRIEVAL_DOCUMENT type used when indexing.
       this.logger.log(`Generating embedding directly for query: ${query.substring(0, 30)}...`);
-      const embedding = await this.embeddingService.embedText(query);
+      const embedding = await this.embeddingService.embedQuery(query);
       
       // Cache the embedding
       await this.redisService.set(cacheKey, JSON.stringify(embedding), this.cacheTtl);

@@ -36,7 +36,7 @@ export interface RunTurnResult {
 }
 
 interface ResolvedProvider {
-  provider: 'xai' | 'google' | 'mistral' | '';
+  provider: 'xai' | 'google' | 'mistral' | 'openrouter' | '';
   modelName: string;
   modelUsed: string;
 }
@@ -70,8 +70,10 @@ export class AgentRuntimeService {
   private readonly googleApiKey: string;
   private readonly xaiApiKey: string;
   private readonly mistralApiKey: string;
+  private readonly openrouterApiKey: string;
   private readonly xaiClient: OpenAI;
   private readonly mistralClient: OpenAI;
+  private readonly openrouterClient: OpenAI;
 
   constructor(
     private readonly configService: ConfigService,
@@ -82,8 +84,17 @@ export class AgentRuntimeService {
     this.googleApiKey = this.configService.get<string>('GOOGLE_API_KEY') || this.configService.get<string>('GEMINI_API_KEY');
     this.xaiApiKey = this.configService.get<string>('XAI_API_KEY');
     this.mistralApiKey = this.configService.get<string>('MISTRAL_API_KEY');
+    this.openrouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
     this.xaiClient = new OpenAI({ apiKey: this.xaiApiKey || 'dummy-key', baseURL: 'https://api.x.ai/v1' });
     this.mistralClient = new OpenAI({ apiKey: this.mistralApiKey || 'dummy-key', baseURL: 'https://api.mistral.ai/v1' });
+    this.openrouterClient = new OpenAI({
+      apiKey: this.openrouterApiKey || 'dummy-key',
+      baseURL: 'https://openrouter.ai/api/v1',
+      defaultHeaders: {
+        'HTTP-Referer': this.configService.get<string>('NEXT_PUBLIC_BASE_URL') || 'http://localhost:3000',
+        'X-Title': 'Jibu',
+      },
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -144,7 +155,8 @@ export class AgentRuntimeService {
         }
       }
     } else {
-      const client = this.xaiClient;
+      // mistral + tool paths are handled above; here provider is xai or openrouter.
+      const client = ctx.provider === 'openrouter' ? this.openrouterClient : this.xaiClient;
       const stream = await client.chat.completions.create({
         model: ctx.modelName,
         messages: ctx.messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -224,7 +236,12 @@ export class AgentRuntimeService {
   // ---------------------------------------------------------------------------
 
   private async runOpenAiLoop(ctx: Awaited<ReturnType<typeof this.prepareTurn>>): Promise<RunTurnResult> {
-    const client = ctx.provider === 'mistral' ? this.mistralClient : this.xaiClient;
+    const client =
+      ctx.provider === 'mistral'
+        ? this.mistralClient
+        : ctx.provider === 'openrouter'
+          ? this.openrouterClient
+          : this.xaiClient;
     const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = ctx.functionDefs.map((f) => ({
       type: 'function',
       function: { name: f.name, description: f.description, parameters: f.parameters as Record<string, unknown> },
@@ -356,6 +373,14 @@ export class AgentRuntimeService {
     let modelName = '';
 
     const strip = (m: string) => m.replace(/^.*?\//, '');
+
+    // OpenRouter is an OpenAI-compatible gateway. Its model ids are namespaced
+    // (e.g. "openai/gpt-4o", "anthropic/claude-3.5-sonnet") so we keep the full
+    // id rather than stripping the provider prefix.
+    if (/openrouter|open-router/.test(configProvider) && this.openrouterApiKey) {
+      const modelName = configModel || 'openai/gpt-4o-mini';
+      return { provider: 'openrouter', modelName, modelUsed: modelName };
+    }
 
     if (/x-ai|xai|grok/.test(configProvider) && this.xaiApiKey) {
       provider = 'xai';

@@ -24,18 +24,12 @@ import { WorkspaceSwitcher } from "@libs/shadcn-ui/components/workspace/Workspac
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BookOpen,
   CreditCard,
-  FileCog,
-  FileText,
-  Files,
   LayoutDashboard,
-  LayoutGrid,
   MessageSquare,
   Settings,
   Users,
   Phone,
-  Briefcase,
   BarChart,
 } from "lucide-react"
 
@@ -71,8 +65,8 @@ function NavItem({
   return (
     <SidebarMenuItem>
       <div className={cn(
-        "w-full flex items-center gap-2 text-sm px-3 py-2 rounded-md transition-colors",
-        isActive ? "bg-[#E6F7F0] text-[#009959] font-medium" : "text-[#22262A] hover:bg-gray-100 hover:text-[#009959]"
+        "w-full flex items-center gap-2.5 text-sm px-3 py-2 rounded-lg transition-all duration-150",
+        isActive ? "bg-[#E6F7F0] text-[#009959] font-semibold" : "text-[#3a3f44] hover:bg-gray-100 hover:text-[#009959]"
       )}>
         <Link href={href} className="w-full flex items-center gap-2">
           {React.cloneElement(icon, {
@@ -169,6 +163,9 @@ export function CustomAppSidebar({
           <>
             {/* Main Navigation */}
             <SidebarGroup>
+              <SidebarGroupLabel className="px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                Workspace
+              </SidebarGroupLabel>
               <SidebarMenu>
                 <NavItem href={`${wsBase}`} icon={<LayoutDashboard />} isHome={true}>
                   {t("Home")}
@@ -176,7 +173,6 @@ export function CustomAppSidebar({
                 <NavItem 
                   href={`${wsBase}/agents`} 
                   icon={<MessageSquare />}
-                  counter={5} // This would be a dynamic value from API in production
                 >
                   {t("Agents")}
                 </NavItem>
@@ -187,71 +183,42 @@ export function CustomAppSidebar({
 
             {/* Management */}
             <SidebarGroup>
+              <SidebarGroupLabel className="px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                Manage
+              </SidebarGroupLabel>
               <SidebarMenu>
                 <NavItem 
                   href={`${wsBase}/phone-numbers`} 
                   icon={<Phone />}
-                  counter={2} // This would be a dynamic value from API in production
                 >
                   {t("Phone Numbers")}
                 </NavItem>
                 <NavItem 
                   href={`${wsBase}/members`} 
                   icon={<Users />}
-                  counter={8} // This would be a dynamic value from API in production
                 >
                   {t("Members")}
                 </NavItem>
                 <NavItem 
                   href={`${wsBase}/usage`} 
                   icon={<BarChart />}
-                  counter={0} // This would be a dynamic value from API in production
                 >
                   {t("Usage")}
                 </NavItem>
                 <NavItem 
                   href={`${wsBase}/billing`} 
                   icon={<CreditCard />}
-                  badge="Pro" // This would be the current plan from API in production
                 >
                   {t("Plans & Billing")}
                 </NavItem>
               </SidebarMenu>
             </SidebarGroup>
 
-            <Separator className="my-2 bg-gray-200" />
-
-            {/* Learn & Support */}
-            <SidebarGroup>
-              <SidebarMenu>
-                <NavItem href="/learn" icon={<BookOpen />}>
-                  {t("Learn")}
-                </NavItem>
-                <NavItem href="/documentation" icon={<FileText />}>
-                  {t("Documentation")}
-                </NavItem>
-                <NavItem href="/changelog" icon={<Files />}>
-                  {t("Changelog")}
-                </NavItem>
-                <NavItem href="/hire-pro" icon={<Briefcase />}>
-                  {t("Hire a Pro")}
-                </NavItem>
-              </SidebarMenu>
-            </SidebarGroup>
-
-            {/* Removed Payment Widget from here - moved to footer */}
           </>
         )}
       </SidebarContent>
 
       <SidebarFooter className="border-0 flex-col gap-2">
-        {/* Payment Widget */}
-        <div className="px-4 mb-2">
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
-            <div className="font-medium mb-1 text-[#22262A]">Payment Widget</div>
-            <div className="text-xs text-gray-600">Manage your subscription and billing</div>
-          </div>
-        </div>
         <NavItem href={`${wsBase}/settings`} icon={<Settings />}>
           {t("Settings")}
         </NavItem>

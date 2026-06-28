@@ -178,6 +178,39 @@ export async function sendChatMessage(
 }
 
 /**
+ * Send a user message and return BOTH the persisted user message and the
+ * synchronous assistant reply produced by the single-brain runtime
+ * (agent-backed chats answer inline; see ChatsService.createMessage).
+ */
+export async function sendUserMessageWithReply(
+  chatId: string,
+  content: string
+): Promise<{ user: ChatMessage; assistant: ChatMessage | null }> {
+  const existing = await getChatMessages(chatId);
+  const sequenceId = existing.length;
+
+  const created = await fetchAPI(`/v1/chats/${chatId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content, role: 'user', sequenceId, type: 'text' }),
+  });
+
+  const toMsg = (m: any): ChatMessage => ({
+    id: String(m.id),
+    content: m.content,
+    role: m.role,
+    sequenceId: m.sequenceId,
+    createdAt: safeISO(m.createdAt),
+    updatedAt: safeISO(m.updatedAt),
+    type: m.type || 'text',
+  });
+
+  return {
+    user: toMsg(created),
+    assistant: created?.assistantMessage ? toMsg(created.assistantMessage) : null,
+  };
+}
+
+/**
  * Update a chat's name
  * @param chatId The ID of the chat
  * @param name The new name for the chat

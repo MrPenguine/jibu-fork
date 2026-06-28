@@ -389,6 +389,8 @@ enum LlmProvider {
   DEEPSEEK
   META
   XAI
+  MISTRAL
+  OPENROUTER
   CUSTOM
 }
 
