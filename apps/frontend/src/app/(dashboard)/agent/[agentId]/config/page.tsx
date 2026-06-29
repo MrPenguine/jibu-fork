@@ -98,6 +98,14 @@ export default function AgentConfigPage() {
     setConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
+  // Switching provider must also reset the model, otherwise the previous
+  // provider's model id (e.g. an OpenRouter "vendor/model" or "grok-3-latest")
+  // lingers and shows as a stale/invalid selection in the next provider's UI.
+  const changeProvider = (provider: string) => {
+    const defaultModel = provider === "openrouter" ? "" : MODELS[provider]?.[0] ?? "";
+    setConfig((prev) => (prev ? { ...prev, provider, model: defaultModel } : prev));
+  };
+
   const toggleInArray = (key: "toolIds" | "knowledgeBaseIds", id: string) => {
     setConfig((prev) => {
       if (!prev) return prev;
@@ -182,7 +190,7 @@ export default function AgentConfigPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Provider</Label>
-              <Select value={config.provider} onValueChange={(v) => update("provider", v)}>
+              <Select value={config.provider} onValueChange={changeProvider}>
                 <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
                 <SelectContent>
                   {PROVIDERS.map((p) => (
