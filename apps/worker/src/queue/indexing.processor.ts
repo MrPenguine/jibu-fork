@@ -43,7 +43,7 @@ export class IndexingProcessor {
   @Process(JOB_NAMES.INDEX_FILE_SOURCE)
   async processIndexFileSource(job: Job<IndexFileSourceJobData>) {
     this.logger.debug(
-      `Processing index job ${job.id} for source: ${job.data.knowledgeBaseSourceId} in org: ${job.data.organizationId}`
+      `Processing index job ${job.id} for source: ${job.data.knowledgeBaseSourceId} in workspace: ${job.data.workspaceId}`
     );
     
     try {
@@ -243,7 +243,6 @@ export class IndexingProcessor {
             fileId: source.sourcePointer,
             fileName: source.file.name,
             knowledgeBaseId: source.knowledgeBaseId,
-            organizationId: job.data.organizationId,
             workspaceId: source.file.workspaceId,
             chunkIndex: index
           }
@@ -625,7 +624,7 @@ export class IndexingProcessor {
             // Queue the reindexing job
             const indexingJobData: IndexFileSourceJobData = {
               knowledgeBaseSourceId: job.data.knowledgeBaseSourceId,
-              organizationId: job.data.organizationId
+              workspaceId: job.data.workspaceId
             };
             
             // Add job to queue with higher priority

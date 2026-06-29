@@ -79,7 +79,7 @@ export class VectorDbService {
   async ensureCollection(name: string, vectorSize?: number): Promise<void> {
     try {
       // Use vectorSize parameter if provided, otherwise use the configured value from .env
-      const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10);
+      const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
       
       this.logger.log(`Ensuring collection ${name} exists with vector size ${dimension}`);
       
@@ -90,7 +90,7 @@ export class VectorDbService {
       if (error.response && error.response.status === 404) {
         // Collection doesn't exist, create it
         // Use vectorSize parameter if provided, otherwise use the configured value from .env
-        const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10);
+        const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
         
       await this.createCollection(name, {
         vectors: {
@@ -138,7 +138,7 @@ export class VectorDbService {
         });
         
         // Check if vector has valid length
-        if (sanitizedVector.length !== parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10)) {
+        if (sanitizedVector.length !== parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10)) {
           this.logger.warn(`Vector dimension mismatch: ${sanitizedVector.length} vs expected ${this.configService.get('VECTOR_DIMENSION')}`);
         }
         

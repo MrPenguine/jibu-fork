@@ -49,12 +49,12 @@ export interface EmailJobData {
 
 export interface IndexFileSourceJobData {
   knowledgeBaseSourceId: string;
-  organizationId: string;
+  workspaceId: string;
 }
 
 export interface DeindexSourceJobData {
   knowledgeBaseSourceId: string;
-  organizationId: string;
+  workspaceId: string;
   sourceType: string;
   sourcePointer: string;
   knowledgeBaseId: string;

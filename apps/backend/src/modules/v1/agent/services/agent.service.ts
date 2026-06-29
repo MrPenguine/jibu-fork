@@ -314,6 +314,42 @@ export class AgentService {
     return this.getConfig(id, workspaceId);
   }
 
+  /** List the knowledge bases linked to an agent (full KB records). */
+  async listAgentKnowledgeBases(agentId: string, workspaceId: string) {
+    await this.findOne(agentId, workspaceId);
+    const links = await this.prisma.agentKnowledgeBase.findMany({
+      where: { agentId },
+      include: { knowledgeBase: true },
+    });
+    return links
+      .map((l) => l.knowledgeBase)
+      .filter((kb) => kb && kb.workspaceId === workspaceId);
+  }
+
+  /** Link a knowledge base to an agent (idempotent). */
+  async linkAgentKnowledgeBase(agentId: string, knowledgeBaseId: string, workspaceId: string) {
+    await this.findOne(agentId, workspaceId);
+    const kb = await this.prisma.knowledgeBase.findFirst({
+      where: { id: knowledgeBaseId, workspaceId },
+    });
+    if (!kb) {
+      throw new NotFoundException(`Knowledge base ${knowledgeBaseId} not found in this workspace`);
+    }
+    await this.prisma.agentKnowledgeBase.upsert({
+      where: { agentId_knowledgeBaseId: { agentId, knowledgeBaseId } },
+      create: { agentId, knowledgeBaseId },
+      update: {},
+    });
+    return this.listAgentKnowledgeBases(agentId, workspaceId);
+  }
+
+  /** Unlink a knowledge base from an agent. */
+  async unlinkAgentKnowledgeBase(agentId: string, knowledgeBaseId: string, workspaceId: string) {
+    await this.findOne(agentId, workspaceId);
+    await this.prisma.agentKnowledgeBase.deleteMany({ where: { agentId, knowledgeBaseId } });
+    return this.listAgentKnowledgeBases(agentId, workspaceId);
+  }
+
   /** List the workspace's tools for the config-form multi-select. */
   async listWorkspaceTools(workspaceId: string) {
     return this.prisma.tool.findMany({

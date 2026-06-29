@@ -69,7 +69,7 @@ export class QueueController {
       // Add job to the indexing queue
       await this.queueService.addIndexKnowledgeBaseSourceJob({
         knowledgeBaseSourceId: reindexDto.sourceId,
-        organizationId: reindexDto.organizationId,
+        workspaceId: reindexDto.organizationId,
       });
       
       this.logger.log(`Successfully queued reindexing job for source ${reindexDto.sourceId}`);
