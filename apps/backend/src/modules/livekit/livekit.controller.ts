@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Query, Body, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Query, Param, Body, BadRequestException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { LiveKitService } from './livekit.service';
 import { LiveKitAgentService } from './livekit-agent.service';
@@ -18,6 +19,50 @@ export class LiveKitController {
   @Get('token')
   async getToken(@Query('room') room: string, @Query('user') user: string) {
     return { token: await this.livekitService.createToken(user, room) };
+  }
+
+  @Public()
+  @Get('health')
+  @ApiOperation({ summary: 'LiveKit configuration/health probe' })
+  health() {
+    return this.livekitService.health();
+  }
+
+  @Public()
+  @Get('voice/start')
+  @ApiOperation({ summary: 'Start a voice room for an agent and mint a caller token' })
+  async startVoice(@Query('agentId') agentId: string, @Query('sessionId') sessionId?: string) {
+    if (!agentId) throw new BadRequestException('agentId is required');
+    // Resolves agent + workspace (throws NotFound if the agent does not exist).
+    const config = await this.livekitAgentService.getAgentConfig(agentId);
+    const session = await this.livekitService.startVoiceSession({
+      agentId,
+      workspaceId: config.workspaceId,
+      sessionId: sessionId || randomUUID(),
+    });
+    return { ...session, agent: { id: config.agentId, name: config.name } };
+  }
+
+  @Public()
+  @Post('voice/end')
+  @ApiOperation({ summary: 'End a voice room (delete it on the LiveKit server)' })
+  async endVoice(@Body() body: { room: string }) {
+    if (!body?.room) throw new BadRequestException('room is required');
+    return this.livekitService.deleteRoom(body.room);
+  }
+
+  @Public()
+  @Get('rooms')
+  @ApiOperation({ summary: 'List active LiveKit rooms' })
+  async rooms() {
+    return { rooms: await this.livekitService.listRooms() };
+  }
+
+  @Public()
+  @Get('rooms/:room/participants')
+  @ApiOperation({ summary: 'List participants in a room' })
+  async participants(@Param('room') room: string) {
+    return { participants: await this.livekitService.listParticipants(room) };
   }
 
   @Public()

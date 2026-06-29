@@ -8,7 +8,7 @@ from livekit.agents.llm import function_tool
 from livekit.plugins import google, silero, deepgram, elevenlabs
 from dotenv import load_dotenv
 
-from config import DEFAULT_AGENT_ID
+from config import DEFAULT_AGENT_ID, XAI_API_KEY, MISTRAL_API_KEY, OPENROUTER_API_KEY
 from . import backend_client
 from .chat_manager import ChatManager
 from .idle_monitor import IdleMonitor
@@ -52,13 +52,25 @@ def _build_llm(cfg: dict):
 
     if "gemini" in provider or "google" in provider:
         return google.LLM(model=model or "gemini-flash-latest")
+    if "openrouter" in provider:
+        # OpenRouter is OpenAI-compatible; model ids stay vendor-namespaced.
+        from livekit.plugins import openai
+        return openai.LLM(
+            model=model or "openai/gpt-4o-mini",
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+        )
     if "grok" in provider or "xai" in provider or "x-ai" in provider:
         # xAI is OpenAI-compatible.
         from livekit.plugins import openai
-        return openai.LLM(model=model or "grok-3-latest", base_url="https://api.x.ai/v1")
+        return openai.LLM(model=model or "grok-3-latest", base_url="https://api.x.ai/v1", api_key=XAI_API_KEY)
     if "mistral" in provider:
         from livekit.plugins import openai
-        return openai.LLM(model=model or "mistral-large-latest", base_url="https://api.mistral.ai/v1")
+        return openai.LLM(
+            model=model or "mistral-large-latest",
+            base_url="https://api.mistral.ai/v1",
+            api_key=MISTRAL_API_KEY,
+        )
     # Default
     return google.LLM(model="gemini-flash-latest")
 

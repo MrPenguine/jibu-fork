@@ -30,6 +30,7 @@ import {
   Settings,
   Users,
   Phone,
+  PhoneCall,
   BarChart,
 } from "lucide-react"
 
@@ -175,6 +176,12 @@ export function CustomAppSidebar({
                   icon={<MessageSquare />}
                 >
                   {t("Agents")}
+                </NavItem>
+                <NavItem 
+                  href={`${wsBase}/calls`} 
+                  icon={<PhoneCall />}
+                >
+                  {t("Calls")}
                 </NavItem>
               </SidebarMenu>
             </SidebarGroup>
