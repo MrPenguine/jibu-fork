@@ -24,6 +24,18 @@ OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 DEEPGRAM_API_KEY = os.getenv('DEEPGRAM_API_KEY')
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 
+# Map keys to the standard environment variable names that livekit plugins expect
+if ELEVENLABS_API_KEY:
+    os.environ['ELEVEN_API_KEY'] = ELEVENLABS_API_KEY
+
+AZURE_SPEECH_KEY = os.getenv('AZURE_SPEECH_KEY')
+AZURE_SPEECH_REGION = os.getenv('AZURE_SPEECH_REGION', 'eastus2')
+if AZURE_SPEECH_KEY:
+    os.environ['AZURE_SPEECH_KEY'] = AZURE_SPEECH_KEY
+if AZURE_SPEECH_REGION:
+    os.environ['AZURE_SPEECH_REGION'] = AZURE_SPEECH_REGION
+
+
 # --- Basic settings ---
 try:
     HTTP_PORT = int(os.getenv('PORT', 8000))

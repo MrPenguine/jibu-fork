@@ -5,7 +5,7 @@ import uuid
 from livekit.agents import JobContext, WorkerOptions, cli, AutoSubscribe
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.llm import function_tool
-from livekit.plugins import google, silero, deepgram, elevenlabs, openai
+from livekit.plugins import google, silero, deepgram, elevenlabs, openai, azure, cartesia
 from dotenv import load_dotenv
 
 from config import DEFAULT_AGENT_ID, XAI_API_KEY, MISTRAL_API_KEY, OPENROUTER_API_KEY
@@ -51,13 +51,22 @@ def _build_llm(cfg: dict):
     model = llm_cfg.get("model") or ""
 
     if "gemini" in provider or "google" in provider:
-        return google.LLM(model=model or "gemini-flash-latest")
+        return google.LLM(model=model or "gemini-2.5-flash")
     if "openrouter" in provider:
         # OpenRouter is OpenAI-compatible; model ids stay vendor-namespaced.
         return openai.LLM(
-            model=model or "openai/gpt-4o-mini",
+            model=model or "google/gemini-2.5-flash",
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
+        )
+    if "ollama" in provider:
+        # Ollama runs locally on port 11434 and is OpenAI-compatible.
+        import os
+        base_url = os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1"
+        return openai.LLM(
+            model=model or "llama3",
+            base_url=base_url,
+            api_key="ollama",
         )
     if "grok" in provider or "xai" in provider or "x-ai" in provider:
         # xAI is OpenAI-compatible.
@@ -68,24 +77,47 @@ def _build_llm(cfg: dict):
             base_url="https://api.mistral.ai/v1",
             api_key=MISTRAL_API_KEY,
         )
-    # Default
-    return google.LLM(model="gemini-flash-latest")
+    # Default fallback — Google Gemini 2.5 Flash (stable, no daily free-tier cap via API key)
+    return google.LLM(model="gemini-2.5-flash")
 
 
 def _build_stt(cfg: dict):
+    """Map agent STT config to a LiveKit STT plugin."""
     voice = (cfg or {}).get("voice") or {}
     provider = (voice.get("sttProvider") or "").lower()
-    if "deepgram" in provider or not provider:
-        return deepgram.STT()
+
+    if "google" in provider:
+        return google.STT()
+    if "azure" in provider:
+        return azure.STT()
+    if "whisper" in provider or "openai" in provider:
+        # OpenAI Whisper via the openai plugin
+        return openai.STT(model="whisper-1")
+    # Default: Deepgram Nova-3 (best real-time accuracy)
     return deepgram.STT()
 
 
 def _build_tts(cfg: dict):
+    """Map agent TTS config to a LiveKit TTS plugin."""
     voice = (cfg or {}).get("voice") or {}
     provider = (voice.get("ttsProvider") or "").lower()
-    voice_id = voice.get("voiceId")
-    if "eleven" in provider:
+    voice_id = voice.get("voiceId") or ""
+
+    if "eleven" in provider or "elevenlabs" in provider:
         return elevenlabs.TTS(voice_id=voice_id) if voice_id else elevenlabs.TTS()
+    if "google" in provider:
+        # Google Cloud TTS — Chirp HD voices, 1M standard chars/month free
+        return google.TTS(voice=voice_id) if voice_id else google.TTS()
+    if "azure" in provider:
+        # Azure Neural TTS — 500K chars/month free
+        return azure.TTS(voice=voice_id) if voice_id else azure.TTS()
+    if "cartesia" in provider:
+        # Cartesia Sonic-2 — 1M chars/month free, best real-time quality
+        return cartesia.TTS(voice=voice_id) if voice_id else cartesia.TTS()
+    if "openai" in provider:
+        # OpenAI TTS-1 or TTS-1-HD
+        return openai.TTS(voice=voice_id or "alloy")
+    # Default: Deepgram Aura (fast, low-latency)
     return deepgram.TTS()
 
 

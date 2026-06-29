@@ -36,7 +36,7 @@ export interface RunTurnResult {
 }
 
 interface ResolvedProvider {
-  provider: 'xai' | 'google' | 'mistral' | 'openrouter' | '';
+  provider: 'xai' | 'google' | 'mistral' | 'openrouter' | 'ollama' | '';
   modelName: string;
   modelUsed: string;
 }
@@ -74,6 +74,7 @@ export class AgentRuntimeService {
   private readonly xaiClient: OpenAI;
   private readonly mistralClient: OpenAI;
   private readonly openrouterClient: OpenAI;
+  private readonly ollamaClient: OpenAI;
 
   constructor(
     private readonly configService: ConfigService,
@@ -94,6 +95,10 @@ export class AgentRuntimeService {
         'HTTP-Referer': this.configService.get<string>('NEXT_PUBLIC_BASE_URL') || 'http://localhost:3000',
         'X-Title': 'Jibu',
       },
+    });
+    this.ollamaClient = new OpenAI({
+      apiKey: 'ollama',
+      baseURL: this.configService.get<string>('OLLAMA_BASE_URL') || 'http://localhost:11434/v1',
     });
   }
 
@@ -155,8 +160,13 @@ export class AgentRuntimeService {
         }
       }
     } else {
-      // mistral + tool paths are handled above; here provider is xai or openrouter.
-      const client = ctx.provider === 'openrouter' ? this.openrouterClient : this.xaiClient;
+      // mistral + tool paths are handled above; here provider is xai, openrouter, or ollama.
+      const client =
+        ctx.provider === 'openrouter'
+          ? this.openrouterClient
+          : ctx.provider === 'ollama'
+            ? this.ollamaClient
+            : this.xaiClient;
       const stream = await client.chat.completions.create({
         model: ctx.modelName,
         messages: ctx.messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -241,7 +251,9 @@ export class AgentRuntimeService {
         ? this.mistralClient
         : ctx.provider === 'openrouter'
           ? this.openrouterClient
-          : this.xaiClient;
+          : ctx.provider === 'ollama'
+            ? this.ollamaClient
+            : this.xaiClient;
     const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = ctx.functionDefs.map((f) => ({
       type: 'function',
       function: { name: f.name, description: f.description, parameters: f.parameters as Record<string, unknown> },
@@ -315,10 +327,19 @@ export class AgentRuntimeService {
     });
 
     // Build chat history (exclude system + context messages).
-    const historyContents = ctx.messages
+    const rawHistory = ctx.messages
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .slice(0, -1)
       .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+
+    // The Google Generative AI SDK requires the first message in history to be from 'user'.
+    // Strip out any leading 'model' messages to prevent validation crashes.
+    let startIndex = 0;
+    while (startIndex < rawHistory.length && rawHistory[startIndex].role === 'model') {
+      startIndex++;
+    }
+    const historyContents = rawHistory.slice(startIndex);
+
     const chat = model.startChat({ history: historyContents });
 
     const toolCalls: ToolCallRecord[] = [];
@@ -380,6 +401,11 @@ export class AgentRuntimeService {
     if (/openrouter|open-router/.test(configProvider) && this.openrouterApiKey) {
       const modelName = configModel || 'openai/gpt-4o-mini';
       return { provider: 'openrouter', modelName, modelUsed: modelName };
+    }
+
+    if (/ollama/.test(configProvider)) {
+      const modelName = configModel || 'llama3';
+      return { provider: 'ollama', modelName, modelUsed: `ollama/${modelName}` };
     }
 
     if (/x-ai|xai|grok/.test(configProvider) && this.xaiApiKey) {

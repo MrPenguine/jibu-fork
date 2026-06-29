@@ -1,36 +1,20 @@
 "use client";
 
-import React, { ReactNode } from "react";
-import { useParams, redirect } from "next/navigation";
-import AgentCmsSidebar from "@libs/shadcn-ui/components/agent/AgentCmsSidebar";
+import { useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 
-export default function AgentCmsLayout({ children }: { children: ReactNode }) {
+export default function AgentCmsLayout() {
   const params = useParams();
+  const router = useRouter();
   const agentId = params?.agentId as string;
 
-  if (!agentId) {
-    redirect("/workspace");
-  }
+  useEffect(() => {
+    if (agentId) {
+      router.replace(`/agent/${agentId}/config`);
+    } else {
+      router.replace("/workspace");
+    }
+  }, [agentId, router]);
 
-  return (
-    <div className="flex min-h-screen w-full bg-white text-gray-900">
-      {/* Fixed CMS sidebar positioned immediately after the 4rem agent rail */}
-      <div
-        className="fixed top-0 bottom-0 z-40"
-        style={{
-          left: "var(--sidebar-width)",
-          width: "16rem",
-        }}
-      >
-        <AgentCmsSidebar agentId={agentId} />
-      </div>
-      {/* Content starts after the agent rail (4rem) + CMS sidebar (16rem) */}
-      <div
-        className="flex-1 pl-0 min-h-screen bg-white overflow-y-auto"
-        style={{ marginLeft: "calc(var(--sidebar-width) + 16rem)" }}
-      >
-        {children}
-      </div>
-    </div>
-  );
+  return null;
 }

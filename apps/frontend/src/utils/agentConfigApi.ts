@@ -49,3 +49,7 @@ export async function updateAgentConfig(
 export async function listAgentTools(agentId: string): Promise<WorkspaceTool[]> {
   return fetchAPI(`/v1/agents/${agentId}/available-tools`);
 }
+
+export async function getOllamaModels(): Promise<string[]> {
+  return fetchAPI(`/v1/agents/ollama/models`);
+}

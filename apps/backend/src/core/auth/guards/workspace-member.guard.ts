@@ -1,5 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { Reflector } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 
 /**
@@ -10,9 +11,22 @@ import { Logger } from '@nestjs/common';
 export class WorkspaceMemberGuard implements CanActivate {
   private readonly logger = new Logger(WorkspaceMemberGuard.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Check if the route has the isPublic metadata
+    const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
     const { user } = request;
     

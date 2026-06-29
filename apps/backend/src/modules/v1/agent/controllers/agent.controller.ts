@@ -303,6 +303,26 @@ export class AgentController {
     return new StreamableFile(stream, { type: 'text/event-stream', disposition: 'inline' });
   }
 
+  @Get('ollama/models')
+  @Public()
+  @ApiOperation({ summary: 'Fetch downloaded models from local Ollama service' })
+  @ApiResponse({ status: 200, description: 'Return list of local Ollama model tags.' })
+  async getOllamaModels() {
+    const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434/v1';
+    const tagsUrl = ollamaUrl.replace('/v1', '/api/tags');
+    try {
+      const response = await fetch(tagsUrl, { signal: AbortSignal.timeout(2000) });
+      if (!response.ok) {
+        throw new Error(`Ollama returned status ${response.status}`);
+      }
+      const data = await response.json() as { models?: Array<{ name: string }> };
+      return (data.models || []).map((m) => m.name);
+    } catch (error) {
+      this.logger.warn(`Could not connect to Ollama at ${tagsUrl}: ${error.message}`);
+      return [];
+    }
+  }
+
   @Get('health-check')
   @Public()
   @ApiOperation({ summary: 'Check if the agent service is running properly' })

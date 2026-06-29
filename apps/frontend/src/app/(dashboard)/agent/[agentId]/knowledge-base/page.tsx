@@ -623,9 +623,6 @@ export default function AgentKnowledgeBasePage() {
         onOpenChange={setOpenSettings}
       />
 
-      {/* Floating tester button and right-sheet demo chat (UI only) */}
-      <KnowledgeBaseTester />
-
       {/* Integrations & API (UI only) */}
       <ZendeskDialog open={openZendesk} onOpenChange={setOpenZendesk} />
       <KnowledgeApiDialog open={openKnowledgeApi} onOpenChange={setOpenKnowledgeApi} />

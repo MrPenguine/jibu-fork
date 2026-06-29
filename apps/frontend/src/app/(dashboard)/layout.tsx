@@ -104,17 +104,7 @@ export default function DashboardLayout({
     logout(new FormData());
   };
   
-  const pathname = usePathname();
-  const isAgentPage = pathname.includes('/agent/');
-  
-  if (isAgentPage) {
-    return (
-      <WorkspaceProvider>
-        {children}
-        <Toaster />
-      </WorkspaceProvider>
-    );
-  }
+
 
   return (
     <div className="relative flex h-screen w-full flex-row overflow-hidden">
