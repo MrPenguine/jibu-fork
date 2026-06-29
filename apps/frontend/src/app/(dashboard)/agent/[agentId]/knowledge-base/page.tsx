@@ -2,7 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { listKnowledgeBases, createKnowledgeBase, listFoldersForKb, createFolderForKb, deleteFolderForKb, linkFileToKnowledgeBase, listKnowledgeBaseSources, deleteSourceFromKb } from "../../../../../utils/knowledgebaseApi";
+import { createKnowledgeBase, listFoldersForKb, createFolderForKb, deleteFolderForKb, linkFileToKnowledgeBase, listKnowledgeBaseSources, deleteSourceFromKb } from "../../../../../utils/knowledgebaseApi";
+import { listAgentKnowledgeBases, linkAgentKnowledgeBase } from "../../../../../utils/agentConfigApi";
 import { uploadFile, getFileDownloadUrl } from "../../../../../utils/fileApi";
 import { useWorkspace } from "../../../../../utils/workspaceContext";
 import { toast } from "@libs/shadcn-ui/components/ui/use-toast";
@@ -76,20 +77,23 @@ export default function AgentKnowledgeBasePage() {
       }
       setIsLoading(true);
       try {
-        // Get or create a knowledge base for this workspace
-        // TODO: Link agent to specific KB once backend relationship is established
-        let kbs = await listKnowledgeBases();
+        // Resolve the knowledge base linked to THIS agent. If none is linked yet,
+        // create a dedicated KB for the agent and link it via AgentKnowledgeBase.
         let kbId: string;
-        
-        if (kbs.length === 0) {
-          // Create a default knowledge base
+        const linkedKbs = await listAgentKnowledgeBases(agentId);
+
+        if (linkedKbs.length > 0) {
+          kbId = linkedKbs[0].id;
+        } else {
           const newKb = await createKnowledgeBase(`KB for Agent ${agentId}`);
           kbId = newKb.id;
-        } else {
-          // Use the first available KB for now
-          kbId = kbs[0].id;
+          try {
+            await linkAgentKnowledgeBase(agentId, kbId);
+          } catch (linkErr) {
+            console.error("Failed to link KB to agent:", linkErr);
+          }
         }
-        
+
         setKnowledgeBaseId(kbId);
         
         // Load folders for this KB

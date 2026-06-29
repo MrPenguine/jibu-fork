@@ -102,6 +102,39 @@ export class AgentController {
     return this.agentService.listWorkspaceTools(workspaceId);
   }
 
+  @Get(':id/knowledge-bases')
+  @ApiOperation({ summary: 'List knowledge bases linked to the agent' })
+  async listKnowledgeBases(@Param('id') id: string, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.listAgentKnowledgeBases(id, workspaceId);
+  }
+
+  @Post(':id/knowledge-bases')
+  @ApiOperation({ summary: 'Link a knowledge base to the agent' })
+  async linkKnowledgeBase(
+    @Param('id') id: string,
+    @Body() body: { knowledgeBaseId: string },
+    @Req() req,
+  ) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    if (!body?.knowledgeBaseId) throw new BadRequestException('knowledgeBaseId is required');
+    return this.agentService.linkAgentKnowledgeBase(id, body.knowledgeBaseId, workspaceId);
+  }
+
+  @Delete(':id/knowledge-bases/:knowledgeBaseId')
+  @ApiOperation({ summary: 'Unlink a knowledge base from the agent' })
+  async unlinkKnowledgeBase(
+    @Param('id') id: string,
+    @Param('knowledgeBaseId') knowledgeBaseId: string,
+    @Req() req,
+  ) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.unlinkAgentKnowledgeBase(id, knowledgeBaseId, workspaceId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a agent by ID' })
   @ApiResponse({ status: 200, description: 'Return the agent.' })

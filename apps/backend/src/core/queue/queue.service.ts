@@ -60,7 +60,7 @@ export class QueueService {
     try {
       await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, data, options);
       this.logger.debug(
-        `Added indexing job for source: ${data.knowledgeBaseSourceId} in org: ${data.organizationId}`,
+        `Added indexing job for source: ${data.knowledgeBaseSourceId} in workspace: ${data.workspaceId}`,
       );
     } catch (error) {
       this.logger.error(`Failed to add indexing job: ${error.message}`, error.stack);
