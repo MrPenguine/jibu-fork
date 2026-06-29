@@ -213,6 +213,32 @@ export async function listKnowledgeBases(specificWorkspaceId?: string): Promise<
 }
 
 /**
+ * Update an existing knowledge base (rename or change description)
+ */
+export async function updateKnowledgeBase(
+  knowledgeBaseId: string,
+  payload: { name?: string; description?: string },
+  specificWorkspaceId?: string
+): Promise<KnowledgeBase | null> {
+  try {
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    const headers = await getAuthHeaders(workspaceId || '');
+    const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (e) {
+    console.error('Error updating knowledge base:', e);
+    return null;
+  }
+}
+
+/**
  * Create a new knowledge base
  * @param name The name of the knowledge base
  * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace

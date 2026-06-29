@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createKnowledgeBase, listFoldersForKb, createFolderForKb, deleteFolderForKb, linkFileToKnowledgeBase, listKnowledgeBaseSources, deleteSourceFromKb } from "../../../../../utils/knowledgebaseApi";
+import { createKnowledgeBase, listFoldersForKb, createFolderForKb, deleteFolderForKb, linkFileToKnowledgeBase, listKnowledgeBaseSources, deleteSourceFromKb, updateKnowledgeBase } from "../../../../../utils/knowledgebaseApi";
 import { listAgentKnowledgeBases, linkAgentKnowledgeBase } from "../../../../../utils/agentConfigApi";
 import { uploadFile, getFileDownloadUrl } from "../../../../../utils/fileApi";
 import { useWorkspace } from "../../../../../utils/workspaceContext";
@@ -42,6 +42,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@libs/shadcn-ui/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@libs/shadcn-ui/components/ui/dialog";
 
 export default function AgentKnowledgeBasePage() {
   const params = useParams<{ agentId: string }>();
@@ -54,6 +62,8 @@ export default function AgentKnowledgeBasePage() {
   const [preview, setPreview] = useState(false);
   const [sources, setSources] = useState<KnowledgeBaseSource[]>([]);
   const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
+  const [kbName, setKbName] = useState("Knowledge base");
+  const [tempKbName, setTempKbName] = useState("");
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
   const [openCreateFolder, setOpenCreateFolder] = useState(false);
   const [openUrl, setOpenUrl] = useState(false);
@@ -80,13 +90,16 @@ export default function AgentKnowledgeBasePage() {
         // Resolve the knowledge base linked to THIS agent. If none is linked yet,
         // create a dedicated KB for the agent and link it via AgentKnowledgeBase.
         let kbId: string;
+        let name = "Knowledge base";
         const linkedKbs = await listAgentKnowledgeBases(agentId);
 
         if (linkedKbs.length > 0) {
           kbId = linkedKbs[0].id;
+          name = linkedKbs[0].name;
         } else {
           const newKb = await createKnowledgeBase(`KB for Agent ${agentId}`);
           kbId = newKb.id;
+          name = newKb.name;
           try {
             await linkAgentKnowledgeBase(agentId, kbId);
           } catch (linkErr) {
@@ -95,6 +108,8 @@ export default function AgentKnowledgeBasePage() {
         }
 
         setKnowledgeBaseId(kbId);
+        setKbName(name);
+        setTempKbName(name);
         
         // Load folders for this KB
         await loadFolders(kbId);
@@ -110,6 +125,22 @@ export default function AgentKnowledgeBasePage() {
     };
     load();
   }, [agentId, router]);
+
+  const handleRenameKb = async () => {
+    if (!knowledgeBaseId || !tempKbName.trim()) return;
+    try {
+      const result = await updateKnowledgeBase(knowledgeBaseId, { name: tempKbName.trim() });
+      if (result) {
+        setKbName(result.name);
+        toast({ title: "Success", description: "Knowledge base renamed successfully" });
+        setOpenSettings(false);
+      } else {
+        toast({ title: "Error", description: "Failed to rename knowledge base", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to rename knowledge base", variant: "destructive" });
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!search) return sources;
@@ -432,6 +463,7 @@ export default function AgentKnowledgeBasePage() {
   return (
     <div className="w-full">
       <KnowledgeBaseHeader
+        title={kbName}
         search={search}
         onSearchChange={setSearch}
         preview={preview}
@@ -617,15 +649,49 @@ export default function AgentKnowledgeBasePage() {
         setOpenPlainText(false);
       }} />
 
-      {/* Preview and Settings (UI only) */}
+      {/* Preview and Settings */}
       <KnowledgeBasePreviewDialog
         open={openPreview}
         onOpenChange={(v) => { setOpenPreview(v); if (!v) setPreview(false); }}
       />
-      <KnowledgeBaseSettingsDialog
-        open={openSettings}
-        onOpenChange={setOpenSettings}
-      />
+      
+      {/* Settings (Rename knowledge base) */}
+      <Dialog open={openSettings} onOpenChange={setOpenSettings}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Knowledge Base</DialogTitle>
+            <DialogDescription>
+              Provide a clear name to organize the documents linked to this agent.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="kbNameInput" className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Knowledge Base Name
+              </label>
+              <input
+                id="kbNameInput"
+                type="text"
+                value={tempKbName}
+                onChange={(e) => setTempKbName(e.target.value)}
+                placeholder="e.g. Product Support FAQ"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#009959] focus:outline-none focus:ring-1 focus:ring-[#009959]"
+              />
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button variant="outline" onClick={() => {
+              setTempKbName(kbName);
+              setOpenSettings(false);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameKb} disabled={!tempKbName.trim()} className="bg-[#009959] hover:bg-[#007d49] text-white">
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Integrations & API (UI only) */}
       <ZendeskDialog open={openZendesk} onOpenChange={setOpenZendesk} />
