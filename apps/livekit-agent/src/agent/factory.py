@@ -5,7 +5,7 @@ import uuid
 from livekit.agents import JobContext, WorkerOptions, cli, AutoSubscribe
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.llm import function_tool
-from livekit.plugins import google, silero, deepgram, elevenlabs
+from livekit.plugins import google, silero, deepgram, elevenlabs, openai
 from dotenv import load_dotenv
 
 from config import DEFAULT_AGENT_ID, XAI_API_KEY, MISTRAL_API_KEY, OPENROUTER_API_KEY
@@ -54,7 +54,6 @@ def _build_llm(cfg: dict):
         return google.LLM(model=model or "gemini-flash-latest")
     if "openrouter" in provider:
         # OpenRouter is OpenAI-compatible; model ids stay vendor-namespaced.
-        from livekit.plugins import openai
         return openai.LLM(
             model=model or "openai/gpt-4o-mini",
             base_url="https://openrouter.ai/api/v1",
@@ -62,10 +61,8 @@ def _build_llm(cfg: dict):
         )
     if "grok" in provider or "xai" in provider or "x-ai" in provider:
         # xAI is OpenAI-compatible.
-        from livekit.plugins import openai
         return openai.LLM(model=model or "grok-3-latest", base_url="https://api.x.ai/v1", api_key=XAI_API_KEY)
     if "mistral" in provider:
-        from livekit.plugins import openai
         return openai.LLM(
             model=model or "mistral-large-latest",
             base_url="https://api.mistral.ai/v1",
