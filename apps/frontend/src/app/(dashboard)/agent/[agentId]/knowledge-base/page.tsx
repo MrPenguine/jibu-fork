@@ -98,13 +98,13 @@ export default function AgentKnowledgeBasePage() {
           name = linkedKbs[0].name;
         } else {
           const newKb = await createKnowledgeBase(`KB for Agent ${agentId}`);
+          // The link MUST persist — otherwise the next visit can't find this KB
+          // and would create another one, orphaning everything uploaded here.
+          // Let a failure propagate to the outer catch so the KB stays
+          // uninitialized (uploads are blocked) and the user is told.
+          await linkAgentKnowledgeBase(agentId, newKb.id);
           kbId = newKb.id;
           name = newKb.name;
-          try {
-            await linkAgentKnowledgeBase(agentId, kbId);
-          } catch (linkErr) {
-            console.error("Failed to link KB to agent:", linkErr);
-          }
         }
 
         setKnowledgeBaseId(kbId);
@@ -117,8 +117,14 @@ export default function AgentKnowledgeBasePage() {
         // Load sources for this KB
         await loadSources(kbId);
       } catch (e) {
-        console.error("Failed to load knowledge base sources:", e);
+        console.error("Failed to initialize knowledge base:", e);
         setSources([]);
+        setKnowledgeBaseId(null);
+        toast({
+          title: "Error",
+          description: "Failed to initialize this agent's knowledge base. Please retry.",
+          variant: "destructive",
+        });
       } finally {
         setIsLoading(false);
       }
