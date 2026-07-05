@@ -356,6 +356,63 @@ export default function AgentKnowledgeBasePage() {
     }
   };
 
+  const handlePlainTextImport = async (payload: PlainTextPayload) => {
+    if (!knowledgeBaseId) {
+      toast({
+        title: "Error",
+        description: "Knowledge base not initialized",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!payload.text || payload.text.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Please enter some text to import",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Reuse the file pipeline: wrap the pasted text in a .txt file so the
+      // worker indexes it through the same chunk/embed path as uploaded files.
+      const fileName = `pasted-text-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`;
+      const textFile = new File([payload.text.trim()], fileName, { type: "text/plain" });
+
+      const uploadedFile = await uploadFile(textFile, undefined, activeWorkspace?.id);
+
+      let validFolderId: string | undefined = undefined;
+      if (payload.folderId && payload.folderId.trim() !== "") {
+        const trimmedFolderId = payload.folderId.trim();
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const cuidRegex = /^c[a-z0-9]{24,}$/i;
+        if (uuidRegex.test(trimmedFolderId) || cuidRegex.test(trimmedFolderId)) {
+          validFolderId = trimmedFolderId;
+        }
+      }
+
+      await linkFileToKnowledgeBase(knowledgeBaseId, uploadedFile.id, undefined, validFolderId);
+
+      toast({
+        title: "Success",
+        description: "Text imported and queued for indexing",
+      });
+      await loadSources(knowledgeBaseId);
+      setOpenPlainText(false);
+    } catch (error: any) {
+      console.error("[handlePlainTextImport] Error importing text:", error);
+      toast({
+        title: "Error",
+        description: "Failed to import text",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleDeleteSource = async (sourceId: string) => {
     if (!knowledgeBaseId) {
       toast({
@@ -650,10 +707,7 @@ export default function AgentKnowledgeBasePage() {
         }}
         onImport={handleUploadFiles}
       />
-      <PlainTextDialog open={openPlainText} onOpenChange={setOpenPlainText} onImport={(payload: PlainTextPayload) => {
-        console.log('Plain text import:', payload, 'agent', agentId);
-        setOpenPlainText(false);
-      }} />
+      <PlainTextDialog open={openPlainText} onOpenChange={setOpenPlainText} onImport={handlePlainTextImport} />
 
       {/* Preview and Settings */}
       <KnowledgeBasePreviewDialog

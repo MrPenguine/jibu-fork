@@ -4,7 +4,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QUEUE_NAMES } from '@jibu/queue-definitions';
 import { QueueService } from './queue.service';
 import { QueueProcessor } from './queue.processor';
-import { IndexingProcessor } from './indexing.processor';
 import { QueueController } from './queue.controller';
 import { QueueMonitorController } from './queue-monitor.controller';
 import { QueueHealthController } from './queue-health.controller';
@@ -60,7 +59,7 @@ import { QueueHealthController } from './queue-health.controller';
     ),
   ],
   controllers: [QueueController, QueueMonitorController, QueueHealthController],
-  providers: [QueueService, QueueProcessor, IndexingProcessor],
+  providers: [QueueService, QueueProcessor],
   exports: [BullModule, QueueService],
 })
 export class QueueModule {}
