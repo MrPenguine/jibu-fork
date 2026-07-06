@@ -47,9 +47,16 @@ export interface EmailJobData {
   body: string;
 }
 
+export interface ChunkConfig {
+  strategies?: string[];   // e.g. ['clean_html','summarize','smart','headers','faq']
+  chunkSize?: number;
+  chunkOverlap?: number;
+}
+
 export interface IndexFileSourceJobData {
   knowledgeBaseSourceId: string;
   workspaceId: string;
+  chunkConfig?: ChunkConfig;
 }
 
 export interface DeindexSourceJobData {

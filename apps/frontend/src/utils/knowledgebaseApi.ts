@@ -422,11 +422,18 @@ export async function listKnowledgeBaseSources(knowledgeBaseId: string, specific
  * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  * @returns The created knowledge base source
  */
+export interface ChunkConfigInput {
+  strategies?: string[];
+  chunkSize?: number;
+  chunkOverlap?: number;
+}
+
 export async function linkFileToKnowledgeBase(
   knowledgeBaseId: string,
   fileId: string,
   specificWorkspaceId?: string,
-  folderId?: string
+  folderId?: string,
+  chunkConfig?: ChunkConfigInput
 ): Promise<KnowledgeBaseSource> {
   try {
     // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
@@ -462,6 +469,19 @@ export async function linkFileToKnowledgeBase(
       sourceType: 'file',
       indexingStatus: 'PENDING',
     };
+
+    // Include chunking configuration when provided
+    if (chunkConfig) {
+      if (Array.isArray(chunkConfig.strategies) && chunkConfig.strategies.length > 0) {
+        requestBody.chunkingStrategy = chunkConfig.strategies;
+      }
+      if (typeof chunkConfig.chunkSize === 'number') {
+        requestBody.chunkSize = chunkConfig.chunkSize;
+      }
+      if (typeof chunkConfig.chunkOverlap === 'number') {
+        requestBody.chunkOverlap = chunkConfig.chunkOverlap;
+      }
+    }
     
     // Only add folderId if it's a valid non-empty string and matches expected format
     if (folderId && folderId.trim() !== '') {

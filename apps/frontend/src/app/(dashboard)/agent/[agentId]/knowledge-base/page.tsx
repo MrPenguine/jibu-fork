@@ -314,7 +314,14 @@ export default function AgentKnowledgeBasePage() {
             knowledgeBaseId,
             uploadedFile.id,
             undefined,
-            validFolderId
+            validFolderId,
+            {
+              strategies: payload.chunkingStrategy
+                ? payload.chunkingStrategy.split(',').map((s) => s.trim()).filter(Boolean)
+                : undefined,
+              chunkSize: payload.chunkSize,
+              chunkOverlap: payload.chunkOverlap,
+            }
           );
           console.log('[handleUploadFiles] File linked to KB');
 

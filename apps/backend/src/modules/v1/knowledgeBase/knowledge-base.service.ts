@@ -26,6 +26,50 @@ function isSupportedFileType(mimeType?: string, fileName?: string): boolean {
   return false;
 }
 
+const VALID_CHUNK_STRATEGIES = ['clean_html', 'summarize', 'smart', 'headers', 'faq'];
+const DEFAULT_CHUNK_SIZE = 1000;
+const DEFAULT_CHUNK_OVERLAP = 200;
+
+export interface ChunkConfigInput {
+  strategies?: string[];
+  chunkSize?: number;
+  chunkOverlap?: number;
+}
+
+/**
+ * Normalize raw chunk config into a persisted shape with sane defaults.
+ * Accepts strategies as an array or a comma-joined string, filters to known
+ * strategies, and clamps size/overlap.
+ */
+function normalizeChunkConfig(input?: ChunkConfigInput) {
+  const rawStrategies = Array.isArray(input?.strategies)
+    ? input!.strategies
+    : typeof (input as any)?.strategies === 'string'
+      ? String((input as any).strategies).split(',')
+      : [];
+
+  const strategies = rawStrategies
+    .map((s) => String(s).trim().toLowerCase())
+    .filter((s) => VALID_CHUNK_STRATEGIES.includes(s));
+
+  const chunkSize =
+    typeof input?.chunkSize === 'number' && input.chunkSize > 0
+      ? Math.min(Math.max(Math.round(input.chunkSize), 100), 8000)
+      : DEFAULT_CHUNK_SIZE;
+
+  const chunkOverlap =
+    typeof input?.chunkOverlap === 'number' && input.chunkOverlap >= 0
+      ? Math.min(Math.max(Math.round(input.chunkOverlap), 0), 2000)
+      : DEFAULT_CHUNK_OVERLAP;
+
+  return {
+    // de-dupe while preserving first occurrence
+    strategies: [...new Set(strategies)],
+    chunkSize,
+    chunkOverlap: Math.min(chunkOverlap, chunkSize - 1),
+  };
+}
+
 @Injectable()
 export class KnowledgeBaseService {
   private readonly logger = new Logger(KnowledgeBaseService.name);
@@ -174,7 +218,7 @@ export class KnowledgeBaseService {
   /**
    * Link a file as a source to a knowledge base
    */
-  async linkFileSource(knowledgeBaseId: string, fileId: string, workspaceId: string, userId: string, folderId?: string) {
+  async linkFileSource(knowledgeBaseId: string, fileId: string, workspaceId: string, userId: string, folderId?: string, chunkConfig?: ChunkConfigInput) {
     try {
       await this.findKnowledgeBaseById(knowledgeBaseId, workspaceId);
 
@@ -219,7 +263,7 @@ export class KnowledgeBaseService {
         }
       }
 
-      const source = await this.createSourceForFile(knowledgeBaseId, workspaceId, file, folderId);
+      const source = await this.createSourceForFile(knowledgeBaseId, workspaceId, file, folderId, chunkConfig);
 
       this.logger.log(`Created source: ${JSON.stringify(source)}`);
 
@@ -233,9 +277,12 @@ export class KnowledgeBaseService {
   /**
    * Helper to create a source for a file
    */
-  private async createSourceForFile(knowledgeBaseId: string, workspaceId: string, file: any, folderId?: string) {
+  private async createSourceForFile(knowledgeBaseId: string, workspaceId: string, file: any, folderId?: string, chunkConfig?: ChunkConfigInput) {
     try {
       this.logger.log(`Creating source for file ${file.id} in knowledge base ${knowledgeBaseId}`);
+
+      const normalizedChunkConfig = normalizeChunkConfig(chunkConfig);
+      this.logger.log(`Chunk config for source: ${JSON.stringify(normalizedChunkConfig)}`);
 
       const source = await this.prisma.knowledgeBaseSource.create({
         data: {
@@ -244,6 +291,7 @@ export class KnowledgeBaseService {
           sourcePointer: file.id,
           workspaceId: workspaceId,
           indexingStatus: 'PENDING',
+          chunkConfig: normalizedChunkConfig,
           ...(folderId && { folderId }),
         },
       });
@@ -256,6 +304,7 @@ export class KnowledgeBaseService {
         await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
           knowledgeBaseSourceId: source.id,
           workspaceId: workspaceId,
+          chunkConfig: normalizedChunkConfig,
         });
 
         this.logger.log(`Successfully added indexing job for source ${source.id} to Bull queue`);

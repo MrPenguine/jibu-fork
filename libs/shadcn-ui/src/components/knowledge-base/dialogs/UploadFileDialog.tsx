@@ -5,14 +5,20 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
+import { Input } from "../../ui/input";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { ChunkingStrategySelect, type ChunkingStrategyKey } from "../ChunkingStrategySelect";
 
 export interface UploadFilePayload {
   files: File[];
   chunkingStrategy?: string;
+  chunkSize?: number;
+  chunkOverlap?: number;
   folderId?: string;
 }
+
+const DEFAULT_CHUNK_SIZE = 1000;
+const DEFAULT_CHUNK_OVERLAP = 200;
 
 interface UploadFileDialogProps {
   open: boolean;
@@ -27,6 +33,8 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
   const [files, setFiles] = useState<File[]>([]);
   const [chunking, setChunking] = useState<ChunkingStrategyKey[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
+  const [chunkSize, setChunkSize] = useState<number>(DEFAULT_CHUNK_SIZE);
+  const [chunkOverlap, setChunkOverlap] = useState<number>(DEFAULT_CHUNK_OVERLAP);
 
   const [rejected, setRejected] = useState<string[]>([]);
 
@@ -50,6 +58,8 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
       setChunking([]);
       setFolderId(undefined);
       setRejected([]);
+      setChunkSize(DEFAULT_CHUNK_SIZE);
+      setChunkOverlap(DEFAULT_CHUNK_OVERLAP);
     } else if (preselectedFolderId) {
       // Set the preselected folder when dialog opens
       setFolderId(preselectedFolderId);
@@ -68,8 +78,10 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
   const handleImport = () => {
     console.log('[UploadFileDialog] Importing with folderId:', folderId);
     console.log('[UploadFileDialog] Available folders:', folders);
-    onImport({ files, chunkingStrategy: chunking.join(","), folderId });
+    onImport({ files, chunkingStrategy: chunking.join(","), chunkSize, chunkOverlap, folderId });
   };
+
+  const usesSmart = chunking.includes("smart" as ChunkingStrategyKey);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -105,6 +117,41 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
           <div className="grid gap-2">
             <Label htmlFor="kb-chunking-strategy">LLM chunking strategy</Label>
             <ChunkingStrategySelect value={chunking} onChange={setChunking} />
+          </div>
+
+          {/* Chunk size / overlap */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="kb-chunk-size">Chunk size (chars)</Label>
+              <Input
+                id="kb-chunk-size"
+                type="number"
+                min={100}
+                max={8000}
+                step={100}
+                value={chunkSize}
+                disabled={usesSmart}
+                onChange={(e) => setChunkSize(Number(e.target.value))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="kb-chunk-overlap">Chunk overlap (chars)</Label>
+              <Input
+                id="kb-chunk-overlap"
+                type="number"
+                min={0}
+                max={2000}
+                step={50}
+                value={chunkOverlap}
+                disabled={usesSmart}
+                onChange={(e) => setChunkOverlap(Number(e.target.value))}
+              />
+            </div>
+            {usesSmart && (
+              <p className="col-span-2 text-xs text-slate-500">
+                Smart chunking groups by topic and ignores size/overlap.
+              </p>
+            )}
           </div>
 
           {/* Folder */}
