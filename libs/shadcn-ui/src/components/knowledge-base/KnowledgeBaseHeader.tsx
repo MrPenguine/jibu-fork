@@ -3,7 +3,7 @@
 import React from 'react';
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Plus, Eye, SlidersHorizontal } from "lucide-react";
+import { Plus, Eye, SlidersHorizontal, Boxes } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
 
 interface KnowledgeBaseHeaderProps {
@@ -17,6 +17,7 @@ interface KnowledgeBaseHeaderProps {
   onPickUpload: () => void;
   onPickPlainText: () => void;
   onOpenSettings?: () => void;
+  onOpenChunks?: () => void;
   onPickZendesk?: () => void;
   onOpenKnowledgeApi?: () => void;
 }
@@ -32,6 +33,7 @@ export function KnowledgeBaseHeader({
   onPickUpload,
   onPickPlainText,
   onOpenSettings,
+  onOpenChunks,
   onPickZendesk,
   onOpenKnowledgeApi,
 }: KnowledgeBaseHeaderProps) {
@@ -55,9 +57,15 @@ export function KnowledgeBaseHeader({
           <Button variant="outline" size="icon" className="h-9 w-9" aria-label="Knowledge base settings" onClick={onOpenSettings}>
             <SlidersHorizontal className="h-4 w-4" />
           </Button>
-          {/* Preview button */}
+          {/* Browse chunks */}
+          {onOpenChunks && (
+            <Button variant="outline" className="h-9" onClick={onOpenChunks}>
+              <Boxes className="h-4 w-4 mr-2" /> Chunks
+            </Button>
+          )}
+          {/* Preview / retrieval test button */}
           <Button variant="outline" className="h-9" onClick={() => onTogglePreview(!preview)}>
-            <Eye className="h-4 w-4 mr-2" /> Preview
+            <Eye className="h-4 w-4 mr-2" /> Test
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

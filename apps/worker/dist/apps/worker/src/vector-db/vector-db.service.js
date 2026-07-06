@@ -46,14 +46,14 @@ let VectorDbService = VectorDbService_1 = class VectorDbService {
     }
     async ensureCollection(name, vectorSize) {
         try {
-            const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10);
+            const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
             this.logger.log(`Ensuring collection ${name} exists with vector size ${dimension}`);
             await axios_1.default.get(`${this.qdrantUrl}/collections/${name}`);
             this.logger.log(`Collection ${name} already exists`);
         }
         catch (error) {
             if (error.response && error.response.status === 404) {
-                const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10);
+                const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
                 await this.createCollection(name, {
                     vectors: {
                         size: dimension,
@@ -72,8 +72,12 @@ let VectorDbService = VectorDbService_1 = class VectorDbService {
         }
     }
     async upsert(collection, data) {
+        var _a, _b;
         try {
-            await this.ensureCollection(collection);
+            await this.ensureCollection(collection, data.dimension);
+            const expectedDimension = data.dimension ||
+                ((_b = (_a = data.points[0]) === null || _a === void 0 ? void 0 : _a.vector) === null || _b === void 0 ? void 0 : _b.length) ||
+                parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
             const qdrantPoints = data.points.map(point => {
                 var _a, _b;
                 const pointId = typeof point.id === 'string' ?
@@ -85,8 +89,8 @@ let VectorDbService = VectorDbService_1 = class VectorDbService {
                     }
                     return v;
                 });
-                if (sanitizedVector.length !== parseInt(this.configService.get('VECTOR_DIMENSION') || '512', 10)) {
-                    this.logger.warn(`Vector dimension mismatch: ${sanitizedVector.length} vs expected ${this.configService.get('VECTOR_DIMENSION')}`);
+                if (sanitizedVector.length !== expectedDimension) {
+                    this.logger.warn(`Vector dimension mismatch: ${sanitizedVector.length} vs expected ${expectedDimension}`);
                 }
                 let sanitizedPayload = {};
                 try {
@@ -252,6 +256,40 @@ let VectorDbService = VectorDbService_1 = class VectorDbService {
         catch (error) {
             this.logger.error(`Failed to scroll collection ${collection}: ${error.message}`);
             return [];
+        }
+    }
+    async retrieve(collection, ids, options = {}) {
+        try {
+            const exists = await this.collectionExists(collection);
+            if (!exists)
+                return [];
+            const normalizedIds = ids.map((id) => typeof id === 'string' ? id.replace(/-/g, '') : String(id));
+            const response = await axios_1.default.post(`${this.qdrantUrl}/collections/${collection}/points`, {
+                ids: normalizedIds,
+                with_payload: options.with_payload !== false,
+                with_vector: options.with_vector === true,
+            });
+            return response.data.result || [];
+        }
+        catch (error) {
+            this.logger.error(`Failed to retrieve points from ${collection}: ${error.message}`);
+            return [];
+        }
+    }
+    async deleteByIds(collection, ids) {
+        try {
+            const exists = await this.collectionExists(collection);
+            if (!exists) {
+                this.logger.warn(`Collection ${collection} doesn't exist, skipping deleteByIds`);
+                return;
+            }
+            const normalizedIds = ids.map((id) => typeof id === 'string' ? id.replace(/-/g, '') : String(id));
+            await axios_1.default.post(`${this.qdrantUrl}/collections/${collection}/points/delete?wait=true`, { points: normalizedIds });
+            this.logger.debug(`Deleted ${normalizedIds.length} points from ${collection}`);
+        }
+        catch (error) {
+            this.logger.error(`Failed to delete points by id from ${collection}: ${error.message}`);
+            throw error;
         }
     }
     async deleteCollection(name) {

@@ -11,6 +11,7 @@ export declare const JOB_NAMES: {
     EMAIL_JOB: string;
     INDEX_FILE_SOURCE: string;
     DEINDEX_SOURCE: string;
+    REEMBED_CHUNK: string;
     EXECUTE_WORKFLOW: string;
     CANCEL_WORKFLOW: string;
     CHECK_WORKFLOW_STATUS: string;
@@ -25,16 +26,29 @@ export interface EmailJobData {
     subject: string;
     body: string;
 }
+export interface ChunkConfig {
+    strategies?: string[];
+    chunkSize?: number;
+    chunkOverlap?: number;
+}
 export interface IndexFileSourceJobData {
     knowledgeBaseSourceId: string;
-    organizationId: string;
+    workspaceId: string;
+    chunkConfig?: ChunkConfig;
 }
 export interface DeindexSourceJobData {
     knowledgeBaseSourceId: string;
-    organizationId: string;
+    workspaceId: string;
     sourceType: string;
     sourcePointer: string;
     knowledgeBaseId: string;
+}
+export interface ReembedChunkJobData {
+    knowledgeBaseId: string;
+    sourceId: string;
+    chunkMetadataId: string;
+    vectorId: string;
+    text: string;
 }
 export interface WorkflowExecutionJobData {
     workflowId: string;

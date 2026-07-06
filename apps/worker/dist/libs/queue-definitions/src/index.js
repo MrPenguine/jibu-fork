@@ -15,6 +15,7 @@ exports.JOB_NAMES = {
     EMAIL_JOB: 'email-job',
     INDEX_FILE_SOURCE: 'index-file-source',
     DEINDEX_SOURCE: 'deindex-source',
+    REEMBED_CHUNK: 'reembed-chunk',
     EXECUTE_WORKFLOW: 'execute-workflow',
     CANCEL_WORKFLOW: 'cancel-workflow',
     CHECK_WORKFLOW_STATUS: 'check-workflow-status',

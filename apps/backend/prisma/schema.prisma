@@ -214,6 +214,14 @@ model KnowledgeBase {
   name           String
   workspaceId String
   workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  // Per-KB embedding model. Documents and queries must embed with the SAME model,
+  // so this is stored once per KB and read at both index and query time.
+  embeddingProvider String?       // 'gemini' | 'openai'
+  embeddingModel    String?       // e.g. 'gemini-embedding-001', 'text-embedding-3-small'
+  // Retrieval + answer config: { topK, systemPrompt, temperature, maxTokens }
+  retrievalConfig   Json?
+  // Default chunk config applied to new sources unless overridden per-source
+  defaultChunkConfig Json?
   sources        KnowledgeBaseSource[]
   chunks         ChunkMetadata[] // Relation to chunks
   assistantLinks AssistantKnowledgeBase[]
@@ -228,15 +236,19 @@ model KnowledgeBaseSource {
   id                String          @id @default(uuid())
   knowledgeBaseId   String
   workspaceId    String
-  sourceType        String          @default("file")
-  sourcePointer     String // Stores File ID for sourceType='file'
+  sourceType        String          @default("file") // file | url | sitemap
+  sourcePointer     String?         // Stores File ID for sourceType='file'
+  sourceUrl         String?         // Stores the URL for sourceType='url' | 'sitemap'
+  title             String?         // Human-friendly label (e.g. the URL or fetched page title)
+  refreshInterval   String?         // never | daily | weekly | monthly (url/sitemap only)
+  lastIndexedAt     DateTime?
   indexingStatus    String          @default("PENDING")
   hasIndexedContent Boolean         @default(false)
   folderId          String?
   chunkConfig       Json?           // Per-source chunking config: { strategies, chunkSize, chunkOverlap }
   knowledgeBase     KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  file              File            @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
+  file              File?           @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
   folder            Folder?         @relation(fields: [folderId], references: [id])
   chunks            ChunkMetadata[] // Relation to chunks
   createdAt         DateTime        @default(now())

@@ -2,7 +2,27 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createKnowledgeBase, listFoldersForKb, createFolderForKb, deleteFolderForKb, linkFileToKnowledgeBase, listKnowledgeBaseSources, deleteSourceFromKb, updateKnowledgeBase } from "../../../../../utils/knowledgebaseApi";
+import {
+  createKnowledgeBase,
+  listFoldersForKb,
+  createFolderForKb,
+  deleteFolderForKb,
+  linkFileToKnowledgeBase,
+  listKnowledgeBaseSources,
+  deleteSourceFromKb,
+  updateKnowledgeBase,
+  linkUrlsToKnowledgeBase,
+  getKnowledgeBaseSettings,
+  updateKnowledgeBaseSettings,
+  browseKnowledgeBaseChunks,
+  getKnowledgeBaseChunk,
+  updateKnowledgeBaseChunk,
+  deleteKnowledgeBaseChunk,
+  retrieveTestKnowledgeBase,
+  type KnowledgeBaseSettings,
+  type ChunkMetadata,
+  type RefreshRate,
+} from "../../../../../utils/knowledgebaseApi";
 import { listAgentKnowledgeBases, linkAgentKnowledgeBase } from "../../../../../utils/agentConfigApi";
 import { uploadFile, getFileDownloadUrl } from "../../../../../utils/fileApi";
 import { useWorkspace } from "../../../../../utils/workspaceContext";
@@ -24,6 +44,7 @@ import {
   type PlainTextPayload,
   KnowledgeBasePreviewDialog,
   KnowledgeBaseSettingsDialog,
+  ChunkBrowserDialog,
   KnowledgeBaseTester,
   ZendeskDialog,
   KnowledgeApiDialog,
@@ -42,14 +63,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@libs/shadcn-ui/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@libs/shadcn-ui/components/ui/dialog";
 
 export default function AgentKnowledgeBasePage() {
   const params = useParams<{ agentId: string }>();
@@ -63,7 +76,6 @@ export default function AgentKnowledgeBasePage() {
   const [sources, setSources] = useState<KnowledgeBaseSource[]>([]);
   const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
   const [kbName, setKbName] = useState("Knowledge base");
-  const [tempKbName, setTempKbName] = useState("");
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
   const [openCreateFolder, setOpenCreateFolder] = useState(false);
   const [openUrl, setOpenUrl] = useState(false);
@@ -71,7 +83,16 @@ export default function AgentKnowledgeBasePage() {
   const [openUpload, setOpenUpload] = useState(false);
   const [openPlainText, setOpenPlainText] = useState(false);
   const [openPreview, setOpenPreview] = useState(false);
-  const [openSettings, setOpenSettings] = useState(false);
+  const [openKbSettings, setOpenKbSettings] = useState(false);
+  const [kbSettings, setKbSettings] = useState<KnowledgeBaseSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [openChunks, setOpenChunks] = useState(false);
+  const [chunkItems, setChunkItems] = useState<ChunkMetadata[]>([]);
+  const [chunkTotal, setChunkTotal] = useState(0);
+  const [chunkPage, setChunkPage] = useState(1);
+  const [chunksLoading, setChunksLoading] = useState(false);
+  const CHUNK_PAGE_SIZE = 20;
   const [openZendesk, setOpenZendesk] = useState(false);
   const [openKnowledgeApi, setOpenKnowledgeApi] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -109,7 +130,6 @@ export default function AgentKnowledgeBasePage() {
 
         setKnowledgeBaseId(kbId);
         setKbName(name);
-        setTempKbName(name);
         
         // Load folders for this KB
         await loadFolders(kbId);
@@ -132,19 +152,123 @@ export default function AgentKnowledgeBasePage() {
     load();
   }, [agentId, router]);
 
-  const handleRenameKb = async () => {
-    if (!knowledgeBaseId || !tempKbName.trim()) return;
+  // ---- PR-4: KB settings (embedding model + retrieval config) ----
+  const handleOpenKbSettings = async () => {
+    if (!knowledgeBaseId) return;
+    setOpenKbSettings(true);
+    setSettingsLoading(true);
     try {
-      const result = await updateKnowledgeBase(knowledgeBaseId, { name: tempKbName.trim() });
-      if (result) {
-        setKbName(result.name);
-        toast({ title: "Success", description: "Knowledge base renamed successfully" });
-        setOpenSettings(false);
-      } else {
-        toast({ title: "Error", description: "Failed to rename knowledge base", variant: "destructive" });
+      const s = await getKnowledgeBaseSettings(knowledgeBaseId);
+      setKbSettings(s);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load settings", variant: "destructive" });
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleSaveKbSettings = async (payload: {
+    name: string;
+    embeddingModel: string;
+    retrievalConfig: { topK: number; systemPrompt: string; temperature: number; maxTokens: number };
+    defaultChunkConfig: { chunkSize: number; chunkOverlap: number };
+  }) => {
+    if (!knowledgeBaseId) return;
+    setSettingsSaving(true);
+    try {
+      if (payload.name && payload.name !== kbName) {
+        const renamed = await updateKnowledgeBase(knowledgeBaseId, { name: payload.name });
+        if (renamed) setKbName(renamed.name);
       }
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to rename knowledge base", variant: "destructive" });
+      const updated = await updateKnowledgeBaseSettings(knowledgeBaseId, {
+        embeddingModel: payload.embeddingModel,
+        retrievalConfig: payload.retrievalConfig,
+        defaultChunkConfig: payload.defaultChunkConfig,
+      });
+      setKbSettings(updated);
+      const reindexed = updated.reindexedSources || 0;
+      toast({
+        title: "Settings saved",
+        description: reindexed > 0
+          ? `Embedding model changed — re-embedding ${reindexed} source${reindexed === 1 ? "" : "s"}.`
+          : "Knowledge base settings updated.",
+      });
+      setOpenKbSettings(false);
+      if (reindexed > 0) await loadSources(knowledgeBaseId);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to save settings", variant: "destructive" });
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  // ---- PR-5: Chunk management ----
+  const loadChunks = async (page: number) => {
+    if (!knowledgeBaseId) return;
+    setChunksLoading(true);
+    try {
+      const res = await browseKnowledgeBaseChunks(knowledgeBaseId, { page, pageSize: CHUNK_PAGE_SIZE });
+      setChunkItems(res.items);
+      setChunkTotal(res.total);
+      setChunkPage(res.page);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load chunks", variant: "destructive" });
+    } finally {
+      setChunksLoading(false);
+    }
+  };
+
+  const handleOpenChunks = async () => {
+    setOpenChunks(true);
+    await loadChunks(1);
+  };
+
+  const handleViewChunk = async (chunkId: string): Promise<ChunkMetadata> => {
+    if (!knowledgeBaseId) throw new Error("No knowledge base");
+    return getKnowledgeBaseChunk(knowledgeBaseId, chunkId);
+  };
+
+  const handleEditChunk = async (chunkId: string, text: string) => {
+    if (!knowledgeBaseId) return;
+    await updateKnowledgeBaseChunk(knowledgeBaseId, chunkId, text);
+    toast({ title: "Re-embedding", description: "Chunk queued for re-embedding." });
+  };
+
+  const handleDeleteChunk = async (chunkId: string) => {
+    if (!knowledgeBaseId) return;
+    await deleteKnowledgeBaseChunk(knowledgeBaseId, chunkId);
+    toast({ title: "Deleted", description: "Chunk removed." });
+    await loadChunks(chunkPage);
+  };
+
+  // ---- PR-5: real retrieval test ----
+  const handleAskRetrieval = async (question: string) => {
+    if (!knowledgeBaseId) throw new Error("No knowledge base");
+    return retrieveTestKnowledgeBase(knowledgeBaseId, question);
+  };
+
+  // ---- PR-3: URL ingestion ----
+  const handleImportUrls = async (payload: UrlImportPayload) => {
+    if (!knowledgeBaseId) {
+      toast({ title: "Error", description: "Knowledge base not ready", variant: "destructive" });
+      return;
+    }
+    try {
+      const strategies = (payload.chunkingStrategy || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await linkUrlsToKnowledgeBase(knowledgeBaseId, {
+        urls: payload.urls,
+        refreshRate: (payload.refreshRate as RefreshRate) || "never",
+        folderId: payload.folderId,
+        chunkConfig: strategies.length > 0 ? { strategies } : undefined,
+      });
+      toast({ title: "Importing", description: `Fetching ${payload.urls.length} URL(s)…` });
+      setOpenUrl(false);
+      await loadSources(knowledgeBaseId);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to import URLs", variant: "destructive" });
     }
   };
 
@@ -542,7 +666,8 @@ export default function AgentKnowledgeBasePage() {
         onPickSitemap={() => setOpenSitemap(true)}
         onPickUpload={() => setOpenUpload(true)}
         onPickPlainText={() => setOpenPlainText(true)}
-        onOpenSettings={() => setOpenSettings(true)}
+        onOpenSettings={handleOpenKbSettings}
+        onOpenChunks={handleOpenChunks}
         onPickZendesk={() => setOpenZendesk(true)}
         onOpenKnowledgeApi={() => setOpenKnowledgeApi(true)}
       />
@@ -689,10 +814,7 @@ export default function AgentKnowledgeBasePage() {
 
       {/* Dialogs */}
       <CreateFolderDialog open={openCreateFolder} onOpenChange={setOpenCreateFolder} onCreate={handleCreateFolder} />
-      <UrlImportDialog open={openUrl} onOpenChange={setOpenUrl} onImport={(payload: UrlImportPayload) => {
-        console.log('Import URLs:', payload, 'agent', agentId);
-        setOpenUrl(false);
-      }} />
+      <UrlImportDialog open={openUrl} onOpenChange={setOpenUrl} onImport={handleImportUrls} />
       <SitemapImportDialog open={openSitemap} onOpenChange={setOpenSitemap} onImport={(payload: SitemapImportPayload) => {
         console.log('Sitemap import:', payload, 'agent', agentId);
         setOpenSitemap(false);
@@ -716,49 +838,38 @@ export default function AgentKnowledgeBasePage() {
       />
       <PlainTextDialog open={openPlainText} onOpenChange={setOpenPlainText} onImport={handlePlainTextImport} />
 
-      {/* Preview and Settings */}
+      {/* Real retrieval test */}
       <KnowledgeBasePreviewDialog
         open={openPreview}
         onOpenChange={(v) => { setOpenPreview(v); if (!v) setPreview(false); }}
+        onAsk={handleAskRetrieval}
       />
-      
-      {/* Settings (Rename knowledge base) */}
-      <Dialog open={openSettings} onOpenChange={setOpenSettings}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename Knowledge Base</DialogTitle>
-            <DialogDescription>
-              Provide a clear name to organize the documents linked to this agent.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="kbNameInput" className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Knowledge Base Name
-              </label>
-              <input
-                id="kbNameInput"
-                type="text"
-                value={tempKbName}
-                onChange={(e) => setTempKbName(e.target.value)}
-                placeholder="e.g. Product Support FAQ"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#009959] focus:outline-none focus:ring-1 focus:ring-[#009959]"
-              />
-            </div>
-          </div>
-          <DialogFooter className="sm:justify-end gap-2">
-            <Button variant="outline" onClick={() => {
-              setTempKbName(kbName);
-              setOpenSettings(false);
-            }}>
-              Cancel
-            </Button>
-            <Button onClick={handleRenameKb} disabled={!tempKbName.trim()} className="bg-[#009959] hover:bg-[#007d49] text-white">
-              Save changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+      {/* KB settings: embedding model + model-aware chunk size + retrieval config */}
+      <KnowledgeBaseSettingsDialog
+        open={openKbSettings}
+        onOpenChange={setOpenKbSettings}
+        name={kbName}
+        settings={kbSettings}
+        loading={settingsLoading}
+        saving={settingsSaving}
+        onSave={handleSaveKbSettings}
+      />
+
+      {/* Chunk browser */}
+      <ChunkBrowserDialog
+        open={openChunks}
+        onOpenChange={setOpenChunks}
+        items={chunkItems}
+        total={chunkTotal}
+        page={chunkPage}
+        pageSize={CHUNK_PAGE_SIZE}
+        loading={chunksLoading}
+        onPageChange={(p) => loadChunks(p)}
+        onView={handleViewChunk}
+        onSaveEdit={handleEditChunk}
+        onDelete={handleDeleteChunk}
+      />
 
       {/* Integrations & API (UI only) */}
       <ZendeskDialog open={openZendesk} onOpenChange={setOpenZendesk} />

@@ -470,8 +470,18 @@ export class AgentRuntimeService {
     const chunks: string[] = [];
     for (const kbId of kbIds) {
       try {
+        // Read the KB's persisted embedding model + retrieval config so the
+        // query embeds with the SAME model used at index time, and honors topK.
+        const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: kbId } });
+        const embeddingModel = (kb as any)?.embeddingModel || null;
+        const retrievalConfig = ((kb as any)?.retrievalConfig as Record<string, unknown>) || {};
+        const topK =
+          typeof retrievalConfig.topK === 'number' && retrievalConfig.topK > 0
+            ? Math.min(Math.round(retrievalConfig.topK as number), 50)
+            : 5;
+
         const processed = this.ragService.preprocessQuery(query);
-        const results = await this.ragService.searchKnowledgeBase(kbId, processed);
+        const results = await this.ragService.searchKnowledgeBase(kbId, processed, topK, embeddingModel);
         for (const r of results) {
           const text = (r as { payload?: { text?: string } })?.payload?.text;
           if (text) chunks.push(text);

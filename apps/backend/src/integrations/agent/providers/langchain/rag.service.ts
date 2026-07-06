@@ -43,10 +43,10 @@ export class RagService {
   /**
    * Generate an embedding for a query using the embedding service directly
    */
-  private async generateEmbedding(query: string): Promise<number[]> {
+  private async generateEmbedding(query: string, embeddingModel?: string | null): Promise<number[]> {
     try {
-      // Generate a cache key based on the query
-      const cacheKey = `embedding:${createHash('md5').update(query).digest('hex')}`;
+      // Cache key includes the model so different models never collide.
+      const cacheKey = `embedding:${embeddingModel || 'default'}:${createHash('md5').update(query).digest('hex')}`;
       
       // Check if embedding is in cache
       const cachedEmbeddingJson = await this.redisService.get(cacheKey);
@@ -57,9 +57,10 @@ export class RagService {
       
       // Use the embedding service directly. Use the RETRIEVAL_QUERY task type
       // (embedQuery) so query embeddings are optimized for search rather than
-      // the RETRIEVAL_DOCUMENT type used when indexing.
-      this.logger.log(`Generating embedding directly for query: ${query.substring(0, 30)}...`);
-      const embedding = await this.embeddingService.embedQuery(query);
+      // the RETRIEVAL_DOCUMENT type used when indexing. The model MUST match the
+      // model used to index this KB's documents, else the vector spaces differ.
+      this.logger.log(`Generating embedding for query using model ${embeddingModel || 'default'}: ${query.substring(0, 30)}...`);
+      const embedding = await this.embeddingService.embedQuery(query, { model: embeddingModel });
       
       // Cache the embedding
       await this.redisService.set(cacheKey, JSON.stringify(embedding), this.cacheTtl);
@@ -263,7 +264,7 @@ export class RagService {
   /**
    * Search for relevant documents in the knowledge base
    */
-  async searchKnowledgeBase(knowledgeBaseId: string, query: string, limit: number = 5): Promise<SearchResult[]> {
+  async searchKnowledgeBase(knowledgeBaseId: string, query: string, limit: number = 5, embeddingModel?: string | null): Promise<SearchResult[]> {
     try {
       this.logger.log(`[RAG DEBUG] Searching knowledge base ${knowledgeBaseId} for query: ${query}`);
       
@@ -272,8 +273,8 @@ export class RagService {
         return [];
       }
       
-      // Generate a cache key based on the knowledge base ID and query
-      const cacheKey = `search:${knowledgeBaseId}:${createHash('md5').update(query).digest('hex')}:${limit}`;
+      // Generate a cache key based on the knowledge base ID, query and model
+      const cacheKey = `search:${knowledgeBaseId}:${embeddingModel || 'default'}:${createHash('md5').update(query).digest('hex')}:${limit}`;
       
       // Check if results are in cache
       const cachedResultsJson = await this.redisService.get(cacheKey);
@@ -282,8 +283,8 @@ export class RagService {
         return JSON.parse(cachedResultsJson);
       }
       
-      // Generate embedding for the query using the embedding service directly
-      const embedding = await this.generateEmbedding(query);
+      // Generate embedding for the query using the KB's embedding model
+      const embedding = await this.generateEmbedding(query, embeddingModel);
       
       // Use the vector database service directly to search
       const collectionName = `kb_${knowledgeBaseId}`;

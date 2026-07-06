@@ -32,6 +32,7 @@ export declare class VectorDbService {
     upsert(collection: string, data: {
         points: VectorEntry[];
         wait?: boolean;
+        dimension?: number;
     }): Promise<void>;
     collectionExists(name: string): Promise<boolean>;
     delete(collection: string, filter: {
@@ -59,5 +60,10 @@ export declare class VectorDbService {
         with_vector?: boolean;
         filter?: any;
     }): Promise<SearchResult[]>;
+    retrieve(collection: string, ids: string[], options?: {
+        with_payload?: boolean;
+        with_vector?: boolean;
+    }): Promise<SearchResult[]>;
+    deleteByIds(collection: string, ids: string[]): Promise<void>;
     deleteCollection(name: string): Promise<boolean>;
 }

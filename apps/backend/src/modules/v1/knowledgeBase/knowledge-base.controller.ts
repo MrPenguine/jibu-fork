@@ -17,6 +17,10 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
 import { UpdateKnowledgeBaseDto } from './dto/update-knowledge-base.dto';
 import { LinkFileSourceDto } from './dto/link-file-source.dto';
+import { LinkUrlSourceDto } from './dto/link-url-source.dto';
+import { KnowledgeBaseSettingsDto } from './dto/knowledge-base-settings.dto';
+import { UpdateChunkDto, RetrieveTestDto } from './dto/update-chunk.dto';
+import { Query } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 
 @ApiTags('Knowledge Bases')
@@ -764,5 +768,125 @@ export class KnowledgeBaseController {
       this.logger.error(`Failed to link knowledge base to assistant: ${error.message}`, error.stack);
       return { success: false, error: `Failed to link knowledge base to assistant: ${error.message}` };
     }
+  }
+
+  // Resolve workspace/org id from headers with a token fallback.
+  private resolveOrgId(req: any): string {
+    const orgId =
+      req.headers['x-workspace-id'] ||
+      req.headers['organization-id'] ||
+      req.headers['x-force-organization-id'] ||
+      req.user?.orgId;
+    if (!orgId) throw new NotFoundException('Organization ID is required');
+    return orgId;
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR-3: URL ingestion
+  // ---------------------------------------------------------------------------
+
+  @Post(':id/sources/url')
+  @ApiOperation({ summary: 'Link one or more URLs as knowledge base sources' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  async linkUrlSources(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: LinkUrlSourceDto,
+  ) {
+    const orgId = dto.workspaceId || this.resolveOrgId(req);
+    this.logger.log(`[linkUrlSources] Linking ${dto.urls?.length || 0} URL(s) to KB ${id} for org ${orgId}`);
+    return this.knowledgeBaseService.linkUrlSources(id, dto, orgId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR-4: KB settings
+  // ---------------------------------------------------------------------------
+
+  @Get(':id/settings')
+  @ApiOperation({ summary: 'Get knowledge base settings (embedding model + retrieval config)' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  async getSettings(@Req() req, @Param('id') id: string) {
+    const orgId = this.resolveOrgId(req);
+    return this.knowledgeBaseService.getKnowledgeBaseSettings(id, orgId);
+  }
+
+  @Patch(':id/settings')
+  @ApiOperation({ summary: 'Update knowledge base settings' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  async updateSettings(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: KnowledgeBaseSettingsDto,
+  ) {
+    const orgId = dto.workspaceId || this.resolveOrgId(req);
+    this.logger.log(`[updateSettings] Updating settings for KB ${id} in org ${orgId}`);
+    return this.knowledgeBaseService.updateKnowledgeBaseSettings(id, dto, orgId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // PR-5: Chunk management + retrieval test
+  // ---------------------------------------------------------------------------
+
+  @Get(':id/chunks/browse')
+  @ApiOperation({ summary: 'Browse chunks (paginated) for a knowledge base' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  async browseChunks(
+    @Req() req,
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('sourceId') sourceId?: string,
+  ) {
+    const orgId = this.resolveOrgId(req);
+    return this.knowledgeBaseService.listChunks(id, orgId, {
+      page: page ? parseInt(page, 10) : undefined,
+      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+      sourceId,
+    });
+  }
+
+  @Get(':id/chunks/:chunkId')
+  @ApiOperation({ summary: 'Get a single chunk with its full text' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  @ApiParam({ name: 'chunkId', description: 'Chunk metadata ID' })
+  async getChunk(@Req() req, @Param('id') id: string, @Param('chunkId') chunkId: string) {
+    const orgId = this.resolveOrgId(req);
+    return this.knowledgeBaseService.getChunk(id, chunkId, orgId);
+  }
+
+  @Patch(':id/chunks/:chunkId')
+  @ApiOperation({ summary: 'Edit a chunk (re-embeds it)' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  @ApiParam({ name: 'chunkId', description: 'Chunk metadata ID' })
+  async updateChunk(
+    @Req() req,
+    @Param('id') id: string,
+    @Param('chunkId') chunkId: string,
+    @Body() dto: UpdateChunkDto,
+  ) {
+    const orgId = dto.workspaceId || this.resolveOrgId(req);
+    return this.knowledgeBaseService.updateChunk(id, chunkId, dto.text, orgId);
+  }
+
+  @Delete(':id/chunks/:chunkId')
+  @ApiOperation({ summary: 'Delete a chunk from Qdrant + Postgres' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  @ApiParam({ name: 'chunkId', description: 'Chunk metadata ID' })
+  async deleteChunk(@Req() req, @Param('id') id: string, @Param('chunkId') chunkId: string) {
+    const orgId = this.resolveOrgId(req);
+    return this.knowledgeBaseService.deleteChunk(id, chunkId, orgId);
+  }
+
+  @Post(':id/retrieve')
+  @ApiOperation({ summary: 'Run a real retrieval test against the knowledge base' })
+  @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
+  async retrieveTest(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: RetrieveTestDto,
+  ) {
+    const orgId = dto.workspaceId || this.resolveOrgId(req);
+    this.logger.log(`[retrieveTest] KB ${id} question: "${dto.question?.substring(0, 60)}"`);
+    return this.knowledgeBaseService.retrieveTest(id, dto.question, orgId);
   }
 } 
