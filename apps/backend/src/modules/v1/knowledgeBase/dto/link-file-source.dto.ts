@@ -18,7 +18,6 @@ export class LinkFileSourceDto {
   })
   @IsString()
   @IsOptional()
-  @IsUUID()
   workspaceId?: string;
 
   @ApiProperty({

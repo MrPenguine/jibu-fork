@@ -98,13 +98,13 @@ export default function AgentKnowledgeBasePage() {
           name = linkedKbs[0].name;
         } else {
           const newKb = await createKnowledgeBase(`KB for Agent ${agentId}`);
+          // The link MUST persist — otherwise the next visit can't find this KB
+          // and would create another one, orphaning everything uploaded here.
+          // Let a failure propagate to the outer catch so the KB stays
+          // uninitialized (uploads are blocked) and the user is told.
+          await linkAgentKnowledgeBase(agentId, newKb.id);
           kbId = newKb.id;
           name = newKb.name;
-          try {
-            await linkAgentKnowledgeBase(agentId, kbId);
-          } catch (linkErr) {
-            console.error("Failed to link KB to agent:", linkErr);
-          }
         }
 
         setKnowledgeBaseId(kbId);
@@ -117,8 +117,14 @@ export default function AgentKnowledgeBasePage() {
         // Load sources for this KB
         await loadSources(kbId);
       } catch (e) {
-        console.error("Failed to load knowledge base sources:", e);
+        console.error("Failed to initialize knowledge base:", e);
         setSources([]);
+        setKnowledgeBaseId(null);
+        toast({
+          title: "Error",
+          description: "Failed to initialize this agent's knowledge base. Please retry.",
+          variant: "destructive",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -343,6 +349,63 @@ export default function AgentKnowledgeBasePage() {
       toast({
         title: "Error",
         description: "Failed to upload files",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handlePlainTextImport = async (payload: PlainTextPayload) => {
+    if (!knowledgeBaseId) {
+      toast({
+        title: "Error",
+        description: "Knowledge base not initialized",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!payload.text || payload.text.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Please enter some text to import",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Reuse the file pipeline: wrap the pasted text in a .txt file so the
+      // worker indexes it through the same chunk/embed path as uploaded files.
+      const fileName = `pasted-text-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`;
+      const textFile = new File([payload.text.trim()], fileName, { type: "text/plain" });
+
+      const uploadedFile = await uploadFile(textFile, undefined, activeWorkspace?.id);
+
+      let validFolderId: string | undefined = undefined;
+      if (payload.folderId && payload.folderId.trim() !== "") {
+        const trimmedFolderId = payload.folderId.trim();
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const cuidRegex = /^c[a-z0-9]{24,}$/i;
+        if (uuidRegex.test(trimmedFolderId) || cuidRegex.test(trimmedFolderId)) {
+          validFolderId = trimmedFolderId;
+        }
+      }
+
+      await linkFileToKnowledgeBase(knowledgeBaseId, uploadedFile.id, undefined, validFolderId);
+
+      toast({
+        title: "Success",
+        description: "Text imported and queued for indexing",
+      });
+      await loadSources(knowledgeBaseId);
+      setOpenPlainText(false);
+    } catch (error: any) {
+      console.error("[handlePlainTextImport] Error importing text:", error);
+      toast({
+        title: "Error",
+        description: "Failed to import text",
         variant: "destructive",
       });
     } finally {
@@ -644,10 +707,7 @@ export default function AgentKnowledgeBasePage() {
         }}
         onImport={handleUploadFiles}
       />
-      <PlainTextDialog open={openPlainText} onOpenChange={setOpenPlainText} onImport={(payload: PlainTextPayload) => {
-        console.log('Plain text import:', payload, 'agent', agentId);
-        setOpenPlainText(false);
-      }} />
+      <PlainTextDialog open={openPlainText} onOpenChange={setOpenPlainText} onImport={handlePlainTextImport} />
 
       {/* Preview and Settings */}
       <KnowledgeBasePreviewDialog
