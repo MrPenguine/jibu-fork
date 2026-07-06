@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { ChunkingStrategySelect, type ChunkingStrategyKey } from "../ChunkingStrategySelect";
 
 export interface UploadFilePayload {
@@ -28,13 +28,18 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
   const [chunking, setChunking] = useState<ChunkingStrategyKey[]>([]);
   const [folderId, setFolderId] = useState<string | undefined>();
 
+  const [rejected, setRejected] = useState<string[]>([]);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: (acceptedFiles: File[]) => {
+    onDrop: (acceptedFiles: File[], fileRejections: FileRejection[]) => {
       setFiles(acceptedFiles);
+      setRejected((fileRejections || []).map((r) => r.file?.name).filter(Boolean));
     },
     accept: {
       'application/pdf': ['.pdf'],
       'text/plain': ['.txt'],
+      'text/markdown': ['.md', '.markdown'],
+      'text/csv': ['.csv'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     }
   });
@@ -44,6 +49,7 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
       setFiles([]);
       setChunking([]);
       setFolderId(undefined);
+      setRejected([]);
     } else if (preselectedFolderId) {
       // Set the preselected folder when dialog opens
       setFolderId(preselectedFolderId);
@@ -82,10 +88,15 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
               <p className="text-slate-500">Drop file(s) here or</p>
               <Button variant="outline" className="mt-2">Browse</Button>
             </div>
-            <p className="text-sm text-slate-500">Supported file types: pdf, txt, docx - 10mb max.</p>
+            <p className="text-sm text-slate-500">Supported file types: pdf, txt, md, csv, docx - 10mb max.</p>
             {files.length > 0 && (
               <div className="text-sm text-slate-600">
                 Selected: {files.map((f) => f.name).join(", ")}
+              </div>
+            )}
+            {rejected.length > 0 && (
+              <div className="text-sm text-red-600">
+                Unsupported and skipped: {rejected.join(", ")}
               </div>
             )}
           </div>
