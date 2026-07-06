@@ -354,6 +354,11 @@ export class KnowledgeBaseController {
         orgId,
         userId,
         linkFileSourceDto.folderId,
+        {
+          strategies: linkFileSourceDto.chunkingStrategy,
+          chunkSize: linkFileSourceDto.chunkSize,
+          chunkOverlap: linkFileSourceDto.chunkOverlap,
+        },
       );
       
       this.logger.log(`Successfully linked file to KB: ${JSON.stringify({

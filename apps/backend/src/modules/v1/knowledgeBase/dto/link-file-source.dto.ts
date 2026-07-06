@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUUID, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID, IsOptional, IsArray, IsInt, Min, Max } from 'class-validator';
 
 export class LinkFileSourceDto {
   @ApiProperty({
@@ -28,4 +28,36 @@ export class LinkFileSourceDto {
   @IsOptional()
   @IsString()
   folderId?: string;
+
+  @ApiProperty({
+    description: 'LLM chunking strategies to apply, ordered or comma-joined',
+    example: ['clean_html', 'faq'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  chunkingStrategy?: string[];
+
+  @ApiProperty({
+    description: 'Target chunk size in characters',
+    example: 1000,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(100)
+  @Max(8000)
+  chunkSize?: number;
+
+  @ApiProperty({
+    description: 'Chunk overlap in characters',
+    example: 200,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2000)
+  chunkOverlap?: number;
 }

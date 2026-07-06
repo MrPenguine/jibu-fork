@@ -4,6 +4,7 @@ import { Job } from 'bull';
 import { PrismaService } from '../../../backend/src/core/database/prisma.service';
 import { FileService } from '../../../backend/src/modules/v1/file/file.service';
 import { ChunkingService } from '../chunking/chunking.service';
+import { StrategyChunkingService } from '../chunking/strategy-chunking.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
 import axios from 'axios';
@@ -28,6 +29,7 @@ export class IndexingProcessor {
     private readonly prisma: PrismaService,
     private readonly fileService: FileService,
     private readonly chunkingService: ChunkingService,
+    private readonly strategyChunkingService: StrategyChunkingService,
     private readonly embeddingService: EmbeddingService,
     private readonly vectorDbService: VectorDbService,
     @InjectQueue(QUEUE_NAMES.INDEXING) private readonly indexingQueue: Queue
@@ -109,8 +111,11 @@ export class IndexingProcessor {
       // Sanitize text to ensure it's valid UTF-8
       textContent = this.sanitizeText(textContent);
       
-      // 4. Split text into chunks - pass the mime type for specialized handling
-      const chunks = await this.chunkingService.splitTextIntoChunks(textContent, mimeType);
+      // 4. Split text into chunks using the configured strategy pipeline
+      const chunkConfig = job.data.chunkConfig || (source as any).chunkConfig || {};
+      this.logger.debug(`Chunking with config: ${JSON.stringify(chunkConfig)}`);
+      const chunkResults = await this.strategyChunkingService.chunk(textContent, mimeType, chunkConfig);
+      const chunks = chunkResults.map((c) => c.text);
       this.logger.debug(`Split text into ${chunks.length} chunks`);
       
       // Log sample chunk data
@@ -149,7 +154,9 @@ export class IndexingProcessor {
             fileName: source.file.name,
             knowledgeBaseId: source.knowledgeBaseId,
             workspaceId: source.file.workspaceId,
-            chunkIndex: index
+            chunkIndex: index,
+            chunkType: chunkResults[index]?.chunkType || 'content',
+            strategies: chunkResults[index]?.strategies || []
           }
         };
       });
@@ -211,6 +218,8 @@ export class IndexingProcessor {
           vectorId: point.id,
           textPreview: textPreview,
           textLength: sanitizedText.length,
+          chunkType: chunkResults[index]?.chunkType || 'content',
+          strategies: chunkResults[index]?.strategies || [],
         };
       });
       

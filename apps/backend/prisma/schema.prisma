@@ -233,6 +233,7 @@ model KnowledgeBaseSource {
   indexingStatus    String          @default("PENDING")
   hasIndexedContent Boolean         @default(false)
   folderId          String?
+  chunkConfig       Json?           // Per-source chunking config: { strategies, chunkSize, chunkOverlap }
   knowledgeBase     KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   file              File            @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
@@ -255,6 +256,8 @@ model ChunkMetadata {
   vectorId        String
   textPreview     String
   textLength      Int
+  chunkType       String   @default("content") // e.g. content | faq_question
+  strategies      String[] @default([])         // ordered chunking strategies applied
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
