@@ -1,10 +1,30 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
 import { UpdateKnowledgeBaseDto } from './dto/update-knowledge-base.dto';
 import { JOB_NAMES } from '@jibu/queue-definitions';
+
+// Supported knowledge-base file types (kept in sync with the worker extractor + UI dropzone).
+const SUPPORTED_EXTENSIONS = ['pdf', 'txt', 'md', 'markdown', 'csv', 'tsv', 'docx', 'json', 'log'];
+const SUPPORTED_MIME_HINTS = [
+  'pdf',
+  'text/',
+  'markdown',
+  'csv',
+  'json',
+  'officedocument.wordprocessingml',
+  'msword',
+];
+
+function isSupportedFileType(mimeType?: string, fileName?: string): boolean {
+  const mime = (mimeType || '').toLowerCase();
+  const ext = (fileName?.split('.').pop() || '').toLowerCase();
+  if (SUPPORTED_MIME_HINTS.some((h) => mime.includes(h))) return true;
+  if (SUPPORTED_EXTENSIONS.includes(ext)) return true;
+  return false;
+}
 
 @Injectable()
 export class KnowledgeBaseService {
@@ -177,6 +197,13 @@ export class KnowledgeBaseService {
       if (!file) {
         this.logger.warn(`File with ID ${fileId} not found for workspace ${workspaceId}`);
         throw new NotFoundException(`File with ID ${fileId} not found`);
+      }
+
+      if (!isSupportedFileType(file.mimeType, file.name)) {
+        this.logger.warn(`Rejected unsupported file type for ${file.name} (${file.mimeType})`);
+        throw new BadRequestException(
+          `Unsupported file type "${file.mimeType || file.name}". Supported types: pdf, txt, md, csv, docx.`,
+        );
       }
 
       this.logger.log(`Found file: ${JSON.stringify(file)}`);

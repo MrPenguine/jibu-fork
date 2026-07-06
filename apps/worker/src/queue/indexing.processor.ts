@@ -87,118 +87,23 @@ export class IndexingProcessor {
       
       // Check file type to determine how to handle it
       const mimeType = source.file.mimeType;
+      const fileName = source.file.name || '';
       let textContent = '';
-      
+
       try {
-        if (mimeType.startsWith('text/')) {
-          // For text files, use the content directly
-          textContent = Buffer.from(fileContent).toString('utf-8');
-          this.logger.debug(`Extracted ${textContent.length} characters of text content from file`);
-        } else if (mimeType.includes('pdf')) {
-          // For PDF files, use the pdf-parse library for proper extraction
-          try {
-            const pdfParse = require('pdf-parse');
-            this.logger.debug('Using pdf-parse library for PDF extraction');
-            
-            // Check for PDF header to confirm it's a valid PDF
-            const fileContentBuffer = Buffer.from(fileContent);
-            const header = fileContentBuffer.slice(0, 5).toString();
-            
-            if (header.startsWith('%PDF-')) {
-              this.logger.debug('Valid PDF header detected');
-              
-              // Use pdf-parse for proper PDF extraction
-              const pdfData = await pdfParse(fileContentBuffer);
-              textContent = pdfData.text || '';
-              
-              // Log PDF information for debugging
-              if (pdfData.info) {
-                this.logger.debug(`PDF Info: Pages=${pdfData.numpages}, Version=${pdfData.info.PDFFormatVersion || 'unknown'}`);
-                
-                // Check if the PDF is possibly a scanned document
-                const producer = (pdfData.info.Producer || '').toLowerCase();
-                const creator = (pdfData.info.Creator || '').toLowerCase();
-                const isLikelyScanned = 
-                  producer.includes('scan') || 
-                  creator.includes('scan') || 
-                  producer.includes('image') || 
-                  creator.includes('image') ||
-                  producer.includes('ocr') || 
-                  creator.includes('ocr');
-                  
-                if (isLikelyScanned) {
-                  this.logger.warn('PDF metadata suggests this may be a scanned document');
-                }
-              }
-              
-              // Check if the PDF extraction was reasonably successful
-              if (!textContent || textContent.trim().length === 0) {
-                this.logger.warn('PDF parsing yielded empty text, PDF may require OCR');
-                textContent = "This PDF requires OCR processing. Please convert it to a text-searchable PDF.";
-                
-                // Update source status to indicate warning
-                await this.prisma.knowledgeBaseSource.update({
-                  where: { id: source.id },
-                  data: { 
-                    indexingStatus: 'WARNING'
-                  }
-                });
-              } else {
-                // Additional check for PDFs with very little text (likely scanned)
-                const charCount = textContent.length;
-                const wordCount = textContent.split(/\s+/).length;
-                
-                // Calculate average characters per page (rough heuristic)
-                const pageCount = pdfData.numpages || 1;
-                const charsPerPage = charCount / pageCount;
-                
-                if (charsPerPage < 100) {
-                  this.logger.warn(`Suspiciously low character count per page (${charsPerPage.toFixed(1)}), PDF may be scanned`);
-                  
-                  // Add warning note to the text content
-                  textContent = "Note: This PDF appears to contain very little text and may be a scanned document. OCR processing is recommended.\n\n" + textContent;
-                } else {
-                  this.logger.debug(`Successfully extracted ${textContent.length} characters (${wordCount} words) from ${pageCount} page PDF`);
-                }
-                
-                // Log sample of extracted text for debugging
-                if (textContent.length > 0) {
-                  const sampleText = textContent.substring(0, Math.min(500, textContent.length));
-                  this.logger.debug(`PDF text sample: "${sampleText}${textContent.length > 500 ? '...' : ''}"`);
-                }
-              }
-            } else {
-              this.logger.error('Invalid PDF header, file may be corrupted');
-              textContent = "PDF extraction failed - file appears to be corrupted or not a valid PDF.";
-              
-              await this.prisma.knowledgeBaseSource.update({
-                where: { id: source.id },
-                data: { 
-                  indexingStatus: 'ERROR'
-                }
-              });
-            }
-          } catch (pdfError) {
-            this.logger.error(`PDF processing failed: ${pdfError.message}`);
-            textContent = "PDF processing failed. This document may not be properly indexed.";
-            
-            // Update source with the specific error information
-            await this.prisma.knowledgeBaseSource.update({
-              where: { id: source.id },
-              data: { 
-                indexingStatus: 'ERROR'
-              }
-            });
-          }
-        } else {
-          // For other file types, attempt basic extraction with warning
-          this.logger.warn(`Unsupported file type: ${mimeType}, attempting basic text extraction`);
-          textContent = Buffer.from(fileContent).toString('utf-8');
-          this.logger.debug(`Basic extraction of ${textContent.length} characters from file of type ${mimeType}`);
-        }
+        textContent = await this.extractTextFromFile(
+          Buffer.from(fileContent),
+          mimeType,
+          fileName,
+          source.id,
+        );
       } catch (error) {
-        this.logger.warn(`Error extracting text from file: ${error.message}`);
-        textContent = `File content for ${source.file.name} (${mimeType})`;
+        this.logger.error(`Text extraction failed for "${fileName}" (${mimeType}): ${error.message}`);
+        await this.prisma.knowledgeBaseSource.update({
+          where: { id: source.id },
+          data: { indexingStatus: 'FAILED' },
+        });
+        throw error;
       }
       
       // Sanitize text to ensure it's valid UTF-8
@@ -666,6 +571,109 @@ export class IndexingProcessor {
       this.logger.error(`Error processing deindex job ${job.id}: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  /**
+   * Extract plain text from a downloaded file buffer based on its type.
+   * Supported: pdf, txt, markdown, csv, docx. Unsupported types throw.
+   */
+  private async extractTextFromFile(
+    buffer: Buffer,
+    mimeType: string,
+    fileName: string,
+    sourceId: string,
+  ): Promise<string> {
+    const mime = (mimeType || '').toLowerCase();
+    const ext = (fileName.split('.').pop() || '').toLowerCase();
+
+    const isPdf = mime.includes('pdf') || ext === 'pdf';
+    const isDocx =
+      mime.includes('officedocument.wordprocessingml') ||
+      mime.includes('msword') ||
+      ext === 'docx';
+    const isPlainText =
+      mime.startsWith('text/') ||
+      mime.includes('json') ||
+      mime.includes('markdown') ||
+      mime.includes('csv') ||
+      ['txt', 'md', 'markdown', 'csv', 'tsv', 'text', 'log', 'json'].includes(ext);
+
+    if (isPdf) {
+      return this.extractPdf(buffer, sourceId);
+    }
+
+    if (isDocx) {
+      const mammoth = require('mammoth');
+      const result = await mammoth.extractRawText({ buffer });
+      const text = (result?.value || '').trim();
+      if (!text) {
+        throw new Error('DOCX contained no extractable text');
+      }
+      this.logger.debug(`Extracted ${text.length} characters from DOCX "${fileName}"`);
+      return text;
+    }
+
+    if (isPlainText) {
+      const text = buffer.toString('utf-8');
+      this.logger.debug(`Extracted ${text.length} characters of plain text from "${fileName}"`);
+      return text;
+    }
+
+    // Unsupported type — do not silently index binary garbage.
+    throw new Error(
+      `Unsupported file type "${mimeType || ext || 'unknown'}". Supported types: pdf, txt, md, csv, docx.`,
+    );
+  }
+
+  /**
+   * Extract text from a PDF buffer using pdf-parse, with scanned-document heuristics.
+   */
+  private async extractPdf(buffer: Buffer, sourceId: string): Promise<string> {
+    const pdfParse = require('pdf-parse');
+    const header = buffer.slice(0, 5).toString();
+    if (!header.startsWith('%PDF-')) {
+      throw new Error('Invalid PDF header — file appears corrupted or not a valid PDF');
+    }
+
+    const pdfData = await pdfParse(buffer);
+    let textContent = pdfData.text || '';
+
+    if (pdfData.info) {
+      const producer = (pdfData.info.Producer || '').toLowerCase();
+      const creator = (pdfData.info.Creator || '').toLowerCase();
+      const isLikelyScanned = ['scan', 'image', 'ocr'].some(
+        (k) => producer.includes(k) || creator.includes(k),
+      );
+      if (isLikelyScanned) {
+        this.logger.warn('PDF metadata suggests this may be a scanned document');
+      }
+    }
+
+    if (!textContent || textContent.trim().length === 0) {
+      this.logger.warn('PDF parsing yielded empty text, PDF may require OCR');
+      await this.prisma.knowledgeBaseSource.update({
+        where: { id: sourceId },
+        data: { indexingStatus: 'WARNING' },
+      });
+      return 'This PDF requires OCR processing. Please convert it to a text-searchable PDF.';
+    }
+
+    const pageCount = pdfData.numpages || 1;
+    const charsPerPage = textContent.length / pageCount;
+    if (charsPerPage < 100) {
+      this.logger.warn(
+        `Suspiciously low character count per page (${charsPerPage.toFixed(1)}), PDF may be scanned`,
+      );
+      textContent =
+        'Note: This PDF appears to contain very little text and may be a scanned document. OCR processing is recommended.\n\n' +
+        textContent;
+    } else {
+      this.logger.debug(
+        `Successfully extracted ${textContent.length} characters from ${pageCount} page PDF`,
+      );
+    }
+
+    return textContent;
   }
 
   /**
