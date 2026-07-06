@@ -9,6 +9,7 @@ export * from './dialogs/UploadFileDialog';
 export * from './dialogs/PlainTextDialog';
 export * from './dialogs/KnowledgeBasePreviewDialog';
 export * from './dialogs/KnowledgeBaseSettingsDialog';
+export * from './dialogs/ChunkBrowserDialog';
 export * from './KnowledgeBaseTester';
 export * from './dialogs/ZendeskDialog';
 export * from './dialogs/KnowledgeApiDialog';

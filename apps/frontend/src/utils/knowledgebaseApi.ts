@@ -832,3 +832,269 @@ export async function unlinkFileFromKnowledgeBase(
     throw error;
   }
 }
+
+// ===========================================================================
+// PR-3: URL ingestion
+// ===========================================================================
+
+export type RefreshRate = 'never' | 'daily' | 'weekly' | 'monthly';
+
+export interface LinkUrlSourcesInput {
+  urls: string[];
+  refreshRate?: RefreshRate;
+  folderId?: string;
+  chunkConfig?: ChunkConfigInput;
+}
+
+/**
+ * Link one or more URLs as knowledge base sources. The worker fetches each URL,
+ * extracts readable text, then chunks + embeds it through the normal pipeline.
+ */
+export async function linkUrlsToKnowledgeBase(
+  knowledgeBaseId: string,
+  input: LinkUrlSourcesInput,
+  specificWorkspaceId?: string,
+): Promise<any> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  if (!knowledgeBaseId) throw new Error('Knowledge base ID is required');
+
+  const urls = (input.urls || []).map((u) => u.trim()).filter(Boolean);
+  if (urls.length === 0) throw new Error('At least one URL is required');
+
+  const headers = await getAuthHeaders(workspaceId);
+  const body: any = { urls, workspaceId };
+  if (input.refreshRate) body.refreshRate = input.refreshRate;
+  if (input.folderId && input.folderId.trim() !== '') body.folderId = input.folderId.trim();
+  if (input.chunkConfig) {
+    if (Array.isArray(input.chunkConfig.strategies) && input.chunkConfig.strategies.length > 0) {
+      body.chunkingStrategy = input.chunkConfig.strategies;
+    }
+    if (typeof input.chunkConfig.chunkSize === 'number') body.chunkSize = input.chunkConfig.chunkSize;
+    if (typeof input.chunkConfig.chunkOverlap === 'number') body.chunkOverlap = input.chunkConfig.chunkOverlap;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/sources/url`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to link URLs: ${errorText}`);
+  }
+  return response.json();
+}
+
+// ===========================================================================
+// PR-4: KB settings (embedding model + retrieval config)
+// ===========================================================================
+
+export interface EmbeddingModelInfo {
+  model: string;
+  provider: string;
+  dimension: number;
+  maxChunkChars: number;
+}
+
+export interface KnowledgeBaseSettings {
+  embeddingProvider: string;
+  embeddingModel: string;
+  embeddingDimension?: number;
+  maxChunkChars?: number;
+  retrievalConfig: {
+    topK?: number;
+    systemPrompt?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+  defaultChunkConfig: {
+    strategies?: string[];
+    chunkSize?: number;
+    chunkOverlap?: number;
+  };
+  availableModels: EmbeddingModelInfo[];
+  reindexedSources?: number;
+}
+
+export async function getKnowledgeBaseSettings(
+  knowledgeBaseId: string,
+  specificWorkspaceId?: string,
+): Promise<KnowledgeBaseSettings> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  const headers = await getAuthHeaders(workspaceId);
+  const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/settings`, {
+    method: 'GET',
+    headers,
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to load settings: ${errorText}`);
+  }
+  return response.json();
+}
+
+export async function updateKnowledgeBaseSettings(
+  knowledgeBaseId: string,
+  settings: Partial<Omit<KnowledgeBaseSettings, 'availableModels' | 'embeddingDimension' | 'maxChunkChars' | 'reindexedSources'>>,
+  specificWorkspaceId?: string,
+): Promise<KnowledgeBaseSettings> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  const headers = await getAuthHeaders(workspaceId);
+  const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/settings`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ ...settings, workspaceId }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update settings: ${errorText}`);
+  }
+  return response.json();
+}
+
+// ===========================================================================
+// PR-5: Chunk management + real retrieval test
+// ===========================================================================
+
+export interface ChunkMetadata {
+  id: string;
+  vectorId: string;
+  sourceId: string;
+  chunkIndex: number;
+  chunkType?: string;
+  strategies?: string[];
+  textPreview?: string;
+  text?: string;
+  source?: { id: string; title?: string; sourceType?: string; sourceUrl?: string };
+}
+
+export interface ChunkPage {
+  total: number;
+  page: number;
+  pageSize: number;
+  items: ChunkMetadata[];
+}
+
+export async function browseKnowledgeBaseChunks(
+  knowledgeBaseId: string,
+  opts: { page?: number; pageSize?: number; sourceId?: string } = {},
+  specificWorkspaceId?: string,
+): Promise<ChunkPage> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  const headers = await getAuthHeaders(workspaceId);
+  const params = new URLSearchParams();
+  if (opts.page) params.set('page', String(opts.page));
+  if (opts.pageSize) params.set('pageSize', String(opts.pageSize));
+  if (opts.sourceId) params.set('sourceId', opts.sourceId);
+  const qs = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/chunks/browse${qs ? `?${qs}` : ''}`,
+    { method: 'GET', headers },
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to browse chunks: ${errorText}`);
+  }
+  return response.json();
+}
+
+export async function getKnowledgeBaseChunk(
+  knowledgeBaseId: string,
+  chunkId: string,
+  specificWorkspaceId?: string,
+): Promise<ChunkMetadata> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  const headers = await getAuthHeaders(workspaceId);
+  const response = await fetch(
+    `${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/chunks/${chunkId}`,
+    { method: 'GET', headers },
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to load chunk: ${errorText}`);
+  }
+  return response.json();
+}
+
+export async function updateKnowledgeBaseChunk(
+  knowledgeBaseId: string,
+  chunkId: string,
+  text: string,
+  specificWorkspaceId?: string,
+): Promise<{ success: boolean; chunkId: string; status: string }> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  const headers = await getAuthHeaders(workspaceId);
+  const response = await fetch(
+    `${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/chunks/${chunkId}`,
+    { method: 'PATCH', headers, body: JSON.stringify({ text, workspaceId }) },
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update chunk: ${errorText}`);
+  }
+  return response.json();
+}
+
+export async function deleteKnowledgeBaseChunk(
+  knowledgeBaseId: string,
+  chunkId: string,
+  specificWorkspaceId?: string,
+): Promise<{ success: boolean; chunkId: string }> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  const headers = await getAuthHeaders(workspaceId);
+  const response = await fetch(
+    `${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/chunks/${chunkId}`,
+    { method: 'DELETE', headers },
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete chunk: ${errorText}`);
+  }
+  return response.json();
+}
+
+export interface RetrievedChunk {
+  vectorId: string;
+  score: number;
+  text: string;
+  chunkType: string;
+  sourceId?: string;
+  sourceUrl?: string | null;
+  fileName?: string | null;
+}
+
+export interface RetrieveTestResult {
+  question: string;
+  embeddingModel: string;
+  topK: number;
+  chunks: RetrievedChunk[];
+  answer: string;
+}
+
+export async function retrieveTestKnowledgeBase(
+  knowledgeBaseId: string,
+  question: string,
+  specificWorkspaceId?: string,
+): Promise<RetrieveTestResult> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  if (!question || !question.trim()) throw new Error('A question is required');
+  const headers = await getAuthHeaders(workspaceId);
+  const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/retrieve`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ question, workspaceId }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Retrieval test failed: ${errorText}`);
+  }
+  return response.json();
+}

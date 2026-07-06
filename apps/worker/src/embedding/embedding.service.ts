@@ -1,66 +1,126 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
-// You might need to import TaskType if you want to use the enum directly,
-// though string literals are also fine.
-// const { TaskType } = require('@google/generative-ai'); // If using CommonJS
-// import { TaskType } from '@google/generative-ai/dist/generativelanguage_v1beta'; // This path is tricky, better to use string literals
+export type EmbeddingProvider = 'gemini' | 'openai';
+
+export interface EmbeddingModelSpec {
+  provider: EmbeddingProvider;
+  dimension: number;
+  /** Max input size in characters we allow per chunk before the model degrades. */
+  maxChunkChars: number;
+}
+
+/**
+ * Registry of supported embedding models. An embedding model fixes a vector
+ * space + dimension, so the same model MUST be used for indexing a document and
+ * for embedding a query against it. `maxChunkChars` bounds the chunk-size slider
+ * in the UI so chunks never exceed the model's input window.
+ */
+export const EMBEDDING_MODELS: Record<string, EmbeddingModelSpec> = {
+  'gemini-embedding-001': { provider: 'gemini', dimension: 768, maxChunkChars: 8000 },
+  'text-embedding-3-small': { provider: 'openai', dimension: 1536, maxChunkChars: 32000 },
+  'text-embedding-3-large': { provider: 'openai', dimension: 3072, maxChunkChars: 32000 },
+};
+
+export const DEFAULT_EMBEDDING_MODEL = 'gemini-embedding-001';
+
+export function resolveEmbeddingModel(model?: string | null): {
+  model: string;
+  spec: EmbeddingModelSpec;
+} {
+  const name = model && EMBEDDING_MODELS[model] ? model : DEFAULT_EMBEDDING_MODEL;
+  return { model: name, spec: EMBEDDING_MODELS[name] };
+}
 
 @Injectable()
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
-  private generativeModel: any; // Type inferred by TypeScript later
-  private modelName: string;
-  private vectorDimension: number;
+  private readonly genAI: GoogleGenerativeAI | null;
+  private readonly openai: OpenAI | null;
+  private readonly defaultModelName: string;
+  private readonly defaultDimension: number;
 
   constructor(private readonly configService: ConfigService) {
     this.logger.log('Initializing embedding service');
 
     const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY');
-    this.modelName = this.configService.get<string>('EMBEDDING_MODEL', 'gemini-embedding-001');
-    this.vectorDimension = parseInt(this.configService.get<string>('VECTOR_DIMENSION', '768'), 10);
+    const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
 
-    if (!geminiApiKey) {
-      this.logger.error('GEMINI_API_KEY is not set. Embedding service will not function correctly.');
-      throw new Error('GEMINI_API_KEY is required for the EmbeddingService.');
+    // The env EMBEDDING_MODEL/VECTOR_DIMENSION remain the fallback default so
+    // existing KBs (which have no per-KB model stored) keep working unchanged.
+    this.defaultModelName = this.configService.get<string>('EMBEDDING_MODEL', DEFAULT_EMBEDDING_MODEL);
+    this.defaultDimension = parseInt(
+      this.configService.get<string>('VECTOR_DIMENSION', '768'),
+      10,
+    );
+
+    this.genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
+    this.openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
+
+    if (!this.genAI) {
+      this.logger.error('GEMINI_API_KEY is not set. Gemini embeddings will not function.');
+    }
+    if (!this.openai) {
+      this.logger.warn('OPENAI_API_KEY is not set. OpenAI embedding models are unavailable.');
     }
 
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
-    this.generativeModel = genAI.getGenerativeModel({ model: this.modelName });
+    this.logger.log(
+      `Embedding service ready. Default model: ${this.defaultModelName} (${this.defaultDimension}d)`,
+    );
+  }
 
-    this.logger.log(`Using Google Gemini embedding model: ${this.modelName} with dimension: ${this.vectorDimension}`);
+  /** Resolve the effective model + dimension for a given (optional) model name. */
+  private resolve(model?: string | null): { model: string; provider: EmbeddingProvider; dimension: number } {
+    if (!model) {
+      const spec = EMBEDDING_MODELS[this.defaultModelName];
+      return spec
+        ? { model: this.defaultModelName, provider: spec.provider, dimension: this.defaultDimension }
+        : { model: this.defaultModelName, provider: 'gemini', dimension: this.defaultDimension };
+    }
+    const { model: name, spec } = resolveEmbeddingModel(model);
+    return { model: name, provider: spec.provider, dimension: spec.dimension };
+  }
+
+  /** Public helper so callers (worker/RAG) can size the Qdrant collection. */
+  getDimension(model?: string | null): number {
+    return this.resolve(model).dimension;
+  }
+
+  private buildFallbackVector(dimension: number): number[] {
+    const vector = new Array(dimension).fill(0).map((_, i) => 0.00001 * (i % 2 === 0 ? 1 : -1));
+    const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+    if (magnitude > 0) {
+      for (let i = 0; i < dimension; i++) vector[i] /= magnitude;
+    }
+    return vector;
   }
 
   /**
-   * Create embeddings for an array of texts (documents for indexing)
-   * This method explicitly uses 'RETRIEVAL_DOCUMENT' taskType.
-   * You can optionally pass document titles if available.
+   * Create embeddings for an array of texts (documents for indexing).
+   * Uses the requested model (defaults to the env/Gemini model).
    */
-  async embedDocuments(documents: { text: string; title?: string }[]): Promise<number[][]> {
-    this.logger.log(`Generating embeddings for ${documents.length} documents using ${this.modelName}`);
+  async embedDocuments(
+    documents: { text: string; title?: string }[],
+    opts?: { model?: string | null },
+  ): Promise<number[][]> {
+    const { model, provider, dimension } = this.resolve(opts?.model);
+    this.logger.log(
+      `Generating embeddings for ${documents.length} documents using ${model} (${provider}, ${dimension}d)`,
+    );
     const startTime = Date.now();
 
-    const validDocumentsToEmbed: { text: string; title?: string; originalIndex: number }[] = [];
+    const validDocumentsToEmbed: { text: string; originalIndex: number }[] = [];
     documents.forEach((doc, index) => {
       if (doc.text && doc.text.trim().length > 0 && !doc.text.startsWith('%PDF') && !/^\uFFFD/.test(doc.text)) {
-        validDocumentsToEmbed.push({ text: doc.text.trim(), title: doc.title, originalIndex: index });
+        validDocumentsToEmbed.push({ text: doc.text.trim(), originalIndex: index });
       }
     });
 
-    const allEmbeddings: number[][] = new Array(documents.length).fill(null).map(() => {
-      const vector = new Array(this.vectorDimension).fill(0);
-      for (let i = 0; i < this.vectorDimension; i++) {
-        vector[i] = 0.00001 * (i % 2 === 0 ? 1 : -1);
-      }
-      const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
-      if (magnitude > 0) {
-        for (let i = 0; i < this.vectorDimension; i++) {
-          vector[i] /= magnitude;
-        }
-      }
-      return vector;
-    });
+    const allEmbeddings: number[][] = new Array(documents.length)
+      .fill(null)
+      .map(() => this.buildFallbackVector(dimension));
 
     if (validDocumentsToEmbed.length === 0) {
       this.logger.log('No valid documents to embed, returning default vectors.');
@@ -68,61 +128,51 @@ export class EmbeddingService {
     }
 
     try {
-      const requests = validDocumentsToEmbed.map(doc => ({
-        content: { parts: [{ text: doc.text }] },
-        taskType: 'RETRIEVAL_DOCUMENT', // Specify for indexing documents
-        // Request the exact configured dimension. Models like gemini-embedding-001
-        // default to 3072 but honor Matryoshka truncation, so this keeps the
-        // returned vector length consistent with the Qdrant collection size.
-        outputDimensionality: this.vectorDimension,
-        // Optionally include title if available and relevant:
-        // title: doc.title || undefined,
-      }));
-
-      const result = await this.generativeModel.batchEmbedContents({ requests });
-      const embeddingResponses = result.embeddings;
-
-      if (embeddingResponses && Array.isArray(embeddingResponses)) {
-        embeddingResponses.forEach((embedding, i) => {
-          if (embedding && embedding.values && embedding.values.length === this.vectorDimension) {
-            const originalIndex = validDocumentsToEmbed[i].originalIndex;
-            allEmbeddings[originalIndex] = embedding.values;
-          } else {
-            this.logger.warn(`Received malformed or incorrect dimension embedding for document at original index ${validDocumentsToEmbed[i].originalIndex}`);
-          }
-        });
+      let vectors: number[][];
+      if (provider === 'openai') {
+        vectors = await this.openaiEmbed(
+          model,
+          validDocumentsToEmbed.map((d) => d.text),
+          dimension,
+        );
       } else {
-        this.logger.error('Unexpected response format from Gemini embedding API.');
-        throw new Error('Invalid response from embedding API.');
+        vectors = await this.geminiEmbedDocuments(
+          model,
+          validDocumentsToEmbed.map((d) => d.text),
+          dimension,
+        );
       }
 
-      const elapsed = Date.now() - startTime;
-      this.logger.log(`Generated ${embeddingResponses.length} actual embeddings (out of ${documents.length}) in ${elapsed}ms`);
+      vectors.forEach((values, i) => {
+        if (values && values.length === dimension) {
+          allEmbeddings[validDocumentsToEmbed[i].originalIndex] = values;
+        } else {
+          this.logger.warn(
+            `Malformed/incorrect dimension embedding for document at index ${validDocumentsToEmbed[i].originalIndex}`,
+          );
+        }
+      });
 
+      this.logger.log(
+        `Generated ${vectors.length} embeddings (of ${documents.length}) in ${Date.now() - startTime}ms`,
+      );
       return allEmbeddings;
     } catch (error) {
-      this.logger.error(`Error generating document embeddings with Gemini API: ${error.message}`, error.stack);
+      this.logger.error(`Error generating document embeddings (${model}): ${error.message}`, error.stack);
       this.logger.error('Returning default vectors due to embedding API error.');
       return allEmbeddings;
     }
   }
 
   /**
-   * Generate a single embedding for a query text
-   * This method explicitly uses 'RETRIEVAL_QUERY' taskType.
+   * Generate a single embedding for a query text using the requested model.
    */
-  async embedQuery(queryText: string): Promise<number[]> {
-    this.logger.log(`Generating embedding for query: "${queryText}" using ${this.modelName}`);
+  async embedQuery(queryText: string, opts?: { model?: string | null }): Promise<number[]> {
+    const { model, provider, dimension } = this.resolve(opts?.model);
+    this.logger.log(`Generating query embedding using ${model} (${provider}, ${dimension}d)`);
     const startTime = Date.now();
 
-    let embeddingVector: number[] | null = null;
-    const fallbackVector = new Array(this.vectorDimension).fill(0).map((_, i) => 0.00001 * (i % 2 === 0 ? 1 : -1));
-    const magnitude = Math.sqrt(fallbackVector.reduce((sum, val) => sum + val * val, 0));
-    if (magnitude > 0) {
-      for (let i = 0; i < this.vectorDimension; i++) {
-        fallbackVector[i] /= magnitude;
-      }
-    }
+    const fallbackVector = this.buildFallbackVector(dimension);
 
     if (!queryText || queryText.trim().length === 0 || queryText.startsWith('%PDF') || /^\uFFFD/.test(queryText)) {
       this.logger.log('Invalid query text, returning default fallback vector.');
@@ -130,37 +180,63 @@ export class EmbeddingService {
     }
 
     try {
-      const result = await this.generativeModel.embedContent({
-        content: { parts: [{ text: queryText.trim() }] },
-        taskType: 'RETRIEVAL_QUERY', // Specify for search queries
-        outputDimensionality: this.vectorDimension,
-      });
-
-      if (result && result.embedding && result.embedding.values) {
-        embeddingVector = result.embedding.values;
-      } else {
-        this.logger.warn('Received malformed embedding for query.');
+      if (provider === 'openai') {
+        const vectors = await this.openaiEmbed(model, [queryText.trim()], dimension);
+        return vectors[0] && vectors[0].length === dimension ? vectors[0] : fallbackVector;
       }
 
-      const elapsed = Date.now() - startTime;
-      this.logger.log(`Generated query embedding in ${elapsed}ms`);
+      if (!this.genAI) return fallbackVector;
+      const generativeModel = this.genAI.getGenerativeModel({ model });
+      const result = await generativeModel.embedContent({
+        content: { parts: [{ text: queryText.trim() }] },
+        taskType: 'RETRIEVAL_QUERY',
+        outputDimensionality: dimension,
+      } as any);
 
-      return embeddingVector || fallbackVector;
+      const values = result?.embedding?.values;
+      this.logger.log(`Generated query embedding in ${Date.now() - startTime}ms`);
+      return values && values.length === dimension ? values : fallbackVector;
     } catch (error) {
-      this.logger.error(`Error generating query embedding with Gemini API: ${error.message}`, error.stack);
-      this.logger.error('Returning default fallback vector due to embedding API error.');
+      this.logger.error(`Error generating query embedding (${model}): ${error.message}`, error.stack);
       return fallbackVector;
     }
   }
 
-  // You can still keep embedText if you want a generic single text embedding,
-  // but it's more precise to use embedDocuments or embedQuery depending on context.
-  // For RAG, you'll mainly use embedDocuments for indexing and embedQuery for search.
-  async embedText(text: string): Promise<number[]> {
-      // Decide whether this generic call is for a document or a query.
-      // For simplicity, let's assume it's for a document if not specified.
-      this.logger.warn("Using generic embedText. Consider using embedDocuments or embedQuery for specific task types.");
-      const embeddings = await this.embedDocuments([{text: text}]);
-      return embeddings[0];
+  private async geminiEmbedDocuments(
+    model: string,
+    texts: string[],
+    dimension: number,
+  ): Promise<number[][]> {
+    if (!this.genAI) throw new Error('Gemini API key not configured');
+    const generativeModel = this.genAI.getGenerativeModel({ model });
+    const requests = texts.map((text) => ({
+      content: { parts: [{ text }] },
+      taskType: 'RETRIEVAL_DOCUMENT',
+      outputDimensionality: dimension,
+    }));
+    const result = await generativeModel.batchEmbedContents({ requests } as any);
+    const embeddingResponses = result.embeddings;
+    if (!embeddingResponses || !Array.isArray(embeddingResponses)) {
+      throw new Error('Invalid response from Gemini embedding API.');
+    }
+    return embeddingResponses.map((e: any) => e?.values || []);
+  }
+
+  private async openaiEmbed(model: string, texts: string[], dimension: number): Promise<number[][]> {
+    if (!this.openai) {
+      this.logger.error(`OpenAI model ${model} requested but OPENAI_API_KEY is not set — using fallback vectors`);
+      return texts.map(() => this.buildFallbackVector(dimension));
+    }
+    const response = await this.openai.embeddings.create({
+      model,
+      input: texts,
+      dimensions: dimension,
+    });
+    return response.data.map((d) => d.embedding as number[]);
+  }
+
+  async embedText(text: string, opts?: { model?: string | null }): Promise<number[]> {
+    const embeddings = await this.embedDocuments([{ text }], opts);
+    return embeddings[0];
   }
 }

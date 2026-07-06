@@ -23,6 +23,7 @@ export const JOB_NAMES = {
   // Indexing queue jobs
   INDEX_FILE_SOURCE: 'index-file-source',
   DEINDEX_SOURCE: 'deindex-source',
+  REEMBED_CHUNK: 'reembed-chunk',
   
   // Workflow execution queue jobs
   EXECUTE_WORKFLOW: 'execute-workflow',
@@ -65,6 +66,14 @@ export interface DeindexSourceJobData {
   sourceType: string;
   sourcePointer: string;
   knowledgeBaseId: string;
+}
+
+export interface ReembedChunkJobData {
+  knowledgeBaseId: string;
+  sourceId: string;
+  chunkMetadataId: string;
+  vectorId: string;
+  text: string;
 }
 
 export interface WorkflowExecutionJobData {

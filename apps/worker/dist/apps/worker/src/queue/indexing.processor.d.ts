@@ -2,19 +2,21 @@ import { Job } from 'bull';
 import { PrismaService } from '../../../backend/src/core/database/prisma.service';
 import { FileService } from '../../../backend/src/modules/v1/file/file.service';
 import { ChunkingService } from '../chunking/chunking.service';
+import { StrategyChunkingService } from '../chunking/strategy-chunking.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
-import { IndexFileSourceJobData, DeindexSourceJobData } from '@jibu/queue-definitions';
+import { IndexFileSourceJobData, DeindexSourceJobData, ReembedChunkJobData } from '@jibu/queue-definitions';
 import { Queue } from 'bull';
 export declare class IndexingProcessor {
     private readonly prisma;
     private readonly fileService;
     private readonly chunkingService;
+    private readonly strategyChunkingService;
     private readonly embeddingService;
     private readonly vectorDbService;
     private readonly indexingQueue;
     private readonly logger;
-    constructor(prisma: PrismaService, fileService: FileService, chunkingService: ChunkingService, embeddingService: EmbeddingService, vectorDbService: VectorDbService, indexingQueue: Queue);
+    constructor(prisma: PrismaService, fileService: FileService, chunkingService: ChunkingService, strategyChunkingService: StrategyChunkingService, embeddingService: EmbeddingService, vectorDbService: VectorDbService, indexingQueue: Queue);
     processIndexFileSource(job: Job<IndexFileSourceJobData>): Promise<{
         success: boolean;
         jobId: import("bull").JobId;
@@ -30,5 +32,13 @@ export declare class IndexingProcessor {
         knowledgeBaseSourceId: string;
         sourceType: string;
     }>;
+    private extractTextFromFile;
+    private extractPdf;
     private sanitizeText;
+    private fetchAndExtractUrl;
+    processReembedChunk(job: Job<ReembedChunkJobData>): Promise<{
+        success: boolean;
+        vectorId: string;
+        chunkMetadataId: string;
+    }>;
 }

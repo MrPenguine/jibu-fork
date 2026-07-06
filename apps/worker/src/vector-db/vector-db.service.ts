@@ -117,10 +117,17 @@ export class VectorDbService {
     data: {
       points: VectorEntry[];
       wait?: boolean;
+      dimension?: number;
     }
   ): Promise<void> {
     try {
-    await this.ensureCollection(collection);
+    await this.ensureCollection(collection, data.dimension);
+
+      // Expected dimension for validation: explicit param, else the vectors' own length, else env default
+      const expectedDimension =
+        data.dimension ||
+        (data.points[0]?.vector?.length) ||
+        parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
     
       // Format points for Qdrant API
       const qdrantPoints = data.points.map(point => {
@@ -138,8 +145,8 @@ export class VectorDbService {
         });
         
         // Check if vector has valid length
-        if (sanitizedVector.length !== parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10)) {
-          this.logger.warn(`Vector dimension mismatch: ${sanitizedVector.length} vs expected ${this.configService.get('VECTOR_DIMENSION')}`);
+        if (sanitizedVector.length !== expectedDimension) {
+          this.logger.warn(`Vector dimension mismatch: ${sanitizedVector.length} vs expected ${expectedDimension}`);
         }
         
         // Ensure payload doesn't contain circular references or invalid types
@@ -387,6 +394,62 @@ export class VectorDbService {
     }
   }
   
+  /**
+   * Retrieve specific points by their ids (payload + optional vector).
+   * Accepts ids with or without hyphens (Qdrant stores them hyphen-stripped).
+   */
+  async retrieve(
+    collection: string,
+    ids: string[],
+    options: { with_payload?: boolean; with_vector?: boolean } = {},
+  ): Promise<SearchResult[]> {
+    try {
+      const exists = await this.collectionExists(collection);
+      if (!exists) return [];
+
+      const normalizedIds = ids.map((id) =>
+        typeof id === 'string' ? id.replace(/-/g, '') : String(id),
+      );
+
+      const response = await axios.post(
+        `${this.qdrantUrl}/collections/${collection}/points`,
+        {
+          ids: normalizedIds,
+          with_payload: options.with_payload !== false,
+          with_vector: options.with_vector === true,
+        },
+      );
+      return response.data.result || [];
+    } catch (error) {
+      this.logger.error(`Failed to retrieve points from ${collection}: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Delete specific points by their ids.
+   */
+  async deleteByIds(collection: string, ids: string[]): Promise<void> {
+    try {
+      const exists = await this.collectionExists(collection);
+      if (!exists) {
+        this.logger.warn(`Collection ${collection} doesn't exist, skipping deleteByIds`);
+        return;
+      }
+      const normalizedIds = ids.map((id) =>
+        typeof id === 'string' ? id.replace(/-/g, '') : String(id),
+      );
+      await axios.post(
+        `${this.qdrantUrl}/collections/${collection}/points/delete?wait=true`,
+        { points: normalizedIds },
+      );
+      this.logger.debug(`Deleted ${normalizedIds.length} points from ${collection}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete points by id from ${collection}: ${error.message}`);
+      throw error;
+    }
+  }
+
   /**
    * Delete a collection
    */

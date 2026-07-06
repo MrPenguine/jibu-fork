@@ -8,6 +8,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../../backend/src/core/database/prisma.service");
 const file_service_1 = require("../../../backend/src/modules/v1/file/file.service");
 const chunking_service_1 = require("../chunking/chunking.service");
+const strategy_chunking_service_1 = require("../chunking/strategy-chunking.service");
 const embedding_service_1 = require("../embedding/embedding.service");
 const vector_db_service_1 = require("../vector-db/vector-db.service");
 const axios_1 = require("axios");
@@ -15,10 +16,11 @@ const queue_definitions_1 = require("@jibu/queue-definitions");
 const crypto_1 = require("crypto");
 const bull_2 = require("@nestjs/bull");
 let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
-    constructor(prisma, fileService, chunkingService, embeddingService, vectorDbService, indexingQueue) {
+    constructor(prisma, fileService, chunkingService, strategyChunkingService, embeddingService, vectorDbService, indexingQueue) {
         this.prisma = prisma;
         this.fileService = fileService;
         this.chunkingService = chunkingService;
+        this.strategyChunkingService = strategyChunkingService;
         this.embeddingService = embeddingService;
         this.vectorDbService = vectorDbService;
         this.indexingQueue = indexingQueue;
@@ -28,7 +30,8 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
         this.logger.log(`Indexing processor initialized with target concurrency: ${concurrency}`);
     }
     async processIndexFileSource(job) {
-        this.logger.debug(`Processing index job ${job.id} for source: ${job.data.knowledgeBaseSourceId} in org: ${job.data.organizationId}`);
+        var _a;
+        this.logger.debug(`Processing index job ${job.id} for source: ${job.data.knowledgeBaseSourceId} in workspace: ${job.data.workspaceId}`);
         try {
             const source = await this.prisma.knowledgeBaseSource.findUnique({
                 where: { id: job.data.knowledgeBaseSourceId },
@@ -40,111 +43,70 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
             if (!source) {
                 throw new Error(`Source with ID ${job.data.knowledgeBaseSourceId} not found`);
             }
-            this.logger.debug(`Found source with file: ${source.file.name}`);
+            const sourceType = source.sourceType || 'file';
+            const isUrlSource = sourceType === 'url' || sourceType === 'sitemap';
             await this.prisma.knowledgeBaseSource.update({
                 where: { id: source.id },
                 data: { indexingStatus: 'PROCESSING' }
             });
-            const downloadUrl = await this.fileService.getDownloadUrl(source.file.id, source.file.workspaceId);
-            this.logger.debug(`Got signed download URL for file: ${source.file.name}`);
-            const response = await axios_1.default.get(downloadUrl, {
-                responseType: 'arraybuffer'
-            });
-            const fileContent = response.data;
-            this.logger.debug(`Downloaded file content, size: ${fileContent.length} bytes`);
-            const mimeType = source.file.mimeType;
+            let mimeType;
+            let sourceName;
+            let filePointer;
             let textContent = '';
-            try {
-                if (mimeType.startsWith('text/')) {
-                    textContent = Buffer.from(fileContent).toString('utf-8');
-                    this.logger.debug(`Extracted ${textContent.length} characters of text content from file`);
+            if (isUrlSource) {
+                const url = source.sourceUrl;
+                if (!url) {
+                    throw new Error(`URL source ${source.id} has no sourceUrl`);
                 }
-                else if (mimeType.includes('pdf')) {
-                    try {
-                        const pdfParse = require('pdf-parse');
-                        this.logger.debug('Using pdf-parse library for PDF extraction');
-                        const fileContentBuffer = Buffer.from(fileContent);
-                        const header = fileContentBuffer.slice(0, 5).toString();
-                        if (header.startsWith('%PDF-')) {
-                            this.logger.debug('Valid PDF header detected');
-                            const pdfData = await pdfParse(fileContentBuffer);
-                            textContent = pdfData.text || '';
-                            if (pdfData.info) {
-                                this.logger.debug(`PDF Info: Pages=${pdfData.numpages}, Version=${pdfData.info.PDFFormatVersion || 'unknown'}`);
-                                const producer = (pdfData.info.Producer || '').toLowerCase();
-                                const creator = (pdfData.info.Creator || '').toLowerCase();
-                                const isLikelyScanned = producer.includes('scan') ||
-                                    creator.includes('scan') ||
-                                    producer.includes('image') ||
-                                    creator.includes('image') ||
-                                    producer.includes('ocr') ||
-                                    creator.includes('ocr');
-                                if (isLikelyScanned) {
-                                    this.logger.warn('PDF metadata suggests this may be a scanned document');
-                                }
-                            }
-                            if (!textContent || textContent.trim().length === 0) {
-                                this.logger.warn('PDF parsing yielded empty text, PDF may require OCR');
-                                textContent = "This PDF requires OCR processing. Please convert it to a text-searchable PDF.";
-                                await this.prisma.knowledgeBaseSource.update({
-                                    where: { id: source.id },
-                                    data: {
-                                        indexingStatus: 'WARNING'
-                                    }
-                                });
-                            }
-                            else {
-                                const charCount = textContent.length;
-                                const wordCount = textContent.split(/\s+/).length;
-                                const pageCount = pdfData.numpages || 1;
-                                const charsPerPage = charCount / pageCount;
-                                if (charsPerPage < 100) {
-                                    this.logger.warn(`Suspiciously low character count per page (${charsPerPage.toFixed(1)}), PDF may be scanned`);
-                                    textContent = "Note: This PDF appears to contain very little text and may be a scanned document. OCR processing is recommended.\n\n" + textContent;
-                                }
-                                else {
-                                    this.logger.debug(`Successfully extracted ${textContent.length} characters (${wordCount} words) from ${pageCount} page PDF`);
-                                }
-                                if (textContent.length > 0) {
-                                    const sampleText = textContent.substring(0, Math.min(500, textContent.length));
-                                    this.logger.debug(`PDF text sample: "${sampleText}${textContent.length > 500 ? '...' : ''}"`);
-                                }
-                            }
-                        }
-                        else {
-                            this.logger.error('Invalid PDF header, file may be corrupted');
-                            textContent = "PDF extraction failed - file appears to be corrupted or not a valid PDF.";
-                            await this.prisma.knowledgeBaseSource.update({
-                                where: { id: source.id },
-                                data: {
-                                    indexingStatus: 'ERROR'
-                                }
-                            });
-                        }
-                    }
-                    catch (pdfError) {
-                        this.logger.error(`PDF processing failed: ${pdfError.message}`);
-                        textContent = "PDF processing failed. This document may not be properly indexed.";
-                        await this.prisma.knowledgeBaseSource.update({
-                            where: { id: source.id },
-                            data: {
-                                indexingStatus: 'ERROR'
-                            }
-                        });
-                    }
+                sourceName = source.title || url;
+                filePointer = null;
+                mimeType = 'text/html';
+                this.logger.debug(`Fetching URL source: ${url}`);
+                try {
+                    textContent = await this.fetchAndExtractUrl(url);
                 }
-                else {
-                    this.logger.warn(`Unsupported file type: ${mimeType}, attempting basic text extraction`);
-                    textContent = Buffer.from(fileContent).toString('utf-8');
-                    this.logger.debug(`Basic extraction of ${textContent.length} characters from file of type ${mimeType}`);
+                catch (error) {
+                    this.logger.error(`URL fetch/extract failed for "${url}": ${error.message}`);
+                    await this.prisma.knowledgeBaseSource.update({
+                        where: { id: source.id },
+                        data: { indexingStatus: 'FAILED' },
+                    });
+                    throw error;
                 }
             }
-            catch (error) {
-                this.logger.warn(`Error extracting text from file: ${error.message}`);
-                textContent = `File content for ${source.file.name} (${mimeType})`;
+            else {
+                if (!source.file) {
+                    throw new Error(`File source ${source.id} has no linked file`);
+                }
+                this.logger.debug(`Found source with file: ${source.file.name}`);
+                mimeType = source.file.mimeType;
+                sourceName = source.file.name || '';
+                filePointer = source.sourcePointer;
+                const downloadUrl = await this.fileService.getDownloadUrl(source.file.id, source.file.workspaceId);
+                this.logger.debug(`Got signed download URL for file: ${source.file.name}`);
+                const response = await axios_1.default.get(downloadUrl, {
+                    responseType: 'arraybuffer'
+                });
+                const fileContent = response.data;
+                this.logger.debug(`Downloaded file content, size: ${fileContent.length} bytes`);
+                try {
+                    textContent = await this.extractTextFromFile(Buffer.from(fileContent), mimeType, sourceName, source.id);
+                }
+                catch (error) {
+                    this.logger.error(`Text extraction failed for "${sourceName}" (${mimeType}): ${error.message}`);
+                    await this.prisma.knowledgeBaseSource.update({
+                        where: { id: source.id },
+                        data: { indexingStatus: 'FAILED' },
+                    });
+                    throw error;
+                }
             }
+            const fileName = sourceName;
             textContent = this.sanitizeText(textContent);
-            const chunks = await this.chunkingService.splitTextIntoChunks(textContent, mimeType);
+            const chunkConfig = job.data.chunkConfig || source.chunkConfig || {};
+            this.logger.debug(`Chunking with config: ${JSON.stringify(chunkConfig)}`);
+            const chunkResults = await this.strategyChunkingService.chunk(textContent, mimeType, chunkConfig);
+            const chunks = chunkResults.map((c) => c.text);
             this.logger.debug(`Split text into ${chunks.length} chunks`);
             if (chunks.length > 0) {
                 this.logger.debug(`Sample chunk (1/${chunks.length}): "${chunks[0].substring(0, 200)}${chunks[0].length > 200 ? '...' : ''}"`);
@@ -152,14 +114,28 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
                     this.logger.debug(`Sample chunk (2/${chunks.length}): "${chunks[1].substring(0, 200)}${chunks[1].length > 200 ? '...' : ''}"`);
                 }
             }
+            const embeddingModel = ((_a = source.knowledgeBase) === null || _a === void 0 ? void 0 : _a.embeddingModel) || null;
+            const embeddingDimension = this.embeddingService.getDimension(embeddingModel);
             const collectionName = `kb_${source.knowledgeBaseId}`;
-            await this.vectorDbService.ensureCollection(collectionName);
-            const embeddings = await this.embeddingService.embedDocuments(chunks.map(chunk => ({ text: chunk })));
-            this.logger.debug(`Generated ${embeddings.length} embeddings`);
+            await this.vectorDbService.ensureCollection(collectionName, embeddingDimension);
+            try {
+                await this.vectorDbService.delete(collectionName, {
+                    filter: { must: [{ key: 'sourceId', match: { value: source.id } }] },
+                    wait: true,
+                });
+                await this.prisma.chunkMetadata.deleteMany({ where: { sourceId: source.id } });
+                this.logger.debug(`Cleared existing vectors/metadata for source ${source.id} before re-index`);
+            }
+            catch (cleanupError) {
+                this.logger.warn(`Pre-index cleanup failed for source ${source.id}: ${cleanupError.message}`);
+            }
+            const embeddings = await this.embeddingService.embedDocuments(chunks.map(chunk => ({ text: chunk })), { model: embeddingModel });
+            this.logger.debug(`Generated ${embeddings.length} embeddings (model: ${embeddingModel || 'default'}, dim: ${embeddingDimension})`);
             if (embeddings.length > 0) {
                 this.logger.debug(`Sample embedding (1/${embeddings.length}): [${embeddings[0].slice(0, 5).join(', ')}${embeddings[0].length > 5 ? '...' : ''}], dimension: ${embeddings[0].length}`);
             }
             const points = chunks.map((chunk, index) => {
+                var _a, _b;
                 const pointId = (0, crypto_1.randomUUID)();
                 return {
                     id: pointId,
@@ -167,16 +143,19 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
                     payload: {
                         text: chunk,
                         sourceId: source.id,
-                        fileId: source.sourcePointer,
-                        fileName: source.file.name,
+                        fileId: filePointer,
+                        fileName: sourceName,
+                        sourceType,
+                        sourceUrl: source.sourceUrl || null,
                         knowledgeBaseId: source.knowledgeBaseId,
-                        organizationId: job.data.organizationId,
-                        workspaceId: source.file.workspaceId,
-                        chunkIndex: index
+                        workspaceId: source.workspaceId,
+                        chunkIndex: index,
+                        chunkType: ((_a = chunkResults[index]) === null || _a === void 0 ? void 0 : _a.chunkType) || 'content',
+                        strategies: ((_b = chunkResults[index]) === null || _b === void 0 ? void 0 : _b.strategies) || []
                     }
                 };
             });
-            await this.vectorDbService.upsert(collectionName, { points });
+            await this.vectorDbService.upsert(collectionName, { points, dimension: embeddingDimension });
             this.logger.debug(`Stored ${points.length} vector points in collection ${collectionName}`);
             if (points.length > 0) {
                 this.logger.debug(`Sample vector point ID: ${points[0].id}`);
@@ -203,6 +182,7 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
                 throw error;
             }
             const chunkMetadataData = points.map((point, index) => {
+                var _a, _b;
                 const sanitizedText = chunks[index]
                     .replace(/[\x00-\x09\x0B-\x1F\x7F-\x9F]/g, '')
                     .replace(/\\x[0-9a-fA-F]?(?![0-9a-fA-F])/g, '')
@@ -216,6 +196,8 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
                     vectorId: point.id,
                     textPreview: textPreview,
                     textLength: sanitizedText.length,
+                    chunkType: ((_a = chunkResults[index]) === null || _a === void 0 ? void 0 : _a.chunkType) || 'content',
+                    strategies: ((_b = chunkResults[index]) === null || _b === void 0 ? void 0 : _b.strategies) || [],
                 };
             });
             const BATCH_SIZE = 25;
@@ -463,7 +445,7 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
                         this.logger.debug(`Updated hasIndexedContent flag for source ${job.data.knowledgeBaseSourceId}`);
                         const indexingJobData = {
                             knowledgeBaseSourceId: job.data.knowledgeBaseSourceId,
-                            organizationId: job.data.organizationId
+                            workspaceId: job.data.workspaceId
                         };
                         await this.indexingQueue.add(queue_definitions_1.JOB_NAMES.INDEX_FILE_SOURCE, indexingJobData, {
                             attempts: 3,
@@ -500,6 +482,75 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
             throw error;
         }
     }
+    async extractTextFromFile(buffer, mimeType, fileName, sourceId) {
+        const mime = (mimeType || '').toLowerCase();
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
+        const isPdf = mime.includes('pdf') || ext === 'pdf';
+        const isDocx = mime.includes('officedocument.wordprocessingml') ||
+            mime.includes('msword') ||
+            ext === 'docx';
+        const isPlainText = mime.startsWith('text/') ||
+            mime.includes('json') ||
+            mime.includes('markdown') ||
+            mime.includes('csv') ||
+            ['txt', 'md', 'markdown', 'csv', 'tsv', 'text', 'log', 'json'].includes(ext);
+        if (isPdf) {
+            return this.extractPdf(buffer, sourceId);
+        }
+        if (isDocx) {
+            const mammoth = require('mammoth');
+            const result = await mammoth.extractRawText({ buffer });
+            const text = ((result === null || result === void 0 ? void 0 : result.value) || '').trim();
+            if (!text) {
+                throw new Error('DOCX contained no extractable text');
+            }
+            this.logger.debug(`Extracted ${text.length} characters from DOCX "${fileName}"`);
+            return text;
+        }
+        if (isPlainText) {
+            const text = buffer.toString('utf-8');
+            this.logger.debug(`Extracted ${text.length} characters of plain text from "${fileName}"`);
+            return text;
+        }
+        throw new Error(`Unsupported file type "${mimeType || ext || 'unknown'}". Supported types: pdf, txt, md, csv, docx.`);
+    }
+    async extractPdf(buffer, sourceId) {
+        const pdfParse = require('pdf-parse');
+        const header = buffer.slice(0, 5).toString();
+        if (!header.startsWith('%PDF-')) {
+            throw new Error('Invalid PDF header — file appears corrupted or not a valid PDF');
+        }
+        const pdfData = await pdfParse(buffer);
+        let textContent = pdfData.text || '';
+        if (pdfData.info) {
+            const producer = (pdfData.info.Producer || '').toLowerCase();
+            const creator = (pdfData.info.Creator || '').toLowerCase();
+            const isLikelyScanned = ['scan', 'image', 'ocr'].some((k) => producer.includes(k) || creator.includes(k));
+            if (isLikelyScanned) {
+                this.logger.warn('PDF metadata suggests this may be a scanned document');
+            }
+        }
+        if (!textContent || textContent.trim().length === 0) {
+            this.logger.warn('PDF parsing yielded empty text, PDF may require OCR');
+            await this.prisma.knowledgeBaseSource.update({
+                where: { id: sourceId },
+                data: { indexingStatus: 'WARNING' },
+            });
+            return 'This PDF requires OCR processing. Please convert it to a text-searchable PDF.';
+        }
+        const pageCount = pdfData.numpages || 1;
+        const charsPerPage = textContent.length / pageCount;
+        if (charsPerPage < 100) {
+            this.logger.warn(`Suspiciously low character count per page (${charsPerPage.toFixed(1)}), PDF may be scanned`);
+            textContent =
+                'Note: This PDF appears to contain very little text and may be a scanned document. OCR processing is recommended.\n\n' +
+                    textContent;
+        }
+        else {
+            this.logger.debug(`Successfully extracted ${textContent.length} characters from ${pageCount} page PDF`);
+        }
+        return textContent;
+    }
     sanitizeText(text) {
         if (!text)
             return '';
@@ -520,6 +571,71 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
             return `Unprocessable content (sanitization error: ${error.message})`;
         }
     }
+    async fetchAndExtractUrl(url) {
+        const cheerio = require('cheerio');
+        const response = await axios_1.default.get(url, {
+            responseType: 'text',
+            timeout: 30000,
+            maxContentLength: 20 * 1024 * 1024,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; JibuBot/1.0; +https://jibu.ai/bot)',
+                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+        });
+        const html = response.data;
+        const $ = cheerio.load(html);
+        $('script, style, noscript, iframe, svg, nav, header, footer, form, aside').remove();
+        const main = $('main').text() || $('article').text() || $('body').text();
+        const text = (main || '')
+            .replace(/\s+\n/g, '\n')
+            .replace(/\n\s+/g, '\n')
+            .replace(/[ \t]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        if (!text || text.length < 20) {
+            throw new Error(`URL "${url}" yielded no extractable text content`);
+        }
+        this.logger.debug(`Extracted ${text.length} characters from URL "${url}"`);
+        return text;
+    }
+    async processReembedChunk(job) {
+        const { knowledgeBaseId, vectorId, text, chunkMetadataId } = job.data;
+        this.logger.debug(`Re-embedding chunk ${chunkMetadataId} (vector ${vectorId}) in KB ${knowledgeBaseId}`);
+        try {
+            const kb = await this.prisma.knowledgeBase.findUnique({
+                where: { id: knowledgeBaseId },
+            });
+            const embeddingModel = (kb === null || kb === void 0 ? void 0 : kb.embeddingModel) || null;
+            const dimension = this.embeddingService.getDimension(embeddingModel);
+            const [vector] = await this.embeddingService.embedDocuments([{ text }], { model: embeddingModel });
+            const collectionName = `kb_${knowledgeBaseId}`;
+            const existing = await this.vectorDbService.retrieve(collectionName, [vectorId]);
+            const prevPayload = (existing && existing[0] && existing[0].payload) || {};
+            await this.vectorDbService.upsert(collectionName, {
+                points: [
+                    {
+                        id: vectorId,
+                        vector,
+                        payload: Object.assign(Object.assign({}, prevPayload), { text }),
+                    },
+                ],
+                dimension,
+            });
+            await this.prisma.chunkMetadata.update({
+                where: { id: chunkMetadataId },
+                data: {
+                    textPreview: text.substring(0, 100),
+                    textLength: text.length,
+                },
+            });
+            this.logger.debug(`Re-embedded chunk ${chunkMetadataId} successfully`);
+            return { success: true, vectorId, chunkMetadataId };
+        }
+        catch (error) {
+            this.logger.error(`Error re-embedding chunk ${chunkMetadataId}: ${error.message}`, error.stack);
+            throw error;
+        }
+    }
 };
 exports.IndexingProcessor = IndexingProcessor;
 tslib_1.__decorate([
@@ -534,13 +650,20 @@ tslib_1.__decorate([
     tslib_1.__metadata("design:paramtypes", [Object]),
     tslib_1.__metadata("design:returntype", Promise)
 ], IndexingProcessor.prototype, "processDeindexSource", null);
+tslib_1.__decorate([
+    (0, bull_1.Process)(queue_definitions_1.JOB_NAMES.REEMBED_CHUNK),
+    tslib_1.__metadata("design:type", Function),
+    tslib_1.__metadata("design:paramtypes", [Object]),
+    tslib_1.__metadata("design:returntype", Promise)
+], IndexingProcessor.prototype, "processReembedChunk", null);
 exports.IndexingProcessor = IndexingProcessor = IndexingProcessor_1 = tslib_1.__decorate([
     (0, common_1.Injectable)(),
     (0, bull_1.Processor)(queue_definitions_1.QUEUE_NAMES.INDEXING),
-    tslib_1.__param(5, (0, bull_2.InjectQueue)(queue_definitions_1.QUEUE_NAMES.INDEXING)),
+    tslib_1.__param(6, (0, bull_2.InjectQueue)(queue_definitions_1.QUEUE_NAMES.INDEXING)),
     tslib_1.__metadata("design:paramtypes", [prisma_service_1.PrismaService,
         file_service_1.FileService,
         chunking_service_1.ChunkingService,
+        strategy_chunking_service_1.StrategyChunkingService,
         embedding_service_1.EmbeddingService,
         vector_db_service_1.VectorDbService, Object])
 ], IndexingProcessor);

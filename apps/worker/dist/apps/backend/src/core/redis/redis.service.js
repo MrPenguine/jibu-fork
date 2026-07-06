@@ -112,6 +112,16 @@ let RedisService = class RedisService {
             return {};
         }
     }
+    async hdel(key, field) {
+        try {
+            await this.redisClient.hdel(key, field);
+            return true;
+        }
+        catch (error) {
+            console.error(`Error deleting hash field ${field} for key ${key}:`, error);
+            return false;
+        }
+    }
     disconnect() {
         if (this.redisClient) {
             this.redisClient.disconnect();

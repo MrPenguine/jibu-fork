@@ -14,5 +14,6 @@ export declare class RedisService implements OnModuleInit, OnModuleDestroy {
     hset(key: string, field: string, value: string): Promise<boolean>;
     hget(key: string, field: string): Promise<string | null>;
     hgetall(key: string): Promise<Record<string, string>>;
+    hdel(key: string, field: string): Promise<boolean>;
     disconnect(): void;
 }

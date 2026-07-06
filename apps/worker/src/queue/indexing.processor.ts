@@ -12,7 +12,8 @@ import {
   QUEUE_NAMES, 
   JOB_NAMES, 
   IndexFileSourceJobData, 
-  DeindexSourceJobData 
+  DeindexSourceJobData,
+  ReembedChunkJobData 
 } from '@jibu/queue-definitions';
 import { randomUUID } from 'crypto';
 import { InjectQueue } from '@nestjs/bull';
@@ -62,51 +63,83 @@ export class IndexingProcessor {
       if (!source) {
         throw new Error(`Source with ID ${job.data.knowledgeBaseSourceId} not found`);
       }
-      
-      this.logger.debug(`Found source with file: ${source.file.name}`);
-      
+
+      const sourceType = (source as any).sourceType || 'file';
+      const isUrlSource = sourceType === 'url' || sourceType === 'sitemap';
+
       // Update status to PROCESSING
       await this.prisma.knowledgeBaseSource.update({
         where: { id: source.id },
         data: { indexingStatus: 'PROCESSING' }
       });
-      
-      // 2. Get a signed download URL for the file using FileService
-      const downloadUrl = await this.fileService.getDownloadUrl(
-        source.file.id, 
-        source.file.workspaceId
-      );
-      
-      this.logger.debug(`Got signed download URL for file: ${source.file.name}`);
-      
-      // 3. Download the file content using axios
-      const response = await axios.get(downloadUrl, {
-        responseType: 'arraybuffer'
-      });
-      
-      const fileContent = response.data;
-      this.logger.debug(`Downloaded file content, size: ${fileContent.length} bytes`);
-      
-      // Check file type to determine how to handle it
-      const mimeType = source.file.mimeType;
-      const fileName = source.file.name || '';
+
+      // Text extraction differs by source type: files are downloaded from
+      // storage, while url/sitemap sources are fetched over HTTP and stripped
+      // to plain text. Both converge on the same chunk -> embed -> upsert path.
+      let mimeType: string;
+      let sourceName: string;
+      let filePointer: string | null;
       let textContent = '';
 
-      try {
-        textContent = await this.extractTextFromFile(
-          Buffer.from(fileContent),
-          mimeType,
-          fileName,
-          source.id,
+      if (isUrlSource) {
+        const url = (source as any).sourceUrl;
+        if (!url) {
+          throw new Error(`URL source ${source.id} has no sourceUrl`);
+        }
+        sourceName = (source as any).title || url;
+        filePointer = null;
+        mimeType = 'text/html';
+        this.logger.debug(`Fetching URL source: ${url}`);
+        try {
+          textContent = await this.fetchAndExtractUrl(url);
+        } catch (error) {
+          this.logger.error(`URL fetch/extract failed for "${url}": ${error.message}`);
+          await this.prisma.knowledgeBaseSource.update({
+            where: { id: source.id },
+            data: { indexingStatus: 'FAILED' },
+          });
+          throw error;
+        }
+      } else {
+        if (!source.file) {
+          throw new Error(`File source ${source.id} has no linked file`);
+        }
+        this.logger.debug(`Found source with file: ${source.file.name}`);
+        mimeType = source.file.mimeType;
+        sourceName = source.file.name || '';
+        filePointer = source.sourcePointer;
+
+        // Get a signed download URL for the file using FileService
+        const downloadUrl = await this.fileService.getDownloadUrl(
+          source.file.id,
+          source.file.workspaceId
         );
-      } catch (error) {
-        this.logger.error(`Text extraction failed for "${fileName}" (${mimeType}): ${error.message}`);
-        await this.prisma.knowledgeBaseSource.update({
-          where: { id: source.id },
-          data: { indexingStatus: 'FAILED' },
+        this.logger.debug(`Got signed download URL for file: ${source.file.name}`);
+
+        // Download the file content using axios
+        const response = await axios.get(downloadUrl, {
+          responseType: 'arraybuffer'
         });
-        throw error;
+        const fileContent = response.data;
+        this.logger.debug(`Downloaded file content, size: ${fileContent.length} bytes`);
+
+        try {
+          textContent = await this.extractTextFromFile(
+            Buffer.from(fileContent),
+            mimeType,
+            sourceName,
+            source.id,
+          );
+        } catch (error) {
+          this.logger.error(`Text extraction failed for "${sourceName}" (${mimeType}): ${error.message}`);
+          await this.prisma.knowledgeBaseSource.update({
+            where: { id: source.id },
+            data: { indexingStatus: 'FAILED' },
+          });
+          throw error;
+        }
       }
+      const fileName = sourceName;
       
       // Sanitize text to ensure it's valid UTF-8
       textContent = this.sanitizeText(textContent);
@@ -126,13 +159,34 @@ export class IndexingProcessor {
         }
       }
       
-      // 5. Create vector collection if it doesn't exist
+      // Resolve the per-KB embedding model so documents and queries embed with
+      // the SAME model. Falls back to the env/Gemini default for legacy KBs.
+      const embeddingModel = (source as any).knowledgeBase?.embeddingModel || null;
+      const embeddingDimension = this.embeddingService.getDimension(embeddingModel);
+
+      // 5. Create vector collection sized for this KB's embedding dimension
       const collectionName = `kb_${source.knowledgeBaseId}`;
-      await this.vectorDbService.ensureCollection(collectionName);
+      await this.vectorDbService.ensureCollection(collectionName, embeddingDimension);
+
+      // Idempotency: on a re-index/refresh, purge this source's existing vectors
+      // and chunk metadata first so we don't accumulate duplicates.
+      try {
+        await this.vectorDbService.delete(collectionName, {
+          filter: { must: [{ key: 'sourceId', match: { value: source.id } }] },
+          wait: true,
+        });
+        await (this.prisma as any).chunkMetadata.deleteMany({ where: { sourceId: source.id } });
+        this.logger.debug(`Cleared existing vectors/metadata for source ${source.id} before re-index`);
+      } catch (cleanupError) {
+        this.logger.warn(`Pre-index cleanup failed for source ${source.id}: ${cleanupError.message}`);
+      }
       
-      // 6. Generate embeddings for each chunk
-      const embeddings = await this.embeddingService.embedDocuments(chunks.map(chunk => ({ text: chunk })));
-      this.logger.debug(`Generated ${embeddings.length} embeddings`);
+      // 6. Generate embeddings for each chunk using the KB's model
+      const embeddings = await this.embeddingService.embedDocuments(
+        chunks.map(chunk => ({ text: chunk })),
+        { model: embeddingModel },
+      );
+      this.logger.debug(`Generated ${embeddings.length} embeddings (model: ${embeddingModel || 'default'}, dim: ${embeddingDimension})`);
       
       // Log sample embedding data
       if (embeddings.length > 0) {
@@ -150,10 +204,12 @@ export class IndexingProcessor {
           payload: {
             text: chunk,
             sourceId: source.id,
-            fileId: source.sourcePointer,
-            fileName: source.file.name,
+            fileId: filePointer,
+            fileName: sourceName,
+            sourceType,
+            sourceUrl: (source as any).sourceUrl || null,
             knowledgeBaseId: source.knowledgeBaseId,
-            workspaceId: source.file.workspaceId,
+            workspaceId: source.workspaceId,
             chunkIndex: index,
             chunkType: chunkResults[index]?.chunkType || 'content',
             strategies: chunkResults[index]?.strategies || []
@@ -161,7 +217,7 @@ export class IndexingProcessor {
         };
       });
       
-      await this.vectorDbService.upsert(collectionName, { points });
+      await this.vectorDbService.upsert(collectionName, { points, dimension: embeddingDimension } as any);
       this.logger.debug(`Stored ${points.length} vector points in collection ${collectionName}`);
       
       // Log sample vector point
@@ -714,6 +770,100 @@ export class IndexingProcessor {
     } catch (error) {
       this.logger.error(`Error sanitizing text: ${error.message}`);
       return `Unprocessable content (sanitization error: ${error.message})`;
+    }
+  }
+
+  /**
+   * Fetch a web page over HTTP and strip it to readable plain text.
+   * Uses cheerio to remove script/style/nav/boilerplate then collapses whitespace.
+   */
+  private async fetchAndExtractUrl(url: string): Promise<string> {
+    const cheerio = require('cheerio');
+    const response = await axios.get(url, {
+      responseType: 'text',
+      timeout: 30000,
+      maxContentLength: 20 * 1024 * 1024,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; JibuBot/1.0; +https://jibu.ai/bot)',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+
+    const html = response.data as string;
+    const $ = cheerio.load(html);
+
+    // Drop non-content nodes
+    $('script, style, noscript, iframe, svg, nav, header, footer, form, aside').remove();
+
+    // Prefer main/article content when present, else fall back to body
+    const main = $('main').text() || $('article').text() || $('body').text();
+    const text = (main || '')
+      .replace(/\s+\n/g, '\n')
+      .replace(/\n\s+/g, '\n')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    if (!text || text.length < 20) {
+      throw new Error(`URL "${url}" yielded no extractable text content`);
+    }
+    this.logger.debug(`Extracted ${text.length} characters from URL "${url}"`);
+    return text;
+  }
+
+  /**
+   * Re-embed a single chunk after its text was edited: regenerate the vector
+   * with the KB's embedding model and upsert the same Qdrant point id in place.
+   */
+  @Process(JOB_NAMES.REEMBED_CHUNK)
+  async processReembedChunk(job: Job<ReembedChunkJobData>) {
+    const { knowledgeBaseId, vectorId, text, chunkMetadataId } = job.data;
+    this.logger.debug(`Re-embedding chunk ${chunkMetadataId} (vector ${vectorId}) in KB ${knowledgeBaseId}`);
+
+    try {
+      const kb = await this.prisma.knowledgeBase.findUnique({
+        where: { id: knowledgeBaseId },
+      });
+      const embeddingModel = (kb as any)?.embeddingModel || null;
+      const dimension = this.embeddingService.getDimension(embeddingModel);
+
+      const [vector] = await this.embeddingService.embedDocuments(
+        [{ text }],
+        { model: embeddingModel },
+      );
+
+      const collectionName = `kb_${knowledgeBaseId}`;
+
+      // Read the existing point to preserve its payload, then overwrite vector + text
+      const existing = await this.vectorDbService.retrieve(collectionName, [vectorId]);
+      const prevPayload = (existing && existing[0] && existing[0].payload) || {};
+
+      await this.vectorDbService.upsert(collectionName, {
+        points: [
+          {
+            id: vectorId,
+            vector,
+            payload: { ...prevPayload, text },
+          },
+        ],
+        dimension,
+      } as any);
+
+      // Keep the Postgres preview in sync
+      await (this.prisma as any).chunkMetadata.update({
+        where: { id: chunkMetadataId },
+        data: {
+          textPreview: text.substring(0, 100),
+          textLength: text.length,
+        },
+      });
+
+      this.logger.debug(`Re-embedded chunk ${chunkMetadataId} successfully`);
+      return { success: true, vectorId, chunkMetadataId };
+    } catch (error) {
+      this.logger.error(`Error re-embedding chunk ${chunkMetadataId}: ${error.message}`, error.stack);
+      throw error;
     }
   }
 } 
