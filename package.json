@@ -150,6 +150,7 @@
     "next-themes": "^0.4.6",
     "node-fetch": "^2.7.0",
     "node-vault": "^0.10.2",
+    "ollama": "^0.5.14",
     "object-inspect": "^1.13.4",
     "openai": "^4.97.0",
     "passport-jwt": "^4.0.1",

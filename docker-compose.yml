@@ -167,6 +167,22 @@ services:
     networks:
       - default
 
+  # Local Ollama embedding backend. The model still needs to be pulled once
+  # before first use (e.g., docker exec -it ollama ollama pull nomic-embed-text-v2-moe).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    cpus: '2.0'
+    # Use a non-default host port (11435) so the container does not clash with
+    # a native Windows Ollama service that may already be bound to 11434.
+    ports:
+      - '11435:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - default
+
 volumes:
   postgres_data:
   qdrant_storage:
@@ -174,6 +190,7 @@ volumes:
   prometheus_data:
   grafana_data:
   n8n_data:
+  ollama_data:
 
 networks:
   default:

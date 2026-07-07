@@ -22,6 +22,7 @@ import { KnowledgeBaseSettingsDto } from './dto/knowledge-base-settings.dto';
 import { UpdateChunkDto, RetrieveTestDto } from './dto/update-chunk.dto';
 import { Query } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('Knowledge Bases')
 @ApiBearerAuth()
@@ -32,7 +33,8 @@ export class KnowledgeBaseController {
 
   constructor(
     private readonly knowledgeBaseService: KnowledgeBaseService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService
   ) {}
 
   @Post()
@@ -823,6 +825,60 @@ export class KnowledgeBaseController {
     return this.knowledgeBaseService.updateKnowledgeBaseSettings(id, dto, orgId);
   }
 
+  @Post('embedding-models/test')
+  @ApiOperation({ summary: 'Check if an Ollama embedding model is available and running' })
+  async testEmbeddingModel(@Req() req, @Body() body: { model?: string; ollamaUrl?: string }) {
+    const model = body.model || 'qwen3-embedding:0.6b';
+    const configuredUrl = body.ollamaUrl || this.configService.get<string>('OLLAMA_URL') || this.configService.get<string>('OLLAMA_HOST') || 'http://localhost:11434';
+    // 127.0.0.1 is tried before localhost because on Windows Docker Desktop often
+    // binds exposed ports only to the IPv4 loopback, while localhost can resolve to ::1.
+    // 11435 is the docker-compose fallback port used when a native Windows Ollama
+    // service already occupies 11434.
+    const candidateUrls = [configuredUrl, 'http://127.0.0.1:11434', 'http://127.0.0.1:11435', 'http://host.docker.internal:11434', 'http://ollama:11434'].map((u) => u.replace(/\/$/, ''));
+
+    const checkUrl = async (baseUrl: string): Promise<{ ok: true; found: { name: string } } | { ok: false; error: string }> => {
+      try {
+        const res = await fetch(`${baseUrl}/api/tags`);
+        if (!res.ok) {
+          return { ok: false, error: `Ollama returned ${res.status} at ${baseUrl}` };
+        }
+        const data = await res.json() as { models?: Array<{ name: string }> };
+        const found = (data.models || []).find((m) => m.name === model || m.name.startsWith(`${model}:`));
+        if (!found) {
+          return { ok: false, error: `Model ${model} not found in Ollama at ${baseUrl}. Models: ${(data.models || []).map((m) => m.name).join(', ') || 'none'}` };
+        }
+        return { ok: true, found };
+      } catch (error) {
+        return { ok: false, error: `Cannot reach Ollama at ${baseUrl}: ${error.message}` };
+      }
+    };
+
+    for (const baseUrl of candidateUrls) {
+      const tags = await checkUrl(baseUrl);
+      if (tags.ok === false) {
+        this.logger.warn(`[testEmbeddingModel] ${tags.error}`);
+        continue;
+      }
+
+      try {
+        const embedRes = await fetch(`${baseUrl}/api/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, input: 'hello' }),
+        });
+        if (!embedRes.ok) {
+          const errText = await embedRes.text().catch(() => 'unknown');
+          return { available: false, error: `Model ${model} is listed at ${baseUrl} but embedding failed: ${errText}` };
+        }
+        return { available: true, model, ollamaUrl: baseUrl, message: `Model ${model} is available and responding at ${baseUrl}.` };
+      } catch (embedErr) {
+        return { available: false, error: `Model ${model} is listed at ${baseUrl} but embedding check failed: ${embedErr.message}` };
+      }
+    }
+
+    return { available: false, error: `Could not reach Ollama or find ${model}. Tried: ${candidateUrls.join(', ')}` };
+  }
+
   // ---------------------------------------------------------------------------
   // PR-5: Chunk management + retrieval test
   // ---------------------------------------------------------------------------
@@ -887,6 +943,9 @@ export class KnowledgeBaseController {
   ) {
     const orgId = dto.workspaceId || this.resolveOrgId(req);
     this.logger.log(`[retrieveTest] KB ${id} question: "${dto.question?.substring(0, 60)}"`);
-    return this.knowledgeBaseService.retrieveTest(id, dto.question, orgId);
+    return this.knowledgeBaseService.retrieveTest(id, dto.question, orgId, {
+      answerProvider: dto.answerProvider,
+      answerModel: dto.answerModel,
+    });
   }
 } 

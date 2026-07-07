@@ -117,6 +117,30 @@ let IndexingProcessor = IndexingProcessor_1 = class IndexingProcessor {
             const embeddingModel = ((_a = source.knowledgeBase) === null || _a === void 0 ? void 0 : _a.embeddingModel) || null;
             const embeddingDimension = this.embeddingService.getDimension(embeddingModel);
             const collectionName = `kb_${source.knowledgeBaseId}`;
+            const existingSize = await this.vectorDbService.getCollectionVectorSize(collectionName);
+            if (existingSize !== null && existingSize !== embeddingDimension) {
+                this.logger.warn(`Collection ${collectionName} has vector size ${existingSize}, expected ${embeddingDimension} for model ${embeddingModel || 'default'}. Re-indexing all sources for KB ${source.knowledgeBaseId}.`);
+                await this.prisma.chunkMetadata.deleteMany({
+                    where: { knowledgeBaseId: source.knowledgeBaseId },
+                });
+                const otherSources = await this.prisma.knowledgeBaseSource.findMany({
+                    where: { knowledgeBaseId: source.knowledgeBaseId, id: { not: source.id } },
+                });
+                for (const s of otherSources) {
+                    if (s.indexingStatus === 'PROCESSING' || s.indexingStatus === 'PENDING') {
+                        continue;
+                    }
+                    await this.prisma.knowledgeBaseSource.update({
+                        where: { id: s.id },
+                        data: { indexingStatus: 'PENDING', hasIndexedContent: false },
+                    });
+                    await this.indexingQueue.add(queue_definitions_1.JOB_NAMES.INDEX_FILE_SOURCE, {
+                        knowledgeBaseSourceId: s.id,
+                        workspaceId: s.workspaceId,
+                        chunkConfig: s.chunkConfig || undefined,
+                    });
+                }
+            }
             await this.vectorDbService.ensureCollection(collectionName, embeddingDimension);
             try {
                 await this.vectorDbService.delete(collectionName, {

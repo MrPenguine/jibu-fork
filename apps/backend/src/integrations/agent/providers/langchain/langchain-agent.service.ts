@@ -219,7 +219,11 @@ let context = '';
         const kbResults = await this.searchKnowledgeBase(effectiveKnowledgeBaseId, input);
         if (kbResults.length > 0) {
           this.logger.log(`Found ${kbResults.length} results from knowledge base`);
-          context = 'Here is some relevant information:\n\n' + 
+          const kbSystemPrompt = await this.getKnowledgeBaseSystemPrompt(effectiveKnowledgeBaseId);
+          const prefix = kbSystemPrompt
+            ? `Follow these instructions when answering from this knowledge base: ${kbSystemPrompt}\n\nHere is the relevant information:`
+            : 'Here is some relevant information:';
+          context = prefix + '\n\n' +
             kbResults.map(result => result.payload?.text || '').join('\n\n');
         } else {
           this.logger.warn(`No results found from knowledge base ${effectiveKnowledgeBaseId}`);
@@ -509,7 +513,11 @@ let context = '';
         const kbResults = await this.searchKnowledgeBase(effectiveKnowledgeBaseId, input);
         if (kbResults.length > 0) {
           this.logger.log(`Found ${kbResults.length} results from knowledge base for streaming request`);
-          context = 'Here is some relevant information:\n\n' + 
+          const kbSystemPrompt = await this.getKnowledgeBaseSystemPrompt(effectiveKnowledgeBaseId);
+          const prefix = kbSystemPrompt
+            ? `Follow these instructions when answering from this knowledge base: ${kbSystemPrompt}\n\nHere is the relevant information:`
+            : 'Here is some relevant information:';
+          context = prefix + '\n\n' +
             kbResults.map(result => result.payload?.text || '').join('\n\n');
         } else {
           this.logger.warn(`No results found from knowledge base ${effectiveKnowledgeBaseId} for streaming request`);
@@ -854,6 +862,18 @@ let context = '';
     }
   }
   
+  private async getKnowledgeBaseSystemPrompt(knowledgeBaseId: string): Promise<string> {
+    if (!knowledgeBaseId) return '';
+    try {
+      const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: knowledgeBaseId } });
+      const retrievalConfig = (kb as any)?.retrievalConfig as Record<string, unknown> | undefined;
+      return (retrievalConfig?.systemPrompt as string) || '';
+    } catch (error) {
+      this.logger.warn(`Error reading KB system prompt for ${knowledgeBaseId}: ${error.message}`);
+      return '';
+    }
+  }
+
   private async searchKnowledgeBase(knowledgeBaseId: string, query: string) {
     if (!knowledgeBaseId || !query) {
       return [];

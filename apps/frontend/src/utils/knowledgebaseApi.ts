@@ -955,6 +955,26 @@ export async function updateKnowledgeBaseSettings(
   return response.json();
 }
 
+export async function testEmbeddingModel(
+  model: string,
+  ollamaUrl?: string,
+  specificWorkspaceId?: string,
+): Promise<{ available: boolean; error?: string; message?: string; ollamaUrl?: string }> {
+  const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+  if (!workspaceId) throw new Error('No active workspace selected');
+  const headers = await getAuthHeaders(workspaceId);
+  const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/embedding-models/test`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model, ollamaUrl }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to test model: ${errorText}`);
+  }
+  return response.json();
+}
+
 // ===========================================================================
 // PR-5: Chunk management + real retrieval test
 // ===========================================================================
@@ -1082,6 +1102,7 @@ export async function retrieveTestKnowledgeBase(
   knowledgeBaseId: string,
   question: string,
   specificWorkspaceId?: string,
+  opts?: { answerProvider?: string; answerModel?: string },
 ): Promise<RetrieveTestResult> {
   const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
   if (!workspaceId) throw new Error('No active workspace selected');
@@ -1090,7 +1111,7 @@ export async function retrieveTestKnowledgeBase(
   const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/retrieve`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ question, workspaceId }),
+    body: JSON.stringify({ question, workspaceId, ...opts }),
   });
   if (!response.ok) {
     const errorText = await response.text();

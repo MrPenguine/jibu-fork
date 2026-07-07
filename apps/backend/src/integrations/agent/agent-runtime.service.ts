@@ -467,11 +467,12 @@ export class AgentRuntimeService {
 
   private async buildRagContext(kbIds: string[], query: string): Promise<string> {
     if (!kbIds.length || !query) return '';
-    const chunks: string[] = [];
+    const contexts: string[] = [];
     for (const kbId of kbIds) {
       try {
         // Read the KB's persisted embedding model + retrieval config so the
-        // query embeds with the SAME model used at index time, and honors topK.
+        // query embeds with the SAME model used at index time, and honors topK
+        // and the KB-specific system prompt.
         const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: kbId } });
         const embeddingModel = (kb as any)?.embeddingModel || null;
         const retrievalConfig = ((kb as any)?.retrievalConfig as Record<string, unknown>) || {};
@@ -482,15 +483,23 @@ export class AgentRuntimeService {
 
         const processed = this.ragService.preprocessQuery(query);
         const results = await this.ragService.searchKnowledgeBase(kbId, processed, topK, embeddingModel);
+        const chunks: string[] = [];
         for (const r of results) {
           const text = (r as { payload?: { text?: string } })?.payload?.text;
           if (text) chunks.push(text);
         }
+        if (!chunks.length) continue;
+
+        const kbSystemPrompt = (retrievalConfig.systemPrompt as string) || '';
+        const prefix = kbSystemPrompt
+          ? `Follow these instructions when answering from this knowledge base: ${kbSystemPrompt}\n\nHere is the relevant information:`
+          : 'Here is some relevant information:';
+        contexts.push(`${prefix}\n\n${chunks.join('\n\n')}`);
       } catch (e) {
         this.logger.warn(`KB search failed for ${kbId}: ${(e as Error).message}`);
       }
     }
-    return chunks.length ? `Here is some relevant information:\n\n${chunks.join('\n\n')}` : '';
+    return contexts.length ? contexts.join('\n\n') : '';
   }
 
   private async getChatHistory(chatId: string): Promise<Array<{ role: string; content: string }>> {

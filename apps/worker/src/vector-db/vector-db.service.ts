@@ -74,27 +74,34 @@ export class VectorDbService {
   }
   
   /**
-   * Ensure a collection exists, creating it if needed
+   * Ensure a collection exists, creating it if needed. If the collection exists
+   * but its declared vector size does not match the expected dimension, it is
+   * dropped and recreated so the new model's dimension is used.
    */
   async ensureCollection(name: string, vectorSize?: number): Promise<void> {
+    const dimension = vectorSize;
+    if (!dimension) {
+      throw new Error(`Cannot ensure collection ${name}: vector size is required`);
+    }
+
     try {
-      // Use vectorSize parameter if provided, otherwise use the configured value from .env
-      const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
-      
       this.logger.log(`Ensuring collection ${name} exists with vector size ${dimension}`);
       
-      // Check if collection exists
-      await axios.get(`${this.qdrantUrl}/collections/${name}`);
-      this.logger.log(`Collection ${name} already exists`);
-    } catch (error) {
-      if (error.response && error.response.status === 404) {
-        // Collection doesn't exist, create it
-        // Use vectorSize parameter if provided, otherwise use the configured value from .env
-        const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
-        
+      // Check if collection exists and has the right size
+      const existingSize = await this.getCollectionVectorSize(name);
+      if (existingSize !== null && existingSize !== dimension) {
+        this.logger.warn(
+          `Collection ${name} has vector size ${existingSize}, expected ${dimension}. Dropping and recreating.`,
+        );
+        await this.deleteCollection(name);
+      } else if (existingSize === dimension) {
+        this.logger.log(`Collection ${name} already exists with correct vector size ${dimension}`);
+        return;
+      }
+      
       await this.createCollection(name, {
         vectors: {
-            size: dimension,
+          size: dimension,
           distance: 'Cosine',
         },
         optimizers_config: {
@@ -102,10 +109,26 @@ export class VectorDbService {
         },
         replication_factor: 1,
       });
-      } else {
-        this.logger.error(`Error checking collection ${name}: ${error.message}`);
-        throw error;
+    } catch (error) {
+      this.logger.error(`Error ensuring collection ${name}: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  /**
+   * Return the declared vector size for a collection, or null if it does not exist.
+   */
+  async getCollectionVectorSize(name: string): Promise<number | null> {
+    try {
+      const response = await axios.get(`${this.qdrantUrl}/collections/${name}`);
+      const size = response.data?.result?.config?.params?.vectors?.size;
+      return typeof size === 'number' ? size : null;
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        return null;
       }
+      this.logger.warn(`Error reading collection ${name} size: ${error.message}`);
+      return null;
     }
   }
   
@@ -121,13 +144,15 @@ export class VectorDbService {
     }
   ): Promise<void> {
     try {
-    await this.ensureCollection(collection, data.dimension);
+      await this.ensureCollection(collection, data.dimension);
 
-      // Expected dimension for validation: explicit param, else the vectors' own length, else env default
+      // Expected dimension for validation: explicit param or the vectors' own length.
       const expectedDimension =
         data.dimension ||
-        (data.points[0]?.vector?.length) ||
-        parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
+        data.points[0]?.vector?.length;
+      if (!expectedDimension) {
+        throw new Error(`Cannot upsert to collection ${collection}: dimension is required`);
+      }
     
       // Format points for Qdrant API
       const qdrantPoints = data.points.map(point => {

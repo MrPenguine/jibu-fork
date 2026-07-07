@@ -23,4 +23,14 @@ export class RetrieveTestDto {
   @IsOptional()
   @IsString()
   workspaceId?: string;
+
+  @ApiProperty({ description: 'LLM provider for answer generation (e.g., google, openrouter, ollama)', required: false })
+  @IsOptional()
+  @IsString()
+  answerProvider?: string;
+
+  @ApiProperty({ description: 'LLM model for answer generation', required: false })
+  @IsOptional()
+  @IsString()
+  answerModel?: string;
 }

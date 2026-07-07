@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
 import { UpdateKnowledgeBaseDto } from './dto/update-knowledge-base.dto';
@@ -92,6 +93,8 @@ export class KnowledgeBaseService {
   private readonly logger = new Logger(KnowledgeBaseService.name);
 
   private readonly genAI: GoogleGenerativeAI | null;
+  private readonly openrouter: OpenAI | null;
+  private readonly ollamaChat: OpenAI | null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -102,6 +105,24 @@ export class KnowledgeBaseService {
   ) {
     const geminiKey = this.configService.get<string>('GEMINI_API_KEY');
     this.genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
+
+    const openrouterKey = this.configService.get<string>('OPENROUTER_API_KEY');
+    this.openrouter = openrouterKey
+      ? new OpenAI({
+          apiKey: openrouterKey,
+          baseURL: 'https://openrouter.ai/api/v1',
+          defaultHeaders: {
+            'HTTP-Referer': this.configService.get<string>('NEXT_PUBLIC_BASE_URL') || 'http://localhost:3000',
+            'X-Title': 'Jibu',
+          },
+        })
+      : null;
+
+    const ollamaChatUrl = this.configService.get<string>('OLLAMA_URL') || this.configService.get<string>('OLLAMA_HOST') || 'http://localhost:11434';
+    this.ollamaChat = new OpenAI({
+      apiKey: 'ollama',
+      baseURL: `${ollamaChatUrl.replace(/\/$/, '')}/v1`,
+    });
   }
 
   /**
@@ -785,20 +806,36 @@ export class KnowledgeBaseService {
 
     await this.prisma.knowledgeBase.update({ where: { id: knowledgeBaseId }, data });
 
-    // If the embedding model changed to a different vector space, the existing
-    // collection is now incompatible: drop it and re-index every source so the
-    // new model's dimension is used ("model hopping").
+    // Determine the effective model after this update and its expected dimension
+    // from the model registry. The collection must match this dimension; otherwise
+    // Qdrant searches will return 400.
+    const effectiveModel = (data.embeddingModel as string) || prevModel;
+    const expectedDim = EMBEDDING_MODEL_REGISTRY[effectiveModel]?.dimension;
+    const collectionName = `kb_${knowledgeBaseId}`;
+    const collectionSize = await this.vectorDb.getCollectionVectorSize(collectionName);
+    const dimensionMismatch =
+      collectionSize !== null && expectedDim !== undefined && collectionSize !== expectedDim;
+
+    // If the embedding model changed to a different vector space, or if the
+    // existing collection size does not match the model's expected dimension
+    // (e.g., from an old VECTOR_DIMENSION env value), drop the collection and
+    // re-index every source so the correct dimension is used.
     let reindexed = 0;
-    const newModel = (data.embeddingModel as string) || prevModel;
-    const prevDim = EMBEDDING_MODEL_REGISTRY[prevModel]?.dimension;
-    const newDim = EMBEDDING_MODEL_REGISTRY[newModel]?.dimension;
-    if (data.embeddingModel && newModel !== prevModel) {
-      this.logger.log(`Embedding model changed ${prevModel} -> ${newModel} (dim ${prevDim}->${newDim}); re-indexing KB ${knowledgeBaseId}`);
-      try {
-        await this.vectorDb.deleteCollection(`kb_${knowledgeBaseId}`);
-      } catch (e) {
-        this.logger.warn(`Failed to drop collection during model change: ${(e as Error).message}`);
+    if (data.embeddingModel || dimensionMismatch) {
+      if (dimensionMismatch) {
+        this.logger.warn(
+          `Collection ${collectionName} has vector size ${collectionSize}, but model ${effectiveModel} expects ${expectedDim}. Dropping and re-indexing KB ${knowledgeBaseId}.`,
+        );
+      } else {
+        this.logger.log(`Embedding model changed ${prevModel} -> ${effectiveModel}; re-indexing KB ${knowledgeBaseId}`);
       }
+
+      try {
+        await this.vectorDb.deleteCollection(collectionName);
+      } catch (e) {
+        this.logger.warn(`Failed to drop collection during re-index: ${(e as Error).message}`);
+      }
+
       const sources = await this.prisma.knowledgeBaseSource.findMany({
         where: { knowledgeBaseId },
       });
@@ -842,7 +879,7 @@ export class KnowledgeBaseService {
         orderBy: [{ sourceId: 'asc' }, { chunkIndex: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { source: { select: { id: true, title: true, sourceType: true, sourceUrl: true } } },
+        include: { source: { select: { id: true, sourceType: true, sourceUrl: true } } },
       }),
     ]);
 
@@ -903,7 +940,12 @@ export class KnowledgeBaseService {
    * Real retrieval test: embed the question with the KB's model, search Qdrant,
    * and generate a grounded answer using the KB's retrieval config.
    */
-  async retrieveTest(knowledgeBaseId: string, question: string, workspaceId: string) {
+  async retrieveTest(
+    knowledgeBaseId: string,
+    question: string,
+    workspaceId: string,
+    opts?: { answerProvider?: string; answerModel?: string },
+  ) {
     const kb = await this.findKnowledgeBaseById(knowledgeBaseId, workspaceId);
     const embeddingModel = (kb as any).embeddingModel || DEFAULT_EMBEDDING_MODEL;
     const retrievalConfig = { ...this.defaultSettings().retrievalConfig, ...((kb as any).retrievalConfig || {}) };
@@ -926,7 +968,7 @@ export class KnowledgeBaseService {
       fileName: r.payload?.fileName || null,
     }));
 
-    const answer = await this.generateGroundedAnswer(question, chunks, retrievalConfig);
+    const answer = await this.generateGroundedAnswer(question, chunks, retrievalConfig, opts);
     return { question, embeddingModel, topK: retrievalConfig.topK, chunks, answer };
   }
 
@@ -934,29 +976,65 @@ export class KnowledgeBaseService {
     question: string,
     chunks: { text: string }[],
     retrievalConfig: { systemPrompt?: string; temperature?: number; maxTokens?: number },
+    opts?: { answerProvider?: string; answerModel?: string },
   ): Promise<string> {
     if (!chunks.length) {
       return "I couldn't find anything relevant in this knowledge base to answer that.";
     }
-    if (!this.genAI) {
-      return 'Retrieved context is shown below, but no answer model (GEMINI_API_KEY) is configured.';
-    }
+
+    const context = chunks
+      .map((c, i) => `[Document ${i + 1}]\n${c.text}`)
+      .join('\n\n');
+    const systemPrompt =
+      retrievalConfig.systemPrompt ||
+      'You are a helpful assistant. Answer using only the provided context.';
+    const temperature = retrievalConfig.temperature ?? 0.7;
+    const maxTokens = retrievalConfig.maxTokens ?? 1024;
+    const provider = (opts?.answerProvider || '').toLowerCase();
+    const model = opts?.answerModel;
+
     try {
-      const context = chunks
-        .map((c, i) => `[Document ${i + 1}]\n${c.text}`)
-        .join('\n\n');
-      const systemPrompt =
-        retrievalConfig.systemPrompt ||
-        'You are a helpful assistant. Answer using only the provided context.';
-      const model = this.genAI.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+      if (provider === 'openrouter') {
+        if (!this.openrouter) {
+          return 'Retrieved context is shown below, but no answer model (OPENROUTER_API_KEY) is configured.';
+        }
+        const res = await this.openrouter.chat.completions.create({
+          model: model || 'openai/gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Context information:\n${context}\n\nQuestion: ${question}` },
+          ],
+          temperature,
+          max_tokens: maxTokens,
+        });
+        return res.choices[0]?.message?.content || 'No answer generated.';
+      }
+
+      if (provider === 'ollama') {
+        const res = await this.ollamaChat.chat.completions.create({
+          model: model || 'llama3.2',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Context information:\n${context}\n\nQuestion: ${question}` },
+          ],
+          temperature,
+          max_tokens: maxTokens,
+        });
+        return res.choices[0]?.message?.content || 'No answer generated.';
+      }
+
+      if (!this.genAI) {
+        return 'Retrieved context is shown below, but no answer model (GEMINI_API_KEY) is configured.';
+      }
+      const geminiModel = this.genAI.getGenerativeModel({
+        model: model || 'gemini-2.0-flash',
         systemInstruction: `${systemPrompt}\n\nContext information:\n${context}`,
         generationConfig: {
-          temperature: retrievalConfig.temperature ?? 0.7,
-          maxOutputTokens: retrievalConfig.maxTokens ?? 1024,
+          temperature,
+          maxOutputTokens: maxTokens,
         },
       });
-      const result = await model.generateContent(question);
+      const result = await geminiModel.generateContent(question);
       return result.response.text() || 'No answer generated.';
     } catch (e) {
       this.logger.error(`Error generating grounded answer: ${(e as Error).message}`);

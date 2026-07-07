@@ -45,30 +45,50 @@ let VectorDbService = VectorDbService_1 = class VectorDbService {
         }
     }
     async ensureCollection(name, vectorSize) {
+        const dimension = vectorSize;
+        if (!dimension) {
+            throw new Error(`Cannot ensure collection ${name}: vector size is required`);
+        }
         try {
-            const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
             this.logger.log(`Ensuring collection ${name} exists with vector size ${dimension}`);
-            await axios_1.default.get(`${this.qdrantUrl}/collections/${name}`);
-            this.logger.log(`Collection ${name} already exists`);
+            const existingSize = await this.getCollectionVectorSize(name);
+            if (existingSize !== null && existingSize !== dimension) {
+                this.logger.warn(`Collection ${name} has vector size ${existingSize}, expected ${dimension}. Dropping and recreating.`);
+                await this.deleteCollection(name);
+            }
+            else if (existingSize === dimension) {
+                this.logger.log(`Collection ${name} already exists with correct vector size ${dimension}`);
+                return;
+            }
+            await this.createCollection(name, {
+                vectors: {
+                    size: dimension,
+                    distance: 'Cosine',
+                },
+                optimizers_config: {
+                    default_segment_number: 2,
+                },
+                replication_factor: 1,
+            });
+        }
+        catch (error) {
+            this.logger.error(`Error ensuring collection ${name}: ${error.message}`);
+            throw error;
+        }
+    }
+    async getCollectionVectorSize(name) {
+        var _a, _b, _c, _d, _e;
+        try {
+            const response = await axios_1.default.get(`${this.qdrantUrl}/collections/${name}`);
+            const size = (_e = (_d = (_c = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.result) === null || _b === void 0 ? void 0 : _b.config) === null || _c === void 0 ? void 0 : _c.params) === null || _d === void 0 ? void 0 : _d.vectors) === null || _e === void 0 ? void 0 : _e.size;
+            return typeof size === 'number' ? size : null;
         }
         catch (error) {
             if (error.response && error.response.status === 404) {
-                const dimension = vectorSize || parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
-                await this.createCollection(name, {
-                    vectors: {
-                        size: dimension,
-                        distance: 'Cosine',
-                    },
-                    optimizers_config: {
-                        default_segment_number: 2,
-                    },
-                    replication_factor: 1,
-                });
+                return null;
             }
-            else {
-                this.logger.error(`Error checking collection ${name}: ${error.message}`);
-                throw error;
-            }
+            this.logger.warn(`Error reading collection ${name} size: ${error.message}`);
+            return null;
         }
     }
     async upsert(collection, data) {
@@ -76,8 +96,10 @@ let VectorDbService = VectorDbService_1 = class VectorDbService {
         try {
             await this.ensureCollection(collection, data.dimension);
             const expectedDimension = data.dimension ||
-                ((_b = (_a = data.points[0]) === null || _a === void 0 ? void 0 : _a.vector) === null || _b === void 0 ? void 0 : _b.length) ||
-                parseInt(this.configService.get('VECTOR_DIMENSION') || '768', 10);
+                ((_b = (_a = data.points[0]) === null || _a === void 0 ? void 0 : _a.vector) === null || _b === void 0 ? void 0 : _b.length);
+            if (!expectedDimension) {
+                throw new Error(`Cannot upsert to collection ${collection}: dimension is required`);
+            }
             const qdrantPoints = data.points.map(point => {
                 var _a, _b;
                 const pointId = typeof point.id === 'string' ?

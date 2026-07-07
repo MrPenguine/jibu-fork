@@ -514,7 +514,7 @@ export const agentApiClient = {
       const headers = await getAuthHeaders(workspaceId);
       
       const response = await fetch(`${API_BASE_URL}/v1/agents/${agentId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers,
         body: JSON.stringify(data),
       });

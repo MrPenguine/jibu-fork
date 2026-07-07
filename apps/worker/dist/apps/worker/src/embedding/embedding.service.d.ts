@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-export type EmbeddingProvider = 'gemini' | 'openai';
+export type EmbeddingProvider = 'gemini' | 'openai' | 'ollama';
 export interface EmbeddingModelSpec {
     provider: EmbeddingProvider;
     dimension: number;
@@ -16,9 +16,13 @@ export declare class EmbeddingService {
     private readonly logger;
     private readonly genAI;
     private readonly openai;
+    private readonly ollama;
+    private readonly ollamaHost;
     private readonly defaultModelName;
-    private readonly defaultDimension;
+    private readonly legacyFallbackDimension;
+    private workingOllamaHost;
     constructor(configService: ConfigService);
+    private resolveDefaultSpec;
     private resolve;
     getDimension(model?: string | null): number;
     private buildFallbackVector;
@@ -33,6 +37,8 @@ export declare class EmbeddingService {
     }): Promise<number[]>;
     private geminiEmbedDocuments;
     private openaiEmbed;
+    private ollamaEmbed;
+    private ollamaHttpEmbedFallback;
     embedText(text: string, opts?: {
         model?: string | null;
     }): Promise<number[]>;

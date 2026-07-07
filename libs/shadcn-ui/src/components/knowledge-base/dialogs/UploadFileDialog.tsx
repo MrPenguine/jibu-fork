@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../../ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "../../ui/dialog";
 import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { Input } from "../../ui/input";
 import { useDropzone, type FileRejection } from "react-dropzone";
 import { ChunkingStrategySelect, type ChunkingStrategyKey } from "../ChunkingStrategySelect";
+import { Upload, FolderPlus } from "lucide-react";
 
 export interface UploadFilePayload {
   files: File[];
@@ -85,29 +86,39 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>Import file</DialogTitle>
+      <DialogContent className="sm:max-w-[560px] rounded-2xl border-0 bg-white p-0 shadow-2xl overflow-hidden">
+        <DialogHeader className="bg-gradient-to-r from-primary to-emerald-600 px-6 py-5 text-white">
+          <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Import file
+          </DialogTitle>
+          <DialogDescription className="text-emerald-50">
+            Upload PDF, TXT, DOCX, CSV, or Markdown files to add to the knowledge base.
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-6 py-2">
+        <div className="grid gap-6 px-6 py-5">
           {/* File Dropzone */}
           <div className="grid gap-2">
-            <Label htmlFor="kb-files">File(s)</Label>
+            <Label htmlFor="kb-files" className="text-slate-700 font-medium">File(s)</Label>
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300'}`}>
+              className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-colors ${isDragActive ? 'border-primary bg-emerald-50' : 'border-slate-200 hover:border-primary/50 bg-slate-50/50'}`}>
               <input {...getInputProps()} />
-              <p className="text-slate-500">Drop file(s) here or</p>
-              <Button variant="outline" className="mt-2">Browse</Button>
+              <div className="flex flex-col items-center gap-2">
+                <div className="rounded-xl bg-emerald-50 p-3 text-primary">
+                  <Upload className="h-6 w-6" />
+                </div>
+                <p className="text-slate-600 font-medium">Drop file(s) here or click to browse</p>
+                <p className="text-xs text-slate-400">PDF, TXT, MD, CSV, DOCX — up to 10 MB</p>
+              </div>
             </div>
-            <p className="text-sm text-slate-500">Supported file types: pdf, txt, md, csv, docx - 10mb max.</p>
             {files.length > 0 && (
-              <div className="text-sm text-slate-600">
-                Selected: {files.map((f) => f.name).join(", ")}
+              <div className="text-sm text-slate-700 bg-emerald-50/50 rounded-xl p-3 border border-emerald-100">
+                Selected: <span className="font-medium">{files.map((f) => f.name).join(", ")}</span>
               </div>
             )}
             {rejected.length > 0 && (
-              <div className="text-sm text-red-600">
+              <div className="text-sm text-red-600 bg-red-50 rounded-xl p-3 border border-red-100">
                 Unsupported and skipped: {rejected.join(", ")}
               </div>
             )}
@@ -115,14 +126,14 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
 
           {/* LLM Chunking Strategy */}
           <div className="grid gap-2">
-            <Label htmlFor="kb-chunking-strategy">LLM chunking strategy</Label>
+            <Label htmlFor="kb-chunking-strategy" className="text-slate-700 font-medium">LLM chunking strategy</Label>
             <ChunkingStrategySelect value={chunking} onChange={setChunking} />
           </div>
 
           {/* Chunk size / overlap */}
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="kb-chunk-size">Chunk size (chars)</Label>
+              <Label htmlFor="kb-chunk-size" className="text-slate-700 font-medium">Chunk size (chars)</Label>
               <Input
                 id="kb-chunk-size"
                 type="number"
@@ -132,10 +143,11 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
                 value={chunkSize}
                 disabled={usesSmart}
                 onChange={(e) => setChunkSize(Number(e.target.value))}
+                className="rounded-xl border-slate-200 focus-visible:ring-primary"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="kb-chunk-overlap">Chunk overlap (chars)</Label>
+              <Label htmlFor="kb-chunk-overlap" className="text-slate-700 font-medium">Chunk overlap (chars)</Label>
               <Input
                 id="kb-chunk-overlap"
                 type="number"
@@ -145,6 +157,7 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
                 value={chunkOverlap}
                 disabled={usesSmart}
                 onChange={(e) => setChunkOverlap(Number(e.target.value))}
+                className="rounded-xl border-slate-200 focus-visible:ring-primary"
               />
             </div>
             {usesSmart && (
@@ -156,15 +169,15 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
 
           {/* Folder */}
           <div className="grid gap-2">
-            <Label htmlFor="kb-folder">Folder ({folders?.length || 0} available)</Label>
+            <Label htmlFor="kb-folder" className="text-slate-700 font-medium">Folder ({folders?.length || 0} available)</Label>
             <Select value={folderId} onValueChange={handleFolderChange}>
-              <SelectTrigger id="kb-folder">
+              <SelectTrigger id="kb-folder" className="rounded-xl border-slate-200">
                 <SelectValue placeholder="Select folder" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl">
                 {folders && folders.length > 0 ? (
                   folders.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    <SelectItem key={f.id} value={f.id} className="rounded-lg">{f.name}</SelectItem>
                   ))
                 ) : (
                   <div className="px-2 py-1.5 text-sm text-muted-foreground">No folders available</div>
@@ -173,16 +186,20 @@ export function UploadFileDialog({ open, onOpenChange, onImport, folders = [], o
             </Select>
             <button
               type="button"
-              className="self-start text-sm text-blue-600 hover:underline"
+              className="self-start text-sm text-primary hover:text-primary/80 font-medium flex items-center gap-1"
               onClick={() => onOpenCreateFolder?.()}
             >
+              <FolderPlus className="h-3.5 w-3.5" />
               Create folder
             </button>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleImport} disabled={files.length === 0}>Import</Button>
+        <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl border-slate-200">Cancel</Button>
+          <Button onClick={handleImport} disabled={files.length === 0} className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
+            <Upload className="h-4 w-4" />
+            Import
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

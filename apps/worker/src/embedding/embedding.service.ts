@@ -2,8 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
+import { Ollama } from 'ollama';
 
-export type EmbeddingProvider = 'gemini' | 'openai';
+export type EmbeddingProvider = 'gemini' | 'openai' | 'ollama';
 
 export interface EmbeddingModelSpec {
   provider: EmbeddingProvider;
@@ -22,9 +23,12 @@ export const EMBEDDING_MODELS: Record<string, EmbeddingModelSpec> = {
   'gemini-embedding-001': { provider: 'gemini', dimension: 768, maxChunkChars: 8000 },
   'text-embedding-3-small': { provider: 'openai', dimension: 1536, maxChunkChars: 32000 },
   'text-embedding-3-large': { provider: 'openai', dimension: 3072, maxChunkChars: 32000 },
+  'nomic-embed-text-v2-moe': { provider: 'ollama', dimension: 768, maxChunkChars: 32000 },
+  'qwen3-embedding': { provider: 'ollama', dimension: 1024, maxChunkChars: 32000 },
+  'qwen3-embedding:0.6b': { provider: 'ollama', dimension: 1024, maxChunkChars: 32000 },
 };
 
-export const DEFAULT_EMBEDDING_MODEL = 'gemini-embedding-001';
+export const DEFAULT_EMBEDDING_MODEL = 'qwen3-embedding:0.6b';
 
 export function resolveEmbeddingModel(model?: string | null): {
   model: string;
@@ -39,25 +43,31 @@ export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
   private readonly genAI: GoogleGenerativeAI | null;
   private readonly openai: OpenAI | null;
+  private readonly ollama: Ollama | null;
+  private readonly ollamaHost: string;
   private readonly defaultModelName: string;
-  private readonly defaultDimension: number;
+  private readonly legacyFallbackDimension: number;
+  private workingOllamaHost: string | null = null;
 
   constructor(private readonly configService: ConfigService) {
     this.logger.log('Initializing embedding service');
 
     const geminiApiKey = this.configService.get<string>('GEMINI_API_KEY');
     const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.ollamaHost = this.configService.get<string>('OLLAMA_URL') || this.configService.get<string>('OLLAMA_HOST') || 'http://localhost:11434';
 
-    // The env EMBEDDING_MODEL/VECTOR_DIMENSION remain the fallback default so
-    // existing KBs (which have no per-KB model stored) keep working unchanged.
+    // The default model name still comes from env for legacy KBs that have no
+    // per-KB model stored, but its dimension is taken from the model registry.
+    // VECTOR_DIMENSION is only used as a fallback for unknown/legacy models.
     this.defaultModelName = this.configService.get<string>('EMBEDDING_MODEL', DEFAULT_EMBEDDING_MODEL);
-    this.defaultDimension = parseInt(
+    this.legacyFallbackDimension = parseInt(
       this.configService.get<string>('VECTOR_DIMENSION', '768'),
       10,
     );
 
     this.genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
     this.openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
+    this.ollama = new Ollama({ host: this.ollamaHost });
 
     if (!this.genAI) {
       this.logger.error('GEMINI_API_KEY is not set. Gemini embeddings will not function.');
@@ -65,19 +75,28 @@ export class EmbeddingService {
     if (!this.openai) {
       this.logger.warn('OPENAI_API_KEY is not set. OpenAI embedding models are unavailable.');
     }
+    this.logger.log(`Ollama client configured at ${this.ollamaHost}`);
 
+    const defaultSpec = this.resolveDefaultSpec();
     this.logger.log(
-      `Embedding service ready. Default model: ${this.defaultModelName} (${this.defaultDimension}d)`,
+      `Embedding service ready. Default model: ${defaultSpec.model} (${defaultSpec.provider}, ${defaultSpec.dimension}d)`,
     );
+  }
+
+  private resolveDefaultSpec(): { model: string; provider: EmbeddingProvider; dimension: number } {
+    const spec = EMBEDDING_MODELS[this.defaultModelName];
+    if (spec) {
+      return { model: this.defaultModelName, provider: spec.provider, dimension: spec.dimension };
+    }
+    // Unknown legacy model: fall back to the env dimension so existing setups
+    // do not break until the model is added to the registry or migrated.
+    return { model: this.defaultModelName, provider: 'gemini', dimension: this.legacyFallbackDimension };
   }
 
   /** Resolve the effective model + dimension for a given (optional) model name. */
   private resolve(model?: string | null): { model: string; provider: EmbeddingProvider; dimension: number } {
     if (!model) {
-      const spec = EMBEDDING_MODELS[this.defaultModelName];
-      return spec
-        ? { model: this.defaultModelName, provider: spec.provider, dimension: this.defaultDimension }
-        : { model: this.defaultModelName, provider: 'gemini', dimension: this.defaultDimension };
+      return this.resolveDefaultSpec();
     }
     const { model: name, spec } = resolveEmbeddingModel(model);
     return { model: name, provider: spec.provider, dimension: spec.dimension };
@@ -129,18 +148,13 @@ export class EmbeddingService {
 
     try {
       let vectors: number[][];
+      const texts = validDocumentsToEmbed.map((d) => d.text);
       if (provider === 'openai') {
-        vectors = await this.openaiEmbed(
-          model,
-          validDocumentsToEmbed.map((d) => d.text),
-          dimension,
-        );
+        vectors = await this.openaiEmbed(model, texts, dimension);
+      } else if (provider === 'ollama') {
+        vectors = await this.ollamaEmbed(model, texts, dimension);
       } else {
-        vectors = await this.geminiEmbedDocuments(
-          model,
-          validDocumentsToEmbed.map((d) => d.text),
-          dimension,
-        );
+        vectors = await this.geminiEmbedDocuments(model, texts, dimension);
       }
 
       vectors.forEach((values, i) => {
@@ -182,6 +196,11 @@ export class EmbeddingService {
     try {
       if (provider === 'openai') {
         const vectors = await this.openaiEmbed(model, [queryText.trim()], dimension);
+        return vectors[0] && vectors[0].length === dimension ? vectors[0] : fallbackVector;
+      }
+
+      if (provider === 'ollama') {
+        const vectors = await this.ollamaEmbed(model, [queryText.trim()], dimension);
         return vectors[0] && vectors[0].length === dimension ? vectors[0] : fallbackVector;
       }
 
@@ -233,6 +252,63 @@ export class EmbeddingService {
       dimensions: dimension,
     });
     return response.data.map((d) => d.embedding as number[]);
+  }
+
+  private async ollamaEmbed(model: string, texts: string[], dimension: number): Promise<number[][]> {
+    if (!this.ollama) {
+      this.logger.error(`Ollama model ${model} requested but Ollama client is not configured — using fallback vectors`);
+      return texts.map(() => this.buildFallbackVector(dimension));
+    }
+
+    const candidates = [
+      this.workingOllamaHost,
+      this.ollamaHost,
+      'http://127.0.0.1:11434',
+      'http://127.0.0.1:11435',
+      'http://host.docker.internal:11434',
+      'http://ollama:11434',
+    ]
+      .filter(Boolean)
+      .map((u) => u!.replace(/\/$/, ''));
+    const uniqueCandidates = Array.from(new Set(candidates));
+
+    // 10 minute timeout: Ollama can take several minutes to load an embedding
+    // model into GPU/CPU memory on the first request.
+    const OLLAMA_EMBED_TIMEOUT_MS = 10 * 60 * 1000;
+
+    for (const baseUrl of uniqueCandidates) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), OLLAMA_EMBED_TIMEOUT_MS);
+        const res = await fetch(`${baseUrl}/api/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, input: texts }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (!res.ok) {
+          const errText = await res.text().catch(() => 'unknown');
+          this.logger.warn(`Ollama returned ${res.status} at ${baseUrl}: ${errText}`);
+          continue;
+        }
+        const data = (await res.json()) as { embeddings?: number[][] };
+        const embeddings = data.embeddings || [];
+        const valid = embeddings.filter((vector) => Array.isArray(vector) && vector.length === dimension);
+        if (valid.length !== texts.length) {
+          this.logger.warn(`Ollama dimension mismatch at ${baseUrl}: ${embeddings.map((v) => v?.length).join(', ')}`);
+          continue;
+        }
+        this.workingOllamaHost = baseUrl;
+        this.logger.log(`Ollama embedding succeeded for ${model} at ${baseUrl}`);
+        return valid;
+      } catch (err) {
+        this.logger.warn(`Ollama unreachable at ${baseUrl}: ${err.message}`);
+      }
+    }
+
+    this.logger.error(`Ollama embedding exhausted for ${model}. Tried: ${uniqueCandidates.join(', ')}`);
+    return texts.map(() => this.buildFallbackVector(dimension));
   }
 
   async embedText(text: string, opts?: { model?: string | null }): Promise<number[]> {

@@ -239,6 +239,7 @@ export interface WorkflowDefinition {
   status?: string;
   ui?: any;
   modelDefaults?: any;
+  hasDraft?: boolean;
 }
 
 // Agent session output interface

@@ -29,6 +29,7 @@ export declare class VectorDbService {
         replication_factor?: number;
     }): Promise<void>;
     ensureCollection(name: string, vectorSize?: number): Promise<void>;
+    getCollectionVectorSize(name: string): Promise<number | null>;
     upsert(collection: string, data: {
         points: VectorEntry[];
         wait?: boolean;

@@ -14,6 +14,7 @@ import {
   linkUrlsToKnowledgeBase,
   getKnowledgeBaseSettings,
   updateKnowledgeBaseSettings,
+  testEmbeddingModel,
   browseKnowledgeBaseChunks,
   getKnowledgeBaseChunk,
   updateKnowledgeBaseChunk,
@@ -34,24 +35,19 @@ import {
   type KnowledgeBaseSource,
   FolderCard,
   CreateFolderDialog,
-  UrlImportDialog,
   type UrlImportPayload,
-  SitemapImportDialog,
   type SitemapImportPayload,
-  UploadFileDialog,
   type UploadFilePayload,
-  PlainTextDialog,
   type PlainTextPayload,
   KnowledgeBasePreviewDialog,
   KnowledgeBaseSettingsDialog,
   ChunkBrowserDialog,
-  KnowledgeBaseTester,
-  ZendeskDialog,
-  KnowledgeApiDialog,
+  AddDataSourceDrawer,
 } from "@libs/shadcn-ui";
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton";
 import { Button } from "@libs/shadcn-ui/components/ui/button";
-import { FileText, Download, Trash2 } from "lucide-react";
+import { FileText, Download, Trash2, Loader2 } from "lucide-react";
+import { Progress } from "@libs/shadcn-ui/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,10 +74,6 @@ export default function AgentKnowledgeBasePage() {
   const [kbName, setKbName] = useState("Knowledge base");
   const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
   const [openCreateFolder, setOpenCreateFolder] = useState(false);
-  const [openUrl, setOpenUrl] = useState(false);
-  const [openSitemap, setOpenSitemap] = useState(false);
-  const [openUpload, setOpenUpload] = useState(false);
-  const [openPlainText, setOpenPlainText] = useState(false);
   const [openPreview, setOpenPreview] = useState(false);
   const [openKbSettings, setOpenKbSettings] = useState(false);
   const [kbSettings, setKbSettings] = useState<KnowledgeBaseSettings | null>(null);
@@ -93,10 +85,8 @@ export default function AgentKnowledgeBasePage() {
   const [chunkPage, setChunkPage] = useState(1);
   const [chunksLoading, setChunksLoading] = useState(false);
   const CHUNK_PAGE_SIZE = 20;
-  const [openZendesk, setOpenZendesk] = useState(false);
-  const [openKnowledgeApi, setOpenKnowledgeApi] = useState(false);
+  const [openAddDataSource, setOpenAddDataSource] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | undefined>(undefined);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [allSourcesExpanded, setAllSourcesExpanded] = useState(true);
 
@@ -242,9 +232,9 @@ export default function AgentKnowledgeBasePage() {
   };
 
   // ---- PR-5: real retrieval test ----
-  const handleAskRetrieval = async (question: string) => {
+  const handleAskRetrieval = async (question: string, opts: { answerProvider?: string; answerModel?: string }) => {
     if (!knowledgeBaseId) throw new Error("No knowledge base");
-    return retrieveTestKnowledgeBase(knowledgeBaseId, question);
+    return retrieveTestKnowledgeBase(knowledgeBaseId, question, undefined, opts);
   };
 
   // ---- PR-3: URL ingestion ----
@@ -265,7 +255,6 @@ export default function AgentKnowledgeBasePage() {
         chunkConfig: strategies.length > 0 ? { strategies } : undefined,
       });
       toast({ title: "Importing", description: `Fetching ${payload.urls.length} URL(s)…` });
-      setOpenUrl(false);
       await loadSources(knowledgeBaseId);
     } catch (e: any) {
       toast({ title: "Error", description: e?.message || "Failed to import URLs", variant: "destructive" });
@@ -277,6 +266,20 @@ export default function AgentKnowledgeBasePage() {
     const q = search.toLowerCase();
     return sources.filter((s) => s.name.toLowerCase().includes(q) || s.type.toLowerCase().includes(q));
   }, [sources, search]);
+
+  const processingCount = useMemo(
+    () => sources.filter((s) => s.indexingStatus === 'PENDING' || s.indexingStatus === 'PROCESSING').length,
+    [sources],
+  );
+
+  // Poll source statuses while anything is being indexed so the progress bars update.
+  useEffect(() => {
+    if (!knowledgeBaseId || processingCount === 0) return;
+    const timer = setInterval(() => {
+      loadSources(knowledgeBaseId);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [knowledgeBaseId, processingCount]);
 
   const loadFolders = async (kbId: string) => {
     try {
@@ -473,8 +476,6 @@ export default function AgentKnowledgeBasePage() {
           variant: "destructive",
         });
       }
-
-      setOpenUpload(false);
     } catch (error) {
       console.error('[handleUploadFiles] Upload error:', error);
       toast({
@@ -531,7 +532,6 @@ export default function AgentKnowledgeBasePage() {
         description: "Text imported and queued for indexing",
       });
       await loadSources(knowledgeBaseId);
-      setOpenPlainText(false);
     } catch (error: any) {
       console.error("[handlePlainTextImport] Error importing text:", error);
       toast({
@@ -607,12 +607,6 @@ export default function AgentKnowledgeBasePage() {
 
   const openCreateFolderDialog = () => setOpenCreateFolder(true);
 
-  const handleAddSourceToFolder = (folderId: string) => {
-    console.log('[handleAddSourceToFolder] Opening upload dialog for folder:', folderId);
-    setSelectedFolderId(folderId);
-    setOpenUpload(true);
-  };
-
   const handleToggleFolderExpand = (folderId: string, expanded: boolean) => {
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
@@ -631,6 +625,12 @@ export default function AgentKnowledgeBasePage() {
 
   const getFilesForFolder = (folderId: string) => {
     return sources.filter(s => s.folder?.id === folderId);
+  };
+
+  const getProcessingCountForFolder = (folderId: string): number => {
+    return sources.filter(
+      s => s.folder?.id === folderId && (s.indexingStatus === 'PENDING' || s.indexingStatus === 'PROCESSING')
+    ).length;
   };
 
   const handleToggleAllSources = () => {
@@ -662,14 +662,10 @@ export default function AgentKnowledgeBasePage() {
         onSearchChange={setSearch}
         preview={preview}
         onTogglePreview={handleTogglePreview}
-        onPickUrls={() => setOpenUrl(true)}
-        onPickSitemap={() => setOpenSitemap(true)}
-        onPickUpload={() => setOpenUpload(true)}
-        onPickPlainText={() => setOpenPlainText(true)}
         onOpenSettings={handleOpenKbSettings}
         onOpenChunks={handleOpenChunks}
-        onPickZendesk={() => setOpenZendesk(true)}
-        onOpenKnowledgeApi={() => setOpenKnowledgeApi(true)}
+        onOpenAddDataSource={() => setOpenAddDataSource(true)}
+        processingCount={processingCount}
       />
 
       <div className="px-6 pb-6 space-y-6">
@@ -696,8 +692,8 @@ export default function AgentKnowledgeBasePage() {
                     id={folder.id}
                     name={folder.name}
                     fileCount={getFileCountForFolder(folder.id)}
+                    processingCount={getProcessingCountForFolder(folder.id)}
                     onDelete={handleDeleteFolder}
-                    onAddSource={handleAddSourceToFolder}
                     onToggleExpand={handleToggleFolderExpand}
                     isExpanded={isExpanded}
                   >
@@ -705,80 +701,101 @@ export default function AgentKnowledgeBasePage() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b bg-muted/50">
-                              <th className="text-left p-3 font-semibold">File Name</th>
-                              <th className="text-left p-3 font-semibold">Type</th>
-                              <th className="text-left p-3 font-semibold">File Size</th>
-                              <th className="text-left p-3 font-semibold">Date Uploaded</th>
-                              <th className="text-right p-3 font-semibold">Actions</th>
+                            <tr className="border-b border-slate-100 bg-slate-50/40">
+                              <th className="text-left p-3 font-semibold text-slate-700">File Name</th>
+                              <th className="text-left p-3 font-semibold text-slate-700">Type</th>
+                              <th className="text-left p-3 font-semibold text-slate-700">File Size</th>
+                              <th className="text-left p-3 font-semibold text-slate-700">Status</th>
+                              <th className="text-right p-3 font-semibold text-slate-700">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {folderFiles.map((source) => (
-                              <tr key={source.id} className="border-b hover:bg-muted/30 transition-colors">
-                                <td className="p-3">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4 text-slate-500 flex-shrink-0" />
-                                    <span className="font-medium truncate">{source.name}</span>
-                                  </div>
-                                </td>
-                                <td className="p-3 text-slate-600">{source.type || 'N/A'}</td>
-                                <td className="p-3 text-slate-600">
-                                  {source.sizeBytes ? (() => {
-                                    const bytes = source.sizeBytes;
-                                    const k = 1024;
-                                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                                    const i = Math.floor(Math.log(bytes) / Math.log(k));
-                                    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-                                  })() : 'N/A'}
-                                </td>
-                                <td className="p-3 text-slate-600">
-                                  {source.createdAt ? new Date(source.createdAt).toLocaleDateString() : 'N/A'}
-                                </td>
-                                <td className="p-3">
-                                  <div className="flex gap-2 justify-end">
-                                    {source.fileId && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8"
-                                        onClick={() => handleDownloadFile(source.fileId!, source.name)}
-                                      >
-                                        <Download className="h-3 w-3 mr-1" />
-                                        Download
-                                      </Button>
-                                    )}
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
-                                          <Trash2 className="h-3 w-3 mr-1" />
-                                          Delete
+                            {folderFiles.map((source) => {
+                              const status = source.indexingStatus || 'PENDING';
+                              const isProcessing = status === 'PENDING' || status === 'PROCESSING';
+                              return (
+                                <tr key={source.id} className="border-b border-slate-100 hover:bg-white transition-colors">
+                                  <td className="p-3">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                                      <span className="font-medium text-slate-800 truncate">{source.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-3 text-slate-600">{source.type || 'N/A'}</td>
+                                  <td className="p-3 text-slate-600">
+                                    {source.sizeBytes ? (() => {
+                                      const bytes = source.sizeBytes;
+                                      const k = 1024;
+                                      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                                      const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                      return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+                                    })() : 'N/A'}
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="space-y-1.5 min-w-[120px]">
+                                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                                        status === 'COMPLETED' || status === 'INDEXED'
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                          : isProcessing
+                                          ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                          : status === 'FAILED'
+                                          ? 'bg-red-50 text-red-700 border-red-100'
+                                          : 'bg-amber-50 text-amber-700 border-amber-100'
+                                      }`}>
+                                        {isProcessing && <Loader2 className="h-3 w-3 animate-spin" />}
+                                        {status === 'COMPLETED' || status === 'INDEXED' ? 'Ready' : status}
+                                      </span>
+                                      {isProcessing && (
+                                        <Progress value={55} className="h-1.5 rounded-full bg-slate-100" />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="flex gap-2 justify-end">
+                                      {source.fileId && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 rounded-lg border-slate-200"
+                                          onClick={() => handleDownloadFile(source.fileId!, source.name)}
+                                          disabled={isProcessing}
+                                        >
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Download
                                         </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Delete source?</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Are you sure you want to delete "{source.name}"? This action cannot be undone.
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleDeleteSource(source.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                      )}
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button variant="outline" size="sm" className="h-8 rounded-lg border-slate-200 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                            <Trash2 className="h-3 w-3 mr-1" />
                                             Delete
-                                          </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle className="text-slate-800">Delete source?</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-slate-500">
+                                              Are you sure you want to delete "{source.name}"? This action cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel className="rounded-xl border-slate-200">Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteSource(source.id)} className="rounded-xl bg-red-600 text-white hover:bg-red-700">
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
+                      <p className="text-sm text-slate-500 text-center py-4">
                         No files in this folder yet
                       </p>
                     )}
@@ -793,12 +810,7 @@ export default function AgentKnowledgeBasePage() {
         {filtered.length === 0 ? (
           <KnowledgeBaseEmptyState
             onCreateFolder={openCreateFolderDialog}
-            onPickUrls={() => setOpenUrl(true)}
-            onPickSitemap={() => setOpenSitemap(true)}
-            onPickUpload={() => setOpenUpload(true)}
-            onPickPlainText={() => setOpenPlainText(true)}
-            onPickZendesk={() => setOpenZendesk(true)}
-            onOpenKnowledgeApi={() => setOpenKnowledgeApi(true)}
+            onAddDataSource={() => setOpenAddDataSource(true)}
           />
         ) : (
           <KnowledgeBaseList 
@@ -813,30 +825,23 @@ export default function AgentKnowledgeBasePage() {
       </div>
 
       {/* Dialogs */}
-      <CreateFolderDialog open={openCreateFolder} onOpenChange={setOpenCreateFolder} onCreate={handleCreateFolder} />
-      <UrlImportDialog open={openUrl} onOpenChange={setOpenUrl} onImport={handleImportUrls} />
-      <SitemapImportDialog open={openSitemap} onOpenChange={setOpenSitemap} onImport={(payload: SitemapImportPayload) => {
-        console.log('Sitemap import:', payload, 'agent', agentId);
-        setOpenSitemap(false);
-      }} />
-      <UploadFileDialog
-        open={openUpload}
-        onOpenChange={(open) => {
-          setOpenUpload(open);
-          if (!open) {
-            // Clear selected folder when dialog closes
-            setSelectedFolderId(undefined);
-          }
-        }}
+      <AddDataSourceDrawer
+        open={openAddDataSource}
+        onOpenChange={setOpenAddDataSource}
         folders={folders}
-        preselectedFolderId={selectedFolderId}
-        onOpenCreateFolder={() => {
-          console.log('[UploadFileDialog] Opening create folder dialog, current folders:', folders);
-          setOpenCreateFolder(true);
+        onUploadFiles={handleUploadFiles}
+        onImportUrls={handleImportUrls}
+        onImportSitemap={(payload: SitemapImportPayload) => {
+          console.log('Sitemap import:', payload, 'agent', agentId);
         }}
-        onImport={handleUploadFiles}
+        onImportPlainText={handlePlainTextImport}
+        onOpenCreateFolder={openCreateFolderDialog}
+        onConnectZendesk={() => {
+          toast({ title: "Zendesk", description: "Zendesk integration setup is coming soon." });
+        }}
       />
-      <PlainTextDialog open={openPlainText} onOpenChange={setOpenPlainText} onImport={handlePlainTextImport} />
+
+      <CreateFolderDialog open={openCreateFolder} onOpenChange={setOpenCreateFolder} onCreate={handleCreateFolder} />
 
       {/* Real retrieval test */}
       <KnowledgeBasePreviewDialog
@@ -854,6 +859,7 @@ export default function AgentKnowledgeBasePage() {
         loading={settingsLoading}
         saving={settingsSaving}
         onSave={handleSaveKbSettings}
+        onTestModel={testEmbeddingModel}
       />
 
       {/* Chunk browser */}
@@ -871,9 +877,6 @@ export default function AgentKnowledgeBasePage() {
         onDelete={handleDeleteChunk}
       />
 
-      {/* Integrations & API (UI only) */}
-      <ZendeskDialog open={openZendesk} onOpenChange={setOpenZendesk} />
-      <KnowledgeApiDialog open={openKnowledgeApi} onOpenChange={setOpenKnowledgeApi} />
     </div>
   );
 }

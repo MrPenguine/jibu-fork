@@ -12,11 +12,14 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-export const EMBEDDING_PROVIDERS = ['gemini', 'openai'] as const;
+export const EMBEDDING_PROVIDERS = ['gemini', 'openai', 'ollama'] as const;
 export const EMBEDDING_MODELS = [
   'gemini-embedding-001',
   'text-embedding-3-small',
   'text-embedding-3-large',
+  'nomic-embed-text-v2-moe',
+  'qwen3-embedding',
+  'qwen3-embedding:0.6b',
 ] as const;
 
 export class RetrievalConfigDto {

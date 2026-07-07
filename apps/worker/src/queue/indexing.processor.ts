@@ -166,6 +166,37 @@ export class IndexingProcessor {
 
       // 5. Create vector collection sized for this KB's embedding dimension
       const collectionName = `kb_${source.knowledgeBaseId}`;
+      
+      // If the collection was created with an old/wrong dimension (e.g., from a
+      // previous VECTOR_DIMENSION env value), drop it and re-index every source
+      // so the new model dimension is used consistently.
+      const existingSize = await this.vectorDbService.getCollectionVectorSize(collectionName);
+      if (existingSize !== null && existingSize !== embeddingDimension) {
+        this.logger.warn(
+          `Collection ${collectionName} has vector size ${existingSize}, expected ${embeddingDimension} for model ${embeddingModel || 'default'}. Re-indexing all sources for KB ${source.knowledgeBaseId}.`,
+        );
+        await (this.prisma as any).chunkMetadata.deleteMany({
+          where: { knowledgeBaseId: source.knowledgeBaseId },
+        });
+        const otherSources = await this.prisma.knowledgeBaseSource.findMany({
+          where: { knowledgeBaseId: source.knowledgeBaseId, id: { not: source.id } },
+        });
+        for (const s of otherSources) {
+          if (s.indexingStatus === 'PROCESSING' || s.indexingStatus === 'PENDING') {
+            continue;
+          }
+          await this.prisma.knowledgeBaseSource.update({
+            where: { id: s.id },
+            data: { indexingStatus: 'PENDING', hasIndexedContent: false },
+          });
+          await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+            knowledgeBaseSourceId: s.id,
+            workspaceId: s.workspaceId,
+            chunkConfig: (s as any).chunkConfig || undefined,
+          });
+        }
+      }
+      
       await this.vectorDbService.ensureCollection(collectionName, embeddingDimension);
 
       // Idempotency: on a re-index/refresh, purge this source's existing vectors
