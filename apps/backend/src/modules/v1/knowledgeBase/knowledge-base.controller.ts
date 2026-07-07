@@ -864,7 +864,7 @@ export class KnowledgeBaseController {
         const embedRes = await fetch(`${baseUrl}/api/embed`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, input: 'hello' }),
+          body: JSON.stringify({ model, input: 'hello', keep_alive: -1 }),
         });
         if (!embedRes.ok) {
           const errText = await embedRes.text().catch(() => 'unknown');

@@ -283,7 +283,10 @@ export class EmbeddingService {
         const res = await fetch(`${baseUrl}/api/embed`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, input: texts }),
+          // keep_alive: -1 keeps the model resident in memory instead of
+          // unloading after the default idle window, which avoids long reload
+          // delays on subsequent queries.
+          body: JSON.stringify({ model, input: texts, keep_alive: -1 }),
           signal: controller.signal,
         });
         clearTimeout(timeout);
