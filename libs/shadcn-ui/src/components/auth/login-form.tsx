@@ -55,6 +55,12 @@ export function LoginForm({
 
   const isLoading = isPending || isLoggingIn
 
+  const navigateAfterAuth = () => {
+    setIsLoggingIn(true)
+    router.push("/")
+    router.refresh()
+  }
+
   const handleGoogleSignIn = () => {
     startTransition(async () => {
       try {
@@ -130,24 +136,18 @@ export function LoginForm({
           }
           
           if (mode === "signup") {
-            setError("Check your email for the confirmation link")
+            if (data.hasSession) {
+              navigateAfterAuth()
+            } else {
+              setError(data.message || "Check your email for the confirmation link")
+            }
             return
           }
         }
-        
+
         // If login is successful, let middleware and server decide where to go
         if (mode === "login") {
-          setIsLoggingIn(true)
-          try {
-            // Send the user to the root; middleware will use get-user-context
-            // to decide between /admin and the appropriate workspace route.
-            router.push("/")
-          } catch (e) {
-            console.error("Post-login redirect failed:", e)
-            router.push("/workspaces")
-          } finally {
-            router.refresh()
-          }
+          navigateAfterAuth()
         }
       } catch (err) {
         setError("An unexpected error occurred")

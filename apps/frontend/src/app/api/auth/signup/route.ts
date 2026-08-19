@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -33,7 +33,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Check your email for the confirmation link' 
+      hasSession: Boolean(data.session),
+      message: data.session
+        ? 'Account created successfully'
+        : 'Check your email for the confirmation link',
     })
   } catch (error) {
     console.error('Signup error:', error)

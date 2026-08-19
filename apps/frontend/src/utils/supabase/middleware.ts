@@ -1,6 +1,29 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function redirectWithSession(
+  request: NextRequest,
+  response: NextResponse,
+  destination: string | URL,
+) {
+  const redirectUrl = typeof destination === 'string'
+    ? request.nextUrl.clone()
+    : new URL(destination.toString())
+  if (typeof destination === 'string') {
+    redirectUrl.pathname = destination
+  }
+  const redirectResponse = NextResponse.redirect(redirectUrl)
+  response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie))
+  return redirectResponse
+}
+
+function workspaceResolutionError(request: NextRequest) {
+  const redirectUrl = request.nextUrl.clone()
+  redirectUrl.pathname = '/login/error'
+  redirectUrl.search = '?reason=workspace-resolution'
+  return redirectUrl
+}
+
 export async function updateSession(request: NextRequest) {
   // Skip middleware for callback routes to prevent redirect loops
   // This ensures the OAuth callback can complete without interruption
@@ -64,12 +87,32 @@ export async function updateSession(request: NextRequest) {
           false
         )
         if (!isPlatformAdmin) {
-          const redirectUrl = request.nextUrl.clone()
-          redirectUrl.pathname = '/workspaces'
-          return NextResponse.redirect(redirectUrl)
+          const workspaceId = data?.workspaceId || data?.workspace?.id
+          if (workspaceId) {
+            return redirectWithSession(request, supabaseResponse, `/workspace/${workspaceId}`)
+          }
+
+          return redirectWithSession(
+            request,
+            supabaseResponse,
+            workspaceResolutionError(request),
+          )
         }
+      } else {
+        return redirectWithSession(
+          request,
+          supabaseResponse,
+          workspaceResolutionError(request),
+        )
       }
-    } catch (_) {}
+    } catch (error) {
+      console.error('Error resolving admin workspace context:', error)
+      return redirectWithSession(
+        request,
+        supabaseResponse,
+        workspaceResolutionError(request),
+      )
+    }
   }
 
   // Legacy redirects for removed /auth routes
@@ -114,7 +157,6 @@ export async function updateSession(request: NextRequest) {
     user &&
     (path === '/' || path === '/login' || path === '/signup')
   ) {
-    const redirectUrl = request.nextUrl.clone()
     try {
       const apiUrl = new URL('/api/auth/get-user-context', request.nextUrl)
       const wsResp = await fetch(apiUrl.toString(), {
@@ -131,8 +173,7 @@ export async function updateSession(request: NextRequest) {
           false
         )
         if (isPlatformAdmin) {
-          redirectUrl.pathname = '/admin'
-          return NextResponse.redirect(redirectUrl)
+          return redirectWithSession(request, supabaseResponse, '/admin')
         }
         // Be flexible with response shapes
         const workspaceId =
@@ -141,16 +182,29 @@ export async function updateSession(request: NextRequest) {
           data?.lastWorkspace?.id ||
           data?.workspaceId
         if (workspaceId) {
-          redirectUrl.pathname = `/workspace/${workspaceId}`
-          return NextResponse.redirect(redirectUrl)
+          return redirectWithSession(request, supabaseResponse, `/workspace/${workspaceId}`)
         }
+      } else {
+        return redirectWithSession(
+          request,
+          supabaseResponse,
+          workspaceResolutionError(request),
+        )
       }
-    } catch (_) {
-      // ignore and fallback below
+    } catch (error) {
+      console.error('Error resolving post-auth workspace:', error)
+      return redirectWithSession(
+        request,
+        supabaseResponse,
+        workspaceResolutionError(request),
+      )
     }
-    // Standard fallback if we can't resolve a workspace
-    redirectUrl.pathname = '/workspaces'
-    return NextResponse.redirect(redirectUrl)
+
+    return redirectWithSession(
+      request,
+      supabaseResponse,
+      workspaceResolutionError(request),
+    )
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
