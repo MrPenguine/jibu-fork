@@ -3,6 +3,9 @@ import { createClient } from '../../../../utils/supabase/server';
 import { API_BASE_URL } from '../../../../utils/api';
 
 const DEFAULT_WORKSPACE_NAME = 'My Workspace';
+const PROVISIONING_RETRY_MESSAGE =
+  'User provisioning in progress. Please retry shortly.';
+const PROVISIONING_RETRY_DELAYS_MS = [200, 400, 800, 1200];
 
 interface WorkspaceResponse {
   id?: string;
@@ -40,6 +43,7 @@ class WorkspaceResolutionError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly provisioningInProgress = false,
   ) {
     super(message);
     this.name = 'WorkspaceResolutionError';
@@ -57,10 +61,43 @@ const workspaceResolutionInFlight = new Map<
   Promise<WorkspaceResolution>
 >();
 
-function throwBackendFailure(label: string, response: Response): never {
+function getResponseMessage(data: unknown): string | undefined {
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  if (!data || typeof data !== 'object') {
+    return undefined;
+  }
+
+  const message = (data as { message?: unknown }).message;
+  if (typeof message === 'string') {
+    return message;
+  }
+
+  if (Array.isArray(message) && message.every((item) => typeof item === 'string')) {
+    return message.join(' ');
+  }
+
+  return undefined;
+}
+
+async function throwBackendFailure(
+  label: string,
+  response: Response,
+): Promise<never> {
+  let responseMessage: string | undefined;
+  try {
+    responseMessage = getResponseMessage(await response.clone().json());
+  } catch {
+    responseMessage = undefined;
+  }
+
   throw new WorkspaceResolutionError(
     `${label} failed: ${response.status} ${response.statusText}`,
     response.status >= 400 ? response.status : 502,
+    response.status === 401 &&
+      responseMessage?.includes(PROVISIONING_RETRY_MESSAGE) === true,
   );
 }
 
@@ -82,7 +119,7 @@ async function fetchWorkspaceList(
   }
 
   if (!response.ok) {
-    throwBackendFailure('Workspace list lookup', response);
+    await throwBackendFailure('Workspace list lookup', response);
   }
 
   const data = await parseResponse<WorkspaceResponse | WorkspaceResponse[]>(
@@ -100,7 +137,7 @@ async function fetchWorkspaceList(
   return workspaces;
 }
 
-async function resolveWorkspaceContext(
+async function resolveWorkspaceContextOnce(
   accessToken: string,
 ): Promise<WorkspaceResolution> {
   const authHeaders = {
@@ -131,7 +168,7 @@ async function resolveWorkspaceContext(
       undefined;
     workspaceId = getWorkspaceId(resolvedWorkspace);
   } else if (lastWorkspaceResponse.status !== 404) {
-    throwBackendFailure('Last workspace lookup', lastWorkspaceResponse);
+    await throwBackendFailure('Last workspace lookup', lastWorkspaceResponse);
   }
 
   if (!workspaceId) {
@@ -164,7 +201,7 @@ async function resolveWorkspaceContext(
         }
 
         if (!createWorkspaceResponse.ok) {
-          throwBackendFailure(
+          await throwBackendFailure(
             'Default workspace creation',
             createWorkspaceResponse,
           );
@@ -207,7 +244,7 @@ async function resolveWorkspaceContext(
   }
 
   if (!contextResponse.ok) {
-    throwBackendFailure('User context lookup', contextResponse);
+    await throwBackendFailure('User context lookup', contextResponse);
   }
 
   const contextData = await parseResponse<WorkspaceResponse>(contextResponse);
@@ -216,6 +253,31 @@ async function resolveWorkspaceContext(
     resolvedWorkspace,
     workspaceId,
   };
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function resolveWorkspaceContext(
+  accessToken: string,
+): Promise<WorkspaceResolution> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await resolveWorkspaceContextOnce(accessToken);
+    } catch (error) {
+      const retryDelay = PROVISIONING_RETRY_DELAYS_MS[attempt];
+      if (
+        !(error instanceof WorkspaceResolutionError) ||
+        !error.provisioningInProgress ||
+        retryDelay === undefined
+      ) {
+        throw error;
+      }
+
+      await wait(retryDelay);
+    }
+  }
 }
 
 function getWorkspaceResolution(
