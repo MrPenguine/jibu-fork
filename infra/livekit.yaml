@@ -8,7 +8,7 @@ rtc:
 redis:
   address: redis:6379
 keys:
-  jibuapikey: jibuapisecret
+  jibuapikey: jibuapisecret_dev_secret_key_32ch
 
 # Prometheus metrics configuration
 prometheus:
