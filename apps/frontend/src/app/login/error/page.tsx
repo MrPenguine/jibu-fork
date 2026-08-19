@@ -1,14 +1,19 @@
-'use client'
-
 import { Button } from "@libs/shadcn-ui/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@libs/shadcn-ui/components/ui/card"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
 
-export default function LoginErrorPage() {
-  const searchParams = useSearchParams()
+interface LoginErrorPageProps {
+  searchParams: Promise<{
+    reason?: string | string[]
+  }>
+}
+
+export default async function LoginErrorPage({
+  searchParams,
+}: LoginErrorPageProps) {
+  const { reason } = await searchParams
   const isWorkspaceResolutionError =
-    searchParams.get("reason") === "workspace-resolution"
+    reason === "workspace-resolution"
 
   return (
     <div className="flex min-h-svh items-center justify-center p-4">
