@@ -28,10 +28,6 @@ function getWorkspaceId(data: WorkspaceResponse | null | undefined): string | un
   );
 }
 
-function getBackendErrorMessage(label: string, response: Response): string {
-  return `${label} failed: ${response.status} ${response.statusText}`;
-}
-
 async function parseResponse<T = unknown>(response: Response): Promise<T | null> {
   try {
     return await response.json();
@@ -40,91 +36,114 @@ async function parseResponse<T = unknown>(response: Response): Promise<T | null>
   }
 }
 
-async function backendFailure(
-  label: string,
-  response: Response,
-): Promise<NextResponse> {
-  return NextResponse.json(
-    { error: getBackendErrorMessage(label, response) },
-    { status: response.status >= 400 ? response.status : 502 },
+class WorkspaceResolutionError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'WorkspaceResolutionError';
+  }
+}
+
+interface WorkspaceResolution {
+  contextData: WorkspaceResponse | null;
+  resolvedWorkspace?: WorkspaceResponse;
+  workspaceId: string;
+}
+
+const workspaceResolutionInFlight = new Map<
+  string,
+  Promise<WorkspaceResolution>
+>();
+
+function throwBackendFailure(label: string, response: Response): never {
+  throw new WorkspaceResolutionError(
+    `${label} failed: ${response.status} ${response.statusText}`,
+    response.status >= 400 ? response.status : 502,
   );
 }
 
-export async function GET() {
+async function fetchWorkspaceList(
+  authHeaders: Record<string, string>,
+): Promise<WorkspaceResponse[]> {
+  let response: Response;
   try {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    response = await fetch(`${API_BASE_URL}/workspaces`, {
+      method: 'GET',
+      headers: authHeaders,
+    });
+  } catch (error) {
+    console.error('Error resolving workspaces:', error);
+    throw new WorkspaceResolutionError(
+      'Unable to resolve your workspaces',
+      502,
+    );
+  }
 
-    if (!session?.access_token) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
+  if (!response.ok) {
+    throwBackendFailure('Workspace list lookup', response);
+  }
 
-    const authHeaders = {
-      Authorization: `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    };
+  const data = await parseResponse<WorkspaceResponse | WorkspaceResponse[]>(
+    response,
+  );
+  const workspaces = Array.isArray(data) ? data : data?.workspaces;
+  if (!Array.isArray(workspaces)) {
+    console.error('Workspace list response was not an array');
+    throw new WorkspaceResolutionError(
+      'Unable to resolve your workspaces',
+      502,
+    );
+  }
 
-    let workspaceId: string | undefined;
-    let resolvedWorkspace: WorkspaceResponse | undefined;
+  return workspaces;
+}
 
-    let lastWorkspaceResponse: Response;
-    try {
-      lastWorkspaceResponse = await fetch(`${API_BASE_URL}/users/last-workspace`, {
-        method: 'GET',
-        headers: authHeaders,
-      });
-    } catch (error) {
-      console.error('Error resolving last workspace:', error);
-      return NextResponse.json(
-        { error: 'Unable to resolve your workspace' },
-        { status: 502 },
-      );
-    }
+async function resolveWorkspaceContext(
+  accessToken: string,
+): Promise<WorkspaceResolution> {
+  const authHeaders = {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+  };
 
-    if (lastWorkspaceResponse.ok) {
-      resolvedWorkspace = await parseResponse<WorkspaceResponse>(lastWorkspaceResponse) || undefined;
+  let workspaceId: string | undefined;
+  let resolvedWorkspace: WorkspaceResponse | undefined;
+
+  let lastWorkspaceResponse: Response;
+  try {
+    lastWorkspaceResponse = await fetch(`${API_BASE_URL}/users/last-workspace`, {
+      method: 'GET',
+      headers: authHeaders,
+    });
+  } catch (error) {
+    console.error('Error resolving last workspace:', error);
+    throw new WorkspaceResolutionError(
+      'Unable to resolve your workspace',
+      502,
+    );
+  }
+
+  if (lastWorkspaceResponse.ok) {
+    resolvedWorkspace =
+      (await parseResponse<WorkspaceResponse>(lastWorkspaceResponse)) ||
+      undefined;
+    workspaceId = getWorkspaceId(resolvedWorkspace);
+  } else if (lastWorkspaceResponse.status !== 404) {
+    throwBackendFailure('Last workspace lookup', lastWorkspaceResponse);
+  }
+
+  if (!workspaceId) {
+    let workspaces = await fetchWorkspaceList(authHeaders);
+
+    if (workspaces.length > 0) {
+      resolvedWorkspace = workspaces[0];
       workspaceId = getWorkspaceId(resolvedWorkspace);
-    } else if (lastWorkspaceResponse.status !== 404) {
-      return backendFailure('Last workspace lookup', lastWorkspaceResponse);
-    }
-
-    if (!workspaceId) {
-      let workspacesResponse: Response;
-      try {
-        workspacesResponse = await fetch(`${API_BASE_URL}/workspaces`, {
-          method: 'GET',
-          headers: authHeaders,
-        });
-      } catch (error) {
-        console.error('Error resolving workspaces:', error);
-        return NextResponse.json(
-          { error: 'Unable to resolve your workspaces' },
-          { status: 502 },
-        );
-      }
-
-      if (!workspacesResponse.ok) {
-        return backendFailure('Workspace list lookup', workspacesResponse);
-      }
-
-      const workspacesData = await parseResponse<WorkspaceResponse | WorkspaceResponse[]>(
-        workspacesResponse,
-      );
-      const workspaces = Array.isArray(workspacesData)
-        ? workspacesData
-        : workspacesData?.workspaces;
-
-      if (!Array.isArray(workspaces)) {
-        console.error('Workspace list response was not an array');
-        return NextResponse.json(
-          { error: 'Unable to resolve your workspaces' },
-          { status: 502 },
-        );
-      }
-
+    } else {
+      // Re-check immediately before creating so a workspace provisioned by a
+      // racing request is reused instead of creating another one.
+      workspaces = await fetchWorkspaceList(authHeaders);
       if (workspaces.length > 0) {
         resolvedWorkspace = workspaces[0];
         workspaceId = getWorkspaceId(resolvedWorkspace);
@@ -138,64 +157,123 @@ export async function GET() {
           });
         } catch (error) {
           console.error('Error creating default workspace:', error);
-          return NextResponse.json(
-            { error: 'Unable to create your default workspace' },
-            { status: 502 },
+          throw new WorkspaceResolutionError(
+            'Unable to create your default workspace',
+            502,
           );
         }
 
         if (!createWorkspaceResponse.ok) {
-          return backendFailure(
+          throwBackendFailure(
             'Default workspace creation',
             createWorkspaceResponse,
           );
         }
 
-        resolvedWorkspace = await parseResponse<WorkspaceResponse>(
-          createWorkspaceResponse,
-        ) || undefined;
+        resolvedWorkspace =
+          (await parseResponse<WorkspaceResponse>(createWorkspaceResponse)) ||
+          undefined;
         workspaceId = getWorkspaceId(resolvedWorkspace);
       }
     }
+  }
 
-    if (!workspaceId) {
-      console.error('Workspace resolution returned no workspace ID');
+  if (!workspaceId) {
+    console.error('Workspace resolution returned no workspace ID');
+    throw new WorkspaceResolutionError(
+      'Unable to resolve your workspace',
+      502,
+    );
+  }
+
+  const contextHeaders = {
+    ...authHeaders,
+    'X-Workspace-ID': workspaceId,
+    'workspace-id': workspaceId,
+  };
+
+  let contextResponse: Response;
+  try {
+    contextResponse = await fetch(`${API_BASE_URL}/users/context`, {
+      method: 'GET',
+      headers: contextHeaders,
+    });
+  } catch (error) {
+    console.error('Error fetching user context:', error);
+    throw new WorkspaceResolutionError(
+      'Unable to fetch your user context',
+      502,
+    );
+  }
+
+  if (!contextResponse.ok) {
+    throwBackendFailure('User context lookup', contextResponse);
+  }
+
+  const contextData = await parseResponse<WorkspaceResponse>(contextResponse);
+  return {
+    contextData,
+    resolvedWorkspace,
+    workspaceId,
+  };
+}
+
+function getWorkspaceResolution(
+  userId: string,
+  accessToken: string,
+): Promise<WorkspaceResolution> {
+  const existing = workspaceResolutionInFlight.get(userId);
+  if (existing) {
+    return existing;
+  }
+
+  const resolution = resolveWorkspaceContext(accessToken).finally(() => {
+    workspaceResolutionInFlight.delete(userId);
+  });
+  workspaceResolutionInFlight.set(userId, resolution);
+  return resolution;
+}
+
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.access_token || !session.user?.id) {
       return NextResponse.json(
-        { error: 'Unable to resolve your workspace' },
-        { status: 502 },
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
 
-    const contextHeaders = {
-      ...authHeaders,
-      'X-Workspace-ID': workspaceId,
-      'workspace-id': workspaceId,
-    };
-
-    let contextResponse: Response;
     try {
-      contextResponse = await fetch(`${API_BASE_URL}/users/context`, {
-        method: 'GET',
-        headers: contextHeaders,
+      const resolution = await getWorkspaceResolution(
+        session.user.id,
+        session.access_token,
+      );
+      const { contextData, resolvedWorkspace, workspaceId } = resolution;
+      return NextResponse.json({
+        ...(contextData || {}),
+        workspaceId: contextData?.workspaceId || workspaceId,
+        workspace:
+          contextData?.workspace ||
+          resolvedWorkspace?.workspace ||
+          resolvedWorkspace,
       });
     } catch (error) {
-      console.error('Error fetching user context:', error);
+      if (error instanceof WorkspaceResolutionError) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: error.status },
+        );
+      }
+
+      console.error('Error resolving user context:', error);
       return NextResponse.json(
-        { error: 'Unable to fetch your user context' },
-        { status: 502 },
+        { error: 'An unexpected error occurred' },
+        { status: 500 },
       );
     }
-
-    if (!contextResponse.ok) {
-      return backendFailure('User context lookup', contextResponse);
-    }
-
-    const contextData = await parseResponse<WorkspaceResponse>(contextResponse);
-    return NextResponse.json({
-      ...(contextData || {}),
-      workspaceId: contextData?.workspaceId || workspaceId,
-      workspace: contextData?.workspace || resolvedWorkspace?.workspace || resolvedWorkspace,
-    });
   } catch (error) {
     console.error('Error in get-user-context:', error);
     return NextResponse.json(
