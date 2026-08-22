@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { createClient } from './auth/client';
+import { authClient } from './auth/client';
 import { API_BASE_URL } from './api';
 
 // Define the user interface
@@ -44,6 +44,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const sessionState = authClient.useSession();
 
   // Standard API request function with auth token
   const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
@@ -72,9 +73,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      const auth = createClient();
-      const { data: sessionData } = await auth.auth.getSession();
-      if (!sessionData.session) {
+      if (!sessionState.data?.user) {
         setUser(null);
         setToken(null);
         setIsPlatformAdmin(false);
@@ -120,15 +119,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 
   // Initialize context on mount
   useEffect(() => {
-    refreshContext();
-    const auth = createClient();
-    const { data: { subscription } } = auth.auth.onAuthStateChange(() => {
-      refreshContext();
-    });
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+    void refreshContext();
+  }, [sessionState.data?.user?.id, sessionState.isPending]);
 
   // Context value to provide
   const contextValue: ApiContextType = {

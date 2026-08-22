@@ -1,5 +1,5 @@
 import { fetchAPI, API_BASE_URL } from './api';
-import { createClient } from './auth/client';
+import { authClient } from './auth/client';
 
 export interface FileMetadata {
   id: string;
@@ -149,15 +149,14 @@ export async function uploadFile(
     try {
       // Get the Better Auth session. The HttpOnly session cookie is sent by
       // the browser with the API request below.
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: session } = await authClient.getSession();
       
       if (!session?.user?.id) {
         throw new Error('No active session. User must be authenticated to make this request.');
       }
       
       // Get user ID from session
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = session?.user;
       let userId = user?.id;
       
       if (!userId) {
@@ -472,8 +471,8 @@ export async function deleteFile(fileId: string, specificWorkspaceId?: string, s
     let userId = specificUserId;
     
     if (!userId) {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data } = await authClient.getSession();
+      const user = data?.user;
       userId = user?.id;
       
       if (!userId) {
@@ -521,8 +520,7 @@ export async function getFileDownloadUrl(fileId: string, specificWorkspaceId?: s
   try {
     console.log('[getFileDownloadUrl] Getting download URL for file:', fileId);
     
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: session } = await authClient.getSession();
     
     if (!session?.user?.id) {
       throw new Error('No active session');

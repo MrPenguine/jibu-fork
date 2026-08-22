@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { FolderController } from './folder.controller';
 import { FolderService } from './folder.service';
-import { PrismaService } from '../../../core/database/prisma.service';
+import { DatabaseModule } from '../../../core/database/database.module';
 
 @Module({
+  imports: [DatabaseModule],
   controllers: [FolderController],
-  providers: [FolderService, PrismaService],
+  providers: [FolderService],
 })
 export class FolderModule {}

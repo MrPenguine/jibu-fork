@@ -1,7 +1,7 @@
 import { fetchAPI } from './api';
 import { getActiveWorkspaceId } from './fileApi';
 import { useWorkspace } from './workspaceContext';
-import { createClient } from './auth/client';
+import { authClient } from './auth/client';
 
 export interface Assistant {
   id: string;
@@ -121,6 +121,11 @@ export const getAssistants = async (workspaceId?: string): Promise<Assistant[]> 
     try {
       console.log(`[getAssistants] Fetching assistants for workspace: ${wsId}`);
       
+      const { data: session } = await authClient.getSession();
+      if (!session?.user?.id) {
+        throw new Error('No authentication token available');
+      }
+      
       const assistants = await fetchAPI(`/assistants?workspaceId=${wsId}`);
       console.log(`[getAssistants] Successfully fetched ${assistants.length} assistants`);
       return assistants.map(transformAssistant) || [];
@@ -169,9 +174,8 @@ export const getAssistant = async (assistantId: string): Promise<Assistant> => {
     console.log(`[getAssistant] Current workspace ID: ${workspaceId || 'none'}`);
     
     try {
-      // Add extra debugging to trace the exact headers being sent
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: session } = await authClient.getSession();
+      
       if (!session?.user?.id) {
         console.error('[getAssistant] No authentication token available');
         throw new Error('No authentication token available');

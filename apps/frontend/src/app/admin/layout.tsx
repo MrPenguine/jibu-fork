@@ -128,7 +128,7 @@ export default function AdminLayout({
   }, [router, user, apiLoading, isPlatformAdmin]);
 
   const handleLogout = () => {
-    logout(new FormData());
+    logout();
   };
 
   // Loading state

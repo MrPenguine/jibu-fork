@@ -1,4 +1,4 @@
-import { createClient } from './auth/client';
+import { authClient } from './auth/client';
 import { getActiveWorkspaceId } from './fileApi';
 import { fetchAPI, API_BASE_URL } from './api';
 
@@ -128,9 +128,8 @@ export function getCurrentWorkspaceId(specificWorkspaceId?: string): string | nu
 
 // Get authorization headers with token and workspace ID
 async function getAuthHeaders(workspaceId: string) {
-  const supabase = createClient();
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.user?.id;
+  const { data: session } = await authClient.getSession();
+  const token = session?.user?.id;
   
   if (!token) {
     throw new Error('No active session');
@@ -639,9 +638,8 @@ export async function directUnlinkRequest(
       // Get auth token and add to request
       const getAndSetAuthToken = async () => {
         try {
-          const supabase = createClient();
-          const { data } = await supabase.auth.getSession();
-          const token = data.session?.user?.id;
+          const { data } = await authClient.getSession();
+          const token = data?.user?.id;
           
           if (!token) {
             console.error('[directUnlinkRequest] No active session');

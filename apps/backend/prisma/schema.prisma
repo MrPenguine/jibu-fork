@@ -9,9 +9,9 @@ datasource db {
 }
 
 model User {
-  id               String                @id
-  email            String                @unique
-  emailConfirmed   Boolean               @default(false)
+  id               String                   @id
+  email            String                   @unique
+  emailConfirmed   Boolean                  @default(false)
   firstName        String?
   lastName         String?
   fullName         String?
@@ -20,28 +20,29 @@ model User {
   providerIds      String[]
   lastSignInAt     DateTime?
   phoneNumber      String?
-  phoneConfirmed   Boolean               @default(false)
-  isAnonymous      Boolean               @default(false)
+  phoneConfirmed   Boolean                  @default(false)
+  isAnonymous      Boolean                  @default(false)
   metadata         Json? // For storing additional user_metadata
-  lastWorkspaceId  String? // Store the ID of the last organization the user accessed
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
+  lastWorkspaceId        String? // Store the ID of the last organization the user accessed
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
   memberships      WorkspaceMembership[] // Relation field
   files            File[] // Reverse relation
-  lastWorkspace    Workspace?            @relation("UserLastWorkspace", fields: [lastWorkspaceId], references: [id], onDelete: SetNull)
+  lastWorkspace          Workspace?            @relation("UserLastWorkspace", fields: [lastWorkspaceId], references: [id], onDelete: SetNull)
   sentInvitations  Invitation[] // Invitations sent by this user
   createdTools     Tool[] // Tools created by this user
   toolExecutions   ToolExecution[] // Tool executions performed by this user
   onboardingStatus OnboardingStatus? // Relation to onboarding status
   apiKeys          ApiKey[]
 
-  isAdmin          Boolean   @default(false)
+  isAdmin          Boolean                  @default(false)
   adminRole        String?
-  isSuspended      Boolean   @default(false)
+  isSuspended      Boolean                  @default(false)
   suspendedAt      DateTime?
   suspensionReason String?
 
-  adminAuditLogs AdminAuditLog[] @relation("AdminActions")
+  adminAuditLogs   AdminAuditLog[]          @relation("AdminActions")
+  authUser         AuthUser? @relation(fields: [id], references: [id], onDelete: Cascade)
 
   @@index([lastWorkspaceId])
 }
@@ -56,6 +57,7 @@ model AuthUser {
   updatedAt     DateTime
   sessions      AuthSession[]
   accounts      AuthAccount[]
+  user          User?
 
   @@map("auth_users")
 }
@@ -108,16 +110,16 @@ model AuthVerification {
 }
 
 model Workspace {
-  id                   String                @id @default(uuid())
+  id                   String                   @id @default(uuid())
   name                 String
   email                String?
   settings             Json? // Store workspace settings as JSON
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
   memberships          WorkspaceMembership[] // Relation field
   credentials          Credential[] // Relation to credentials
   files                File[] // Reverse relation
-  usersLastWorkspace   User[]                @relation("UserLastWorkspace") // Users who have this as their last workspace
+  usersLastWorkspace   User[]                   @relation("UserLastWorkspace") // Users who have this as their last workspace
   invitations          Invitation[] // Invitations for this workspace
   workflows            Workflow[] // Relation to workflows
   apiKeys              ApiKey[] // API keys belonging to this workspace
@@ -133,29 +135,29 @@ model Workspace {
   webhookInvocations   WebhookInvocation[]
   assistants           Assistant[] // Assistants belonging to this workspace
 
-  subscription Subscription?
-  usageRecords UsageRecord[]
+  subscription         Subscription?
+  usageRecords         UsageRecord[]
 
-  isSuspended      Boolean   @default(false)
-  suspendedAt      DateTime?
-  suspendedBy      String?
-  suspensionReason String?
+  isSuspended          Boolean   @default(false)
+  suspendedAt          DateTime?
+  suspendedBy          String?
+  suspensionReason     String?
 
   @@index([id])
 }
 
 model WorkspaceMembership {
-  id          String   @id @default(uuid())
+  id             String   @id @default(uuid())
   workspaceId String
-  userId      String? // Optional to handle invitations for non-users
-  email       String? // Store email for pending memberships with no user
-  role        String
-  status      String   @default("pending") // Status: "pending", "active", "revoked"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  userId         String? // Optional to handle invitations for non-users
+  email          String? // Store email for pending memberships with no user
+  role           String
+  status         String   @default("pending") // Status: "pending", "active", "revoked"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([workspaceId])
@@ -163,31 +165,31 @@ model WorkspaceMembership {
 }
 
 model Invitation {
-  id          String   @id @default(uuid())
-  email       String
+  id             String   @id @default(uuid())
+  email          String
   workspaceId String
-  role        String
-  token       String   @unique
-  status      String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
-  invitedById String
-  message     String? // Optional message to include with invitation
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  expiresAt   DateTime
+  role           String
+  token          String   @unique
+  status         String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  invitedById    String
+  message        String? // Optional message to include with invitation
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  expiresAt      DateTime
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  invitedBy User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
-  @@unique([email, workspaceId])
   @@index([workspaceId])
   @@index([invitedById])
   @@index([token])
   @@index([email])
+  @@unique([email, workspaceId])
 }
 
 model Credential {
   id                   String   @id @default(uuid())
-  workspaceId          String
+  workspaceId       String
   provider             String
   type                 String
   name                 String
@@ -198,7 +200,7 @@ model Credential {
   updatedAt            DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tools     Tool[] // Tools that use this credential
+  tools        Tool[] // Tools that use this credential
 
   @@unique([workspaceId, provider, name])
   @@index([workspaceId])
@@ -211,12 +213,12 @@ model File {
   storageKey      String   @unique
   mimeType        String
   sizeBytes       Int
-  workspaceId     String
+  workspaceId  String
   userId          String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   knowledgeBaseSources KnowledgeBaseSource[] // Relationship to knowledge base sources
 
@@ -225,31 +227,31 @@ model File {
 }
 
 model Folder {
-  id                   String                @id @default(cuid())
-  name                 String
-  workspaceId          String
-  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  agents               Agent[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id             String       @id @default(cuid())
+  name           String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agents         Agent[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   knowledgeBaseSources KnowledgeBaseSource[]
 }
 
 model ApiKey {
-  id          String     @id @default(cuid())
-  name        String
-  prefix      String     @unique
-  scopes      String[]
+  id             String       @id @default(cuid())
+  name           String
+  prefix         String       @unique
+  scopes         String[]
   workspaceId String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agentId     String?
-  agent       Agent?     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  revoked     Boolean    @default(false)
-  lastUsedAt  DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @default(now())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId        String?
+  agent          Agent?       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  revoked        Boolean      @default(false)
+  lastUsedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now())
 
   @@index([workspaceId])
   @@index([userId])
@@ -270,24 +272,24 @@ model OnboardingStatus {
 }
 
 model KnowledgeBase {
-  id                 String                   @id @default(uuid())
-  name               String
-  workspaceId        String
-  workspace          Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id             String                @id @default(uuid())
+  name           String
+  workspaceId String
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Per-KB embedding model. Documents and queries must embed with the SAME model,
   // so this is stored once per KB and read at both index and query time.
-  embeddingProvider  String? // 'gemini' | 'openai'
-  embeddingModel     String? // e.g. 'gemini-embedding-001', 'text-embedding-3-small'
+  embeddingProvider String?       // 'gemini' | 'openai'
+  embeddingModel    String?       // e.g. 'gemini-embedding-001', 'text-embedding-3-small'
   // Retrieval + answer config: { topK, systemPrompt, temperature, maxTokens }
-  retrievalConfig    Json?
+  retrievalConfig   Json?
   // Default chunk config applied to new sources unless overridden per-source
   defaultChunkConfig Json?
-  sources            KnowledgeBaseSource[]
-  chunks             ChunkMetadata[] // Relation to chunks
-  assistantLinks     AssistantKnowledgeBase[]
-  agentLinks         AgentKnowledgeBase[]
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  sources        KnowledgeBaseSource[]
+  chunks         ChunkMetadata[] // Relation to chunks
+  assistantLinks AssistantKnowledgeBase[]
+  agentLinks     AgentKnowledgeBase[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
   @@index([workspaceId])
 }
@@ -295,19 +297,19 @@ model KnowledgeBase {
 model KnowledgeBaseSource {
   id                String          @id @default(uuid())
   knowledgeBaseId   String
-  workspaceId       String
+  workspaceId    String
   sourceType        String          @default("file") // file | url | sitemap
-  sourcePointer     String? // Stores File ID for sourceType='file'
-  sourceUrl         String? // Stores the URL for sourceType='url' | 'sitemap'
-  title             String? // Human-friendly label (e.g. the URL or fetched page title)
-  refreshInterval   String? // never | daily | weekly | monthly (url/sitemap only)
+  sourcePointer     String?         // Stores File ID for sourceType='file'
+  sourceUrl         String?         // Stores the URL for sourceType='url' | 'sitemap'
+  title             String?         // Human-friendly label (e.g. the URL or fetched page title)
+  refreshInterval   String?         // never | daily | weekly | monthly (url/sitemap only)
   lastIndexedAt     DateTime?
   indexingStatus    String          @default("PENDING")
   hasIndexedContent Boolean         @default(false)
   folderId          String?
-  chunkConfig       Json? // Per-source chunking config: { strategies, chunkSize, chunkOverlap }
+  chunkConfig       Json?           // Per-source chunking config: { strategies, chunkSize, chunkOverlap }
   knowledgeBase     KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
-  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   file              File?           @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
   folder            Folder?         @relation(fields: [folderId], references: [id])
   chunks            ChunkMetadata[] // Relation to chunks
@@ -329,7 +331,7 @@ model ChunkMetadata {
   textPreview     String
   textLength      Int
   chunkType       String   @default("content") // e.g. content | faq_question
-  strategies      String[] @default([]) // ordered chunking strategies applied
+  strategies      String[] @default([])         // ordered chunking strategies applied
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -342,17 +344,17 @@ model ChunkMetadata {
 }
 
 model Chat {
-  id          String         @id @default(uuid())
-  name        String? // Optional name for the chat
+  id             String         @id @default(uuid())
+  name           String? // Optional name for the chat
   workspaceId String
-  agentId     String? // Optional: For agent-based chats
-  workflowId  String? // Optional: For associating chats with workflows
-  sessionId   String // Required: For calls: phone number, For chats: user identifier or anonymous session
-  sessionType String         @default("chat") // "chat" or "call"
-  nodeType    AgentNodeType? // Store the current node type for agent workflows
-  metadata    Json? // Additional metadata for the chat/call session
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  agentId        String? // Optional: For agent-based chats
+  workflowId     String? // Optional: For associating chats with workflows
+  sessionId      String // Required: For calls: phone number, For chats: user identifier or anonymous session
+  sessionType    String         @default("chat") // "chat" or "call"
+  nodeType       AgentNodeType? // Store the current node type for agent workflows
+  metadata       Json? // Additional metadata for the chat/call session
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   agent         Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
@@ -388,22 +390,22 @@ model Message {
 }
 
 model Tool {
-  id           String   @id @default(uuid())
-  workspaceId  String
-  name         String
-  description  String?
-  type         String // e.g., "google.calendar.availability.check", "google.sheets.row.append"
-  function     Json // Stores function name and parameters schema
-  messages     Json[] // Array of message configurations
-  metadata     Json? // Tool-specific configuration
-  credentialId String? // Optional reference to a credential
-  enabled      Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  createdById  String
+  id             String   @id @default(uuid())
+  workspaceId String
+  name           String
+  description    String?
+  type           String // e.g., "google.calendar.availability.check", "google.sheets.row.append"
+  function       Json // Stores function name and parameters schema
+  messages       Json[] // Array of message configurations
+  metadata       Json? // Tool-specific configuration
+  credentialId   String? // Optional reference to a credential
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdById    String
 
   // Relationships
-  workspace      Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   credential     Credential?     @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
@@ -453,7 +455,6 @@ enum AgentNodeType {
   PLAY_AUDIO // For voice: play a pre-recorded audio URL
   WORKFLOW_CALL // Execute a secondary workflow
 }
-
 // --- New Enums for Agent-level defaults ---
 enum LlmProvider {
   OPENAI
@@ -491,23 +492,23 @@ enum SttProvider {
 
 // --- Agent Definition ---
 model Agent {
-  id          String    @id @default(uuid())
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  name        String
-  description String?
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  folderId    String?
-  folder      Folder?   @relation(fields: [folderId], references: [id])
+  id             String         @id @default(uuid())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  name           String
+  description    String?
+  workspaceId    String
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folderId       String?
+  folder         Folder?        @relation(fields: [folderId], references: [id])
 
   // --- Agent-level default settings (typed) ---
-  llmProvider LlmProvider?
-  llmModel    String?
-  ttsProvider TtsProvider?
-  ttsVoiceId  String?
-  sttProvider SttProvider?
-  sttModel    String?
+  llmProvider    LlmProvider?
+  llmModel       String?
+  ttsProvider    TtsProvider?
+  ttsVoiceId     String?
+  sttProvider    SttProvider?
+  sttModel       String?
 
   // --- Call/Channel Specific Settings (moved from Assistant) ---
   firstMessage               String?
@@ -523,14 +524,14 @@ model Agent {
   metadata                   Json? // For storing agent-specific settings, like system prompts
 
   // --- Optional links retained ---
-  n8nWorkflowId String?
-  n8nWorkflow   N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
-  chats         Chat[]
-  sessions      AgentSession[]
-  usageRecords  UsageRecord[]
-  apiKeys       ApiKey[]
-  workflows     Workflow[]
-  assistants    Assistant[] // Added back-relation to Assistant
+  n8nWorkflowId  String?
+  n8nWorkflow    N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
+  chats          Chat[]
+  sessions       AgentSession[]
+  usageRecords   UsageRecord[]
+  apiKeys        ApiKey[]
+  workflows      Workflow[]
+  assistants     Assistant[] // Added back-relation to Assistant
 
   // --- Single-brain config links (source of truth for runtime) ---
   tools          AgentTool[]
@@ -546,28 +547,28 @@ model Agent {
 
 // --- Assistant Models ---
 model Assistant {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String      @id @default(uuid())
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   // Ownership and isolation
-  agentId String
-  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId        String
+  agent          Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   // Denormalized for tenancy scoping and fast filters
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId    String
+  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Identity and settings (can override agent defaults)
-  name         String
-  description  String?
-  llmProvider  LlmProvider?
-  llmModel     String?
-  voiceId      String?
-  sttModel     String?
-  hipaaEnabled Boolean      @default(false)
-  systemPrompt String?
-  metadata     Json?
+  name           String
+  description    String?
+  llmProvider    LlmProvider?
+  llmModel       String?
+  voiceId        String?
+  sttModel       String?
+  hipaaEnabled   Boolean     @default(false)
+  systemPrompt   String?
+  metadata       Json?
 
   // Relations
   tools          AssistantTool[]
@@ -579,26 +580,26 @@ model Assistant {
 }
 
 model AssistantTool {
-  id          String @id @default(uuid())
-  assistantId String
-  toolId      String
+  id           String    @id @default(uuid())
+  assistantId  String
+  toolId       String
   // Optional per-assistant tool configuration
-  config      Json?
+  config       Json?
 
-  assistant Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
-  tool      Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  assistant    Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  tool         Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
 
   @@unique([assistantId, toolId])
   @@index([toolId])
 }
 
 model AssistantKnowledgeBase {
-  id              String @id @default(uuid())
-  assistantId     String
-  knowledgeBaseId String
+  id               String        @id @default(uuid())
+  assistantId      String
+  knowledgeBaseId  String
 
-  assistant     Assistant     @relation(fields: [assistantId], references: [id], onDelete: Cascade)
-  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  assistant        Assistant     @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  knowledgeBase    KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
 
   @@unique([assistantId, knowledgeBaseId])
   @@index([knowledgeBaseId])
@@ -612,8 +613,8 @@ model AgentTool {
   // Optional per-agent tool configuration
   config  Json?
 
-  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  tool  Tool  @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  agent   Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tool    Tool  @relation(fields: [toolId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, toolId])
   @@index([toolId])
@@ -624,28 +625,28 @@ model AgentKnowledgeBase {
   agentId         String
   knowledgeBaseId String
 
-  agent         Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  agent           Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, knowledgeBaseId])
   @@index([knowledgeBaseId])
 }
 
 model AgentSession {
-  id            String    @id @default(uuid())
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  agentId       String
-  agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  chatId        String?
-  chat          Chat?     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  workspaceId   String
-  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  status        String    @default("active") // e.g., active, completed, failed
-  currentNodeId String?
-  variables     Json?
-  history       Json? // Log of executed nodes and I/O: Array<{ nodeId: string, input?: any, output?: any, timestamp: Date }>
-  callSid       String? // For voice: SID from the provider
+  id             String       @id @default(uuid())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  agentId        String
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  chatId         String?
+  chat           Chat?        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  status         String       @default("active") // e.g., active, completed, failed
+  currentNodeId  String?
+  variables      Json?
+  history        Json? // Log of executed nodes and I/O: Array<{ nodeId: string, input?: any, output?: any, timestamp: Date }>
+  callSid        String? // For voice: SID from the provider
 
   @@index([agentId])
   @@index([chatId])
@@ -653,37 +654,37 @@ model AgentSession {
 }
 
 model Workflow {
-  id          String   @id @default(uuid())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  name        String
-  description String?
+  id                 String       @id @default(uuid())
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  name               String
+  description        String?
 
   // Agent & Workspace relations
-  agentId     String
-  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agentId            String
+  agent              Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  workspaceId        String
+  workspace          Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Workflow classification
-  isPrimary Boolean @default(false)
+  isPrimary          Boolean      @default(false)
 
   // n8n link
-  n8nWorkflowId String?
-  n8nWorkflow   N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
+  n8nWorkflowId      String?
+  n8nWorkflow        N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
 
   // Versioning pointers
   publishedVersionId String?          @unique
   publishedVersion   WorkflowVersion? @relation("PublishedWorkflowVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
 
-  draftVersionId String?          @unique
-  draftVersion   WorkflowVersion? @relation("DraftWorkflowVersion", fields: [draftVersionId], references: [id], onDelete: SetNull)
+  draftVersionId     String?          @unique
+  draftVersion       WorkflowVersion? @relation("DraftWorkflowVersion", fields: [draftVersionId], references: [id], onDelete: SetNull)
 
   // Reverse relations
-  versions       WorkflowVersion[]
-  agentAsPrimary Agent?            @relation("PrimaryAgentWorkflow")
-  chats          Chat[]
-  webhooks       Webhook[]
+  versions           WorkflowVersion[]
+  agentAsPrimary     Agent?       @relation("PrimaryAgentWorkflow")
+  chats              Chat[]
+  webhooks           Webhook[]
 
   @@index([agentId])
   @@index([workspaceId])
@@ -715,29 +716,28 @@ model N8nWorkflow {
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
-  agents    Agent[] // Agents that use this workflow (can be PRIMARY or SECONDARY)
-  workflows Workflow[] // Workflows linked to this n8n workflow
+  agents     Agent[] // Agents that use this workflow (can be PRIMARY or SECONDARY)
+  workflows  Workflow[] // Workflows linked to this n8n workflow
 
   @@index([workspaceId])
   @@index([n8nWorkflowId])
   @@index([isActive])
   @@index([workflowType]) // Add index for the new field
 }
-
 // New model: WorkflowVersion for versioned workflow JSON snapshots
 model WorkflowVersion {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  workflowId String
-  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowId   String
+  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   version      Int
   workflowJson Json
 
-  status      String    @default("draft") // "draft" | "published" | "archived"
-  publishedAt DateTime?
+  status       String   @default("draft") // "draft" | "published" | "archived"
+  publishedAt  DateTime?
 
   // Back-links for pointers on Workflow
   workflowAsPublishedVersion Workflow? @relation("PublishedWorkflowVersion")
@@ -748,36 +748,36 @@ model WorkflowVersion {
 }
 
 model Webhook {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  workflowId  String? // Optional link to a workflow
+  id             String             @id @default(uuid())
+  name           String
+  description    String?
+  workflowId     String?            // Optional link to a workflow
   workspaceId String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  
   // Relations
-  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  workflow    Workflow?           @relation(fields: [workflowId], references: [id], onDelete: SetNull)
-  invocations WebhookInvocation[]
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflow       Workflow?          @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  invocations    WebhookInvocation[]
 
   @@index([workspaceId])
   @@index([workflowId])
 }
 
 model WebhookInvocation {
-  id          String   @id @default(uuid())
-  webhookId   String
-  payload     Json
-  headers     Json
-  status      String   @default("pending") // pending, completed, failed
-  error       String?
+  id             String   @id @default(uuid())
+  webhookId      String
+  payload        Json
+  headers        Json
+  status         String   @default("pending") // pending, completed, failed
+  error          String?
   workspaceId String
-  createdAt   DateTime @default(now())
-
+  createdAt      DateTime @default(now())
+  
   // Relations
-  webhook   Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  webhook        Webhook      @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([webhookId])
   @@index([workspaceId])
@@ -785,39 +785,39 @@ model WebhookInvocation {
 }
 
 model Plan {
-  id              String   @id @default(cuid())
-  name            String // "Starter", "Pro", "Enterprise"
-  priceMonthly    Float? // null for custom enterprise plans
+  id              String         @id @default(cuid())
+  name            String         // "Starter", "Pro", "Enterprise"
+  priceMonthly    Float?         // null for custom enterprise plans
   priceYearly     Float?
-  creditsIncluded Int // e.g., 10_000 credits per month
-  features        Json // { "apiAccess": true, "customVoices": false }
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  creditsIncluded Int            // e.g., 10_000 credits per month
+  features        Json           // { "apiAccess": true, "customVoices": false }
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  subscriptions Subscription[]
+  subscriptions   Subscription[]
 }
 
 model Subscription {
-  id          String    @id @default(cuid())
-  workspaceId String    @unique
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String     @id @default(cuid())
+  workspaceId      String     @unique
+  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  planId String
-  plan   Plan   @relation(fields: [planId], references: [id])
+  planId           String
+  plan             Plan       @relation(fields: [planId], references: [id])
 
-  status           String // "active", "trialing", "past_due", "canceled"
-  stripeCustomerId String? @unique
-  stripeSubId      String? @unique
+  status           String     // "active", "trialing", "past_due", "canceled"
+  stripeCustomerId String?    @unique
+  stripeSubId      String?    @unique
 
   currentPeriodEnd DateTime
 
   // Credits / limits
-  creditsUsed  Int  @default(0)
-  creditsLimit Int?
+  creditsUsed      Int        @default(0)
+  creditsLimit     Int?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   @@index([workspaceId])
   @@index([planId])
@@ -825,23 +825,23 @@ model Subscription {
 }
 
 model UsageRecord {
-  id String @id @default(cuid())
+  id             String     @id @default(cuid())
 
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId    String
+  workspace      Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  agentId String?
-  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  agentId        String?
+  agent          Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
 
-  type           String // "LLM_TOKENS" | "TTS_CHARACTERS" | "STT_SECONDS" | "CALL_MINUTES"
-  provider       String // "OPENAI", "ELEVENLABS", "DEEPGRAM", etc.
-  modelUsed      String? // "gpt-4o", "eleven_turbo_v2", etc.
-  unitsConsumed  Float // 1500 (tokens), 2500 (characters), 60 (seconds)
-  costInMicroUSD Int // Cost in millionths of USD (e.g., $0.01 = 10000)
+  type           String     // "LLM_TOKENS" | "TTS_CHARACTERS" | "STT_SECONDS" | "CALL_MINUTES"
+  provider       String     // "OPENAI", "ELEVENLABS", "DEEPGRAM", etc.
+  modelUsed      String?    // "gpt-4o", "eleven_turbo_v2", etc.
+  unitsConsumed  Float      // 1500 (tokens), 2500 (characters), 60 (seconds)
+  costInMicroUSD Int        // Cost in millionths of USD (e.g., $0.01 = 10000)
 
-  sessionId String? // Link to AgentSession or Chat for debugging
+  sessionId      String?    // Link to AgentSession or Chat for debugging
 
-  timestamp DateTime @default(now())
+  timestamp      DateTime   @default(now())
 
   @@index([workspaceId, timestamp])
   @@index([type, timestamp])
@@ -850,19 +850,19 @@ model UsageRecord {
 }
 
 model AdminAuditLog {
-  id String @id @default(cuid())
+  id          String   @id @default(cuid())
 
   adminUserId String
-  adminUser   User   @relation("AdminActions", fields: [adminUserId], references: [id], onDelete: Cascade)
+  adminUser   User     @relation("AdminActions", fields: [adminUserId], references: [id], onDelete: Cascade)
 
-  action     String // "SUSPEND_USER", "VIEW_WORKSPACE", "UPDATE_PLAN", etc.
-  targetType String? // "User" | "Workspace" | "Plan" | ...
-  targetId   String?
-  details    Json? // Additional context about the action
-  ipAddress  String?
-  userAgent  String?
+  action      String   // "SUSPEND_USER", "VIEW_WORKSPACE", "UPDATE_PLAN", etc.
+  targetType  String?  // "User" | "Workspace" | "Plan" | ...
+  targetId    String?
+  details     Json?    // Additional context about the action
+  ipAddress   String?
+  userAgent   String?
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@index([adminUserId])
   @@index([targetType, targetId])

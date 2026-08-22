@@ -11,11 +11,9 @@ export async function middleware(request: NextRequest) {
   })
   const session = sessionResponse.ok ? await sessionResponse.json() : null
   const user = session?.user
-  const isAuthPage = path === '/' || path === '/login' || path === '/signup'
-  if (!user && isAuthPage && path !== '/login') {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-  if (user && isAuthPage) {
+  const isPublicAuthPage = path === '/login' || path === '/signup' || path === '/login/error'
+  const isAuthEntryPage = path === '/' || path === '/login' || path === '/signup'
+  if (user && isAuthEntryPage) {
     const contextResponse = await fetch(`${backendUrl}/api/users/context`, {
       headers: { cookie: request.headers.get('cookie') ?? '' },
     })
@@ -30,7 +28,7 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(new URL('/login/error?reason=workspace-resolution', request.url))
   }
-  if (!user && path !== '/login' && path !== '/signup' && path !== '/login/error') {
+  if (!user && !isPublicAuthPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   return NextResponse.next()

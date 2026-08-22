@@ -1,6 +1,6 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { auth } from '../auth';
+import { auth, provisionApplicationUser } from '../auth';
 import { PrismaService } from '../../database/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
@@ -24,13 +24,28 @@ export class SessionAuthGuard implements CanActivate {
       if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
     }
     const session = await auth.api.getSession({ headers });
-    if (!session?.user) return false;
+    if (!session?.user) {
+      throw new UnauthorizedException();
+    }
 
-    const user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findUnique({
       where: { id: session.user.id },
       include: { lastWorkspace: true },
     });
-    if (!user) return false;
+    if (!user) {
+      try {
+        await provisionApplicationUser(session.user);
+        user = await this.prisma.user.findUnique({
+          where: { id: session.user.id },
+          include: { lastWorkspace: true },
+        });
+      } catch {
+        throw new UnauthorizedException('Unable to provision application user');
+      }
+    }
+    if (!user) {
+      throw new UnauthorizedException();
+    }
 
     request.session = session;
     request.user = {

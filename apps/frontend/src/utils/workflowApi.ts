@@ -1,6 +1,6 @@
 import { WorkflowDefinition } from '../../../../libs/shadcn-ui/src/types';
 import { AgentSessionOutput as WorkflowSessionOutput } from '../../../../libs/shadcn-ui/src/types';
-import { createClient } from './auth/client';
+import { authClient } from './auth/client';
 import { getActiveWorkspaceId } from './fileApi';
 import { API_BASE_URL } from './api';
 
@@ -23,9 +23,8 @@ function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
 
 // Get authorization headers with token and workspace ID
 async function getAuthHeaders(workspaceId: string) {
-  const supabase = createClient();
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.user?.id;
+  const { data } = await authClient.getSession();
+  const token = data?.user?.id;
   
   if (!token) {
     throw new Error('No active session');

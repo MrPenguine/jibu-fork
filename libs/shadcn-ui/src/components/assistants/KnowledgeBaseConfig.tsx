@@ -72,7 +72,7 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from "@libs/shadcn-ui/components/ui/tooltip"
-import { createClient } from '../../../../../apps/frontend/src/utils/auth/client'
+import { authClient } from '../../../../../apps/frontend/src/utils/auth/client'
 
 interface KnowledgeBaseConfigProps {
   assistantId?: string;
@@ -784,10 +784,9 @@ export function KnowledgeBaseConfig({
   // Add a function to get request headers with workspace context
   async function getWorkspaceAuthHeaders(wsId: string) {
     try {
-      const supabase = createClient();
-      const session = await supabase.auth.getSession();
+      const { data: session } = await authClient.getSession();
       
-      if (!session.data.session?.user?.id) {
+      if (!session?.user?.id) {
         throw new Error('No active session');
       }
       

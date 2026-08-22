@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './api';
-import { createClient } from './auth/client';
+import { authClient } from './auth/client';
 import { getActiveWorkspaceId } from './fileApi';
 
 // Audio player for TTS
@@ -19,8 +19,7 @@ interface TtsVoiceSettings {
  * Get request headers with workspace context.
  */
 async function getAuthHeaders() {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: session } = await authClient.getSession();
   const workspaceId = getActiveWorkspaceId();
   
   if (!session?.user?.id) {

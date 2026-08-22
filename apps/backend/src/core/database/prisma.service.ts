@@ -50,3 +50,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$disconnect();
   }
 }
+
+let sharedPrismaService: PrismaService | undefined;
+
+export function getSharedPrismaService(): PrismaService {
+  sharedPrismaService ??= new PrismaService();
+  return sharedPrismaService;
+}

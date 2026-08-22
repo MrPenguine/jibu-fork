@@ -1,6 +1,6 @@
 import { fetchAPI, API_BASE_URL } from './api';
 import { FlowNode, FlowEdge, AgentDefinition, AgentSessionOutput } from '../../../../libs/src';
-import { createClient } from './auth/client';
+import { authClient } from './auth/client';
 import { getActiveWorkspaceId } from './fileApi';
 
 // Use shared API_BASE_URL from utils/api for consistent base path handling
@@ -163,8 +163,7 @@ export async function sendStreamingAgentRequest(
     
     // Use fetchAPI for authentication but still need direct fetch for streaming
     // Get auth headers from fetchAPI's internal implementation
-    const auth = createClient();
-    const { data: { session } } = await auth.auth.getSession();
+    const { data: session } = await authClient.getSession();
     const activeWorkspaceId = await import('./fileApi').then(m => m.getActiveWorkspaceId());
     
     if (!session?.user?.id) {
@@ -306,9 +305,8 @@ function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
 
 // Get authorization headers with token and workspace ID
 async function getAuthHeaders(workspaceId: string) {
-  const supabase = createClient();
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.user?.id;
+  const { data: session } = await authClient.getSession();
+  const token = session?.user?.id;
   
   if (!token) {
     throw new Error('No active session');
