@@ -113,7 +113,7 @@ export default function AdminLayout({
 
       if (!isPlatformAdmin) {
         setIsLoading(false);
-        router.push('/workspaces');
+        router.push('/');
         return;
       }
 

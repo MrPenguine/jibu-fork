@@ -1,10 +1,10 @@
-import { createClient } from './supabase/client';
 import { getActiveWorkspaceId } from './fileApi';
 
 /**
  * Base URL for API requests to the backend
  */
 export const API_BASE_URL = (() => {
+  if (typeof window !== 'undefined') return '/api/backend';
   const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
   try {
     const url = new URL(raw);
@@ -32,29 +32,19 @@ export function getActiveWorkspaceIdInternal(): string | null {
 
 /**
  * Make an authenticated request to the backend API
- * This automatically adds the Supabase JWT token to the request headers
+ * This automatically sends the Better Auth session cookie
  * and includes the active workspace ID if available
  */
 export async function fetchAPI(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<any> {
-  const supabase = createClient();
-  
-  // Get current session
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session?.access_token) {
-    throw new Error('No active session. User must be authenticated to make this request.');
-  }
-  
   // Get the active workspace ID using the consistent helper function
   const activeWorkspaceId = getActiveWorkspaceId();
   
   // Prepare request headers with auth token and workspace ID if available
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session.access_token}`,
     ...(activeWorkspaceId ? { 'X-Workspace-ID': activeWorkspaceId, 'workspace-id': activeWorkspaceId } : {}),
     ...options.headers,
   };

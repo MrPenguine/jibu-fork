@@ -30,7 +30,7 @@ export async function GET(
         // Prepare headers for the backend request
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Cookie': req.headers.get('cookie') || '',
           'X-Workspace-ID': workspaceId,
         } as Record<string, string>;
         

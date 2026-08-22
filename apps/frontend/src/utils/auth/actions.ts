@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from '../supabase/server'
+import { authClient } from './client'
 
 const getBaseUrl = () => process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
@@ -14,12 +14,7 @@ export async function login(formData: FormData) {
     return { error: 'Email and password are required' }
   }
 
-  const supabase = await createClient()
-  
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+  const { error } = await authClient.signIn.email({ email, password })
 
   if (error) {
     return { error: error.message }
@@ -37,22 +32,15 @@ export async function signup(formData: FormData) {
     return { error: 'Email and password are required' }
   }
 
-  const supabase = await createClient()
-  
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${getBaseUrl()}/api/auth/confirm`,
-    }
-  })
+  const { data, error } = await authClient.signUp.email({ email, password, name: email })
 
   if (error) {
     return { error: error.message }
   }
 
-  // Even if successful, user needs to confirm their email
-  return { success: true, message: 'Check your email for the confirmation link' }
+  return data?.token
+    ? { success: true, message: 'Account created successfully' }
+    : { success: true, message: 'Check your email for the confirmation link' }
 }
 
 export async function resetPassword(formData: FormData) {
@@ -62,27 +50,20 @@ export async function resetPassword(formData: FormData) {
     return { error: 'Email is required' }
   }
 
-  const supabase = await createClient()
-  
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${getBaseUrl()}/api/auth/confirm?next=/reset-password`,
+  const response = await fetch(`${getBaseUrl()}/api/auth/request-password-reset`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, redirectTo: `${getBaseUrl()}/reset-password` }),
   })
-
-  if (error) {
-    return { error: error.message }
-  }
+  if (!response.ok) return { error: 'Unable to send password reset email' }
 
   return { success: true, message: 'Check your email for the reset link' }
 }
 
 export async function signInWithGoogle() {
-  const supabase = await createClient()
-  
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await authClient.signIn.social({
     provider: 'google',
-    options: {
-      redirectTo: `${getBaseUrl()}/api/auth/callback`,
-    }
+    callbackURL: `${getBaseUrl()}/`,
   })
 
   if (error) {
@@ -93,9 +74,7 @@ export async function signInWithGoogle() {
 }
 
 export async function logout(formData: FormData) {
-  const supabase = await createClient()
-  
-  const { error } = await supabase.auth.signOut()
+  const { error } = await authClient.signOut()
   
   if (error) {
     console.error("Logout error:", error.message)

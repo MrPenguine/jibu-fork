@@ -1,5 +1,5 @@
 import { API_BASE_URL } from './api';
-import { createClient } from './supabase/client';
+import { createClient } from './auth/client';
 import { getActiveWorkspaceId } from './fileApi';
 
 // Audio player for TTS
@@ -16,21 +16,19 @@ interface TtsVoiceSettings {
 }
 
 /**
- * Get authorization headers with token and workspace ID
+ * Get request headers with workspace context.
  */
 async function getAuthHeaders() {
   const supabase = createClient();
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
   const workspaceId = getActiveWorkspaceId();
   
-  if (!token) {
-    throw new Error('No authentication token available');
+  if (!session?.user?.id) {
+    throw new Error('No active session');
   }
   
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
     'Accept': 'audio/mpeg',
     ...(workspaceId ? { 'X-Workspace-ID': workspaceId } : {})
   };

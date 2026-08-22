@@ -115,7 +115,7 @@ export function PlatformAdminSidebar({
         {/* Back to Workspace Link */}
         {!isCollapsed && (
           <div className="px-4 py-2 mt-2">
-            <Link href="/workspaces">
+            <Link href="/">
               <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs">
                 <ArrowLeft className="h-3 w-3" />
                 Back to Workspace

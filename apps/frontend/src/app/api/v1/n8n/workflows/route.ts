@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Cookie': request.headers.get('cookie') || '',
           'X-Workspace-ID': workspaceId,
         } as Record<string, string>;
         
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Cookie': request.headers.get('cookie') || '',
           'X-Workspace-ID': workspaceId,
         } as Record<string, string>;
         

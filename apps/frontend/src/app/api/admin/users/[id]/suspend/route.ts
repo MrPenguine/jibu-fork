@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '../../../../../../utils/api';
-import { createClient } from '../../../../../../utils/supabase/server';
+import { createClient, getSessionHeaders } from '../../../../../../utils/auth/server';
 
 export async function PATCH(
   req: NextRequest,
@@ -12,7 +12,7 @@ export async function PATCH(
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session?.access_token) {
+    if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 },
@@ -30,7 +30,7 @@ export async function PATCH(
     const response = await fetch(`${API_BASE_URL}/admin/users/${id}/suspend`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        ...(await getSessionHeaders()),
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,

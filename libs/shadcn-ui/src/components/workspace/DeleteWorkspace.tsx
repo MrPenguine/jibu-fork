@@ -49,8 +49,7 @@ export default function DeleteWorkspace() {
         description: "Your workspace has been successfully deleted.",
       });
       
-      // Redirect to dashboard or workspaces list
-      router.push('/workspaces');
+      router.push('/');
       
     } catch (error) {
       console.error("Error deleting workspace:", error);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { createClient } from './supabase/client';
+import { createClient } from './auth/client';
 import { API_BASE_URL } from './api';
 
 // Define the user interface
@@ -47,12 +47,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 
   // Standard API request function with auth token
   const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
-    if (!token) {
-      throw new Error('No authentication token available');
-    }
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
       ...options.headers,
     };
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -76,8 +72,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      const supabase = createClient();
-      const { data: sessionData } = await supabase.auth.getSession();
+      const auth = createClient();
+      const { data: sessionData } = await auth.auth.getSession();
       if (!sessionData.session) {
         setUser(null);
         setToken(null);
@@ -86,11 +82,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setToken(sessionData.session.access_token);
-      // Option 1: Get user from Supabase directly
-      // const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-      // if (supabaseUser) setUser({ id: supabaseUser.id, email: supabaseUser.email! });
-      // Option 2: Fetch minimal user context if still needed
+      setToken(null);
+      // Fetch the application user context from the backend.
       try {
         const response = await fetch('/api/auth/get-user-context');
         if (response.ok) {
@@ -128,8 +121,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   // Initialize context on mount
   useEffect(() => {
     refreshContext();
-    const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const auth = createClient();
+    const { data: { subscription } } = auth.auth.onAuthStateChange(() => {
       refreshContext();
     });
     return () => {

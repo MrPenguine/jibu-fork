@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from './supabase/server';
+import { createClient } from './auth/server';
 import { API_BASE_URL } from './api';
 
 /**
@@ -28,7 +28,7 @@ export async function withAuthAndWorkspace(
     // Get current session
     const { data: { session } } = await supabase.auth.getSession();
     
-    if (!session?.access_token) {
+    if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
@@ -45,7 +45,7 @@ export async function withAuthAndWorkspace(
         const workspaceResponse = await fetch(`${API_BASE_URL}/users/context`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Cookie': request.headers.get('cookie') || '',
             'Content-Type': 'application/json',
           },
         });

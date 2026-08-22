@@ -17,7 +17,7 @@ export async function GET(
 
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Cookie': req.headers.get('cookie') || '',
           'X-Workspace-ID': workspaceId!,
           'workspace-id': workspaceId!,
         };
@@ -61,7 +61,7 @@ export async function PUT(
         const requestBody = await req.json();
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Cookie': req.headers.get('cookie') || '',
           'X-Workspace-ID': workspaceId!,
           'workspace-id': workspaceId!,
         };
@@ -112,7 +112,7 @@ export async function DELETE(
 
         const headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Cookie': req.headers.get('cookie') || '',
           'X-Workspace-ID': workspaceId!,
           'workspace-id': workspaceId!,
         };
