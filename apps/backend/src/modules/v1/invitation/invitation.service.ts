@@ -87,6 +87,10 @@ export class InvitationService {
     return this.prisma.invitation.findMany({
       where: {
         workspaceId,
+        status: 'pending',
+        expiresAt: {
+          gt: new Date(),
+        },
       },
       include: {
         invitedBy: {

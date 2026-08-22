@@ -264,8 +264,8 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
 
   const changeMemberRole = async (memberId: string, newRole: string) => {
     try {
-      await fetchAPI(`/workspaces/${targetWorkspaceId}/members/${memberId}`, {
-        method: 'PATCH',
+      await fetchAPI(`/workspaces/${targetWorkspaceId}/members/${memberId}/role`, {
+        method: 'PUT',
         body: JSON.stringify({ role: newRole }),
       });
       toast({ title: 'Role updated', description: `Role updated to ${newRole}.` });

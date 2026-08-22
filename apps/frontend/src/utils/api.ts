@@ -40,7 +40,7 @@ export async function fetchAPI(
   options: RequestInit = {}
 ): Promise<any> {
   // Get the active workspace ID using the consistent helper function
-  const activeWorkspaceId = getActiveWorkspaceId();
+  const activeWorkspaceId = endpoint === '/workspaces' ? null : getActiveWorkspaceId();
   
   // Prepare request headers with auth token and workspace ID if available
   const headers = {
