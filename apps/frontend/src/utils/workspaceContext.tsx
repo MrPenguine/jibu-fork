@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { fetchAPI } from './api';
 import { authClient } from './auth/client';
+import { useRouter } from 'next/navigation';
 
 // Define the workspace interface
 export interface Workspace {
@@ -78,13 +79,13 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
   loading: true,
   error: null,
   incomingInvitations: [],
-  switchWorkspace: async () => {},
-  refreshWorkspaces: async () => {},
+  switchWorkspace: async () => undefined,
+  refreshWorkspaces: async () => undefined,
   updateWorkspace: async () => ({ id: '', name: '', role: '' }),
-  deleteWorkspace: async () => {},
-  inviteMembers: async () => {},
-  acceptInvitation: async () => {},
-  rejectInvitation: async () => {},
+  deleteWorkspace: async () => undefined,
+  inviteMembers: async () => undefined,
+  acceptInvitation: async () => undefined,
+  rejectInvitation: async () => undefined,
 });
 
 // Custom hook to use the workspace context
@@ -98,6 +99,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const sessionState = authClient.useSession();
+  const router = useRouter();
 
   // Function to fetch invitations
   const fetchInvitations = async () => {
@@ -147,30 +149,55 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       
       // Targeted logging for workspace persistence
       const activeOrganizationId = sessionState.data?.session?.activeOrganizationId;
-      let activeWorkspaceId = activeOrganizationId ?? null;
+      let storedWorkspaceId: string | null = null;
       try {
-        if (!activeWorkspaceId) {
-          activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
-        }
+        storedWorkspaceId =
+          sessionStorage.getItem('activeWorkspaceId') ||
+          localStorage.getItem('activeWorkspaceId');
       } catch (storageError) {
         console.error('Error reading from localStorage:', storageError);
       }
-      console.log(`[CONTEXT INIT] Read from localStorage:`, activeWorkspaceId);
+      console.log(`[CONTEXT INIT] Read from storage:`, storedWorkspaceId);
       console.log(`[CONTEXT INIT] Fetched workspaces:`, workspacesWithStatus.map((w: Workspace) => ({id: w.id, name: w.name})));
       
-      // Try to find the active workspace from localStorage
-      if (activeWorkspaceId) {
-        const activeWorkspace = workspacesWithStatus.find(
-          (workspace: Workspace) => workspace.id === activeWorkspaceId
+      // Prefer a stored workspace only when it belongs to the current user.
+      if (storedWorkspaceId) {
+        const storedWorkspace = workspacesWithStatus.find(
+          (workspace: Workspace) => workspace.id === storedWorkspaceId
         );
-        console.log(`[CONTEXT INIT] Result of finding workspace with ID ${activeWorkspaceId}:`, activeWorkspace ? activeWorkspace.id : 'NOT FOUND');
-        if (activeWorkspace) {
-          console.log(`[CONTEXT INIT] Setting active workspace from localStorage: ${activeWorkspace.id}`);
-          setActiveWorkspace(activeWorkspace);
+        console.log(`[CONTEXT INIT] Result of finding workspace with ID ${storedWorkspaceId}:`, storedWorkspace ? storedWorkspace.id : 'NOT FOUND');
+        if (storedWorkspace) {
+          console.log(`[CONTEXT INIT] Setting active workspace from storage: ${storedWorkspace.id}`);
+          setActiveWorkspace(storedWorkspace);
           setLoading(false);
           return;
         } else {
-          console.warn(`[CONTEXT INIT] Workspace ID ${activeWorkspaceId} found in localStorage BUT NOT in fetched list!`);
+          console.warn(`[CONTEXT INIT] Workspace ID ${storedWorkspaceId} is not in the current user's memberships.`);
+          try {
+            localStorage.removeItem('activeWorkspaceId');
+            sessionStorage.removeItem('activeWorkspaceId');
+          } catch (storageError) {
+            console.error('Error clearing stale workspace storage:', storageError);
+          }
+        }
+      }
+
+      // Fall back to Better Auth's active organization when storage is stale.
+      if (activeOrganizationId) {
+        const activeOrganizationWorkspace = workspacesWithStatus.find(
+          (workspace: Workspace) => workspace.id === activeOrganizationId
+        );
+        if (activeOrganizationWorkspace) {
+          console.log(`[CONTEXT INIT] Setting active workspace from Better Auth session: ${activeOrganizationWorkspace.id}`);
+          setActiveWorkspace(activeOrganizationWorkspace);
+          try {
+            localStorage.setItem('activeWorkspaceId', activeOrganizationWorkspace.id);
+            sessionStorage.setItem('activeWorkspaceId', activeOrganizationWorkspace.id);
+          } catch (storageError) {
+            console.error('Error saving active organization to storage:', storageError);
+          }
+          setLoading(false);
+          return;
         }
       }
       
@@ -341,6 +368,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.warn('Could not update workspace on backend:', apiError);
       // The context is updated, and components relying on it should reactively update.
     }
+
+    router.push(`/workspace/${workspace.id}`);
   };
 
   // Function to invite members to a workspace
