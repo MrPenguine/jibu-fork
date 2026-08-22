@@ -184,6 +184,7 @@ model Invitation {
   @@index([invitedById])
   @@index([token])
   @@index([email])
+
   @@unique([email, workspaceId])
 }
 
@@ -455,6 +456,8 @@ enum AgentNodeType {
   PLAY_AUDIO // For voice: play a pre-recorded audio URL
   WORKFLOW_CALL // Execute a secondary workflow
 }
+
+
 // --- New Enums for Agent-level defaults ---
 enum LlmProvider {
   OPENAI
@@ -724,6 +727,8 @@ model N8nWorkflow {
   @@index([isActive])
   @@index([workflowType]) // Add index for the new field
 }
+
+
 // New model: WorkflowVersion for versioned workflow JSON snapshots
 model WorkflowVersion {
   id           String   @id @default(uuid())
