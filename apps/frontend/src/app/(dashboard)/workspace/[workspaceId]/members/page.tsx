@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react"
 import { useWorkspace } from "../../../../../utils/workspaceContext"
 import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton"
 import { Button } from "@libs/shadcn-ui/components/ui/button"
-import { Search, Mail, Copy, Check, X, UserPlus } from "lucide-react"
+import { Search, Copy, Check, X, UserPlus } from "lucide-react"
 import { Input } from "@libs/shadcn-ui/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@libs/shadcn-ui/components/ui/avatar"
 import { 
@@ -16,7 +16,6 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@libs/shadcn-ui/components/ui/dialog"
 import { Label } from "@libs/shadcn-ui/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@libs/shadcn-ui/components/ui/tabs"
-import { Card, CardContent } from "@libs/shadcn-ui/components/ui/card"
 import { fetchAPI } from "../../../../../utils/api"
 import { useParams } from "next/navigation"
 
@@ -101,13 +100,15 @@ export default function MembersPage() {
         })
       });
       
-      // Generate invite link (this would come from the backend in a real implementation)
-      const generatedLink = `${window.location.origin}/invite/${response.id || 'sample-invite-id'}`;
+      const invitation = response.invitations?.find(
+        (item: { status?: string }) => item.status === "invited",
+      );
+      const generatedLink = `${window.location.origin}/invite/${invitation?.invitationId || 'sample-invite-id'}`;
       setInviteLink(generatedLink);
       
       // Add the new invitation to the list
       const newInvitation: Invitation = {
-        id: response.id || `inv-${Date.now()}`,
+        id: invitation?.invitationId || `inv-${Date.now()}`,
         email: inviteEmail,
         role: inviteRole,
         status: "pending",
@@ -219,8 +220,7 @@ export default function MembersPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full justify-between">
                           {inviteRole === "admin" ? "Admin" : 
-                           inviteRole === "member" ? "Member" :
-                           inviteRole === "admin" ? "Admin" : "Select role"}
+                           inviteRole === "member" ? "Member" : "Select role"}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-56">

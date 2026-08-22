@@ -1,6 +1,7 @@
 import { prismaAdapter } from '@better-auth/prisma-adapter';
 import { betterAuth, type BetterAuthOptions, type User as BetterAuthUser } from 'better-auth';
 import { organization } from 'better-auth/plugins';
+import { createHash } from 'crypto';
 import { getSharedPrismaService } from '../database/prisma.service';
 
 const authPrisma = getSharedPrismaService();
@@ -17,6 +18,18 @@ if (!configuredSecret && runtimeEnv === 'production') {
 }
 
 const betterAuthSecret = configuredSecret || 'development-only-better-auth-secret';
+const defaultWorkspaceNamespace = 'jibu-default-workspace-v1';
+
+function defaultWorkspaceId(userId: string): string {
+  const digest = createHash('sha256')
+    .update(`${defaultWorkspaceNamespace}:${userId}`)
+    .digest('hex')
+    .slice(0, 32)
+    .split('');
+  digest[12] = '5';
+  digest[16] = ((parseInt(digest[16] || '0', 16) & 0x3) | 0x8).toString(16);
+  return `${digest.slice(0, 8).join('')}-${digest.slice(8, 12).join('')}-${digest.slice(12, 16).join('')}-${digest.slice(16, 20).join('')}-${digest.slice(20).join('')}`;
+}
 
 const socialProviders =
   googleClientId && googleClientSecret
@@ -55,22 +68,29 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
     });
     const workspace = membership
       ? { id: membership.workspaceId }
-      : await tx.workspace.create({
-          data: {
+      : await tx.workspace.upsert({
+          where: { id: defaultWorkspaceId(createdUser.id) },
+          create: {
+            id: defaultWorkspaceId(createdUser.id),
             name: `${user.firstName || user.email}'s Workspace`,
             slug: `${user.firstName || 'workspace'}-${createdUser.id.slice(0, 8)}`
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '-'),
-            memberships: {
-              create: {
-                userId: user.id,
-                role: 'owner',
-                status: 'active',
-              },
-            },
           },
+          update: {},
           select: { id: true },
         });
+
+    if (!membership) {
+      await tx.workspaceMembership.create({
+        data: {
+          userId: user.id,
+          workspaceId: workspace.id,
+          role: 'owner',
+          status: 'active',
+        },
+      });
+    }
 
     await tx.user.update({
       where: { id: user.id },
@@ -94,17 +114,16 @@ const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
   },
   session: {
     create: {
-      after: async (createdSession) => {
+      before: async (createdSession) => {
         const user = await authPrisma.user.findUnique({
           where: { id: createdSession.userId },
           select: { lastWorkspaceId: true },
         });
-        if (user?.lastWorkspaceId) {
-          await authPrisma.authSession.update({
-            where: { id: createdSession.id },
-            data: { activeOrganizationId: user.lastWorkspaceId },
-          });
-        }
+        return {
+          data: {
+            activeOrganizationId: user?.lastWorkspaceId || defaultWorkspaceId(createdSession.userId),
+          },
+        };
       },
     },
   },

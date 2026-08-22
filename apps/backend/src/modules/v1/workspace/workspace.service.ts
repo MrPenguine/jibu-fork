@@ -258,11 +258,14 @@ export class WorkspaceService {
     }
 
     // Validate role
-    const validRoles = ['admin', 'member', 'editor', 'viewer'];
-    if (!validRoles.includes(role)) {
+    const validRoles = ['owner', 'admin', 'member'] as const;
+    if (!validRoles.includes(role as (typeof validRoles)[number])) {
       throw new HttpException(`Invalid role: ${role}. Must be one of: ${validRoles.join(', ')}`, HttpStatus.BAD_REQUEST);
     }
-    const normalizedRole = role === 'admin' ? 'admin' : 'member';
+    if (role === 'owner') {
+      throw new HttpException('Owner invitations are not supported.', HttpStatus.BAD_REQUEST);
+    }
+    const normalizedRole: 'admin' | 'member' = role === 'admin' ? 'admin' : 'member';
 
     const results = await Promise.all(
       invitedEmails.map(async (email) => {
@@ -303,7 +306,10 @@ export class WorkspaceService {
             email,
             status: 'invited',
             invitationId: invitation.id,
-            token: invitation.id,
+            token: (await this.prisma.invitation.findUniqueOrThrow({
+              where: { id: invitation.id },
+              select: { token: true },
+            })).token,
           };
         } catch (error) {
           console.error(`Error inviting ${email}:`, error);
@@ -371,9 +377,12 @@ export class WorkspaceService {
     invitationId: string,
     action: 'accept' | 'reject',
     headers: Headers,
+    token?: string,
   ) {
-    const invitation = await this.prisma.invitation.findUnique({
-      where: { id: invitationId },
+    const invitation = await this.prisma.invitation.findFirst({
+      where: {
+        OR: [{ id: invitationId }, ...(token ? [{ token }] : [])],
+      },
       include: {
         workspace: true,
       },
@@ -383,9 +392,17 @@ export class WorkspaceService {
       throw new HttpException('Invitation not found.', HttpStatus.NOT_FOUND);
     }
 
+    if (invitation.status === 'canceled') {
+      throw new HttpException('This invitation has been canceled', HttpStatus.BAD_REQUEST);
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      throw new HttpException('This invitation has expired', HttpStatus.BAD_REQUEST);
+    }
+
     if (invitation.status !== 'pending') {
       throw new HttpException(
-        `Invitation already ${invitation.status}.`, 
+        `This invitation has already been ${invitation.status}`,
         HttpStatus.BAD_REQUEST
       );
     }
@@ -792,7 +809,7 @@ export class WorkspaceService {
       throw new BadRequestException('You do not have permission to resend this invitation');
     }
 
-    await auth.api.createInvitation({
+    const resentInvitation = await auth.api.createInvitation({
       body: {
         email: invitation.email,
         organizationId: invitation.workspaceId,
@@ -801,7 +818,9 @@ export class WorkspaceService {
       },
       headers,
     });
-    return this.prisma.invitation.findUniqueOrThrow({ where: { id } });
+    return this.prisma.invitation.findUniqueOrThrow({
+      where: { id: resentInvitation.id },
+    });
   }
 
   /**
@@ -813,21 +832,18 @@ export class WorkspaceService {
     
     const now = new Date();
     
-    const result = await this.prisma.invitation.updateMany({
+    const count = await this.prisma.invitation.count({
       where: {
         status: 'pending',
         expiresAt: {
           lt: now,
         },
       },
-      data: {
-        status: 'canceled',
-      },
     });
     
-    this.logger.log(`Expired ${result.count} invitations`);
+    this.logger.log(`Found ${count} expired invitations`);
     
-    return result;
+    return { count };
   }
 
   /**

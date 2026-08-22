@@ -5,7 +5,6 @@ import { json } from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 import { auth } from './core/auth/auth';
-import { getSharedPrismaService } from './core/database/prisma.service';
 
 // Polyfill global crypto.randomUUID for @nestjs/schedule which expects a global crypto object
 const g: any = global as any;
@@ -16,76 +15,6 @@ if (!('crypto' in g)) {
 
 if (!g.crypto.randomUUID) {
   g.crypto.randomUUID = randomUUID;
-}
-
-interface AuthResponse {
-  user?: {
-    id?: string;
-  };
-}
-
-function getAuthUserId(body: string): string | undefined {
-  try {
-    const parsed: unknown = JSON.parse(body);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'user' in parsed &&
-      typeof parsed.user === 'object' &&
-      parsed.user !== null &&
-      'id' in parsed.user &&
-      typeof parsed.user.id === 'string'
-    ) {
-      return (parsed as AuthResponse).user?.id;
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
-}
-
-async function findWorkspaceId(userId: string): Promise<string | undefined> {
-  const prisma = getSharedPrismaService();
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { lastWorkspaceId: true },
-    });
-    if (user?.lastWorkspaceId) return user.lastWorkspaceId;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  return undefined;
-}
-
-async function refreshActiveOrganizationCookie(
-  responseCookies: string[],
-  responseBody: string,
-  host: string,
-  path: string,
-): Promise<string[]> {
-  if (!path.endsWith('/sign-up/email') && !path.endsWith('/sign-in/email')) {
-    return [];
-  }
-  const userId = getAuthUserId(responseBody);
-  if (!userId) return [];
-  const workspaceId = await findWorkspaceId(userId);
-  if (!workspaceId) return [];
-
-  const cookieHeader = responseCookies
-    .map((cookie) => cookie.split(';', 1)[0])
-    .join('; ');
-  const activeResponse = await auth.handler(
-    new Request(`http://${host}/api/auth/organization/set-active`, {
-      method: 'POST',
-      headers: {
-        cookie: cookieHeader,
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ organizationId: workspaceId }),
-    }),
-  );
-  return activeResponse.headers.getSetCookie?.() || [];
 }
 
 async function bootstrap() {
@@ -119,23 +48,13 @@ async function bootstrap() {
         body: body?.length ? (body as any) : undefined,
       });
       const response = await auth.handler(request);
-      const responseBody = await response.text();
-      const responseCookies = response.headers.getSetCookie?.() || [];
-      const activeOrganizationCookies = response.ok
-        ? await refreshActiveOrganizationCookie(
-            responseCookies,
-            responseBody,
-            String(req.headers.host),
-            req.originalUrl.split('?')[0],
-          )
-        : [];
       res.status(response.status);
       response.headers.forEach((value, key) => {
         if (key !== 'set-cookie') res.setHeader(key, value);
       });
-      const setCookies = [...responseCookies, ...activeOrganizationCookies];
-      if (setCookies.length) res.setHeader('set-cookie', setCookies);
-      res.send(responseBody);
+      const setCookies = response.headers.getSetCookie?.();
+      if (setCookies?.length) res.setHeader('set-cookie', setCookies);
+      res.send(await response.text());
     } catch (error) {
       next(error);
     }

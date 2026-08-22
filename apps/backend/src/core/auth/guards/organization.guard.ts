@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../database/prisma.service';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 interface OrganizationRequest {
   user?: {
@@ -30,9 +32,18 @@ interface OrganizationRequest {
 
 @Injectable()
 export class OrganizationGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+
     const request = context.switchToHttp().getRequest<OrganizationRequest>();
     const userId = request.user?.userId || request.user?.id;
     const isWorkspaceRoute =

@@ -12,6 +12,7 @@ export async function middleware(request: NextRequest) {
   const session = sessionResponse.ok ? await sessionResponse.json() : null
   const user = session?.user
   const isPublicAuthPage = path === '/login' || path === '/signup' || path === '/login/error'
+  const isPublicInvite = path.startsWith('/invite/')
   const isAuthEntryPage = path === '/' || path === '/login' || path === '/signup'
   const workspaceMatch = path.match(/^\/workspace\/([^/]+)/)
   if (user && workspaceMatch && !isAuthEntryPage) {
@@ -23,10 +24,7 @@ export async function middleware(request: NextRequest) {
     })
     if (!workspaceContextResponse.ok) {
       if (workspaceContextResponse.status === 403) {
-        return NextResponse.json(
-          { error: 'You are not a member of this workspace' },
-          { status: 403 },
-        )
+        return NextResponse.redirect(new URL('/login/error?reason=workspace-access', request.url))
       }
       return NextResponse.redirect(new URL('/login/error?reason=workspace-resolution', request.url))
     }
@@ -46,7 +44,7 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(new URL('/login/error?reason=workspace-resolution', request.url))
   }
-  if (!user && !isPublicAuthPage) {
+  if (!user && !isPublicAuthPage && !isPublicInvite) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   return NextResponse.next()

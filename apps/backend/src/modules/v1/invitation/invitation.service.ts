@@ -154,8 +154,14 @@ export class InvitationService {
    * Get an invitation by token (public endpoint)
    */
   async findByToken(token: string) {
-    const invitation = await this.prisma.invitation.findUnique({
-      where: { token },
+    return this.findPublic(token, true);
+  }
+
+  async findPublic(identifier: string, tokenOnly = false) {
+    const invitation = await this.prisma.invitation.findFirst({
+      where: tokenOnly
+        ? { token: identifier }
+        : { OR: [{ id: identifier }, { token: identifier }] },
       include: {
         workspace: true,
         invitedBy: {
@@ -175,14 +181,14 @@ export class InvitationService {
       throw new NotFoundException('Invitation not found');
     }
 
-    if (invitation.status === 'canceled' || invitation.expiresAt < new Date()) {
-      if (invitation.status !== 'canceled') {
-        await this.prisma.invitation.update({
-          where: { id: invitation.id },
-          data: { status: 'canceled' },
-        });
-      }
+    if (invitation.status === 'canceled') {
+      throw new BadRequestException('This invitation has been canceled');
+    }
+    if (invitation.expiresAt < new Date()) {
       throw new BadRequestException('This invitation has expired');
+    }
+    if (invitation.status !== 'pending') {
+      throw new BadRequestException(`This invitation has already been ${invitation.status}`);
     }
 
     return invitation;
@@ -249,7 +255,7 @@ export class InvitationService {
       throw new BadRequestException('You do not have permission to resend this invitation');
     }
 
-    await auth.api.createInvitation({
+    const resentInvitation = await auth.api.createInvitation({
       body: {
         email: invitation.email,
         organizationId: invitation.workspaceId,
@@ -258,7 +264,9 @@ export class InvitationService {
       },
       headers,
     });
-    return this.prisma.invitation.findUniqueOrThrow({ where: { id } });
+    return this.prisma.invitation.findUniqueOrThrow({
+      where: { id: resentInvitation.id },
+    });
   }
 
   /**
@@ -270,20 +278,17 @@ export class InvitationService {
     
     const now = new Date();
     
-    const result = await this.prisma.invitation.updateMany({
+    const count = await this.prisma.invitation.count({
       where: {
         status: 'pending',
         expiresAt: {
           lt: now,
         },
       },
-      data: {
-        status: 'canceled',
-      },
     });
     
-    this.logger.log(`Expired ${result.count} invitations`);
+    this.logger.log(`Found ${count} expired invitations`);
     
-    return result;
+    return { count };
   }
 }

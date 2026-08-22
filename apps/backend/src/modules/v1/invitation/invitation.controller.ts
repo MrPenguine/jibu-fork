@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, UseGuards, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { InvitationService } from './invitation.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
@@ -7,6 +7,7 @@ import { OrganizationRoleGuard } from '../../../core/auth/guards/organization-ro
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { requestHeaders } from '../../../core/auth/request-headers';
+import { Public } from '../../../core/auth/decorators/public.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -55,11 +56,19 @@ export class InvitationController {
   }
 
   @Get('token/:token')
+  @Public()
   @ApiOperation({ summary: 'Get an invitation by token (public endpoint)' })
   @ApiResponse({ status: 200, description: 'Return the invitation.' })
   @ApiResponse({ status: 404, description: 'Invitation not found.' })
   findByToken(@Param('token') token: string) {
     return this.invitationService.findByToken(token);
+  }
+
+  @Get('public/:identifier')
+  @Public()
+  @ApiOperation({ summary: 'Get an invitation by ID or token (public endpoint)' })
+  findPublic(@Param('identifier') identifier: string) {
+    return this.invitationService.findPublic(identifier);
   }
 
   @Post(':id/revoke')

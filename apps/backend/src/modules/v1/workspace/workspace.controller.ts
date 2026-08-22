@@ -61,6 +61,7 @@ export class WorkspaceController {
       id,
       respondDto.action,
       requestHeaders(req),
+      respondDto.token,
     );
   }
 

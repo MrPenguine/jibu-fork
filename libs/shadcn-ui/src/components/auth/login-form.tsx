@@ -11,7 +11,7 @@ import {
 } from "../ui/card"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 type FormMode = "login" | "signup" | "forgot-password"
@@ -28,6 +28,9 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect")
+  const postAuthPath = redirectTo?.startsWith("/") ? redirectTo : "/"
 
   const titles = {
     "login": "Welcome back",
@@ -66,7 +69,7 @@ export function LoginForm({
         const response = await fetch("/api/auth/sign-in/social", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider: "google", callbackURL: "/" }),
+          body: JSON.stringify({ provider: "google", callbackURL: postAuthPath }),
         })
         
         const data = await response.json()
@@ -138,7 +141,7 @@ export function LoginForm({
           try {
             // Send the user to the root; middleware will use get-user-context
             // to decide between /admin and the appropriate workspace route.
-            router.push("/")
+            router.push(postAuthPath)
           } catch (e) {
             console.error("Post-login redirect failed:", e)
             router.push("/login/error?reason=workspace-resolution")
@@ -277,7 +280,7 @@ export function LoginForm({
                       Don&apos;t have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => router.push("/signup")}
+                        onClick={() => router.push(redirectTo ? `/signup?redirect=${encodeURIComponent(redirectTo)}` : "/signup")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -289,7 +292,7 @@ export function LoginForm({
                       Already have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => router.push("/login")}
+                        onClick={() => router.push(redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -304,7 +307,7 @@ export function LoginForm({
                 <div className="text-center text-sm">
                   <button
                     type="button"
-                    onClick={() => router.push("/login")}
+                    onClick={() => router.push(redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login")}
                     className="text-primary underline underline-offset-4"
                     disabled={isLoading}
                   >
