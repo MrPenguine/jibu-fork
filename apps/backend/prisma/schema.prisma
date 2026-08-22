@@ -70,6 +70,7 @@ model AuthSession {
   updatedAt DateTime
   ipAddress String?
   userAgent String?
+  activeOrganizationId String?
   userId    String
   user      AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -112,6 +113,9 @@ model AuthVerification {
 model Workspace {
   id                   String                   @id @default(uuid())
   name                 String
+  slug                 String                   @unique
+  logo                 String?
+  metadata             Json?
   email                String?
   settings             Json? // Store workspace settings as JSON
   createdAt            DateTime                 @default(now())
@@ -152,7 +156,7 @@ model WorkspaceMembership {
   userId         String? // Optional to handle invitations for non-users
   email          String? // Store email for pending memberships with no user
   role           String
-  status         String   @default("pending") // Status: "pending", "active", "revoked"
+  status         String   @default("active") // Plugin members are active; legacy pending/revoked rows remain inaccessible
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -169,13 +173,13 @@ model Invitation {
   email          String
   workspaceId String
   role           String
-  token          String   @unique
-  status         String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  token          String   @unique @default(uuid())
+  status         String   @default("pending")
   invitedById    String
   message        String? // Optional message to include with invitation
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  expiresAt      DateTime
+  expiresAt      DateTime @default(dbgenerated("CURRENT_TIMESTAMP + interval '30 days'"))
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   invitedBy    User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)

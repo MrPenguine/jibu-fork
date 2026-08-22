@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ApiKeyService } from './api-key.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -14,7 +15,7 @@ interface AuthenticatedRequest extends Request {
 
 @ApiTags('API Keys')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('api-keys')
 export class ApiKeyController {
   constructor(private readonly apiKeyService: ApiKeyService) {}

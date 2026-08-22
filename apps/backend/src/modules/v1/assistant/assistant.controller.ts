@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Req, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
-import { WorkspaceMemberGuard } from '../../../core/auth/guards/workspace-member.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
 import { AssistantService } from './assistant.service';
 import { CreateAssistantDto } from './dto/create-assistant.dto';
 import { UpdateAssistantDto } from './dto/update-assistant.dto';
 
 @ApiTags('assistants')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, WorkspaceMemberGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('assistants')
 export class AssistantController {
   constructor(private readonly assistantService: AssistantService) {}

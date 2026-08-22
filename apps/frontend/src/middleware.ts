@@ -13,6 +13,24 @@ export async function middleware(request: NextRequest) {
   const user = session?.user
   const isPublicAuthPage = path === '/login' || path === '/signup' || path === '/login/error'
   const isAuthEntryPage = path === '/' || path === '/login' || path === '/signup'
+  const workspaceMatch = path.match(/^\/workspace\/([^/]+)/)
+  if (user && workspaceMatch && !isAuthEntryPage) {
+    const workspaceContextResponse = await fetch(`${backendUrl}/api/users/context`, {
+      headers: {
+        cookie: request.headers.get('cookie') ?? '',
+        'x-workspace-id': workspaceMatch[1],
+      },
+    })
+    if (!workspaceContextResponse.ok) {
+      if (workspaceContextResponse.status === 403) {
+        return NextResponse.json(
+          { error: 'You are not a member of this workspace' },
+          { status: 403 },
+        )
+      }
+      return NextResponse.redirect(new URL('/login/error?reason=workspace-resolution', request.url))
+    }
+  }
   if (user && isAuthEntryPage) {
     const contextResponse = await fetch(`${backendUrl}/api/users/context`, {
       headers: { cookie: request.headers.get('cookie') ?? '' },

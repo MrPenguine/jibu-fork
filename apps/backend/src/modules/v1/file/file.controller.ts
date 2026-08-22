@@ -17,6 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
 import { FileService } from './file.service';
 import { FileResponseDto } from './dto/file-response.dto';
 import { ListFilesDto } from './dto/list-files.dto';
@@ -46,33 +47,15 @@ interface MulterFile {
 
 @ApiTags('Files')
 @Controller('files')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @ApiBearerAuth()
 export class FileController {
   private readonly logger = new Logger(FileController.name);
 
   constructor(private readonly fileService: FileService) {}
 
-  private getWorkspaceId(req: AuthenticatedRequest, queryWorkspaceId?: string): string {
-    let workspaceId = req.headers['x-force-workspace-id'] as string;
-    
-    if (!workspaceId && queryWorkspaceId) {
-      workspaceId = queryWorkspaceId;
-    }
-    
-    if (!workspaceId && req.headers['x-workspace-id']) {
-      workspaceId = req.headers['x-workspace-id'] as string;
-    }
-    
-    if (!workspaceId && req.body?.workspaceId) {
-      workspaceId = req.body.workspaceId;
-    }
-    
-    if (!workspaceId && req.user?.workspaceId) {
-      workspaceId = req.user.workspaceId;
-    }
-    
-    return workspaceId;
+  private getWorkspaceId(req: AuthenticatedRequest): string {
+    return req.user?.workspaceId || '';
   }
 
   private sanitizeUserId(userId: string | undefined | string[]): string | null {
@@ -113,6 +96,7 @@ export class FileController {
     @Query('workspaceId') queryWorkspaceId: string,
     @Headers('x-workspace-id') headerWorkspaceId: string,
     @Headers('x-force-workspace-id') forceWorkspaceId: string,
+    @Req() req: AuthenticatedRequest,
   ): Promise<FileResponseDto> {
     const userId = this.sanitizeUserId(bodyUserId);
 
@@ -123,9 +107,7 @@ export class FileController {
     this.logger.log(`- Header 'x-workspace-id': ${headerWorkspaceId || 'not provided'}`);
     this.logger.log(`- Header 'x-force-workspace-id': ${forceWorkspaceId || 'not provided'}`);
     
-    const cleanBodyWorkspaceId = bodyWorkspaceId?.includes(',') ? bodyWorkspaceId.split(',')[0] : bodyWorkspaceId;
-    
-    const workspaceId = forceWorkspaceId || queryWorkspaceId || cleanBodyWorkspaceId || headerWorkspaceId;
+    const workspaceId = req.user.workspaceId;
     
     if (!workspaceId) {
       this.logger.error('No workspace ID provided in request');
@@ -164,7 +146,7 @@ export class FileController {
   ): Promise<ListFilesDto> {
     this.logger.log(`List files request received. Query params - workspaceId: ${queryWorkspaceId}`);
     
-    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
+    const workspaceId = this.getWorkspaceId(req);
     
     if (!workspaceId) {
       throw new BadRequestException('Workspace ID is required');
@@ -196,7 +178,7 @@ export class FileController {
   ): Promise<FileResponseDto> {
     this.logger.log(`Get file request received for fileId: ${fileId}. Query params - workspaceId: ${queryWorkspaceId}, userId: ${queryUserId}`);
     
-    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
+    const workspaceId = this.getWorkspaceId(req);
     
     const userId = this.sanitizeUserId(queryUserId || req.user?.userId);
     if (userId) {
@@ -229,7 +211,7 @@ export class FileController {
   ): Promise<{ downloadUrl: string }> {
     this.logger.log(`Get download URL request received for fileId: ${fileId}. Query params - workspaceId: ${queryWorkspaceId}, userId: ${queryUserId}`);
     
-    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
+    const workspaceId = this.getWorkspaceId(req);
     
     const userId = this.sanitizeUserId(queryUserId || req.user?.userId);
     if (userId) {
@@ -266,7 +248,7 @@ export class FileController {
     this.logger.log(`Query params - workspaceId: ${queryWorkspaceId}, userId: ${queryUserId}`);
     this.logger.log(`Headers - x-user-id: ${headerUserId || 'not provided'}`);
     
-    const workspaceId = this.getWorkspaceId(req, queryWorkspaceId);
+    const workspaceId = this.getWorkspaceId(req);
     
     let userId = this.sanitizeUserId(queryUserId);
     

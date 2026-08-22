@@ -1,5 +1,6 @@
 import { prismaAdapter } from '@better-auth/prisma-adapter';
 import { betterAuth, type BetterAuthOptions, type User as BetterAuthUser } from 'better-auth';
+import { organization } from 'better-auth/plugins';
 import { getSharedPrismaService } from '../database/prisma.service';
 
 const authPrisma = getSharedPrismaService();
@@ -57,6 +58,9 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
       : await tx.workspace.create({
           data: {
             name: `${user.firstName || user.email}'s Workspace`,
+            slug: `${user.firstName || 'workspace'}-${createdUser.id.slice(0, 8)}`
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-'),
             memberships: {
               create: {
                 userId: user.id,
@@ -85,6 +89,22 @@ const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
     update: {
       after: async (updatedUser) => {
         await provisionApplicationUser(updatedUser);
+      },
+    },
+  },
+  session: {
+    create: {
+      after: async (createdSession) => {
+        const user = await authPrisma.user.findUnique({
+          where: { id: createdSession.userId },
+          select: { lastWorkspaceId: true },
+        });
+        if (user?.lastWorkspaceId) {
+          await authPrisma.authSession.update({
+            where: { id: createdSession.id },
+            data: { activeOrganizationId: user.lastWorkspaceId },
+          });
+        }
       },
     },
   },
@@ -131,5 +151,44 @@ export const auth = betterAuth({
     },
   },
   socialProviders,
+  plugins: [
+    organization({
+      creatorRole: 'owner',
+      allowUserToCreateOrganization: true,
+      schema: {
+        session: {
+          fields: {
+            activeOrganizationId: 'activeOrganizationId',
+          },
+        },
+        organization: {
+          modelName: 'Workspace',
+        },
+        member: {
+          modelName: 'WorkspaceMembership',
+          fields: {
+            organizationId: 'workspaceId',
+          },
+        },
+        invitation: {
+          modelName: 'Invitation',
+          fields: {
+            organizationId: 'workspaceId',
+            inviterId: 'invitedById',
+          },
+        },
+      },
+      sendInvitationEmail: async ({ id, email, organization: invitedOrganization }) => {
+        const invitationUrl = `${frontendUrl}/invite/${id}`;
+        if (runtimeEnv !== 'production') {
+          console.warn(
+            `[Better Auth] Invitation email delivery is not configured. Invitation URL for ${email} to ${invitedOrganization.name}: ${invitationUrl}`,
+          );
+          return;
+        }
+        throw new Error('Email delivery is not configured');
+      },
+    }),
+  ],
   databaseHooks,
 });

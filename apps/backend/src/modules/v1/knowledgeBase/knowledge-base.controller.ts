@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
 import { UpdateKnowledgeBaseDto } from './dto/update-knowledge-base.dto';
@@ -27,7 +28,7 @@ import { ConfigService } from '@nestjs/config';
 @ApiTags('Knowledge Bases')
 @ApiBearerAuth()
 @Controller('v1/knowledge-bases')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 export class KnowledgeBaseController {
   private readonly logger = new Logger(KnowledgeBaseController.name);
 

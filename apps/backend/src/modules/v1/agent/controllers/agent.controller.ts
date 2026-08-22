@@ -5,7 +5,7 @@ import { AgentService } from '../services/agent.service';
 import { AgentService as IntegrationsAgentService } from '../../../../integrations/agent/agent.service';
 import { CreateAgentDto, UpdateAgentDto, UpdateAgentConfigDto } from '../dto';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
-import { WorkspaceMemberGuard } from '../../../../core/auth/guards/workspace-member.guard';
+import { OrganizationGuard } from '../../../../core/auth/guards/organization.guard';
 import { Public } from '../../../../core/auth/decorators/public.decorator';
 import { Request } from 'express';
 import { AgentRequest, AgentResponse } from '../../../../integrations/agent/interfaces/agent.interface';
@@ -24,12 +24,13 @@ interface StreamResponse {
 // Auth payload placed on req.user by the auth guard/strategy
 interface AuthUser {
   lastWorkspaceId?: string;
-  [key: string]: any;
 }
+
+type AuthenticatedRequest = Request & { user?: AuthUser };
 
 @ApiTags('agents')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, WorkspaceMemberGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('v1/agents')
 export class AgentController {
   private readonly logger = new Logger(AgentController.name);
@@ -232,7 +233,7 @@ export class AgentController {
   async processQuery(@Body() request: AgentRequest, @Req() req: Request): Promise<AgentResponse> {
     this.logger.log(`Processing agent query: ${request.input}`);
 
-    const workspaceId = (req.user as AuthUser)?.lastWorkspaceId || (req.headers['x-workspace-id'] as string);
+    const workspaceId = (req as AuthenticatedRequest).user?.lastWorkspaceId;
 
     if (request.config?.assistantId && workspaceId) {
       try {
@@ -268,7 +269,7 @@ export class AgentController {
   async streamQuery(@Req() req: Request, @Body() request: AgentRequest): Promise<StreamableFile> {
     this.logger.log(`Processing streaming agent query: ${request.input}`);
 
-    const workspaceId = (req.user as AuthUser)?.lastWorkspaceId || (req.headers['x-workspace-id'] as string);
+    const workspaceId = (req as AuthenticatedRequest).user?.lastWorkspaceId;
 
     if (request.config?.assistantId && workspaceId) {
       try {

@@ -45,7 +45,7 @@ export default function MembersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("editor");
+  const [inviteRole, setInviteRole] = useState("member");
   const [isSending, setIsSending] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [isLinkCopied, setIsLinkCopied] = useState(false);
@@ -219,14 +219,13 @@ export default function MembersPage() {
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full justify-between">
                           {inviteRole === "admin" ? "Admin" : 
-                           inviteRole === "editor" ? "Editor" : 
-                           inviteRole === "viewer" ? "Viewer" : "Select role"}
+                           inviteRole === "member" ? "Member" :
+                           inviteRole === "admin" ? "Admin" : "Select role"}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-56">
+                        <DropdownMenuItem onClick={() => setInviteRole("member")}>Member</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setInviteRole("admin")}>Admin</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setInviteRole("editor")}>Editor</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setInviteRole("viewer")}>Viewer</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

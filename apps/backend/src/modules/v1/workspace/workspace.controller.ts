@@ -22,8 +22,10 @@ import {
   TransferOwnershipDto,
 } from './dto/workspace.dto';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
+import { requestHeaders } from '../../../core/auth/request-headers';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('workspaces')
 export class WorkspaceController {
   constructor(private readonly workspaceService: WorkspaceService) {}
@@ -40,12 +42,12 @@ export class WorkspaceController {
 
     @Post('invitations/:id/revoke')
   async revokeInvitation(@Request() req: any, @Param('id') id: string) {
-    return this.workspaceService.revokeInvitation(id, req.user.id);
+    return this.workspaceService.revokeInvitation(id, req.user.id, requestHeaders(req));
   }
 
   @Post('invitations/:id/resend')
   async resendInvitation(@Request() req: any, @Param('id') id: string) {
-    return this.workspaceService.resendInvitation(id, req.user.id);
+    return this.workspaceService.resendInvitation(id, req.user.id, requestHeaders(req));
   }
 
   @Post('invitations/:id/respond')
@@ -58,6 +60,7 @@ export class WorkspaceController {
       req.user.id,
       id,
       respondDto.action,
+      requestHeaders(req),
     );
   }
 
@@ -74,6 +77,7 @@ export class WorkspaceController {
     return this.workspaceService.createWorkspace(
       req.user.id,
       createWorkspaceDto.name,
+      requestHeaders(req),
     );
   }
 
@@ -101,7 +105,7 @@ export class WorkspaceController {
     @Param('id') id: string,
     @Body() inviteDto: InviteMembersDto,
   ) {
-    return this.workspaceService.inviteMembers(req.user.id, id, inviteDto);
+    return this.workspaceService.inviteMembers(req.user.id, id, inviteDto, requestHeaders(req));
   }
 
   @Get(':id/members')
@@ -121,6 +125,7 @@ export class WorkspaceController {
       id,
       memberId,
       updateRoleDto.role,
+      requestHeaders(req),
     );
   }
 
@@ -130,7 +135,7 @@ export class WorkspaceController {
     @Param('id') id: string,
     @Param('memberId') memberId: string,
   ) {
-    return this.workspaceService.removeMember(req.user.id, id, memberId);
+    return this.workspaceService.removeMember(req.user.id, id, memberId, requestHeaders(req));
   }
 
   @Post(':id/transfer-ownership')

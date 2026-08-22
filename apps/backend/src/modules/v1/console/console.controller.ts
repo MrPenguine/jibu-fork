@@ -11,15 +11,16 @@ import {
   ForbiddenException
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { ConsoleService } from './console.service';
 import { LogEntryDto } from './dto/log-entry.dto';
-import { WorkspaceRoleGuard } from '../../../core/auth/guards/workspace-role.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
+import { OrganizationRoleGuard } from '../../../core/auth/guards/organization-role.guard';
 import { Request } from 'express';
 
 @ApiTags('console')
 @Controller('v1/console')
-@UseGuards(AuthGuard('jwt'), WorkspaceRoleGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard, OrganizationRoleGuard())
 @ApiBearerAuth()
 export class ConsoleController {
   constructor(private readonly consoleService: ConsoleService) {}
@@ -34,7 +35,7 @@ export class ConsoleController {
     @Query('sessionId') sessionId: string,
     @Req() req: Request
   ) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
+    const workspaceId = (req as Request & { user?: { workspaceId?: string } }).user?.workspaceId;
     
     // Verify assistant exists in this workspace
     const isValid = await this.consoleService.verifyAssistant(assistantId, workspaceId);
@@ -60,7 +61,7 @@ export class ConsoleController {
     @Query('sessionId') sessionId: string,
     @Req() req: Request
   ) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
+    const workspaceId = (req as Request & { user?: { workspaceId?: string } }).user?.workspaceId;
     
     // Verify assistant exists in this workspace
     const isValid = await this.consoleService.verifyAssistant(assistantId, workspaceId);
@@ -80,7 +81,7 @@ export class ConsoleController {
     @Query('sessionId') sessionId: string,
     @Req() req: Request
   ) {
-    const workspaceId = req.headers['x-workspace-id'] as string;
+    const workspaceId = (req as Request & { user?: { workspaceId?: string } }).user?.workspaceId;
     
     // Verify assistant exists in this workspace
     const isValid = await this.consoleService.verifyAssistant(assistantId, workspaceId);

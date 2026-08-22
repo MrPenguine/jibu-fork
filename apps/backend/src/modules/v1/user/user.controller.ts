@@ -2,6 +2,9 @@ import { Controller, Get, UseGuards, Request, Post, Body, Delete, NotFoundExcept
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { UserService } from './user.service';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
+import { auth } from '../../../core/auth/auth';
+import { requestHeaders } from '../../../core/auth/request-headers';
 
 class UpdateLastWorkspaceDto {
   workspaceId: string;
@@ -28,12 +31,13 @@ export class UserController {
   /**
    * Get user context including workspace information
    */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrganizationGuard)
   @Get('context')
   async getUserContext(@Request() req: any) {
     const user = req.user; // User object from JwtStrategy
 
-    if (!user.lastWorkspaceId) {
+    const workspaceId = user.workspaceId || user.lastWorkspaceId;
+    if (!workspaceId) {
       return {
         user: {
           id: user.id,
@@ -53,7 +57,7 @@ export class UserController {
     const membership = await this.prisma.workspaceMembership.findFirst({
       where: {
         userId: user.id,
-        workspaceId: user.lastWorkspaceId,
+        workspaceId,
       },
       include: {
         workspace: true,
@@ -61,7 +65,7 @@ export class UserController {
     });
 
     if (!membership) {
-      throw new NotFoundException(`Membership not found for workspace ${user.lastWorkspaceId}`);
+      throw new NotFoundException(`Membership not found for workspace ${workspaceId}`);
     }
 
     return {
@@ -95,6 +99,10 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Post('last-workspace')
   async updateLastWorkspace(@Request() req: any, @Body() body: UpdateLastWorkspaceDto) {
+    await auth.api.setActiveOrganization({
+      body: { organizationId: body.workspaceId },
+      headers: requestHeaders(req),
+    });
     return this.userService.updateLastWorkspace(req.user.id, body.workspaceId);
   }
 

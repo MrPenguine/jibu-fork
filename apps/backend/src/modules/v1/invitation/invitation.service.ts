@@ -1,10 +1,8 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { ConfigService } from '@nestjs/config';
-import { randomBytes } from 'crypto';
-import { add } from 'date-fns';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { auth } from '../../../core/auth/auth';
 
 @Injectable()
 export class InvitationService {
@@ -12,13 +10,16 @@ export class InvitationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
   ) {}
 
   /**
    * Create a new invitation
    */
-  async create(createInvitationDto: CreateInvitationDto, invitedById: string) {
+  async create(
+    createInvitationDto: CreateInvitationDto,
+    invitedById: string,
+    headers: Headers,
+  ) {
     this.logger.log(`Creating invitation for ${createInvitationDto.email} by user ${invitedById}`);
     
     const membership = await this.prisma.workspaceMembership.findFirst({
@@ -40,7 +41,7 @@ export class InvitationService {
       where: {
         email: createInvitationDto.email,
         workspaceId: createInvitationDto.workspaceId,
-        status: 'PENDING',
+        status: 'pending',
       },
     });
 
@@ -48,22 +49,21 @@ export class InvitationService {
       throw new BadRequestException('An invitation has already been sent to this email');
     }
 
-    const token = randomBytes(32).toString('hex');
-    
-    const expirationDays = this.configService.get<number>('INVITATION_EXPIRY_DAYS', 7);
-    const expiresAt = add(new Date(), { days: expirationDays });
-
-    return this.prisma.invitation.create({
-      data: {
+    const invitation = await auth.api.createInvitation({
+      body: {
         email: createInvitationDto.email,
-        workspaceId: createInvitationDto.workspaceId,
-        role: createInvitationDto.role,
-        token,
-        invitedById,
-        message: createInvitationDto.message,
-        expiresAt,
+        organizationId: createInvitationDto.workspaceId,
+        role: createInvitationDto.role === 'admin' ? 'admin' : 'member',
       },
+      headers,
     });
+    if (createInvitationDto.message) {
+      await this.prisma.invitation.update({
+        where: { id: invitation.id },
+        data: { message: createInvitationDto.message },
+      });
+    }
+    return this.prisma.invitation.findUniqueOrThrow({ where: { id: invitation.id } });
   }
 
   /**
@@ -175,18 +175,14 @@ export class InvitationService {
       throw new NotFoundException('Invitation not found');
     }
 
-    if (invitation.status === 'EXPIRED' || invitation.expiresAt < new Date()) {
-      if (invitation.status !== 'EXPIRED') {
+    if (invitation.status === 'canceled' || invitation.expiresAt < new Date()) {
+      if (invitation.status !== 'canceled') {
         await this.prisma.invitation.update({
           where: { id: invitation.id },
-          data: { status: 'EXPIRED' },
+          data: { status: 'canceled' },
         });
       }
       throw new BadRequestException('This invitation has expired');
-    }
-
-    if (invitation.status === 'REVOKED') {
-      throw new BadRequestException('This invitation has been revoked');
     }
 
     return invitation;
@@ -195,7 +191,7 @@ export class InvitationService {
   /**
    * Revoke an invitation
    */
-  async revoke(id: string, userId: string) {
+  async revoke(id: string, userId: string, headers: Headers) {
     const invitation = await this.prisma.invitation.findUnique({
       where: { id },
     });
@@ -219,16 +215,17 @@ export class InvitationService {
       throw new BadRequestException('You do not have permission to revoke this invitation');
     }
 
-    return this.prisma.invitation.update({
-      where: { id },
-      data: { status: 'REVOKED' },
+    await auth.api.cancelInvitation({
+      body: { invitationId: id },
+      headers,
     });
+    return this.prisma.invitation.findUniqueOrThrow({ where: { id } });
   }
 
   /**
    * Resend an invitation
    */
-  async resend(id: string, userId: string) {
+  async resend(id: string, userId: string, headers: Headers) {
     const invitation = await this.prisma.invitation.findUnique({
       where: { id },
     });
@@ -252,20 +249,16 @@ export class InvitationService {
       throw new BadRequestException('You do not have permission to resend this invitation');
     }
 
-    const token = randomBytes(32).toString('hex');
-    
-    const expirationDays = this.configService.get<number>('INVITATION_EXPIRY_DAYS', 7);
-    const expiresAt = add(new Date(), { days: expirationDays });
-
-    return this.prisma.invitation.update({
-      where: { id },
-      data: {
-        token,
-        status: 'PENDING',
-        expiresAt,
-        updatedAt: new Date(),
+    await auth.api.createInvitation({
+      body: {
+        email: invitation.email,
+        organizationId: invitation.workspaceId,
+        role: invitation.role === 'admin' ? 'admin' : 'member',
+        resend: true,
       },
+      headers,
     });
+    return this.prisma.invitation.findUniqueOrThrow({ where: { id } });
   }
 
   /**
@@ -279,13 +272,13 @@ export class InvitationService {
     
     const result = await this.prisma.invitation.updateMany({
       where: {
-        status: 'PENDING',
+        status: 'pending',
         expiresAt: {
           lt: now,
         },
       },
       data: {
-        status: 'EXPIRED',
+        status: 'canceled',
       },
     });
     
