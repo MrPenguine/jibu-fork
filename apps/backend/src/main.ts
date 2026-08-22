@@ -4,6 +4,7 @@ import { AppModule } from './app/app.module';
 import { json } from 'express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
+import { auth } from './core/auth/auth';
 
 // Polyfill global crypto.randomUUID for @nestjs/schedule which expects a global crypto object
 const g: any = global as any;
@@ -28,18 +29,46 @@ async function bootstrap() {
     logger: process.env.NODE_ENV === 'development' ? ['log', 'fatal', 'error', 'warn', 'debug', 'verbose'] : ['log', 'fatal', 'error', 'warn'],
     bodyParser: false // Disable NestJS built-in body parser
   });
-  
-  const globalPrefix = 'api';
-  app.setGlobalPrefix(globalPrefix);
 
-  // Use Express body parser with rawBody option
+  app.use('/api/auth', async (req: any, res: any, next: any) => {
+    try {
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+      }
+      let body: Buffer | undefined;
+      if (!['GET', 'HEAD'].includes(req.method)) {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(Buffer.from(chunk));
+        body = Buffer.concat(chunks);
+      }
+      const request = new Request(`http://${req.headers.host}${req.originalUrl}`, {
+        method: req.method,
+        headers,
+        body: body?.length ? (body as any) : undefined,
+      });
+      const response = await auth.handler(request);
+      res.status(response.status);
+      response.headers.forEach((value, key) => {
+        if (key !== 'set-cookie') res.setHeader(key, value);
+      });
+      const setCookies = response.headers.getSetCookie?.();
+      if (setCookies?.length) res.setHeader('set-cookie', setCookies);
+      res.send(await response.text());
+    } catch (error) {
+      next(error);
+    }
+  });
   app.use(json({
     verify: (req: any, res, buf) => {
       req.rawBody = buf;
     },
-    limit: '10mb', // Increase the size limit for file uploads
+    limit: '10mb',
   }));
   
+  const globalPrefix = 'api';
+  app.setGlobalPrefix(globalPrefix);
+
   // Enable validation
   app.useGlobalPipes(new ValidationPipe({
     transform: true,

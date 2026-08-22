@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { supabaseAdmin } from '../../../core/supabase/admin';
 
 @Injectable()
 export class UserService {
@@ -76,12 +75,6 @@ export class UserService {
    * Delete the current user account
    */
   async deleteUserAccount(userId: string): Promise<void> {
-    // Delete the user from Supabase Auth
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (error) {
-      throw new Error(`Failed to delete user from Supabase Auth: ${error.message}`);
-    }
-    // Delete the user from the database
     await this.prisma.user.delete({ where: { id: userId } });
   }
 }

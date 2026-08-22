@@ -3,14 +3,14 @@ import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { WorkspaceController } from './workspace.controller';
 import { WorkspaceService } from './workspace.service';
-import { PrismaService } from '../../../core/database/prisma.service';
+import { DatabaseModule } from '../../../core/database/database.module';
 import { ApiKeyModule } from '../api-key/api-key.module';
 import { EncryptionModule } from '../../../core/encryption/encryption.module';
 
 @Module({
-  imports: [ApiKeyModule, EncryptionModule, ConfigModule, ScheduleModule.forRoot()],
+  imports: [ApiKeyModule, EncryptionModule, ConfigModule, ScheduleModule.forRoot(), DatabaseModule],
   controllers: [WorkspaceController],
-  providers: [WorkspaceService, PrismaService],
+  providers: [WorkspaceService],
   exports: [WorkspaceService]
 })
 export class WorkspaceModule {}

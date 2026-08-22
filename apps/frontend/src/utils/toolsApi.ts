@@ -1,4 +1,4 @@
-import { createClient } from './supabase/client';
+import { authClient } from './auth/client';
 import { fetchAPI, API_BASE_URL } from './api';
 import { getActiveWorkspaceId } from './fileApi';
 
@@ -89,20 +89,17 @@ export function getCurrentWorkspaceId(specificWorkspaceId?: string): string | nu
 
 // Get authorization headers with token and workspace ID
 async function getAuthHeaders(workspaceId: string) {
-  const supabase = createClient();
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
+  const { data: session } = await authClient.getSession();
   
-  if (!token) {
-    throw new Error('No authentication token available');
+  if (!session?.user?.id) {
+    throw new Error('No active session');
   }
   
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
     'X-Workspace-ID': workspaceId,
     'workspace-id': workspaceId, // Some endpoints might expect this format
-    'X-User-ID': session.data.session?.user?.id || '',
+    'X-User-ID': session.user.id,
   };
 }
 

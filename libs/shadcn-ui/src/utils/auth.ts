@@ -1,5 +1,3 @@
-import { createClient } from './supabase/client';
-
 // Get the current workspace ID (preferred)
 export function getCurrentWorkspaceId(): string | null {
   if (typeof window === 'undefined') return null;
@@ -36,21 +34,14 @@ export function getCurrentOrganizationId(): string | null {
   return id;
 }
 
-// Get authorization headers with token and workspace ID (preferred)
+// Get request headers with workspace context.
 export async function getWorkspaceAuthHeaders() {
   const workspaceId = getCurrentWorkspaceId();
   if (!workspaceId) {
     throw new Error('No workspace ID available');
   }
-  const supabase = createClient();
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) {
-    throw new Error('No authentication token available');
-  }
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
     'X-Workspace-Id': workspaceId,
   } as Record<string, string>;
 }

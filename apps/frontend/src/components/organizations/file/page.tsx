@@ -7,10 +7,10 @@ import { Button } from '@libs/shadcn-ui/components/ui/button'
 import { Upload, Download, Link, Trash, FileIcon } from 'lucide-react'
 import { useToast } from '@libs/shadcn-ui/components/ui/use-toast'
 import { Card } from '@libs/shadcn-ui/components/ui/card'
-import * as fileApi from '../../../../utils/fileApi'
+import * as fileApi from '../../../utils/fileApi'
 import { Progress } from '@libs/shadcn-ui/components/ui/progress'
-import { useWorkspace } from '../../../../utils/workspaceContext'
-import { createClient } from '../../../../utils/supabase/client'
+import { useWorkspace } from '../../../utils/workspaceContext'
+import { authClient } from '../../../utils/auth/client'
 
 /**
  * Sanitize a user ID to ensure it's a single string value, not an array
@@ -190,10 +190,9 @@ export default function FilePage() {
       console.log(`[DELETE] Deleting file: ${selectedFile.id} from workspace: ${activeWorkspace.id}`);
       setIsDeleting(true);
       
-      // Get current user ID from Supabase session
+      // Get current user ID from the Better Auth session
       try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
+        const { data } = await authClient.getSession();
         const userId = data?.user?.id;
         
         if (!userId) {

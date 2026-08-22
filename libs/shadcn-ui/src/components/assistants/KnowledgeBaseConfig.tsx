@@ -72,7 +72,7 @@ import {
   TooltipTrigger,
   TooltipProvider
 } from "@libs/shadcn-ui/components/ui/tooltip"
-import { createClient } from '../../../../../apps/frontend/src/utils/supabase/client'
+import { authClient } from '../../../../../apps/frontend/src/utils/auth/client'
 
 interface KnowledgeBaseConfigProps {
   assistantId?: string;
@@ -781,20 +781,16 @@ export function KnowledgeBaseConfig({
     }
   };
   
-  // Add a function to get authorization headers with token and workspace ID
-  // We don't have access to this function from the other file, so we'll implement it here
+  // Add a function to get request headers with workspace context
   async function getWorkspaceAuthHeaders(wsId: string) {
     try {
-      const supabase = createClient();
-      const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
+      const { data: session } = await authClient.getSession();
       
-      if (!token) {
-        throw new Error('No authentication token available');
+      if (!session?.user?.id) {
+        throw new Error('No active session');
       }
       
       return {
-        'Authorization': `Bearer ${token}`,
         'X-Workspace-ID': wsId,
         'workspace-id': wsId,
         'X-Force-Workspace-ID': wsId,

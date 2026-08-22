@@ -101,7 +101,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const handleLogout = () => {
-    logout(new FormData());
+    logout();
   };
   
 

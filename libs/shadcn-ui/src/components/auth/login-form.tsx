@@ -63,15 +63,16 @@ export function LoginForm({
         const formData = new FormData()
         formData.append("provider", "google")
         
-        const response = await fetch("/api/auth/oauth", {
+        const response = await fetch("/api/auth/sign-in/social", {
           method: "POST",
-          body: formData,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ provider: "google", callbackURL: "/" }),
         })
         
         const data = await response.json()
         
-        if (data.error) {
-          setError(data.error)
+        if (!response.ok || data.error) {
+          setError(data.error?.message || data.error || "Unable to sign in with Google")
           return
         }
         
@@ -96,47 +97,43 @@ export function LoginForm({
         formData.append("email", email)
         formData.append("password", password)
         
-        let endpoint = "/api/auth/"
-        
-        switch (mode) {
-          case "login":
-            endpoint += "login"
-            break
-          case "signup":
-            endpoint += "signup"
-            break
-          case "forgot-password":
-            endpoint += "reset-password"
-            break
-        }
-        
+        const endpoint = mode === "login"
+          ? "/api/auth/sign-in/email"
+          : mode === "signup"
+            ? "/api/auth/sign-up/email"
+            : "/api/auth/request-password-reset"
+        const payload = mode === "forgot-password"
+          ? { email, redirectTo: `${window.location.origin}/reset-password` }
+          : mode === "signup"
+            ? { email, password, name: email }
+            : { email, password }
         const response = await fetch(endpoint, {
           method: "POST",
-          body: formData,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
         })
         
         const data = await response.json()
         
-        if (data.error) {
-          setError(data.error)
+        if (!response.ok || data.error) {
+          setError(data.error?.message || data.error || "Authentication failed")
           return
         }
         
-        if (data.success) {
-          if (mode === "forgot-password") {
-            setError("Check your email for the reset link")
-            setMode("login")
-            return
-          }
-          
-          if (mode === "signup") {
-            setError("Check your email for the confirmation link")
-            return
-          }
+        if (mode === "forgot-password") {
+          setError("Check your email for the reset link")
+          setMode("login")
+          return
+        }
+
+        if (mode === "signup" && !data.token) {
+          setError("Check your email for the confirmation link")
+          setMode("login")
+          return
         }
         
         // If login is successful, let middleware and server decide where to go
-        if (mode === "login") {
+        if (mode === "login" || mode === "signup") {
           setIsLoggingIn(true)
           try {
             // Send the user to the root; middleware will use get-user-context
@@ -144,7 +141,7 @@ export function LoginForm({
             router.push("/")
           } catch (e) {
             console.error("Post-login redirect failed:", e)
-            router.push("/workspaces")
+            router.push("/login/error?reason=workspace-resolution")
           } finally {
             router.refresh()
           }

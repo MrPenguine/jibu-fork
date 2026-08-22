@@ -231,7 +231,7 @@ export function CustomAppSidebar({
         </NavItem>
         <NavUser 
           user={userInfo ?? { name: 'User', email: '', avatar: '' }} 
-          profileHref={wsBase ? `${wsBase}/settings` : "/workspaces"}
+          profileHref={wsBase ? `${wsBase}/settings` : "/"}
           {...navUserProps} 
         />
       </SidebarFooter>

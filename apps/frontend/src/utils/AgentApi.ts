@@ -1,6 +1,6 @@
 import { fetchAPI, API_BASE_URL } from './api';
 import { FlowNode, FlowEdge, AgentDefinition, AgentSessionOutput } from '../../../../libs/src';
-import { createClient } from './supabase/client';
+import { authClient } from './auth/client';
 import { getActiveWorkspaceId } from './fileApi';
 
 // Use shared API_BASE_URL from utils/api for consistent base path handling
@@ -163,17 +163,15 @@ export async function sendStreamingAgentRequest(
     
     // Use fetchAPI for authentication but still need direct fetch for streaming
     // Get auth headers from fetchAPI's internal implementation
-    const supabase = await import('./supabase/client').then(m => m.createClient());
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: session } = await authClient.getSession();
     const activeWorkspaceId = await import('./fileApi').then(m => m.getActiveWorkspaceId());
     
-    if (!session?.access_token) {
+    if (!session?.user?.id) {
       throw new Error('No active session. User must be authenticated to make this request.');
     }
     
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`,
       ...(activeWorkspaceId ? { 'X-Workspace-ID': activeWorkspaceId, 'workspace-id': activeWorkspaceId } : {}),
       ...(options?.headers || {})
     };
@@ -307,17 +305,15 @@ function getCurrentWorkspaceId(specificWorkspaceId?: string): string | null {
 
 // Get authorization headers with token and workspace ID
 async function getAuthHeaders(workspaceId: string) {
-  const supabase = createClient();
-  const session = await supabase.auth.getSession();
-  const token = session.data.session?.access_token;
+  const { data: session } = await authClient.getSession();
+  const token = session?.user?.id;
   
   if (!token) {
-    throw new Error('No authentication token available');
+    throw new Error('No active session');
   }
   
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
     'X-Workspace-ID': workspaceId,
     'workspace-id': workspaceId
   };

@@ -113,7 +113,7 @@ export default function AdminLayout({
 
       if (!isPlatformAdmin) {
         setIsLoading(false);
-        router.push('/workspaces');
+        router.push('/');
         return;
       }
 
@@ -128,7 +128,7 @@ export default function AdminLayout({
   }, [router, user, apiLoading, isPlatformAdmin]);
 
   const handleLogout = () => {
-    logout(new FormData());
+    logout();
   };
 
   // Loading state

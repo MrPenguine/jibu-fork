@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '../../../../../utils/api';
-import { createClient } from '../../../../../utils/supabase/server';
+import { createClient, getSessionHeaders } from '../../../../../utils/auth/server';
 
 async function withAuth() {
   const supabase = await createClient();
@@ -8,7 +8,7 @@ async function withAuth() {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session?.access_token) {
+  if (!session?.user?.id) {
     return {
       session: null as any,
       errorResponse: NextResponse.json(
@@ -34,7 +34,7 @@ export async function GET(
     const response = await fetch(`${API_BASE_URL}/admin/subscriptions/${id}`, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        ...(await getSessionHeaders()),
       },
       cache: 'no-store',
     });
@@ -86,7 +86,7 @@ export async function PATCH(
     const response = await fetch(`${API_BASE_URL}/admin/subscriptions/${id}`, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        ...(await getSessionHeaders()),
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -133,7 +133,7 @@ export async function DELETE(
     const response = await fetch(`${API_BASE_URL}/admin/subscriptions/${id}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        ...(await getSessionHeaders()),
       },
     });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '../../../../utils/api';
-import { createClient } from '../../../../utils/supabase/server';
+import { createClient, getSessionHeaders } from '../../../../utils/auth/server';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session?.access_token) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        ...(await getSessionHeaders()),
       },
       cache: 'no-store',
     });
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session?.access_token) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     const response = await fetch(`${API_BASE_URL}/admin/subscriptions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${session.access_token}`,
+        ...(await getSessionHeaders()),
         'Content-Type': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,

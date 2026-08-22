@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuthAndWorkspace } from '../../../utils/apiRouteProtection';
 import { API_BASE_URL } from '../../../utils/api';
+import { getSessionHeaders } from '../../../utils/auth/server';
 
 export async function GET(request: NextRequest) {
   return withAuthAndWorkspace(
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
         const response = await fetch(`${API_BASE_URL}/admin/settings`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            ...(await getSessionHeaders()),
             'Content-Type': 'application/json',
             'X-Workspace-ID': workspaceId || '',
           },
