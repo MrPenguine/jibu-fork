@@ -53,6 +53,7 @@ export class SessionAuthGuard implements CanActivate {
       ...user,
       userId: user.id,
       workspaceId: user.lastWorkspaceId,
+      workspaceRole: undefined,
     };
     return true;
   }

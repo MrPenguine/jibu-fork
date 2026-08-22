@@ -51,7 +51,7 @@ export default function WorkspaceSettingsPage() {
     );
   }
 
-  const isEditor = activeWorkspace.role === 'editor';
+  const isEditor = activeWorkspace.role === 'member';
 
   return (
     <div className="w-full px-6 pb-6 pt-0">
@@ -163,4 +163,3 @@ export default function WorkspaceSettingsPage() {
     </div>
   );
 }
-

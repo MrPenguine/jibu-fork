@@ -9,17 +9,21 @@ import {
   Query,
   Req,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { ChatsService } from './chats.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
 
 /**
  * ChatsController handles REST endpoints for chats, delegating to Prisma for chat rows and ChatsService for message diagnostics.
  */
 @ApiTags('chats')
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('v1/chats')
 export class ChatsController {
   constructor(
@@ -32,7 +36,7 @@ export class ChatsController {
   async listChats(
     @Req() req,
     @Query('agentId') agentId?: string,
-    @Query('sessionType') sessionType: string = 'chat',
+    @Query('sessionType') sessionType = 'chat',
   ) {
     const workspaceId =
       req.user?.lastWorkspaceId ||

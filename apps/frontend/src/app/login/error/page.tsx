@@ -10,13 +10,18 @@ export default async function LoginErrorPage({
   const params = await searchParams
   const reason = Array.isArray(params.reason) ? params.reason[0] : params.reason
   const isWorkspaceResolutionError = reason === 'workspace-resolution'
+  const isWorkspaceAccessError = reason === 'workspace-access'
 
   return (
     <div className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>
-            {isWorkspaceResolutionError ? 'Workspace unavailable' : 'Authentication Error'}
+            {isWorkspaceAccessError
+              ? 'Workspace access denied'
+              : isWorkspaceResolutionError
+                ? 'Workspace unavailable'
+                : 'Authentication Error'}
           </CardTitle>
           <CardDescription>
             We encountered an issue with your authentication request.
@@ -24,9 +29,11 @@ export default async function LoginErrorPage({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {isWorkspaceResolutionError
-              ? "We couldn't load your workspace. Please try again, and contact support if the problem continues."
-              : 'This could be due to an expired or invalid authentication link, or another issue with your account.'}
+            {isWorkspaceAccessError
+              ? "You don't have access to that workspace. Choose one of your workspaces and try again."
+              : isWorkspaceResolutionError
+                ? "We couldn't load your workspace. Please try again, and contact support if the problem continues."
+                : 'This could be due to an expired or invalid authentication link, or another issue with your account.'}
           </p>
         </CardContent>
         <CardFooter>

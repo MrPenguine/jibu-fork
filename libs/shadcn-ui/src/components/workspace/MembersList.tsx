@@ -143,7 +143,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
 
   const getAvailableRoles = () => {
     if (userRole === 'owner') {
-      return ['admin', 'editor'];
+      return ['admin', 'member'];
     }
     return [];
   }
@@ -153,7 +153,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
     if (isCurrentUser) return false;
     if (member.role === 'owner') return false;
     if (userRole === 'owner') return member.role !== 'owner';
-    if (userRole === 'admin') return member.role === 'editor';
+    if (userRole === 'admin') return member.role === 'member';
     return false;
   }
 
@@ -172,7 +172,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
       if (isCurrentUser(a)) return -1;
       if (isCurrentUser(b)) return 1;
 
-      const roleOrder: Record<string, number> = { owner: 0, admin: 1, editor: 2 };
+      const roleOrder: Record<string, number> = { owner: 0, admin: 1, member: 2 };
       if (a.role !== b.role) {
         return (roleOrder[a.role] || 999) - (roleOrder[b.role] || 999);
       }

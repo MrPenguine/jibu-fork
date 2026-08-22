@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../../core/auth/guards/organization.guard';
 import { WorkflowService } from '../services/workflow.service';
 import { OrchestratorService } from '../../../../core/n8n-orchestrator/orchestrator.service';
 import { CompileContextBuilder } from '../../../../core/n8n-orchestrator/compile-context.builder';
@@ -24,7 +25,7 @@ import { CreateWorkflowDto, UpdateWorkflowDto } from '../dto';
 
 @ApiTags('workflows')
 @Controller('v1/workflows')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @ApiBearerAuth()
 export class WorkflowController {
   constructor(

@@ -12,7 +12,23 @@ export async function middleware(request: NextRequest) {
   const session = sessionResponse.ok ? await sessionResponse.json() : null
   const user = session?.user
   const isPublicAuthPage = path === '/login' || path === '/signup' || path === '/login/error'
+  const isPublicInvite = path.startsWith('/invite/')
   const isAuthEntryPage = path === '/' || path === '/login' || path === '/signup'
+  const workspaceMatch = path.match(/^\/workspace\/([^/]+)/)
+  if (user && workspaceMatch && !isAuthEntryPage) {
+    const workspaceContextResponse = await fetch(`${backendUrl}/api/users/context`, {
+      headers: {
+        cookie: request.headers.get('cookie') ?? '',
+        'x-workspace-id': workspaceMatch[1],
+      },
+    })
+    if (!workspaceContextResponse.ok) {
+      if (workspaceContextResponse.status === 403) {
+        return NextResponse.redirect(new URL('/login/error?reason=workspace-access', request.url))
+      }
+      return NextResponse.redirect(new URL('/login/error?reason=workspace-resolution', request.url))
+    }
+  }
   if (user && isAuthEntryPage) {
     const contextResponse = await fetch(`${backendUrl}/api/users/context`, {
       headers: { cookie: request.headers.get('cookie') ?? '' },
@@ -28,7 +44,7 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(new URL('/login/error?reason=workspace-resolution', request.url))
   }
-  if (!user && !isPublicAuthPage) {
+  if (!user && !isPublicAuthPage && !isPublicInvite) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
   return NextResponse.next()

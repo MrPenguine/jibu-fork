@@ -2,6 +2,7 @@ import { Controller, Post, Get, Delete, Body, Param, UsePipes, ValidationPipe, R
 import { CredentialService } from './credential.service';
 import { CreateCredentialDto } from './dto/create-credential.dto';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
+import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -11,7 +12,7 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('credentials')
 export class CredentialController {
   constructor(private readonly credentialService: CredentialService) {}

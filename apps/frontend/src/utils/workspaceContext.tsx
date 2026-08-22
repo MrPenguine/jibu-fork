@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { fetchAPI } from './api';
+import { authClient } from './auth/client';
 
 // Define the workspace interface
 export interface Workspace {
@@ -96,6 +97,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [incomingInvitations, setIncomingInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const sessionState = authClient.useSession();
 
   // Function to fetch invitations
   const fetchInvitations = async () => {
@@ -144,9 +146,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       console.log(`[CONTEXT INIT] Active workspaces:`, activeWorkspaces.map((w: Workspace) => ({id: w.id, name: w.name})));
       
       // Targeted logging for workspace persistence
-      let activeWorkspaceId = null;
+      const activeOrganizationId = sessionState.data?.session?.activeOrganizationId;
+      let activeWorkspaceId = activeOrganizationId ?? null;
       try {
-        activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
+        if (!activeWorkspaceId) {
+          activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
+        }
       } catch (storageError) {
         console.error('Error reading from localStorage:', storageError);
       }
@@ -309,6 +314,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Function to switch active workspace
   const switchWorkspace = async (workspace: Workspace) => {
     console.log('Switching workspace in WorkspaceContext:', workspace.name);
+    const result = await authClient.organization.setActive({
+      organizationId: workspace.id,
+    });
+    if (result.error) {
+      throw new Error(result.error.message || 'Failed to switch workspace');
+    }
     setActiveWorkspace(workspace);
     
     // Store in localStorage and sessionStorage for redundancy
@@ -397,7 +408,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // Fetch workspaces on initial load
   useEffect(() => {
     refreshWorkspaces();
-  }, []);
+  }, [sessionState.data?.session?.activeOrganizationId]);
 
   return (
     <WorkspaceContext.Provider

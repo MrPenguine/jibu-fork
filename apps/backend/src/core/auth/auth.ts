@@ -1,5 +1,6 @@
 import { prismaAdapter } from '@better-auth/prisma-adapter';
 import { betterAuth, type BetterAuthOptions, type User as BetterAuthUser } from 'better-auth';
+import { organization } from 'better-auth/plugins';
 import { getSharedPrismaService } from '../database/prisma.service';
 
 const authPrisma = getSharedPrismaService();
@@ -57,6 +58,9 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
       : await tx.workspace.create({
           data: {
             name: `${user.firstName || user.email}'s Workspace`,
+            slug: `${user.firstName || 'workspace'}-${createdUser.id.slice(0, 8)}`
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-'),
             memberships: {
               create: {
                 userId: user.id,
@@ -75,6 +79,71 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
   });
 }
 
+async function resolveOrCreateWorkspace(userId: string): Promise<string | null> {
+  const user = await authPrisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      firstName: true,
+      lastWorkspaceId: true,
+    },
+  });
+  if (!user) return null;
+
+  const membershipWhere = {
+    userId,
+    status: 'active',
+  };
+  if (user.lastWorkspaceId) {
+    const lastMembership = await authPrisma.workspaceMembership.findFirst({
+      where: {
+        ...membershipWhere,
+        workspaceId: user.lastWorkspaceId,
+      },
+      select: { workspaceId: true },
+    });
+    if (lastMembership) return lastMembership.workspaceId;
+  }
+
+  const existingMembership = await authPrisma.workspaceMembership.findFirst({
+    where: {
+      ...membershipWhere,
+      role: 'owner',
+    },
+    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+    select: { workspaceId: true },
+  });
+  if (existingMembership) {
+    await authPrisma.user.update({
+      where: { id: userId },
+      data: { lastWorkspaceId: existingMembership.workspaceId },
+    });
+    return existingMembership.workspaceId;
+  }
+
+  const workspace = await authPrisma.workspace.create({
+    data: {
+      name: `${user.firstName || user.email}'s Workspace`,
+      slug: `${user.firstName || 'workspace'}-${userId.slice(0, 8)}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
+      memberships: {
+        create: {
+          userId,
+          role: 'owner',
+          status: 'active',
+        },
+      },
+    },
+    select: { id: true },
+  });
+  await authPrisma.user.update({
+    where: { id: userId },
+    data: { lastWorkspaceId: workspace.id },
+  });
+  return workspace.id;
+}
+
 const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
   user: {
     create: {
@@ -85,6 +154,18 @@ const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
     update: {
       after: async (updatedUser) => {
         await provisionApplicationUser(updatedUser);
+      },
+    },
+  },
+  session: {
+    create: {
+      before: async (createdSession) => {
+        const workspaceId = await resolveOrCreateWorkspace(createdSession.userId);
+        return {
+          data: {
+            activeOrganizationId: workspaceId,
+          },
+        };
       },
     },
   },
@@ -131,5 +212,44 @@ export const auth = betterAuth({
     },
   },
   socialProviders,
+  plugins: [
+    organization({
+      creatorRole: 'owner',
+      allowUserToCreateOrganization: true,
+      schema: {
+        session: {
+          fields: {
+            activeOrganizationId: 'activeOrganizationId',
+          },
+        },
+        organization: {
+          modelName: 'Workspace',
+        },
+        member: {
+          modelName: 'WorkspaceMembership',
+          fields: {
+            organizationId: 'workspaceId',
+          },
+        },
+        invitation: {
+          modelName: 'Invitation',
+          fields: {
+            organizationId: 'workspaceId',
+            inviterId: 'invitedById',
+          },
+        },
+      },
+      sendInvitationEmail: async ({ id, email, organization: invitedOrganization }) => {
+        const invitationUrl = `${frontendUrl}/invite/${id}`;
+        if (runtimeEnv !== 'production') {
+          console.warn(
+            `[Better Auth] Invitation email delivery is not configured. Invitation URL for ${email} to ${invitedOrganization.name}: ${invitationUrl}`,
+          );
+          return;
+        }
+        throw new Error('Email delivery is not configured');
+      },
+    }),
+  ],
   databaseHooks,
 });

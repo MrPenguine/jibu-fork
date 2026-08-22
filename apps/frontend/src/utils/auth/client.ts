@@ -1,4 +1,5 @@
 import { createAuthClient } from 'better-auth/react'
+import { organizationClient } from 'better-auth/client/plugins'
 
 const authBaseUrl = process.env.NEXT_PUBLIC_BASE_URL
   ? `${process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, '')}/api/auth`
@@ -8,4 +9,5 @@ const authBaseUrl = process.env.NEXT_PUBLIC_BASE_URL
 
 export const authClient = createAuthClient({
   baseURL: authBaseUrl,
+  plugins: [organizationClient()],
 })

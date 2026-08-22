@@ -1,13 +1,11 @@
 import { Injectable, HttpException, HttpStatus, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { ApiKeyService } from '../api-key/api-key.service';
-import { v4 as uuidv4 } from 'uuid';
-import { add } from 'date-fns';
 import { InviteMembersDto } from './dto/workspace.dto';
 import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { randomUUID, randomBytes } from 'crypto';
 import { VaultService } from '../../../core/encryption/vault.service';
+import { auth } from '../../../core/auth/auth';
 
 @Injectable()
 export class WorkspaceService {
@@ -26,6 +24,7 @@ export class WorkspaceService {
     const memberships = await this.prisma.workspaceMembership.findMany({
       where: {
         userId,
+        status: 'active',
       },
       include: {
         workspace: true,
@@ -47,6 +46,7 @@ export class WorkspaceService {
       where: {
         userId,
         workspaceId: id,
+        status: 'active',
       },
       include: {
         workspace: true,
@@ -67,28 +67,28 @@ export class WorkspaceService {
   /**
    * Create a new workspace and make the current user the owner
    */
-  async createWorkspace(userId: string, name: string) {
+  async createWorkspace(userId: string, name: string, headers: Headers) {
     if (!name || typeof name !== 'string') {
       throw new HttpException('Workspace name is required', HttpStatus.BAD_REQUEST);
     }
 
+    const slug = `${name}-${randomUUID().slice(0, 8)}`
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-');
+    const organization = await auth.api.createOrganization({
+      body: { name, slug },
+      headers,
+    });
+    await auth.api.setActiveOrganization({
+      body: { organizationId: organization.id },
+      headers,
+    });
     const result = await this.prisma.$transaction(async (tx) => {
-      const workspace = await tx.workspace.create({
-        data: {
-          name,
-        },
+      const workspace = await tx.workspace.findUniqueOrThrow({
+        where: { id: organization.id },
       });
-      
-      const membership = await tx.workspaceMembership.create({
-        data: {
-          workspaceId: workspace.id,
-          userId: userId,
-          role: 'owner',
-          status: 'active',
-        },
-        include: {
-          workspace: true,
-        },
+      const membership = await tx.workspaceMembership.findFirstOrThrow({
+        where: { workspaceId: workspace.id, userId },
       });
       
       await tx.user.update({
@@ -222,7 +222,12 @@ export class WorkspaceService {
   /**
    * Invite members to an workspace - requires owner or admin role
    */
-  async inviteMembers(userId: string, workspaceId: string, inviteData: InviteMembersDto) {
+  async inviteMembers(
+    userId: string,
+    workspaceId: string,
+    inviteData: InviteMembersDto,
+    headers: Headers,
+  ) {
     // Check if user has permission to invite (owner or admin)
     const userMembership = await this.prisma.workspaceMembership.findFirst({
       where: {
@@ -245,18 +250,21 @@ export class WorkspaceService {
 
     const workspace = userMembership.workspace;
     const invitedEmails = inviteData.emails;
-    const role = inviteData.role;
-    const message = inviteData.message;
+    const role = inviteData.role.toLowerCase();
 
     if (!invitedEmails || invitedEmails.length === 0) {
       throw new HttpException('No email addresses provided for invitation.', HttpStatus.BAD_REQUEST);
     }
 
     // Validate role
-    const validRoles = ['admin', 'editor', 'viewer'];
-    if (!validRoles.includes(role)) {
+    const validRoles = ['owner', 'admin', 'member'] as const;
+    if (!validRoles.includes(role as (typeof validRoles)[number])) {
       throw new HttpException(`Invalid role: ${role}. Must be one of: ${validRoles.join(', ')}`, HttpStatus.BAD_REQUEST);
     }
+    if (role === 'owner') {
+      throw new HttpException('Owner invitations are not supported.', HttpStatus.BAD_REQUEST);
+    }
+    const normalizedRole: 'admin' | 'member' = role === 'admin' ? 'admin' : 'member';
 
     const results = await Promise.all(
       invitedEmails.map(async (email) => {
@@ -285,52 +293,24 @@ export class WorkspaceService {
             };
           }
 
-          // Generate unique token for the invitation
-          const token = uuidv4();
-          // Set expiration date (30 days from now)
-          const expiresAt = add(new Date(), { days: 30 });
-
-          return await this.prisma.$transaction(async (tx) => {
-            // Create membership record with email field
-            const membership = await tx.workspaceMembership.create({
-              data: {
-                workspaceId,
-                userId: existingUser?.id,
-                email,
-                role,
-                status: 'pending',
-              },
-            });
-
-            // Create invitation record
-            const invitation = await tx.invitation.create({
-              data: {
-                email,
-                workspaceId,
-                role,
-                token,
-                invitedById: userId,
-                status: 'pending',
-                message,
-                expiresAt,
-              },
-              include: {
-                workspace: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            });
-
-            return {
+          const invitation = await auth.api.createInvitation({
+            body: {
               email,
-              status: 'invited',
-              invitationId: invitation.id,
-              token: invitation.token,
-            };
+              organizationId: workspaceId,
+              role: normalizedRole,
+            },
+            headers,
           });
+          const invitationToken = await this.prisma.invitation.findUniqueOrThrow({
+            where: { id: invitation.id },
+            select: { token: true },
+          });
+          return {
+            email,
+            status: 'invited',
+            invitationId: invitation.id,
+            token: invitationToken.token,
+          };
         } catch (error) {
           console.error(`Error inviting ${email}:`, error);
           return {
@@ -392,21 +372,54 @@ export class WorkspaceService {
   /**
    * Accept or reject an invitation
    */
-  async respondToInvitation(userId: string, invitationId: string, action: 'accept' | 'reject') {
-    const invitation = await this.prisma.invitation.findUnique({
+  async respondToInvitation(
+    userId: string,
+    invitationId: string,
+    action: 'accept' | 'reject',
+    headers: Headers,
+    token?: string,
+  ) {
+    const invitationById = await this.prisma.invitation.findUnique({
       where: { id: invitationId },
-      include: {
-        workspace: true,
-      },
+      include: { workspace: true },
     });
+    const invitationByToken = token
+      ? await this.prisma.invitation.findUnique({
+          where: { token },
+          include: { workspace: true },
+        })
+      : null;
+
+    if (
+      invitationById &&
+      invitationByToken &&
+      invitationById.id !== invitationByToken.id
+    ) {
+      throw new HttpException(
+        'Invitation ID and token refer to different invitations.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const invitation = token
+      ? invitationByToken || invitationById
+      : invitationById;
 
     if (!invitation) {
       throw new HttpException('Invitation not found.', HttpStatus.NOT_FOUND);
     }
 
+    if (invitation.status === 'canceled') {
+      throw new HttpException('This invitation has been canceled', HttpStatus.BAD_REQUEST);
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      throw new HttpException('This invitation has expired', HttpStatus.BAD_REQUEST);
+    }
+
     if (invitation.status !== 'pending') {
       throw new HttpException(
-        `Invitation already ${invitation.status}.`, 
+        `This invitation has already been ${invitation.status}`,
         HttpStatus.BAD_REQUEST
       );
     }
@@ -424,45 +437,15 @@ export class WorkspaceService {
     }
 
     if (action === 'reject') {
-      // Reject invitation
-      await this.prisma.$transaction(async (tx) => {
-        await tx.invitation.update({
-          where: { id: invitationId },
-          data: { status: 'rejected' },
-        });
-
-        // Find and update the associated membership
-        await tx.workspaceMembership.updateMany({
-          where: {
-            workspaceId: invitation.workspaceId,
-            email: invitation.email,
-            status: 'pending',
-          },
-          data: { status: 'rejected' },
-        });
+      await auth.api.rejectInvitation({
+        body: { invitationId: invitation.id },
+        headers,
       });
-
       return { message: 'Invitation rejected successfully.' };
     } else {
-      // Accept invitation
-      await this.prisma.$transaction(async (tx) => {
-        await tx.invitation.update({
-          where: { id: invitationId },
-          data: { status: 'accepted' },
-        });
-
-        // Update the membership to link it with the user and set status to active
-        await tx.workspaceMembership.updateMany({
-          where: {
-            workspaceId: invitation.workspaceId,
-            email: invitation.email,
-            status: 'pending',
-          },
-          data: {
-            userId,
-            status: 'active',
-          },
-        });
+      await auth.api.acceptInvitation({
+        body: { invitationId: invitation.id },
+        headers,
       });
 
       return {
@@ -507,6 +490,7 @@ export class WorkspaceService {
     const members = await this.prisma.workspaceMembership.findMany({
       where: {
         workspaceId,
+        status: 'active',
       },
       include: {
         user: {
@@ -545,7 +529,8 @@ export class WorkspaceService {
     userId: string, 
     workspaceId: string, 
     memberId: string, 
-    newRole: string
+    newRole: string,
+    headers: Headers,
   ) {
     // Check if user is a member of the workspace and has permission to update roles
     const userMembership = await this.prisma.workspaceMembership.findFirst({
@@ -583,47 +568,45 @@ export class WorkspaceService {
         );
       }
     } else if (userMembership.role === 'admin') {
-      // Admin can update editors only, not owners or other admins
+      const normalizedNewRole = newRole.toLowerCase();
+      // Admin can update members only, not owners or other admins
       if (memberToUpdate.role === 'owner' || memberToUpdate.role === 'admin' || memberToUpdate.userId === userId) {
         throw new HttpException(
-          'Admins can only change the roles of editors, not owners, other admins, or themselves.',
+          'Admins can only change the roles of members, not owners, other admins, or themselves.',
           HttpStatus.FORBIDDEN
         );
       }
 
-      // Admin can only assign editor role
-      if (newRole !== 'editor') {
+      // Admin can only assign member role
+      if (normalizedNewRole !== 'member' && normalizedNewRole !== 'editor' && normalizedNewRole !== 'viewer') {
         throw new HttpException(
-          'Admins can only assign the editor role.',
+          'Admins can only assign the member role.',
           HttpStatus.FORBIDDEN
         );
       }
     } else {
-      // Editors and viewers cannot update roles
-      throw new HttpException(
-        'Only owners and admins can update member roles.',
-        HttpStatus.FORBIDDEN
-      );
+      throw new HttpException('Only owners and admins can update member roles.', HttpStatus.FORBIDDEN);
     }
 
     // Validate the new role
-    if (!['owner', 'admin', 'editor', 'viewer'].includes(newRole)) {
+    const normalizedRole = newRole.toLowerCase() === 'admin' ? 'admin' : 'member';
+    if (!['owner', 'admin', 'member', 'editor', 'viewer'].includes(newRole.toLowerCase())) {
       throw new HttpException('Invalid role specified.', HttpStatus.BAD_REQUEST);
     }
 
-    // Update the member's role
-    const updatedMember = await this.prisma.workspaceMembership.update({
+    await auth.api.updateMemberRole({
+      body: {
+        memberId,
+        role: normalizedRole,
+        organizationId: workspaceId,
+      },
+      headers,
+    });
+    const updatedMember = await this.prisma.workspaceMembership.findUniqueOrThrow({
       where: { id: memberId },
-      data: { role: newRole },
       include: {
         user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            fullName: true,
-          },
+          select: { id: true, email: true, firstName: true, lastName: true, fullName: true },
         },
       },
     });
@@ -644,7 +627,7 @@ export class WorkspaceService {
   /**
    * Remove a member from an workspace
    */
-  async removeMember(userId: string, workspaceId: string, memberId: string) {
+  async removeMember(userId: string, workspaceId: string, memberId: string, headers: Headers) {
     // Check if user is a member of the workspace and has permission to remove members
     const userMembership = await this.prisma.workspaceMembership.findFirst({
       where: {
@@ -684,8 +667,9 @@ export class WorkspaceService {
       }
       
       // User is leaving the workspace - allow this regardless of role
-      await this.prisma.workspaceMembership.delete({
-        where: { id: memberId },
+      await auth.api.removeMember({
+        body: { memberIdOrEmail: memberId, organizationId: workspaceId },
+        headers,
       });
       
       return { message: 'You have left the workspace successfully.' };
@@ -697,24 +681,20 @@ export class WorkspaceService {
     if (userMembership.role === 'owner') {
       // Owner can remove anyone except themselves (handled above)
     } else if (userMembership.role === 'admin') {
-      // Admin can remove editors only, not owners or other admins
+      // Admin can remove members only, not owners or other admins
       if (memberToRemove.role === 'owner' || memberToRemove.role === 'admin') {
         throw new HttpException(
-          'Admins can only remove editors, not owners or other admins.',
+          'Admins can only remove members, not owners or other admins.',
           HttpStatus.FORBIDDEN
         );
       }
     } else {
-      // Editors and viewers cannot remove members
-      throw new HttpException(
-        'Only owners and admins can remove members.',
-        HttpStatus.FORBIDDEN
-      );
+      throw new HttpException('Only owners and admins can remove members.', HttpStatus.FORBIDDEN);
     }
 
-    // Remove the member
-    await this.prisma.workspaceMembership.delete({
-      where: { id: memberId },
+    await auth.api.removeMember({
+      body: { memberIdOrEmail: memberId, organizationId: workspaceId },
+      headers,
     });
 
     return { message: 'Member removed successfully.' };
@@ -790,7 +770,7 @@ export class WorkspaceService {
     /**
    * Revoke an invitation
    */
-  async revokeInvitation(id: string, userId: string) {
+  async revokeInvitation(id: string, userId: string, headers: Headers) {
     const invitation = await this.prisma.invitation.findUnique({
       where: { id },
     });
@@ -813,16 +793,17 @@ export class WorkspaceService {
       throw new BadRequestException('You do not have permission to revoke this invitation');
     }
 
-    return this.prisma.invitation.update({
-      where: { id },
-      data: { status: 'REVOKED' },
+    await auth.api.cancelInvitation({
+      body: { invitationId: id },
+      headers,
     });
+    return this.prisma.invitation.findUniqueOrThrow({ where: { id } });
   }
 
   /**
    * Resend an invitation
    */
-  async resendInvitation(id: string, userId: string) {
+  async resendInvitation(id: string, userId: string, headers: Headers) {
     const invitation = await this.prisma.invitation.findUnique({
       where: { id },
     });
@@ -845,49 +826,18 @@ export class WorkspaceService {
       throw new BadRequestException('You do not have permission to resend this invitation');
     }
 
-    // Generate a new token
-    const token = randomBytes(32).toString('hex');
-    
-    // Set new expiration date
-    const expirationDays = this.configService.get<number>('INVITATION_EXPIRY_DAYS', 7);
-    const expiresAt = add(new Date(), { days: expirationDays });
-
-    // Update the invitation
-    return this.prisma.invitation.update({
-      where: { id },
-      data: {
-        token,
-        status: 'PENDING',
-        expiresAt,
-        updatedAt: new Date(),
+    const resentInvitation = await auth.api.createInvitation({
+      body: {
+        email: invitation.email,
+        organizationId: invitation.workspaceId,
+        role: invitation.role === 'admin' ? 'admin' : 'member',
+        resend: true,
       },
+      headers,
     });
-  }
-
-  /**
-   * Expire old invitations (to be called by a scheduled job)
-   */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-  async expireOldInvitations() {
-    this.logger.log('Running job to expire old invitations');
-    
-    const now = new Date();
-    
-    const result = await this.prisma.invitation.updateMany({
-      where: {
-        status: 'PENDING',
-        expiresAt: {
-          lt: now,
-        },
-      },
-      data: {
-        status: 'EXPIRED',
-      },
+    return this.prisma.invitation.findUniqueOrThrow({
+      where: { id: resentInvitation.id },
     });
-    
-    this.logger.log(`Expired ${result.count} invitations`);
-    
-    return result;
   }
 
   /**

@@ -2,13 +2,13 @@ import { Controller, Post, Body, Param, UseGuards, Req, BadRequestException } fr
 import { AgentExecutionService } from '../execution/agent-execution.service';
 import { ExecuteAgentDto, ContinueAgentDto } from '../dto';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
-import { WorkspaceMemberGuard } from '../../../../core/auth/guards/workspace-member.guard';
+import { OrganizationGuard } from '../../../../core/auth/guards/organization.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AgentSessionOutput } from '../../../../../../../libs/src';
 
 @ApiTags('agent-execution')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, WorkspaceMemberGuard)
+@UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('v1/agent-execution')
 export class AgentExecutionController {
   constructor(private readonly agentExecutionService: AgentExecutionService) {}

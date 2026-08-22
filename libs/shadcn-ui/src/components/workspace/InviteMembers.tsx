@@ -41,7 +41,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
   const { activeWorkspace, refreshWorkspaces } = useWorkspace()
   const [emailsWithStatus, setEmailsWithStatus] = React.useState<EmailStatus[]>([])
   const [currentEmail, setCurrentEmail] = React.useState("")
-  const [role, setRole] = React.useState("editor")
+  const [role, setRole] = React.useState("member")
   const [message, setMessage] = React.useState("")
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   
@@ -207,7 +207,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
     if (!isOpen) {
       setCurrentEmail("")
       setEmailsWithStatus([])
-      setRole("editor")
+      setRole("member")
       setMessage("")
       setIsSubmitting(false)
     }
@@ -355,7 +355,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
                       </div>
                     </SelectItem>
                     <SelectItem 
-                      value="editor" 
+                      value="member" 
                       className="flex items-center gap-2 py-2 px-3 cursor-pointer rounded-lg data-[state=checked]:bg-primary/15 data-[state=checked]:text-primary data-[highlighted]:bg-primary/10"
                     >
                       <div className="flex items-center gap-2">
@@ -363,16 +363,16 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                           <circle cx="12" cy="7" r="4"/>
                         </svg>
-                        <span className="font-medium">Editor</span>
+                        <span className="font-medium">Member</span>
                       </div>
                       <div className="text-xs text-muted-foreground ml-6">
-                        Can edit content but not manage members
+                        Can access workspace content but not manage members
                       </div>
                     </SelectItem>
                   </>
                 ) : (
                   <SelectItem 
-                    value="editor" 
+                      value="member" 
                     className="flex items-center gap-2 py-2 px-3 cursor-pointer rounded-lg data-[state=checked]:bg-primary/15 data-[state=checked]:text-primary data-[highlighted]:bg-primary/10"
                   >
                     <div className="flex items-center gap-2">
@@ -380,10 +380,10 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                         <circle cx="12" cy="7" r="4"/>
                       </svg>
-                      <span className="font-medium">Editor</span>
+                      <span className="font-medium">Member</span>
                     </div>
                     <div className="text-xs text-muted-foreground ml-6">
-                      Can edit content but not manage members
+                      Can access workspace content but not manage members
                     </div>
                   </SelectItem>
                 )}

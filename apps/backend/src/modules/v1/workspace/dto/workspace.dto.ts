@@ -38,6 +38,10 @@ export class InviteMembersDto {
 export class RespondToInvitationDto {
   @IsEnum(['accept', 'reject'])
   action: 'accept' | 'reject';
+
+  @IsOptional()
+  @IsString()
+  token?: string;
 }
 
 export class UpdateMemberRoleDto {

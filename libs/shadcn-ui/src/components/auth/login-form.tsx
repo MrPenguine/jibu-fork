@@ -11,10 +11,20 @@ import {
 } from "../ui/card"
 import { Input } from "../ui/input"
 import { Label } from "../ui/label"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
 type FormMode = "login" | "signup" | "forgot-password"
+
+function isSafeInternalPath(value: string | null): value is string {
+  return Boolean(
+    value &&
+      value.startsWith("/") &&
+      !value.startsWith("//") &&
+      !value.includes("\\") &&
+      !/^[a-z][a-z\d+.-]*:/i.test(value),
+  )
+}
 
 export function LoginForm({
   className,
@@ -28,6 +38,10 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect")
+  const safeRedirectTo = isSafeInternalPath(redirectTo) ? redirectTo : null
+  const postAuthPath = safeRedirectTo ?? "/"
 
   const titles = {
     "login": "Welcome back",
@@ -66,7 +80,7 @@ export function LoginForm({
         const response = await fetch("/api/auth/sign-in/social", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider: "google", callbackURL: "/" }),
+          body: JSON.stringify({ provider: "google", callbackURL: postAuthPath }),
         })
         
         const data = await response.json()
@@ -138,7 +152,7 @@ export function LoginForm({
           try {
             // Send the user to the root; middleware will use get-user-context
             // to decide between /admin and the appropriate workspace route.
-            router.push("/")
+            router.push(postAuthPath)
           } catch (e) {
             console.error("Post-login redirect failed:", e)
             router.push("/login/error?reason=workspace-resolution")
@@ -277,7 +291,7 @@ export function LoginForm({
                       Don&apos;t have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => router.push("/signup")}
+                        onClick={() => router.push(safeRedirectTo ? `/signup?redirect=${encodeURIComponent(safeRedirectTo)}` : "/signup")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -289,7 +303,7 @@ export function LoginForm({
                       Already have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => router.push("/login")}
+                        onClick={() => router.push(safeRedirectTo ? `/login?redirect=${encodeURIComponent(safeRedirectTo)}` : "/login")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -304,7 +318,7 @@ export function LoginForm({
                 <div className="text-center text-sm">
                   <button
                     type="button"
-                    onClick={() => router.push("/login")}
+                    onClick={() => router.push(safeRedirectTo ? `/login?redirect=${encodeURIComponent(safeRedirectTo)}` : "/login")} 
                     className="text-primary underline underline-offset-4"
                     disabled={isLoading}
                   >
