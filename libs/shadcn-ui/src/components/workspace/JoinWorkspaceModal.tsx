@@ -7,11 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
-  DialogClose
+  DialogFooter
 } from "../ui/dialog"
 import { Button } from "../ui/button"
-import { useRouter } from 'next/navigation'
 import { LoaderCircle } from 'lucide-react'
 import { fetchAPI } from '../../../../../apps/frontend/src/utils/api'
 import { useWorkspace } from '../../../../../apps/frontend/src/utils/workspaceContext'
@@ -21,7 +19,6 @@ interface JoinWorkspaceModalProps {
   onOpenChange: (open: boolean) => void
   invitation: {
     id: string
-    token: string
     workspace: {
       name: string
     }
@@ -37,7 +34,6 @@ export function JoinWorkspaceModal({
 }: JoinWorkspaceModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
   const { refreshWorkspaces } = useWorkspace()
 
   const handleAccept = async () => {
@@ -47,7 +43,7 @@ export function JoinWorkspaceModal({
       
       await fetchAPI(`/workspaces/invitations/${invitation.id}/respond`, {
         method: 'POST',
-        body: JSON.stringify({ action: 'accept', token: invitation.token })
+        body: JSON.stringify({ action: 'accept' })
       })
       
       onOpenChange(false)
@@ -72,7 +68,7 @@ export function JoinWorkspaceModal({
       
       await fetchAPI(`/workspaces/invitations/${invitation.id}/respond`, {
         method: 'POST',
-        body: JSON.stringify({ action: 'reject', token: invitation.token })
+        body: JSON.stringify({ action: 'reject' })
       })
       
       onOpenChange(false)

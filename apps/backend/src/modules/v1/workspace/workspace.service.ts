@@ -3,7 +3,6 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { ApiKeyService } from '../api-key/api-key.service';
 import { InviteMembersDto } from './dto/workspace.dto';
 import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { randomUUID, randomBytes } from 'crypto';
 import { VaultService } from '../../../core/encryption/vault.service';
 import { auth } from '../../../core/auth/auth';
@@ -302,14 +301,15 @@ export class WorkspaceService {
             },
             headers,
           });
+          const invitationToken = await this.prisma.invitation.findUniqueOrThrow({
+            where: { id: invitation.id },
+            select: { token: true },
+          });
           return {
             email,
             status: 'invited',
             invitationId: invitation.id,
-            token: (await this.prisma.invitation.findUniqueOrThrow({
-              where: { id: invitation.id },
-              select: { token: true },
-            })).token,
+            token: invitationToken.token,
           };
         } catch (error) {
           console.error(`Error inviting ${email}:`, error);
@@ -379,14 +379,31 @@ export class WorkspaceService {
     headers: Headers,
     token?: string,
   ) {
-    const invitation = await this.prisma.invitation.findFirst({
-      where: {
-        OR: [{ id: invitationId }, ...(token ? [{ token }] : [])],
-      },
-      include: {
-        workspace: true,
-      },
+    const invitationById = await this.prisma.invitation.findUnique({
+      where: { id: invitationId },
+      include: { workspace: true },
     });
+    const invitationByToken = token
+      ? await this.prisma.invitation.findUnique({
+          where: { token },
+          include: { workspace: true },
+        })
+      : null;
+
+    if (
+      invitationById &&
+      invitationByToken &&
+      invitationById.id !== invitationByToken.id
+    ) {
+      throw new HttpException(
+        'Invitation ID and token refer to different invitations.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const invitation = token
+      ? invitationByToken || invitationById
+      : invitationById;
 
     if (!invitation) {
       throw new HttpException('Invitation not found.', HttpStatus.NOT_FOUND);
@@ -421,13 +438,13 @@ export class WorkspaceService {
 
     if (action === 'reject') {
       await auth.api.rejectInvitation({
-        body: { invitationId },
+        body: { invitationId: invitation.id },
         headers,
       });
       return { message: 'Invitation rejected successfully.' };
     } else {
       await auth.api.acceptInvitation({
-        body: { invitationId },
+        body: { invitationId: invitation.id },
         headers,
       });
 
@@ -821,29 +838,6 @@ export class WorkspaceService {
     return this.prisma.invitation.findUniqueOrThrow({
       where: { id: resentInvitation.id },
     });
-  }
-
-  /**
-   * Expire old invitations (to be called by a scheduled job)
-   */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-  async expireOldInvitations() {
-    this.logger.log('Running job to expire old invitations');
-    
-    const now = new Date();
-    
-    const count = await this.prisma.invitation.count({
-      where: {
-        status: 'pending',
-        expiresAt: {
-          lt: now,
-        },
-      },
-    });
-    
-    this.logger.log(`Found ${count} expired invitations`);
-    
-    return { count };
   }
 
   /**

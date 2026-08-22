@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { auth } from '../../../core/auth/auth';
 
 @Injectable()
@@ -162,16 +161,17 @@ export class InvitationService {
       where: tokenOnly
         ? { token: identifier }
         : { OR: [{ id: identifier }, { token: identifier }] },
-      include: {
-        workspace: true,
-        invitedBy: {
+      select: {
+        id: true,
+        email: true,
+        workspaceId: true,
+        role: true,
+        status: true,
+        expiresAt: true,
+        workspace: {
           select: {
             id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            fullName: true,
-            imageUrl: true,
+            name: true,
           },
         },
       },
@@ -191,7 +191,19 @@ export class InvitationService {
       throw new BadRequestException(`This invitation has already been ${invitation.status}`);
     }
 
-    return invitation;
+    const [localPart, domain] = invitation.email.split('@');
+    const maskedEmail =
+      localPart && domain
+        ? `${localPart[0] || '*'}***@${domain}`
+        : '***';
+
+    return {
+      id: invitation.id,
+      workspace: invitation.workspace,
+      role: invitation.role,
+      expiresAt: invitation.expiresAt,
+      email: maskedEmail,
+    };
   }
 
   /**
@@ -269,26 +281,4 @@ export class InvitationService {
     });
   }
 
-  /**
-   * Expire old invitations (to be called by a scheduled job)
-   */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-  async expireOldInvitations() {
-    this.logger.log('Running job to expire old invitations');
-    
-    const now = new Date();
-    
-    const count = await this.prisma.invitation.count({
-      where: {
-        status: 'pending',
-        expiresAt: {
-          lt: now,
-        },
-      },
-    });
-    
-    this.logger.log(`Found ${count} expired invitations`);
-    
-    return { count };
-  }
 }

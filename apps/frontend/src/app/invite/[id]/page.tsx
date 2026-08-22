@@ -9,7 +9,6 @@ import { authClient } from "../../../utils/auth/client"
 
 interface Invitation {
   id: string
-  token: string
   workspace: {
     id: string
     name: string
@@ -48,7 +47,7 @@ export default function InvitationPage() {
     try {
       await fetchAPI(`/workspaces/invitations/${invitation.id}/respond`, {
         method: "POST",
-        body: JSON.stringify({ action, token: invitation.token }),
+        body: JSON.stringify({ action }),
       })
       router.push(action === "accept" ? `/workspace/${invitation.workspace.id}` : "/")
     } catch (requestError) {

@@ -1,7 +1,6 @@
 import { prismaAdapter } from '@better-auth/prisma-adapter';
 import { betterAuth, type BetterAuthOptions, type User as BetterAuthUser } from 'better-auth';
 import { organization } from 'better-auth/plugins';
-import { createHash } from 'crypto';
 import { getSharedPrismaService } from '../database/prisma.service';
 
 const authPrisma = getSharedPrismaService();
@@ -18,18 +17,6 @@ if (!configuredSecret && runtimeEnv === 'production') {
 }
 
 const betterAuthSecret = configuredSecret || 'development-only-better-auth-secret';
-const defaultWorkspaceNamespace = 'jibu-default-workspace-v1';
-
-function defaultWorkspaceId(userId: string): string {
-  const digest = createHash('sha256')
-    .update(`${defaultWorkspaceNamespace}:${userId}`)
-    .digest('hex')
-    .slice(0, 32)
-    .split('');
-  digest[12] = '5';
-  digest[16] = ((parseInt(digest[16] || '0', 16) & 0x3) | 0x8).toString(16);
-  return `${digest.slice(0, 8).join('')}-${digest.slice(8, 12).join('')}-${digest.slice(12, 16).join('')}-${digest.slice(16, 20).join('')}-${digest.slice(20).join('')}`;
-}
 
 const socialProviders =
   googleClientId && googleClientSecret
@@ -68,35 +55,93 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
     });
     const workspace = membership
       ? { id: membership.workspaceId }
-      : await tx.workspace.upsert({
-          where: { id: defaultWorkspaceId(createdUser.id) },
-          create: {
-            id: defaultWorkspaceId(createdUser.id),
+      : await tx.workspace.create({
+          data: {
             name: `${user.firstName || user.email}'s Workspace`,
             slug: `${user.firstName || 'workspace'}-${createdUser.id.slice(0, 8)}`
               .toLowerCase()
               .replace(/[^a-z0-9]+/g, '-'),
+            memberships: {
+              create: {
+                userId: user.id,
+                role: 'owner',
+                status: 'active',
+              },
+            },
           },
-          update: {},
           select: { id: true },
         });
-
-    if (!membership) {
-      await tx.workspaceMembership.create({
-        data: {
-          userId: user.id,
-          workspaceId: workspace.id,
-          role: 'owner',
-          status: 'active',
-        },
-      });
-    }
 
     await tx.user.update({
       where: { id: user.id },
       data: { lastWorkspaceId: workspace.id },
     });
   });
+}
+
+async function resolveOrCreateWorkspace(userId: string): Promise<string | null> {
+  const user = await authPrisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      email: true,
+      firstName: true,
+      lastWorkspaceId: true,
+    },
+  });
+  if (!user) return null;
+
+  const membershipWhere = {
+    userId,
+    status: 'active',
+  };
+  if (user.lastWorkspaceId) {
+    const lastMembership = await authPrisma.workspaceMembership.findFirst({
+      where: {
+        ...membershipWhere,
+        workspaceId: user.lastWorkspaceId,
+      },
+      select: { workspaceId: true },
+    });
+    if (lastMembership) return lastMembership.workspaceId;
+  }
+
+  const existingMembership = await authPrisma.workspaceMembership.findFirst({
+    where: {
+      ...membershipWhere,
+      role: 'owner',
+    },
+    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+    select: { workspaceId: true },
+  });
+  if (existingMembership) {
+    await authPrisma.user.update({
+      where: { id: userId },
+      data: { lastWorkspaceId: existingMembership.workspaceId },
+    });
+    return existingMembership.workspaceId;
+  }
+
+  const workspace = await authPrisma.workspace.create({
+    data: {
+      name: `${user.firstName || user.email}'s Workspace`,
+      slug: `${user.firstName || 'workspace'}-${userId.slice(0, 8)}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
+      memberships: {
+        create: {
+          userId,
+          role: 'owner',
+          status: 'active',
+        },
+      },
+    },
+    select: { id: true },
+  });
+  await authPrisma.user.update({
+    where: { id: userId },
+    data: { lastWorkspaceId: workspace.id },
+  });
+  return workspace.id;
 }
 
 const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
@@ -115,13 +160,10 @@ const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
   session: {
     create: {
       before: async (createdSession) => {
-        const user = await authPrisma.user.findUnique({
-          where: { id: createdSession.userId },
-          select: { lastWorkspaceId: true },
-        });
+        const workspaceId = await resolveOrCreateWorkspace(createdSession.userId);
         return {
           data: {
-            activeOrganizationId: user?.lastWorkspaceId || defaultWorkspaceId(createdSession.userId),
+            activeOrganizationId: workspaceId,
           },
         };
       },

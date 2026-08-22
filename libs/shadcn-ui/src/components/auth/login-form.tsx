@@ -16,6 +16,16 @@ import { Loader2 } from "lucide-react"
 
 type FormMode = "login" | "signup" | "forgot-password"
 
+function isSafeInternalPath(value: string | null): value is string {
+  return Boolean(
+    value &&
+      value.startsWith("/") &&
+      !value.startsWith("//") &&
+      !value.includes("\\") &&
+      !/^[a-z][a-z\d+.-]*:/i.test(value),
+  )
+}
+
 export function LoginForm({
   className,
   defaultMode,
@@ -30,7 +40,8 @@ export function LoginForm({
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirect")
-  const postAuthPath = redirectTo?.startsWith("/") ? redirectTo : "/"
+  const safeRedirectTo = isSafeInternalPath(redirectTo) ? redirectTo : null
+  const postAuthPath = safeRedirectTo ?? "/"
 
   const titles = {
     "login": "Welcome back",
@@ -280,7 +291,7 @@ export function LoginForm({
                       Don&apos;t have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => router.push(redirectTo ? `/signup?redirect=${encodeURIComponent(redirectTo)}` : "/signup")}
+                        onClick={() => router.push(safeRedirectTo ? `/signup?redirect=${encodeURIComponent(safeRedirectTo)}` : "/signup")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -292,7 +303,7 @@ export function LoginForm({
                       Already have an account?{" "}
                       <button
                         type="button"
-                        onClick={() => router.push(redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login")}
+                        onClick={() => router.push(safeRedirectTo ? `/login?redirect=${encodeURIComponent(safeRedirectTo)}` : "/login")}
                         className="text-primary underline underline-offset-4"
                         disabled={isLoading}
                       >
@@ -307,7 +318,7 @@ export function LoginForm({
                 <div className="text-center text-sm">
                   <button
                     type="button"
-                    onClick={() => router.push(redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login")}
+                    onClick={() => router.push(safeRedirectTo ? `/login?redirect=${encodeURIComponent(safeRedirectTo)}` : "/login")} 
                     className="text-primary underline underline-offset-4"
                     disabled={isLoading}
                   >
