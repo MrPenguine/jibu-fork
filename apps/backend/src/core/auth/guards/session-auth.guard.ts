@@ -46,7 +46,15 @@ export class SessionAuthGuard implements CanActivate {
         where: { id: createdByUserId },
         include: { lastWorkspace: true },
       });
-      if (!user) {
+      const membership = await this.prisma.workspaceMembership.findFirst({
+        where: {
+          userId: createdByUserId,
+          workspaceId: verified.key.referenceId,
+          status: 'active',
+        },
+        select: { role: true },
+      });
+      if (!user || !membership) {
         throw new UnauthorizedException();
       }
 
@@ -55,7 +63,7 @@ export class SessionAuthGuard implements CanActivate {
         userId: user.id,
         workspaceId: verified.key.referenceId,
         lastWorkspaceId: verified.key.referenceId,
-        workspaceRole: undefined,
+        workspaceRole: membership.role,
       };
       request.apiKeyWorkspaceId = verified.key.referenceId;
       request.apiKey = {

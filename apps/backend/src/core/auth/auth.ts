@@ -306,11 +306,13 @@ const authInstance = betterAuth({
           modelName: 'AuthApiKey',
         },
       },
+    // @better-auth/api-key@1.7.1 resolves a separate @better-auth/core type tree from better-auth@1.7.1.
     }) as unknown as BetterAuthPlugin,
   ],
   databaseHooks,
 });
 
+// The plugin cast omits plugin endpoints from inference, so this intersection restores their typed calls.
 export const auth = authInstance as typeof authInstance & {
   api: typeof authInstance.api & ApiKeyApi;
 };

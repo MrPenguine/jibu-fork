@@ -107,6 +107,9 @@ export class ApiKeyService {
       throw new ForbiddenException('Password is required');
     }
     const now = Date.now();
+    for (const [failedUserId, failure] of revealFailures) {
+      if (failure.resetAt <= now) revealFailures.delete(failedUserId);
+    }
     const failures = revealFailures.get(userId);
     if (failures && failures.resetAt > now && failures.count >= 5) {
       await audit('rate_limited');
