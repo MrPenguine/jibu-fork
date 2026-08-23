@@ -195,6 +195,7 @@ export class LangchainAgentService implements IAgentService {
       }
       
       // Extract model configuration from agent metadata and determine provider
+      // @ts-ignore prisma types may be out of date; Agent.metadata exists in schema
       const modelConfig = (agent.metadata as any)?.model || {};
       const { provider, modelName, modelUsed } = this.determineProvider(modelConfig);
       
@@ -208,6 +209,7 @@ export class LangchainAgentService implements IAgentService {
      // Get knowledge base results if needed
 let context = '';
       // Use knowledgeBaseId from request config or from the agent metadata if not provided
+      // @ts-ignore prisma types may be out of date; Agent.metadata exists in schema
       const effectiveKnowledgeBaseId = knowledgeBaseId || (agent.metadata as any)?.knowledgeBaseId;
 
       if (effectiveKnowledgeBaseId) {
@@ -488,6 +490,7 @@ let context = '';
       this.logger.log(`[AGENT_ASSISTANT_DEBUG] Successfully found agent with name: ${agent.name}`);
       
       // Extract model configuration from agent metadata and determine provider
+      // @ts-ignore Prisma types may lag schema; Agent.metadata exists
       const modelConfig = (agent.metadata as any)?.model || {};
       const { provider, modelName, modelUsed } = this.determineProvider(modelConfig);
       
@@ -501,6 +504,7 @@ let context = '';
       // Get knowledge base results if needed
       let context = '';
       // Use knowledgeBaseId from request config or from the agent metadata if not provided
+      // @ts-ignore Prisma types may lag schema; Agent.metadata exists
       const effectiveKnowledgeBaseId = knowledgeBaseId || (agent.metadata as any)?.knowledgeBaseId;
 
       if (effectiveKnowledgeBaseId) {

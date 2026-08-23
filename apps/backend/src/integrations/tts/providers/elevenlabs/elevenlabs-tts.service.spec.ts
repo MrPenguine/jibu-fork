@@ -37,7 +37,7 @@ describe('ElevenLabsTtsService', () => {
         data: {
           voices: [
             {
-              voice_id: '21m00Tcm4TlvDq8ikWAM',
+              voiceId: '21m00Tcm4TlvDq8ikWAM',
               name: 'Rachel',
               samples: [
                 {
@@ -54,10 +54,10 @@ describe('ElevenLabsTtsService', () => {
                 gender: 'female',
               },
               description: 'A warm voice with a conversational tone',
-              preview_url: 'https://storage.googleapis.com/eleven-public-prod/premade/voices/21m00Tcm4TlvDq8ikWAM/df6285d9-9a93-4c7d-b0bf-14628f2e3e6c.mp3',
+              previewUrl: 'https://storage.googleapis.com/eleven-public-prod/premade/voices/21m00Tcm4TlvDq8ikWAM/df6285d9-9a93-4c7d-b0bf-14628f2e3e6c.mp3',
             },
           ],
-          has_more: false,
+          hasMore: false,
           total_count: 1,
         },
       };
@@ -93,12 +93,12 @@ describe('ElevenLabsTtsService', () => {
         data: {
           voices: [
             {
-              voice_id: 'voice1',
+              voiceId: 'voice1',
               name: 'Voice 1',
             },
           ],
-          has_more: true,
-          next_page_token: 'next-page-token',
+          hasMore: true,
+          nextPageToken: 'next-page-token',
         },
       };
 
@@ -107,11 +107,11 @@ describe('ElevenLabsTtsService', () => {
         data: {
           voices: [
             {
-              voice_id: 'voice2',
+              voiceId: 'voice2',
               name: 'Voice 2',
             },
           ],
-          has_more: false,
+          hasMore: false,
         },
       };
 

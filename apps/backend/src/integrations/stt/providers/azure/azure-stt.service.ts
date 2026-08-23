@@ -7,8 +7,6 @@ import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 @Injectable()
 export class AzureSttService implements ISttService {
   private readonly logger = new Logger(AzureSttService.name);
-  private readonly configService: ConfigService;
-  private readonly providerCredentials: ProviderCredentialsResolver;
   private readonly region: string;
   private readonly endpoint: string;
   private readonly activeSessions: Map<string, {
@@ -17,9 +15,10 @@ export class AzureSttService implements ISttService {
     audioConfig: sdk.AudioConfig
   }> = new Map();
 
-  constructor(configService: ConfigService, providerCredentials: ProviderCredentialsResolver) {
-    this.configService = configService;
-    this.providerCredentials = providerCredentials;
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly providerCredentials: ProviderCredentialsResolver,
+  ) {
     this.region = this.configService.get<string>('AZURE_REGION');
     this.endpoint = this.configService.get<string>('AZURE_SPEECH_TO_TEXT_ENDPOINT');
   }
@@ -99,7 +98,7 @@ export class AzureSttService implements ISttService {
       // Create recognizer
       const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
       
-      const transcription = '';
+      let transcription = '';
       
       // Set up event handlers
       recognizer.recognized = (s, e) => {

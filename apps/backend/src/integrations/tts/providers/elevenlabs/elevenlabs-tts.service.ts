@@ -13,11 +13,21 @@ import { ProviderCredentialsResolver } from '../../../../core/provider-credentia
 export class ElevenLabsTtsService implements ITtsService {
   private readonly logger = new Logger(ElevenLabsTtsService.name);
   private readonly baseUrl = 'https://api.elevenlabs.io/v2';
+  private missingCredentialWarningShown = false;
 
   constructor(private readonly providerCredentials: ProviderCredentialsResolver) {}
 
   private async getApiKey(): Promise<string> {
-    return (await this.providerCredentials.getSecret('elevenlabs')) || 'dummy-key';
+    const apiKey = await this.providerCredentials.getSecret('elevenlabs');
+    if (!apiKey) {
+      if (!this.missingCredentialWarningShown) {
+        this.logger.warn('ElevenLabs credential is not configured. ElevenLabs TTS service will not function properly.');
+        this.missingCredentialWarningShown = true;
+      }
+      return 'dummy-key';
+    }
+    this.missingCredentialWarningShown = false;
+    return apiKey;
   }
 
   private async getClient(): Promise<ElevenLabsClient> {
@@ -114,9 +124,7 @@ export class ElevenLabsTtsService implements ITtsService {
       
       // Create a readable stream to return
       const readableStream = new Readable({
-        read() {
-          return undefined;
-        }
+        read() {}
       });
       
       // Pipe the audio stream to the readable stream
@@ -236,22 +244,13 @@ export class ElevenLabsTtsService implements ITtsService {
         params,
       });
 
-      const data = response.data as ListVoicesResponseDTO & {
-        has_more?: boolean;
-        next_page_token?: string;
-      };
+      const data = response.data;
       
       // Map the API response to our VoiceDTO objects and add provider information
       const mappedVoices = data.voices.map(voice => {
         // Add provider information
         const voiceDto = new VoiceDTO();
         Object.assign(voiceDto, voice);
-        const rawVoice = voice as VoiceDTO & {
-          voice_id?: string;
-          preview_url?: string;
-        };
-        voiceDto.voiceId = rawVoice.voiceId || rawVoice.voice_id;
-        voiceDto.previewUrl = rawVoice.previewUrl || rawVoice.preview_url;
         
         // Set provider to ElevenLabs
         voiceDto.provider = 'ElevenLabs';
@@ -264,8 +263,8 @@ export class ElevenLabsTtsService implements ITtsService {
       
       allVoices = [...allVoices, ...mappedVoices];
       
-      hasMore = data.hasMore ?? data.has_more ?? false;
-      nextPageToken = data.nextPageToken ?? data.next_page_token ?? null;
+      hasMore = data.hasMore;
+      nextPageToken = data.nextPageToken;
     }
 
     return allVoices;
