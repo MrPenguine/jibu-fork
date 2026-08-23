@@ -13,6 +13,7 @@ import { AdminModule } from '../modules/admin/admin.module';
 import { VoiceModule } from '../modules/voice/voice.module';
 import { LiveKitModule } from '../modules/livekit/livekit.module';
 import { WhatsAppModule } from '../modules/channels/whatsapp/whatsapp.module';
+import { ProviderCredentialsModule } from '../core/provider-credentials/provider-credentials.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { WhatsAppModule } from '../modules/channels/whatsapp/whatsapp.module';
     LiveKitModule,
     WhatsAppModule,
     RedisModule,
+    ProviderCredentialsModule,
     AdminModule,
   ],
   controllers: [AppController],

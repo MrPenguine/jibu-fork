@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { ElevenLabsTtsService } from './elevenlabs-tts.service';
-import { VoiceDTO } from '../../dto/voice.dto';
+import { ProviderCredentialsResolver } from '../../../../core/provider-credentials/provider-credentials.resolver';
 
 // Mock axios
 jest.mock('axios');
@@ -10,33 +9,21 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('ElevenLabsTtsService', () => {
   let service: ElevenLabsTtsService;
-  let configService: ConfigService;
-
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-        }),
-      ],
       providers: [
         ElevenLabsTtsService,
         {
-          provide: ConfigService,
+          provide: ProviderCredentialsResolver,
           useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'ELEVENLABS_API_KEY') {
-                return 'test-api-key';
-              }
-              return null;
-            }),
+            getSecret: jest.fn().mockResolvedValue('test-api-key'),
           },
         },
       ],
     }).compile();
 
     service = module.get<ElevenLabsTtsService>(ElevenLabsTtsService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {
@@ -50,7 +37,7 @@ describe('ElevenLabsTtsService', () => {
         data: {
           voices: [
             {
-              voice_id: '21m00Tcm4TlvDq8ikWAM',
+              voiceId: '21m00Tcm4TlvDq8ikWAM',
               name: 'Rachel',
               samples: [
                 {
@@ -67,10 +54,10 @@ describe('ElevenLabsTtsService', () => {
                 gender: 'female',
               },
               description: 'A warm voice with a conversational tone',
-              preview_url: 'https://storage.googleapis.com/eleven-public-prod/premade/voices/21m00Tcm4TlvDq8ikWAM/df6285d9-9a93-4c7d-b0bf-14628f2e3e6c.mp3',
+              previewUrl: 'https://storage.googleapis.com/eleven-public-prod/premade/voices/21m00Tcm4TlvDq8ikWAM/df6285d9-9a93-4c7d-b0bf-14628f2e3e6c.mp3',
             },
           ],
-          has_more: false,
+          hasMore: false,
           total_count: 1,
         },
       };
@@ -106,12 +93,12 @@ describe('ElevenLabsTtsService', () => {
         data: {
           voices: [
             {
-              voice_id: 'voice1',
+              voiceId: 'voice1',
               name: 'Voice 1',
             },
           ],
-          has_more: true,
-          next_page_token: 'next-page-token',
+          hasMore: true,
+          nextPageToken: 'next-page-token',
         },
       };
 
@@ -120,11 +107,11 @@ describe('ElevenLabsTtsService', () => {
         data: {
           voices: [
             {
-              voice_id: 'voice2',
+              voiceId: 'voice2',
               name: 'Voice 2',
             },
           ],
-          has_more: false,
+          hasMore: false,
         },
       };
 

@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { ITtsService, TtsVoiceSettings } from '../../interfaces/tts.interface';
 import { ListVoicesResponseDTO, VoiceDTO } from '../../dto/voice.dto';
 import { ElevenLabsClient } from 'elevenlabs';
 import { Readable } from 'stream';
+import { ProviderCredentialsResolver } from '../../../../core/provider-credentials/provider-credentials.resolver';
 
 /**
  * ElevenLabs TTS service implementation
@@ -12,20 +12,26 @@ import { Readable } from 'stream';
 @Injectable()
 export class ElevenLabsTtsService implements ITtsService {
   private readonly logger = new Logger(ElevenLabsTtsService.name);
-  private readonly apiKey: string;
   private readonly baseUrl = 'https://api.elevenlabs.io/v2';
-  private readonly client: ElevenLabsClient;
+  private missingCredentialWarningShown = false;
 
-  constructor(private readonly configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('ELEVENLABS_API_KEY');
-    if (!this.apiKey) {
-      this.logger.warn('ELEVENLABS_API_KEY not set. ElevenLabs TTS service will not function properly.');
+  constructor(private readonly providerCredentials: ProviderCredentialsResolver) {}
+
+  private async getApiKey(): Promise<string> {
+    const apiKey = await this.providerCredentials.getSecret('elevenlabs');
+    if (!apiKey) {
+      if (!this.missingCredentialWarningShown) {
+        this.logger.warn('ElevenLabs credential is not configured. ElevenLabs TTS service will not function properly.');
+        this.missingCredentialWarningShown = true;
+      }
+      return 'dummy-key';
     }
-    
-    // Initialize the ElevenLabs client
-    this.client = new ElevenLabsClient({
-      apiKey: this.apiKey,
-    });
+    this.missingCredentialWarningShown = false;
+    return apiKey;
+  }
+
+  private async getClient(): Promise<ElevenLabsClient> {
+    return new ElevenLabsClient({ apiKey: await this.getApiKey() });
   }
   
   /**
@@ -36,6 +42,7 @@ export class ElevenLabsTtsService implements ITtsService {
    */
   async textToSpeech(text: string, settings: TtsVoiceSettings): Promise<Buffer> {
     try {
+      const client = await this.getClient();
       this.logger.log(`Converting text to speech with voice ID: ${settings.voiceId}`);
       
       // Set default model if not provided
@@ -50,7 +57,7 @@ export class ElevenLabsTtsService implements ITtsService {
       };
       
       // Get audio stream from ElevenLabs API
-      const audioStream = await this.client.textToSpeech.convertAsStream(
+      const audioStream = await client.textToSpeech.convertAsStream(
         settings.voiceId,
         {
           output_format: 'mp3_44100_128',
@@ -88,6 +95,7 @@ export class ElevenLabsTtsService implements ITtsService {
    */
   async streamTextToSpeech(text: string, settings: TtsVoiceSettings): Promise<Readable> {
     try {
+      const client = await this.getClient();
       this.logger.log(`Streaming text to speech with voice ID: ${settings.voiceId}`);
       
       // Set default model if not provided
@@ -102,7 +110,7 @@ export class ElevenLabsTtsService implements ITtsService {
       };
       
       // Get audio stream from ElevenLabs API
-      const audioStream = await this.client.textToSpeech.convertAsStream(
+      const audioStream = await client.textToSpeech.convertAsStream(
         settings.voiceId,
         {
           output_format: 'mp3_44100_128',
@@ -183,7 +191,7 @@ export class ElevenLabsTtsService implements ITtsService {
         },
         {
           headers: {
-            'xi-api-key': this.apiKey,
+            'xi-api-key': await this.getApiKey(),
             'Content-Type': 'application/json',
           },
           responseType: 'arraybuffer', // Important for binary audio data
@@ -230,7 +238,7 @@ export class ElevenLabsTtsService implements ITtsService {
 
       const response = await axios.get<ListVoicesResponseDTO>(`${this.baseUrl}/voices`, {
         headers: {
-          'xi-api-key': this.apiKey,
+          'xi-api-key': await this.getApiKey(),
           'Content-Type': 'application/json',
         },
         params,

@@ -16,51 +16,47 @@ import OpenAI from 'openai';
 import axios from 'axios';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { ProviderCredentialsResolver } from '../../../../core/provider-credentials/provider-credentials.resolver';
 
 @Injectable()
 export class LangchainAgentService implements IAgentService {
   private readonly logger = new Logger(LangchainAgentService.name);
-  private readonly googleApiKey: string;
-  private readonly xaiApiKey: string;
-  private readonly mistralApiKey: string;
-  private readonly openaiClient: OpenAI;
+  private googleApiKey = '';
+  private xaiApiKey = '';
+  private mistralApiKey = '';
+  private openaiClient: OpenAI;
   private readonly workerApiUrl: string;
   
   // Provider instances
-  private readonly xaiProvider: XaiProvider;
-  private readonly geminiProvider: GeminiProvider;
-  private readonly mistralProvider: MistralProvider;
+  private xaiProvider: XaiProvider;
+  private geminiProvider: GeminiProvider;
+  private mistralProvider: MistralProvider;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly ragService: RagService,
+    private readonly providerCredentials: ProviderCredentialsResolver,
   ) {
-    this.googleApiKey = this.configService.get<string>('GOOGLE_API_KEY');
-    this.xaiApiKey = this.configService.get<string>('XAI_API_KEY');
-    this.mistralApiKey = this.configService.get<string>('MISTRAL_API_KEY');
     this.workerApiUrl = this.configService.get<string>('WORKER_API_URL') || 'http://localhost:3001';
-    
-    // Initialize OpenAI client for Grok
+    this.refreshProviderClients();
+  }
+
+  private async refreshProviderCredentials(): Promise<void> {
+    this.googleApiKey = (await this.providerCredentials.getSecret('gemini')) || '';
+    this.xaiApiKey = (await this.providerCredentials.getSecret('xai')) || '';
+    this.mistralApiKey = (await this.providerCredentials.getSecret('mistral')) || '';
+    this.refreshProviderClients();
+  }
+
+  private refreshProviderClients(): void {
     this.openaiClient = new OpenAI({
       apiKey: this.xaiApiKey || 'dummy-key',
       baseURL: 'https://api.x.ai/v1',
     });
-    
-    // Initialize provider instances
     this.xaiProvider = new XaiProvider(this.xaiApiKey);
     this.geminiProvider = new GeminiProvider(this.googleApiKey);
     this.mistralProvider = new MistralProvider(this.mistralApiKey);
-    
-    if (!this.googleApiKey && !this.xaiApiKey && !this.mistralApiKey) {
-      this.logger.warn('No API keys configured. Langchain agent service will not work properly.');
-    } else {
-      const providers = [];
-      if (this.xaiApiKey) providers.push('XAI (Grok)');
-      if (this.googleApiKey) providers.push('Google (Gemini)');
-      if (this.mistralApiKey) providers.push('Mistral AI');
-      this.logger.log(`Available providers: ${providers.join(', ')}`);
-    }
   }
   
   /**
@@ -143,6 +139,7 @@ export class LangchainAgentService implements IAgentService {
   }
   
   async checkConnection(): Promise<boolean> {
+    await this.refreshProviderCredentials();
     try {
       // Try Grok first if available
       if (this.xaiApiKey) {
@@ -180,6 +177,7 @@ export class LangchainAgentService implements IAgentService {
   
   async processRequest(request: AgentRequest): Promise<AgentResponse> {
     try {
+      await this.refreshProviderCredentials();
       const { input, config, sessionId } = request;
       const { assistantId, knowledgeBaseId } = config || {};
       
@@ -463,6 +461,7 @@ let context = '';
   
   async *processStreamingRequest(request: AgentRequest): AsyncIterable<AgentResponse> {
     try {
+      await this.refreshProviderCredentials();
       const { input, config, sessionId } = request;
       const { assistantId, knowledgeBaseId, workflowAgent } = config || {};
       

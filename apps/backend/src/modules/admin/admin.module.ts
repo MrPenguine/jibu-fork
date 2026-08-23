@@ -16,9 +16,12 @@ import { AdminPlansService } from './services/plans.service';
 import { AdminSubscriptionsService } from './services/subscriptions.service';
 import { AdminUsageService } from './services/usage.service';
 import { AdminAnalyticsService } from './services/analytics.service';
+import { AdminProviderCredentialsController } from './controllers/provider-credentials.controller';
+import { AdminProviderCredentialsService } from './services/provider-credentials.service';
+import { ProviderCredentialsModule } from '../../core/provider-credentials/provider-credentials.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, ProviderCredentialsModule],
   controllers: [
     AdminDashboardController,
     AdminUsersController,
@@ -26,6 +29,7 @@ import { AdminAnalyticsService } from './services/analytics.service';
     AdminPlansController,
     AdminSubscriptionsController,
     AdminAnalyticsController,
+    AdminProviderCredentialsController,
   ],
   providers: [
     AdminDashboardService,
@@ -38,6 +42,7 @@ import { AdminAnalyticsService } from './services/analytics.service';
     AdminGuard,
     AdminRoleGuard,
     AdminAuditMiddleware,
+    AdminProviderCredentialsService,
   ],
 })
 export class AdminModule implements NestModule {

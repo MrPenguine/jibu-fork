@@ -5,6 +5,7 @@ import { GoogleGenerativeAI, FunctionDeclaration, Tool as GeminiTool } from '@go
 import { PrismaService } from '../../core/database/prisma.service';
 import { RagService } from './providers/langchain/rag.service';
 import { ToolExecutorService } from './tool-executor.service';
+import { ProviderCredentialsResolver } from '../../core/provider-credentials/provider-credentials.resolver';
 
 export type AgentChannel = 'chat' | 'whatsapp' | 'voice';
 
@@ -67,13 +68,13 @@ const MAX_TOOL_ITERATIONS = 5;
 @Injectable()
 export class AgentRuntimeService {
   private readonly logger = new Logger(AgentRuntimeService.name);
-  private readonly googleApiKey: string;
-  private readonly xaiApiKey: string;
-  private readonly mistralApiKey: string;
-  private readonly openrouterApiKey: string;
-  private readonly xaiClient: OpenAI;
-  private readonly mistralClient: OpenAI;
-  private readonly openrouterClient: OpenAI;
+  private googleApiKey = '';
+  private xaiApiKey = '';
+  private mistralApiKey = '';
+  private openrouterApiKey = '';
+  private xaiClient: OpenAI;
+  private mistralClient: OpenAI;
+  private openrouterClient: OpenAI;
   private readonly ollamaClient: OpenAI;
 
   constructor(
@@ -81,21 +82,11 @@ export class AgentRuntimeService {
     private readonly prisma: PrismaService,
     private readonly ragService: RagService,
     private readonly toolExecutor: ToolExecutorService,
+    private readonly providerCredentials: ProviderCredentialsResolver,
   ) {
-    this.googleApiKey = this.configService.get<string>('GOOGLE_API_KEY') || this.configService.get<string>('GEMINI_API_KEY');
-    this.xaiApiKey = this.configService.get<string>('XAI_API_KEY');
-    this.mistralApiKey = this.configService.get<string>('MISTRAL_API_KEY');
-    this.openrouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
-    this.xaiClient = new OpenAI({ apiKey: this.xaiApiKey || 'dummy-key', baseURL: 'https://api.x.ai/v1' });
-    this.mistralClient = new OpenAI({ apiKey: this.mistralApiKey || 'dummy-key', baseURL: 'https://api.mistral.ai/v1' });
-    this.openrouterClient = new OpenAI({
-      apiKey: this.openrouterApiKey || 'dummy-key',
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: {
-        'HTTP-Referer': this.configService.get<string>('NEXT_PUBLIC_BASE_URL') || 'http://localhost:3000',
-        'X-Title': 'Jibu',
-      },
-    });
+    this.xaiClient = new OpenAI({ apiKey: 'dummy-key', baseURL: 'https://api.x.ai/v1' });
+    this.mistralClient = new OpenAI({ apiKey: 'dummy-key', baseURL: 'https://api.mistral.ai/v1' });
+    this.openrouterClient = this.createOpenRouterClient('dummy-key');
     this.ollamaClient = new OpenAI({
       apiKey: 'ollama',
       baseURL: this.configService.get<string>('OLLAMA_BASE_URL') || 'http://localhost:11434/v1',
@@ -192,6 +183,7 @@ export class AgentRuntimeService {
   // ---------------------------------------------------------------------------
 
   private async prepareTurn(params: RunTurnParams) {
+    await this.refreshProviderCredentials();
     const { agentId, sessionId, input } = params;
     if (!agentId) throw new Error('agentId is required');
 
@@ -239,6 +231,27 @@ export class AgentRuntimeService {
       maxTokens: (modelConfig.maxTokens as number) ?? 2048,
       executedById: params.executedById ?? null,
     };
+  }
+
+  private async refreshProviderCredentials(): Promise<void> {
+    this.googleApiKey = (await this.providerCredentials.getSecret('gemini')) || '';
+    this.xaiApiKey = (await this.providerCredentials.getSecret('xai')) || '';
+    this.mistralApiKey = (await this.providerCredentials.getSecret('mistral')) || '';
+    this.openrouterApiKey = (await this.providerCredentials.getSecret('openrouter')) || '';
+    this.xaiClient = new OpenAI({ apiKey: this.xaiApiKey || 'dummy-key', baseURL: 'https://api.x.ai/v1' });
+    this.mistralClient = new OpenAI({ apiKey: this.mistralApiKey || 'dummy-key', baseURL: 'https://api.mistral.ai/v1' });
+    this.openrouterClient = this.createOpenRouterClient(this.openrouterApiKey || 'dummy-key');
+  }
+
+  private createOpenRouterClient(apiKey: string): OpenAI {
+    return new OpenAI({
+      apiKey,
+      baseURL: 'https://openrouter.ai/api/v1',
+      defaultHeaders: {
+        'HTTP-Referer': this.configService.get<string>('NEXT_PUBLIC_BASE_URL') || 'http://localhost:3000',
+        'X-Title': 'Jibu',
+      },
+    });
   }
 
   // ---------------------------------------------------------------------------
