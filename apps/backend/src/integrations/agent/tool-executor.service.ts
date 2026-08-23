@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { google } from 'googleapis';
 import { PrismaService } from '../../core/database/prisma.service';
+import { ProviderCredentialsResolver } from '../../core/provider-credentials/provider-credentials.resolver';
 import { CredentialService } from '../../modules/v1/credential/credential.service';
 
 export interface ToolExecutionContext {
@@ -43,6 +44,7 @@ export class ToolExecutorService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
     private readonly credentialService: CredentialService,
+    private readonly providerCredentials: ProviderCredentialsResolver,
   ) {}
 
   async executeTool(
@@ -218,7 +220,7 @@ export class ToolExecutorService {
       this.configService.get<string>('N8N_WEBHOOK_BASE_URL') ||
       this.configService.get<string>('N8N_BASE_URL') ||
       this.configService.get<string>('N8N_URL');
-    const apiKey = this.configService.get<string>('N8N_API_KEY');
+    const apiKey = await this.providerCredentials.getSecret('n8n');
 
     const webhookUrl = metadata.webhookUrl as string;
     const workflowId = metadata.n8nWorkflowId as string;

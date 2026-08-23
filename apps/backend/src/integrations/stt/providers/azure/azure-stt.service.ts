@@ -1,12 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ProviderCredentialsResolver } from '../../../../core/provider-credentials/provider-credentials.resolver';
 import { ISttService } from '../../interfaces/stt.interface';
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 
 @Injectable()
 export class AzureSttService implements ISttService {
   private readonly logger = new Logger(AzureSttService.name);
-  private readonly subscriptionKey: string;
+  private readonly configService: ConfigService;
+  private readonly providerCredentials: ProviderCredentialsResolver;
   private readonly region: string;
   private readonly endpoint: string;
   private readonly activeSessions: Map<string, {
@@ -15,19 +17,19 @@ export class AzureSttService implements ISttService {
     audioConfig: sdk.AudioConfig
   }> = new Map();
 
-  constructor(private configService: ConfigService) {
-    this.subscriptionKey = this.configService.get<string>('AZURE_RESOURCE_KEY');
+  constructor(configService: ConfigService, providerCredentials: ProviderCredentialsResolver) {
+    this.configService = configService;
+    this.providerCredentials = providerCredentials;
     this.region = this.configService.get<string>('AZURE_REGION');
     this.endpoint = this.configService.get<string>('AZURE_SPEECH_TO_TEXT_ENDPOINT');
-    
-    if (!this.subscriptionKey || !this.region) {
-      this.logger.warn('Azure STT credentials not properly configured');
-    } else {
-      this.logger.log('Azure STT service initialized');
-    }
   }
 
   async streamToText(audioStream: any): Promise<string> {
+    const subscriptionKey = await this.providerCredentials.getSecret('azureSpeech');
+    if (!subscriptionKey || !this.region) {
+      throw new Error('Azure STT credentials not properly configured');
+    }
+
     return new Promise<string>((resolve, reject) => {
       try {
         const pushStream = sdk.AudioInputStream.createPushStream();
@@ -44,7 +46,7 @@ export class AzureSttService implements ISttService {
         pushStream.close();
         
         const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
-        const speechConfig = sdk.SpeechConfig.fromSubscription(this.subscriptionKey, this.region);
+        const speechConfig = sdk.SpeechConfig.fromSubscription(subscriptionKey, this.region);
         
         // Configure speech recognition
         speechConfig.speechRecognitionLanguage = 'en-US';
@@ -72,6 +74,11 @@ export class AzureSttService implements ISttService {
   }
 
   async startContinuousTranscription(): Promise<string> {
+    const subscriptionKey = await this.providerCredentials.getSecret('azureSpeech');
+    if (!subscriptionKey || !this.region) {
+      throw new Error('Azure STT credentials not properly configured');
+    }
+
     try {
       // Create a session ID
       const sessionId = Date.now().toString();
@@ -83,7 +90,7 @@ export class AzureSttService implements ISttService {
       const audioConfig = sdk.AudioConfig.fromStreamInput(pushStream);
       
       // Create speech config
-      const speechConfig = sdk.SpeechConfig.fromSubscription(this.subscriptionKey, this.region);
+      const speechConfig = sdk.SpeechConfig.fromSubscription(subscriptionKey, this.region);
       speechConfig.speechRecognitionLanguage = 'en-US';
       
       // Enable continuous recognition
@@ -92,7 +99,7 @@ export class AzureSttService implements ISttService {
       // Create recognizer
       const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
       
-      let transcription = '';
+      const transcription = '';
       
       // Set up event handlers
       recognizer.recognized = (s, e) => {

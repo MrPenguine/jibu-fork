@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { ElevenLabsTtsService } from './elevenlabs-tts.service';
-import { VoiceDTO } from '../../dto/voice.dto';
+import { ProviderCredentialsResolver } from '../../../../core/provider-credentials/provider-credentials.resolver';
 
 // Mock axios
 jest.mock('axios');
@@ -10,33 +9,21 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('ElevenLabsTtsService', () => {
   let service: ElevenLabsTtsService;
-  let configService: ConfigService;
-
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-        }),
-      ],
       providers: [
         ElevenLabsTtsService,
         {
-          provide: ConfigService,
+          provide: ProviderCredentialsResolver,
           useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'ELEVENLABS_API_KEY') {
-                return 'test-api-key';
-              }
-              return null;
-            }),
+            getSecret: jest.fn().mockResolvedValue('test-api-key'),
           },
         },
       ],
     }).compile();
 
     service = module.get<ElevenLabsTtsService>(ElevenLabsTtsService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {

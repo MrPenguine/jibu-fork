@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { ConfigService } from '@nestjs/config';
+import { ProviderCredentialsResolver } from '../../../core/provider-credentials/provider-credentials.resolver';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { PrismaService } from '../../../core/database/prisma.service';
@@ -92,8 +93,8 @@ function normalizeChunkConfig(input?: ChunkConfigInput) {
 export class KnowledgeBaseService {
   private readonly logger = new Logger(KnowledgeBaseService.name);
 
-  private readonly genAI: GoogleGenerativeAI | null;
-  private readonly openrouter: OpenAI | null;
+  private genAI: GoogleGenerativeAI | null = null;
+  private openrouter: OpenAI | null = null;
   private readonly ollamaChat: OpenAI | null;
 
   constructor(
@@ -102,22 +103,8 @@ export class KnowledgeBaseService {
     private readonly ragService: RagService,
     private readonly vectorDb: VectorDbService,
     private readonly configService: ConfigService,
+    private readonly providerCredentials: ProviderCredentialsResolver,
   ) {
-    const geminiKey = this.configService.get<string>('GEMINI_API_KEY');
-    this.genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
-
-    const openrouterKey = this.configService.get<string>('OPENROUTER_API_KEY');
-    this.openrouter = openrouterKey
-      ? new OpenAI({
-          apiKey: openrouterKey,
-          baseURL: 'https://openrouter.ai/api/v1',
-          defaultHeaders: {
-            'HTTP-Referer': this.configService.get<string>('NEXT_PUBLIC_BASE_URL') || 'http://localhost:3000',
-            'X-Title': 'Jibu',
-          },
-        })
-      : null;
-
     const ollamaChatUrl = this.configService.get<string>('OLLAMA_URL') || this.configService.get<string>('OLLAMA_HOST') || 'http://localhost:11434';
     this.ollamaChat = new OpenAI({
       apiKey: 'ollama',
@@ -978,6 +965,7 @@ export class KnowledgeBaseService {
     retrievalConfig: { systemPrompt?: string; temperature?: number; maxTokens?: number },
     opts?: { answerProvider?: string; answerModel?: string },
   ): Promise<string> {
+    await this.refreshProviderCredentials();
     if (!chunks.length) {
       return "I couldn't find anything relevant in this knowledge base to answer that.";
     }
@@ -1040,5 +1028,22 @@ export class KnowledgeBaseService {
       this.logger.error(`Error generating grounded answer: ${(e as Error).message}`);
       return `Error generating answer: ${(e as Error).message}`;
     }
+  }
+
+  private async refreshProviderCredentials(): Promise<void> {
+    const geminiKey = await this.providerCredentials.getSecret('gemini');
+    this.genAI = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
+
+    const openrouterKey = await this.providerCredentials.getSecret('openrouter');
+    this.openrouter = openrouterKey
+      ? new OpenAI({
+          apiKey: openrouterKey,
+          baseURL: 'https://openrouter.ai/api/v1',
+          defaultHeaders: {
+            'HTTP-Referer': this.configService.get<string>('NEXT_PUBLIC_BASE_URL') || 'http://localhost:3000',
+            'X-Title': 'Jibu',
+          },
+        })
+      : null;
   }
 }

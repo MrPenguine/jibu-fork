@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { ITtsService, TtsVoiceSettings } from '../../interfaces/tts.interface';
 import { ListVoicesResponseDTO, VoiceDTO } from '../../dto/voice.dto';
 import { ElevenLabsClient } from 'elevenlabs';
 import { Readable } from 'stream';
+import { ProviderCredentialsResolver } from '../../../../core/provider-credentials/provider-credentials.resolver';
 
 /**
  * ElevenLabs TTS service implementation
@@ -12,20 +12,16 @@ import { Readable } from 'stream';
 @Injectable()
 export class ElevenLabsTtsService implements ITtsService {
   private readonly logger = new Logger(ElevenLabsTtsService.name);
-  private readonly apiKey: string;
   private readonly baseUrl = 'https://api.elevenlabs.io/v2';
-  private readonly client: ElevenLabsClient;
 
-  constructor(private readonly configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('ELEVENLABS_API_KEY');
-    if (!this.apiKey) {
-      this.logger.warn('ELEVENLABS_API_KEY not set. ElevenLabs TTS service will not function properly.');
-    }
-    
-    // Initialize the ElevenLabs client
-    this.client = new ElevenLabsClient({
-      apiKey: this.apiKey,
-    });
+  constructor(private readonly providerCredentials: ProviderCredentialsResolver) {}
+
+  private async getApiKey(): Promise<string> {
+    return (await this.providerCredentials.getSecret('elevenlabs')) || 'dummy-key';
+  }
+
+  private async getClient(): Promise<ElevenLabsClient> {
+    return new ElevenLabsClient({ apiKey: await this.getApiKey() });
   }
   
   /**
@@ -36,6 +32,7 @@ export class ElevenLabsTtsService implements ITtsService {
    */
   async textToSpeech(text: string, settings: TtsVoiceSettings): Promise<Buffer> {
     try {
+      const client = await this.getClient();
       this.logger.log(`Converting text to speech with voice ID: ${settings.voiceId}`);
       
       // Set default model if not provided
@@ -50,7 +47,7 @@ export class ElevenLabsTtsService implements ITtsService {
       };
       
       // Get audio stream from ElevenLabs API
-      const audioStream = await this.client.textToSpeech.convertAsStream(
+      const audioStream = await client.textToSpeech.convertAsStream(
         settings.voiceId,
         {
           output_format: 'mp3_44100_128',
@@ -88,6 +85,7 @@ export class ElevenLabsTtsService implements ITtsService {
    */
   async streamTextToSpeech(text: string, settings: TtsVoiceSettings): Promise<Readable> {
     try {
+      const client = await this.getClient();
       this.logger.log(`Streaming text to speech with voice ID: ${settings.voiceId}`);
       
       // Set default model if not provided
@@ -102,7 +100,7 @@ export class ElevenLabsTtsService implements ITtsService {
       };
       
       // Get audio stream from ElevenLabs API
-      const audioStream = await this.client.textToSpeech.convertAsStream(
+      const audioStream = await client.textToSpeech.convertAsStream(
         settings.voiceId,
         {
           output_format: 'mp3_44100_128',
@@ -116,7 +114,9 @@ export class ElevenLabsTtsService implements ITtsService {
       
       // Create a readable stream to return
       const readableStream = new Readable({
-        read() {}
+        read() {
+          return undefined;
+        }
       });
       
       // Pipe the audio stream to the readable stream
@@ -183,7 +183,7 @@ export class ElevenLabsTtsService implements ITtsService {
         },
         {
           headers: {
-            'xi-api-key': this.apiKey,
+            'xi-api-key': await this.getApiKey(),
             'Content-Type': 'application/json',
           },
           responseType: 'arraybuffer', // Important for binary audio data
@@ -230,19 +230,28 @@ export class ElevenLabsTtsService implements ITtsService {
 
       const response = await axios.get<ListVoicesResponseDTO>(`${this.baseUrl}/voices`, {
         headers: {
-          'xi-api-key': this.apiKey,
+          'xi-api-key': await this.getApiKey(),
           'Content-Type': 'application/json',
         },
         params,
       });
 
-      const data = response.data;
+      const data = response.data as ListVoicesResponseDTO & {
+        has_more?: boolean;
+        next_page_token?: string;
+      };
       
       // Map the API response to our VoiceDTO objects and add provider information
       const mappedVoices = data.voices.map(voice => {
         // Add provider information
         const voiceDto = new VoiceDTO();
         Object.assign(voiceDto, voice);
+        const rawVoice = voice as VoiceDTO & {
+          voice_id?: string;
+          preview_url?: string;
+        };
+        voiceDto.voiceId = rawVoice.voiceId || rawVoice.voice_id;
+        voiceDto.previewUrl = rawVoice.previewUrl || rawVoice.preview_url;
         
         // Set provider to ElevenLabs
         voiceDto.provider = 'ElevenLabs';
@@ -255,8 +264,8 @@ export class ElevenLabsTtsService implements ITtsService {
       
       allVoices = [...allVoices, ...mappedVoices];
       
-      hasMore = data.hasMore;
-      nextPageToken = data.nextPageToken;
+      hasMore = data.hasMore ?? data.has_more ?? false;
+      nextPageToken = data.nextPageToken ?? data.next_page_token ?? null;
     }
 
     return allVoices;

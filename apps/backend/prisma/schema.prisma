@@ -42,6 +42,7 @@ model User {
   suspensionReason String?
 
   adminAuditLogs   AdminAuditLog[]          @relation("AdminActions")
+  providerCredentials ProviderCredential[]  @relation("ProviderCredentialCreators")
   authUser         AuthUser? @relation(fields: [id], references: [id], onDelete: Cascade)
 
   @@index([lastWorkspaceId])
@@ -877,4 +878,22 @@ model AdminAuditLog {
   @@index([targetType, targetId])
   @@index([createdAt])
   @@index([action])
+}
+
+model ProviderCredential {
+  id              String    @id @default(cuid())
+  provider        String
+  label           String
+  scope           String    @default("platform")
+  vaultPath       String
+  lastTestedAt    DateTime?
+  lastTestStatus  String?
+  lastTestMessage String?
+  createdById     String?
+  createdBy       User?     @relation("ProviderCredentialCreators", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([provider, scope])
+  @@index([createdById])
 }

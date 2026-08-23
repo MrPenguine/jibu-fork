@@ -1,265 +1,240 @@
 "use client";
 
-import { useState } from "react";
-import { Card } from "@libs/shadcn-ui/components/ui/card";
-import { Button } from "@libs/shadcn-ui/components/ui/button";
+import * as React from "react";
+import { AlertCircle, CheckCircle2, CircleDashed, Loader2, Trash2, XCircle } from "lucide-react";
 import { Badge } from "@libs/shadcn-ui/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@libs/shadcn-ui/components/ui/dialog";
+import { Button } from "@libs/shadcn-ui/components/ui/button";
+import { Card } from "@libs/shadcn-ui/components/ui/card";
 import { Input } from "@libs/shadcn-ui/components/ui/input";
-import { Label } from "@libs/shadcn-ui/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@libs/shadcn-ui/components/ui/select";
-import { 
-  Plus, 
-  Eye, 
-  EyeOff, 
-  Edit, 
-  Trash2,
-  CheckCircle2,
-  XCircle,
-  AlertCircle
-} from "lucide-react";
+import { fetchAPI } from "../../../utils/api";
+import { toast } from "@libs/shadcn-ui/components/ui/use-toast";
 
-// Mock data
-const mockCredentials = [
-  {
-    id: "1",
-    provider: "openai",
-    name: "Jibu OpenAI Production",
-    isActive: true,
-    createdAt: "2024-01-15",
-    lastUsed: "2 hours ago",
-  },
-  {
-    id: "2",
-    provider: "google-gemini",
-    name: "Jibu Gemini Pro",
-    isActive: true,
-    createdAt: "2024-01-20",
-    lastUsed: "5 minutes ago",
-  },
-  {
-    id: "3",
-    provider: "anthropic",
-    name: "Jibu Claude Production",
-    isActive: true,
-    createdAt: "2024-02-01",
-    lastUsed: "1 hour ago",
-  },
-  {
-    id: "4",
-    provider: "elevenlabs",
-    name: "Jibu ElevenLabs TTS",
-    isActive: false,
-    createdAt: "2024-01-10",
-    lastUsed: "3 days ago",
-  },
-];
+type CredentialStatus = "configured" | "env" | "unset";
 
-const providers = [
-  { value: "openai", label: "OpenAI", icon: "🤖" },
-  { value: "google-gemini", label: "Google Gemini", icon: "✨" },
-  { value: "anthropic", label: "Anthropic (Claude)", icon: "🧠" },
-  { value: "azure-openai", label: "Azure OpenAI", icon: "☁️" },
-  { value: "elevenlabs", label: "ElevenLabs", icon: "🔊" },
-  { value: "twilio", label: "Twilio", icon: "📞" },
-];
+interface ProviderCredential {
+  provider: string;
+  label: string;
+  status: CredentialStatus;
+  lastTest: {
+    status: "ok" | "error" | null;
+    message: string | null;
+    testedAt: string | null;
+  } | null;
+}
 
-function ProviderBadge({ provider }: { provider: string }) {
-  const providerConfig = providers.find(p => p.value === provider);
+function StatusBadge({ status }: { status: CredentialStatus }) {
+  if (status === "configured") {
+    return (
+      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+        <CheckCircle2 className="mr-1 h-3 w-3" />
+        Configured
+      </Badge>
+    );
+  }
+  if (status === "env") {
+    return (
+      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+        <CircleDashed className="mr-1 h-3 w-3" />
+        Env fallback
+      </Badge>
+    );
+  }
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-lg">{providerConfig?.icon}</span>
-      <span className="font-medium">{providerConfig?.label || provider}</span>
-    </div>
+    <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-600">
+      Unset
+    </Badge>
   );
 }
 
 export default function CredentialsPage() {
-  const [showKey, setShowKey] = useState<string | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [credentials, setCredentials] = React.useState<ProviderCredential[]>([]);
+  const [drafts, setDrafts] = React.useState<Record<string, string>>({});
+  const [loading, setLoading] = React.useState(true);
+  const [busyProvider, setBusyProvider] = React.useState<string | null>(null);
+
+  const loadCredentials = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await fetchAPI("/admin/provider-credentials");
+      setCredentials(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      toast({
+        title: "Could not load credentials",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadCredentials();
+  }, [loadCredentials]);
+
+  const setCredential = async (provider: ProviderCredential) => {
+    const secret = drafts[provider.provider]?.trim();
+    if (!secret) {
+      toast({ title: "Enter a credential first", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setBusyProvider(provider.provider);
+      await fetchAPI(`/admin/provider-credentials/${provider.provider}`, {
+        method: "PUT",
+        body: JSON.stringify({ secret }),
+      });
+      setDrafts((current) => ({ ...current, [provider.provider]: "" }));
+      toast({ title: `${provider.label} credential saved` });
+      await loadCredentials();
+    } catch (error: any) {
+      toast({
+        title: "Could not save credential",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusyProvider(null);
+    }
+  };
+
+  const removeCredential = async (provider: ProviderCredential) => {
+    if (!window.confirm(`Remove the stored ${provider.label} credential?`)) return;
+
+    try {
+      setBusyProvider(provider.provider);
+      await fetchAPI(`/admin/provider-credentials/${provider.provider}`, { method: "DELETE" });
+      toast({ title: `${provider.label} credential removed` });
+      await loadCredentials();
+    } catch (error: any) {
+      toast({
+        title: "Could not remove credential",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusyProvider(null);
+    }
+  };
+
+  const testCredential = async (provider: ProviderCredential) => {
+    try {
+      setBusyProvider(provider.provider);
+      const result = await fetchAPI(`/admin/provider-credentials/${provider.provider}/test`, {
+        method: "POST",
+      });
+      toast({
+        title: result?.status === "ok" ? `${provider.label} connection succeeded` : `${provider.label} connection failed`,
+        description: result?.message || undefined,
+        variant: result?.status === "ok" ? "default" : "destructive",
+      });
+      await loadCredentials();
+    } catch (error: any) {
+      toast({
+        title: "Could not test credential",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusyProvider(null);
+    }
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Platform Credentials</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage API keys for third-party services used across all workspaces
-          </p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-violet-600 hover:bg-violet-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Credential
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Add Platform Credential</DialogTitle>
-              <DialogDescription>
-                Add a new API key for a third-party service. This will be used by all client workspaces.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="provider">Provider</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {providers.map((provider) => (
-                      <SelectItem key={provider.value} value={provider.value}>
-                        <span className="flex items-center gap-2">
-                          <span>{provider.icon}</span>
-                          <span>{provider.label}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Credential Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., Jibu OpenAI Production"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">API Key</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="sk-..."
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button className="bg-violet-600 hover:bg-violet-700">
-                Create Credential
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+    <div className="space-y-6 p-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Platform Credentials</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Manage third-party provider credentials shared across all workspaces.
+        </p>
       </div>
 
-      {/* Credentials Table */}
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+          <table className="w-full min-w-[780px]">
+            <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Provider
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  API Key
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Last Used
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Provider</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Set or replace</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last test</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {mockCredentials.map((credential) => (
-                <tr key={credential.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <ProviderBadge provider={credential.provider} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{credential.name}</div>
-                    <div className="text-xs text-gray-500">Created {credential.createdAt}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                        {showKey === credential.id ? "sk-1234567890abcdef..." : "••••••••••••••••"}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowKey(showKey === credential.id ? null : credential.id)}
-                      >
-                        {showKey === credential.id ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {credential.isActive ? (
-                      <Badge variant="outline" className="bg-green-100 text-green-700 border-0">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Active
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-gray-100 text-gray-700 border-0">
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Inactive
-                      </Badge>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {credential.lastUsed}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+            <tbody className="divide-y bg-white">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                    Loading provider credentials…
                   </td>
                 </tr>
-              ))}
+              ) : credentials.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">No providers registered.</td>
+                </tr>
+              ) : (
+                credentials.map((provider) => {
+                  const busy = busyProvider === provider.provider;
+                  const lastTest = provider.lastTest;
+                  return (
+                    <tr key={provider.provider} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="font-medium text-gray-900">{provider.label}</div>
+                        <div className="text-xs text-gray-500">{provider.provider}</div>
+                      </td>
+                      <td className="px-6 py-4"><StatusBadge status={provider.status} /></td>
+                      <td className="px-6 py-4">
+                        <div className="flex max-w-sm gap-2">
+                          <Input
+                            type="password"
+                            value={drafts[provider.provider] || ""}
+                            onChange={(event) => setDrafts((current) => ({ ...current, [provider.provider]: event.target.value }))}
+                            placeholder="Enter new credential"
+                            autoComplete="new-password"
+                            aria-label={`New ${provider.label} credential`}
+                          />
+                          <Button onClick={() => void setCredential(provider)} disabled={busy}>
+                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                          </Button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {lastTest ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              {lastTest.status === "ok" ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />}
+                              <span>{lastTest.message || (lastTest.status === "ok" ? "Passed" : "Failed")}</span>
+                            </div>
+                            {lastTest.testedAt && <div className="text-xs text-gray-400">{new Date(lastTest.testedAt).toLocaleString()}</div>}
+                          </div>
+                        ) : "Not tested"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => void testCredential(provider)} disabled={busy}>Test</Button>
+                          <Button variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => void removeCredential(provider)} disabled={busy || provider.status !== "configured"} aria-label={`Remove ${provider.label} credential`}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </Card>
 
-      {/* Info Card */}
-      <Card className="p-4 bg-blue-50 border-blue-200">
+      <Card className="border-blue-200 bg-blue-50 p-4">
         <div className="flex gap-3">
-          <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
           <div>
-            <h4 className="text-sm font-medium text-blue-900">About Platform Credentials</h4>
-            <p className="text-sm text-blue-700 mt-1">
-              These credentials are shared across all client workspaces. When you publish an n8n workflow, 
-              it will automatically use the active credential for the selected LLM provider. Make sure to 
-              keep these keys secure and rotate them regularly.
+            <h2 className="text-sm font-medium text-blue-900">Credentials are write-only</h2>
+            <p className="mt-1 text-sm text-blue-700">
+              Stored values are kept in Vault and can only be replaced or removed. They are never displayed or returned by the API.
             </p>
           </div>
         </div>
