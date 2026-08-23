@@ -19,6 +19,61 @@ export class SessionAuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest();
+    const apiKeyHeader = request.headers?.['x-api-key'];
+    const apiKeyValue = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
+    if (typeof apiKeyValue === 'string' && apiKeyValue.length > 0) {
+      let verified;
+      try {
+        verified = await auth.api.verifyApiKey({
+          body: { key: apiKeyValue },
+        });
+      } catch {
+        throw new UnauthorizedException();
+      }
+      if (!verified.valid || !verified.key) {
+        throw new UnauthorizedException();
+      }
+
+      const metadata =
+        verified.key.metadata && typeof verified.key.metadata === 'object'
+          ? verified.key.metadata as Record<string, unknown>
+          : {};
+      const createdByUserId = metadata.createdByUserId;
+      if (typeof createdByUserId !== 'string') {
+        throw new UnauthorizedException();
+      }
+      const user = await this.prisma.user.findUnique({
+        where: { id: createdByUserId },
+        include: { lastWorkspace: true },
+      });
+      const membership = await this.prisma.workspaceMembership.findFirst({
+        where: {
+          userId: createdByUserId,
+          workspaceId: verified.key.referenceId,
+          status: 'active',
+        },
+        select: { role: true },
+      });
+      if (!user || !membership) {
+        throw new UnauthorizedException();
+      }
+
+      request.user = {
+        ...user,
+        userId: user.id,
+        workspaceId: verified.key.referenceId,
+        lastWorkspaceId: verified.key.referenceId,
+        workspaceRole: membership.role,
+      };
+      request.apiKeyWorkspaceId = verified.key.referenceId;
+      request.apiKey = {
+        id: verified.key.id,
+        referenceId: verified.key.referenceId,
+        metadata,
+      };
+      return true;
+    }
+
     const headers = new Headers();
     for (const [key, value] of Object.entries(request.headers)) {
       if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));

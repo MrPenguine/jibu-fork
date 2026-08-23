@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString } from 'class-validator';
 
 export class CreateApiKeyDto {
   @IsString()
@@ -9,4 +9,9 @@ export class CreateApiKeyDto {
   @IsArray()
   @IsString({ each: true })
   scopes?: string[];
-} 
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  expiresIn?: number;
+}

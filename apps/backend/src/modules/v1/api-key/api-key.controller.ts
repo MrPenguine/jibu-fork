@@ -1,67 +1,79 @@
-import { Controller, Post, Get, Delete, Body, Param, UsePipes, ValidationPipe, Req, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Body, Controller, Delete, Get, Param, Post, Req, UseGuards, UsePipes, ValidationPipe,
+} from '@nestjs/common';
+import { Request } from 'express';
 import { ApiKeyService } from './api-key.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
+import { RevealApiKeyDto } from './dto/reveal-api-key.dto';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
-import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
-  user: {
-    userId: string;
-    workspaceId: string;
-  };
+  user: { userId: string; workspaceId: string };
+  apiKey?: unknown;
 }
 
-@ApiTags('API Keys')
-@ApiBearerAuth()
 @UseGuards(JwtAuthGuard, OrganizationGuard)
 @Controller('api-keys')
 export class ApiKeyController {
   constructor(private readonly apiKeyService: ApiKeyService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new API key' })
-  @ApiResponse({ status: 201, description: 'The API key has been successfully created.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  async createApiKey(@Body() body: CreateApiKeyDto, @Req() req: AuthenticatedRequest) {
-    const { workspaceId, userId } = req.user;
-    return this.apiKeyService.createApiKey(body, workspaceId, userId);
+  createApiKey(@Body() body: CreateApiKeyDto, @Req() req: AuthenticatedRequest) {
+    return this.apiKeyService.createApiKey(
+      body, req.user.workspaceId, req.user.userId, this.requestHeaders(req),
+    );
   }
 
-    @Get()
-  @ApiOperation({ summary: 'List all API keys for the organization' })
-  @ApiResponse({ status: 200, description: 'A list of API keys.' })
-  async listApiKeys(@Req() req: AuthenticatedRequest) {
-    const { workspaceId, userId } = req.user;
-    return this.apiKeyService.listApiKeys(workspaceId, userId);
+  @Get()
+  listApiKeys(@Req() req: AuthenticatedRequest) {
+    return this.apiKeyService.listApiKeys(req.user.workspaceId);
   }
 
-    @Get(':id')
-  @ApiOperation({ summary: 'Get a specific API key' })
-  @ApiResponse({ status: 200, description: 'The API key.' })
-  @ApiResponse({ status: 404, description: 'API key not found.' })
-  async getApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { workspaceId, userId } = req.user;
-    return this.apiKeyService.getApiKey(id, workspaceId, userId);
+  @Get(':id')
+  getApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.apiKeyService.getApiKey(id, req.user.workspaceId);
   }
 
-    @Delete(':id')
-  @ApiOperation({ summary: 'Delete an API key' })
-  @ApiResponse({ status: 200, description: 'The API key has been successfully deleted.' })
-  @ApiResponse({ status: 404, description: 'API key not found.' })
-  async deleteApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { workspaceId, userId } = req.user;
-    return this.apiKeyService.deleteApiKey(id, workspaceId, userId);
+  @Post(':id/reveal')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  revealApiKey(
+    @Param('id') id: string,
+    @Body() body: RevealApiKeyDto | undefined,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.apiKeyService.revealApiKey(
+      id, req.user.workspaceId, req.user.userId, body?.password, req,
+    );
   }
 
-    @Post(':id/revoke')
-  @ApiOperation({ summary: 'Revoke an API key' })
-  @ApiResponse({ status: 200, description: 'The API key has been successfully revoked.' })
-  @ApiResponse({ status: 404, description: 'API key not found.' })
-  async revokeApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const { workspaceId, userId } = req.user;
-    return this.apiKeyService.revokeApiKey(id, workspaceId, userId);
+  @Post(':id/rotate')
+  rotateApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.apiKeyService.rotateApiKey(
+      id, req.user.workspaceId, req.user.userId, this.requestHeaders(req),
+    );
   }
-} 
+
+  @Post(':id/revoke')
+  revokeApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.apiKeyService.revokeApiKey(
+      id, req.user.workspaceId, this.requestHeaders(req),
+    );
+  }
+
+  @Delete(':id')
+  deleteApiKey(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.apiKeyService.deleteApiKey(
+      id, req.user.workspaceId, this.requestHeaders(req),
+    );
+  }
+
+  private requestHeaders(req: Request): Headers {
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+    }
+    return headers;
+  }
+}

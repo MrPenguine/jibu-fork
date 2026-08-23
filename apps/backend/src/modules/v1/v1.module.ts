@@ -10,6 +10,7 @@ import { VoicesModule } from './voices/voices.module';
 import { FolderModule } from './folder/folder.module';
 import { InvitationModule } from './invitation/invitation.module';
 import { AssistantModule } from './assistant/assistant.module';
+import { ApiKeyModule } from './api-key/api-key.module';
 
 
 @Module({
@@ -25,6 +26,7 @@ import { AssistantModule } from './assistant/assistant.module';
     FolderModule,
     InvitationModule,
     AssistantModule,
+    ApiKeyModule,
   ],
   exports: [
     FileModule,
@@ -38,6 +40,7 @@ import { AssistantModule } from './assistant/assistant.module';
     FolderModule,
     InvitationModule,
     AssistantModule,
+    ApiKeyModule,
   ],
 })
 export class V1Module {}

@@ -1,7 +1,49 @@
 import { prismaAdapter } from '@better-auth/prisma-adapter';
-import { betterAuth, type BetterAuthOptions, type User as BetterAuthUser } from 'better-auth';
+import {
+  betterAuth,
+  type BetterAuthOptions,
+  type BetterAuthPlugin,
+  type User as BetterAuthUser,
+} from 'better-auth';
+import { apiKey } from '@better-auth/api-key';
 import { organization } from 'better-auth/plugins';
 import { getSharedPrismaService } from '../database/prisma.service';
+
+interface ApiKeyApi {
+  verifyApiKey(input: { body: { key: string } }): Promise<{
+    valid: boolean;
+    key: {
+      id: string;
+      referenceId: string;
+      metadata?: unknown;
+      name: string | null;
+      prefix: string | null;
+      start: string | null;
+      expiresAt: Date | null;
+    } | null;
+  }>;
+  createApiKey(input: {
+    body: {
+      organizationId: string;
+      name: string;
+      expiresIn?: number | null;
+      metadata?: Record<string, unknown>;
+    };
+    headers?: Headers;
+  }): Promise<{
+    id: string;
+    key: string;
+    name: string | null;
+    prefix: string | null;
+    start: string | null;
+    expiresAt: Date | null;
+  }>;
+  updateApiKey(input: {
+    body: { keyId: string; enabled?: boolean };
+    headers?: Headers;
+  }): Promise<unknown>;
+  deleteApiKey(input: { body: { keyId: string }; headers?: Headers }): Promise<unknown>;
+}
 
 const authPrisma = getSharedPrismaService();
 
@@ -171,7 +213,7 @@ const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
   },
 };
 
-export const auth = betterAuth({
+const authInstance = betterAuth({
   secret: betterAuthSecret,
   baseURL: backendUrl,
   trustedOrigins: [frontendUrl, backendUrl],
@@ -250,6 +292,27 @@ export const auth = betterAuth({
         throw new Error('Email delivery is not configured');
       },
     }),
+    apiKey({
+      references: 'organization',
+      enableSessionForAPIKeys: false,
+      apiKeyHeaders: 'x-api-key',
+      defaultPrefix: 'jibu_',
+      requireName: true,
+      enableMetadata: true,
+      rateLimit: { enabled: false },
+      keyExpiration: { defaultExpiresIn: null },
+      schema: {
+        apikey: {
+          modelName: 'AuthApiKey',
+        },
+      },
+    // @better-auth/api-key@1.7.1 resolves a separate @better-auth/core type tree from better-auth@1.7.1.
+    }) as unknown as BetterAuthPlugin,
   ],
   databaseHooks,
 });
+
+// The plugin cast omits plugin endpoints from inference, so this intersection restores their typed calls.
+export const auth = authInstance as typeof authInstance & {
+  api: typeof authInstance.api & ApiKeyApi;
+};
