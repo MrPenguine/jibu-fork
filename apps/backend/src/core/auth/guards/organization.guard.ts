@@ -28,6 +28,7 @@ interface OrganizationRequest {
   query?: Record<string, string | undefined>;
   headers: Record<string, string | string[] | undefined>;
   membership?: unknown;
+  apiKeyWorkspaceId?: string;
 }
 
 @Injectable()
@@ -53,17 +54,26 @@ export class OrganizationGuard implements CanActivate {
       isWorkspaceRoute
         ? request.params?.id
         : undefined;
-    const selectedWorkspaceId =
-      request.params?.workspaceId ||
-      request.params?.organizationId ||
-      workspaceRouteId ||
-      this.readBodyWorkspaceId(request.body) ||
-      request.query?.workspaceId ||
-      this.readHeader(request.headers, 'x-workspace-id') ||
-      this.readHeader(request.headers, 'workspace-id') ||
-      request.session?.session?.activeOrganizationId ||
-      request.user?.lastWorkspaceId ||
-      undefined;
+    const selectedWorkspaceId = request.apiKeyWorkspaceId
+      ? request.apiKeyWorkspaceId
+      : request.params?.workspaceId ||
+        request.params?.organizationId ||
+        workspaceRouteId ||
+        this.readBodyWorkspaceId(request.body) ||
+        request.query?.workspaceId ||
+        this.readHeader(request.headers, 'x-workspace-id') ||
+        this.readHeader(request.headers, 'workspace-id') ||
+        request.session?.session?.activeOrganizationId ||
+        request.user?.lastWorkspaceId ||
+        undefined;
+
+    if (
+      request.apiKeyWorkspaceId &&
+      workspaceRouteId &&
+      workspaceRouteId !== request.apiKeyWorkspaceId
+    ) {
+      throw new ForbiddenException('API key is restricted to its workspace');
+    }
 
     if (!userId || !selectedWorkspaceId) {
       throw new ForbiddenException('A workspace is required for this request');

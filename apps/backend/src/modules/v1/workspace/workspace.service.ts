@@ -1,10 +1,8 @@
 import { Injectable, HttpException, HttpStatus, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { ApiKeyService } from '../api-key/api-key.service';
 import { InviteMembersDto } from './dto/workspace.dto';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID, randomBytes } from 'crypto';
-import { VaultService } from '../../../core/encryption/vault.service';
+import { randomUUID } from 'crypto';
 import { auth } from '../../../core/auth/auth';
 
 @Injectable()
@@ -12,9 +10,7 @@ export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
   constructor(
     private prisma: PrismaService,
-    private apiKeyService: ApiKeyService,
     private configService: ConfigService,
-    private vaultService: VaultService,
   ) {}
 
   /**
@@ -96,40 +92,6 @@ export class WorkspaceService {
         data: { lastWorkspaceId: workspace.id },
       });
 
-      // Create default API keys for the workspace within the transaction
-      const apiKeyId = randomUUID();
-      const apiKey = 'sk_' + randomBytes(32).toString('hex');
-      const prefix = apiKey.slice(0, 10);
-      
-      // Create private key
-      await this.vaultService.writeSecret('apiKeys', workspace.id, apiKeyId, { apiKey }, workspace.id);
-      await tx.apiKey.create({
-        data: {
-          id: apiKeyId,
-          workspaceId: workspace.id,
-          userId: userId,
-          name: "Default Private Key",
-          prefix,
-          scopes: [],
-        },
-      });
-
-      // Create public key
-      const publicApiKeyId = randomUUID();
-      const publicApiKey = 'sk_' + randomBytes(32).toString('hex');
-      const publicPrefix = publicApiKey.slice(0, 10);
-      await this.vaultService.writeSecret('apiKeys', workspace.id, publicApiKeyId, { apiKey: publicApiKey }, workspace.id);
-      await tx.apiKey.create({
-        data: {
-          id: publicApiKeyId,
-          workspaceId: workspace.id,
-          userId: userId,
-          name: "Default Public Key",
-          prefix: publicPrefix,
-          scopes: [],
-        },
-      });
-      
       return { workspace, membership };
     });
     
