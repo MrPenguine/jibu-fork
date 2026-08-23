@@ -22,7 +22,6 @@ export class RedactionLoggingMiddleware implements NestMiddleware {
     'key',
     'privateKey',
     'credential',
-    'value',
     'jwt',
   ];
 

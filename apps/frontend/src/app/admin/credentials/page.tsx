@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, CheckCircle2, CircleDashed, Loader2, Trash2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, CircleDashed, Info, Loader2, Trash2, XCircle } from "lucide-react";
 import { Badge } from "@libs/shadcn-ui/components/ui/badge";
 import { Button } from "@libs/shadcn-ui/components/ui/button";
 import { Card } from "@libs/shadcn-ui/components/ui/card";
@@ -10,13 +10,14 @@ import { fetchAPI } from "../../../utils/api";
 import { toast } from "@libs/shadcn-ui/components/ui/use-toast";
 
 type CredentialStatus = "configured" | "env" | "unset";
+type TestStatus = "ok" | "error" | "unsupported";
 
 interface ProviderCredential {
   provider: string;
   label: string;
   status: CredentialStatus;
   lastTest: {
-    status: "ok" | "error" | null;
+    status: TestStatus | null;
     message: string | null;
     testedAt: string | null;
   } | null;
@@ -125,9 +126,14 @@ export default function CredentialsPage() {
         method: "POST",
       });
       toast({
-        title: result?.status === "ok" ? `${provider.label} connection succeeded` : `${provider.label} connection failed`,
+        title:
+          result?.status === "ok"
+            ? `${provider.label} connection succeeded`
+            : result?.status === "unsupported"
+              ? `${provider.label} testing unavailable`
+              : `${provider.label} connection failed`,
         description: result?.message || undefined,
-        variant: result?.status === "ok" ? "default" : "destructive",
+        variant: result?.status === "error" ? "destructive" : "default",
       });
       await loadCredentials();
     } catch (error: any) {
@@ -204,7 +210,13 @@ export default function CredentialsPage() {
                         {lastTest ? (
                           <div className="space-y-1">
                             <div className="flex items-center gap-1">
-                              {lastTest.status === "ok" ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />}
+                              {lastTest.status === "ok" ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : lastTest.status === "unsupported" ? (
+                                <Info className="h-4 w-4 text-gray-500" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-600" />
+                              )}
                               <span>{lastTest.message || (lastTest.status === "ok" ? "Passed" : "Failed")}</span>
                             </div>
                             {lastTest.testedAt && <div className="text-xs text-gray-400">{new Date(lastTest.testedAt).toLocaleString()}</div>}

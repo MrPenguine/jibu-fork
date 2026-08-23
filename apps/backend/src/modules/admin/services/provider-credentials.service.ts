@@ -94,7 +94,7 @@ export class AdminProviderCredentialsService {
   async test(provider: string, createdById: string) {
     const definition = this.requireProvider(provider);
     const secret = await this.resolver.getSecret(provider);
-    let status: 'ok' | 'error' = 'error';
+    let status: 'ok' | 'error' | 'unsupported' = 'error';
     let message = 'Credential is not configured';
 
     if (secret && definition.test) {
@@ -106,6 +106,7 @@ export class AdminProviderCredentialsService {
         message = this.sanitizeTestError(error);
       }
     } else if (secret) {
+      status = 'unsupported';
       message = 'Testing is not supported for this provider';
     }
 

@@ -1,6 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios';
 
-export type ProviderTestStatus = 'ok' | 'error';
+export type ProviderTestStatus = 'ok' | 'error' | 'unsupported';
 
 export interface ProviderDefinition {
   key: string;
@@ -9,7 +9,7 @@ export interface ProviderDefinition {
   test?: (secret: string) => Promise<void>;
 }
 
-const request = async (url: string, secret: string, config: AxiosRequestConfig = {}) => {
+const request = async (url: string, config: AxiosRequestConfig = {}) => {
   const response = await axios.get(url, {
     ...config,
     timeout: 10_000,
@@ -29,39 +29,39 @@ export const PROVIDER_REGISTRY: readonly ProviderDefinition[] = [
     label: 'Google Gemini',
     envVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
     test: (secret) =>
-      request('https://generativelanguage.googleapis.com/v1beta/models', secret, {
-        params: { key: secret },
+      request('https://generativelanguage.googleapis.com/v1beta/models', {
+        headers: { 'x-goog-api-key': secret },
       }),
   },
   {
     key: 'openrouter',
     label: 'OpenRouter',
     envVars: ['OPENROUTER_API_KEY'],
-    test: (secret) => request('https://openrouter.ai/api/v1/models', secret, { headers: { Authorization: `Bearer ${secret}` } }),
+    test: (secret) => request('https://openrouter.ai/api/v1/models', { headers: { Authorization: `Bearer ${secret}` } }),
   },
   {
     key: 'elevenlabs',
     label: 'ElevenLabs',
     envVars: ['ELEVENLABS_API_KEY'],
-    test: (secret) => request('https://api.elevenlabs.io/v1/user', secret, { headers: { 'xi-api-key': secret } }),
+    test: (secret) => request('https://api.elevenlabs.io/v1/user', { headers: { 'xi-api-key': secret } }),
   },
   {
     key: 'xai',
     label: 'xAI',
     envVars: ['XAI_API_KEY'],
-    test: (secret) => request('https://api.x.ai/v1/models', secret, { headers: { Authorization: `Bearer ${secret}` } }),
+    test: (secret) => request('https://api.x.ai/v1/models', { headers: { Authorization: `Bearer ${secret}` } }),
   },
   {
     key: 'mistral',
     label: 'Mistral',
     envVars: ['MISTRAL_API_KEY'],
-    test: (secret) => request('https://api.mistral.ai/v1/models', secret, { headers: { Authorization: `Bearer ${secret}` } }),
+    test: (secret) => request('https://api.mistral.ai/v1/models', { headers: { Authorization: `Bearer ${secret}` } }),
   },
   {
     key: 'deepgram',
     label: 'Deepgram',
     envVars: ['DEEPGRAM_API_KEY'],
-    test: (secret) => request('https://api.deepgram.com/v1/projects', secret, { headers: { Authorization: `Token ${secret}` } }),
+    test: (secret) => request('https://api.deepgram.com/v1/projects', { headers: { Authorization: `Token ${secret}` } }),
   },
   {
     key: 'azureSpeech',
