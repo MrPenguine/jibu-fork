@@ -23,7 +23,7 @@ if (!configuredSecret && runtimeEnv === 'production') {
 }
 
 const betterAuthSecret = configuredSecret || 'development-only-better-auth-secret';
-const ADMIN_ROLES = ['admin', 'superadmin'] as const;
+export const ADMIN_ROLES = ['admin', 'superadmin'] as const;
 const adminAccessControl = createAccessControl({
   user: [
     'create',
@@ -107,6 +107,15 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
   const suspended = Boolean(
     authUser?.banned && (!authUser.banExpires || authUser.banExpires > new Date()),
   );
+  const existingApplicationUser = await authPrisma.user.findUnique({
+    where: { id: createdUser.id },
+    select: { isSuspended: true, suspendedAt: true },
+  });
+  const suspendedAt = suspended
+    ? existingApplicationUser?.isSuspended && existingApplicationUser.suspendedAt
+      ? existingApplicationUser.suspendedAt
+      : new Date()
+    : null;
 
   await authPrisma.$transaction(async (tx) => {
     const user = await tx.user.upsert({
@@ -121,7 +130,7 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
         isAdmin: ADMIN_ROLES.includes(authUser?.role as (typeof ADMIN_ROLES)[number]),
         adminRole: authUser?.role,
         isSuspended: suspended,
-        suspendedAt: suspended ? new Date() : null,
+        suspendedAt,
         suspensionReason: suspended ? authUser?.banReason || 'Banned by admin' : null,
       },
       update: {
@@ -132,7 +141,7 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
         isAdmin: ADMIN_ROLES.includes(authUser?.role as (typeof ADMIN_ROLES)[number]),
         adminRole: authUser?.role,
         isSuspended: suspended,
-        suspendedAt: suspended ? undefined : null,
+        suspendedAt,
         suspensionReason: suspended ? authUser?.banReason || 'Banned by admin' : null,
       },
     });
@@ -174,13 +183,22 @@ export async function syncApplicationUserFromAuth(userId: string): Promise<void>
   const suspended = Boolean(
     authUser.banned && (!authUser.banExpires || authUser.banExpires > new Date()),
   );
+  const applicationUser = await authPrisma.user.findUnique({
+    where: { id: userId },
+    select: { isSuspended: true, suspendedAt: true },
+  });
+  const suspendedAt = suspended
+    ? applicationUser?.isSuspended && applicationUser.suspendedAt
+      ? applicationUser.suspendedAt
+      : new Date()
+    : null;
   await authPrisma.user.updateMany({
     where: { id: userId },
     data: {
       isAdmin: ADMIN_ROLES.includes(authUser.role as (typeof ADMIN_ROLES)[number]),
       adminRole: authUser.role,
       isSuspended: suspended,
-      suspendedAt: suspended ? new Date() : null,
+      suspendedAt,
       suspensionReason: suspended ? authUser.banReason || 'Banned by admin' : null,
     },
   });
@@ -399,7 +417,6 @@ const authInstance = betterAuth({
           targetId: body.userId,
           details: {
             role: body.role,
-            statusCode: 200,
           },
           ipAddress: session.session.ipAddress || null,
           userAgent: session.session.userAgent || null,

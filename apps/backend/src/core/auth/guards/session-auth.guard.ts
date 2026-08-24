@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { auth, provisionApplicationUser } from '../auth';
+import { ADMIN_ROLES, auth, provisionApplicationUser } from '../auth';
 import { PrismaService } from '../../database/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
@@ -62,7 +62,7 @@ export class SessionAuthGuard implements CanActivate {
     }
 
     const adminRole = authUser.role || user.adminRole;
-    const isAdmin = ['admin', 'superadmin'].includes(adminRole || '');
+    const isAdmin = ADMIN_ROLES.includes(adminRole as (typeof ADMIN_ROLES)[number]);
     request.session = session;
     request.user = {
       ...session.user,

@@ -115,7 +115,7 @@ export class AdminSystemChecksService {
   }
 
   private async checkOllama() {
-    const response = await fetch(`${this.httpUrl('OLLAMA_URL', 'http://localhost:11435')}/api/tags`);
+    const response = await fetch(`${this.ollamaUrl()}/api/tags`);
     if (!response.ok) return { status: 'fail' as const, message: `Ollama returned HTTP ${response.status}` };
     const body = (await response.json()) as { models?: Array<{ name?: string }> };
     const model = this.config.get<string>('EMBEDDING_MODEL', 'gemini-embedding-001');
@@ -157,12 +157,38 @@ export class AdminSystemChecksService {
 
   private async checkMigrations() {
     const migrationsPath = path.resolve(process.cwd(), 'apps/backend/prisma/migrations');
-    const directories = fs.readdirSync(migrationsPath, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-    const applied = await this.prisma.$queryRaw<Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }>>`
-      SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations"
-    `;
+    let directories: string[];
+    try {
+      directories = fs.readdirSync(migrationsPath, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return {
+          status: 'skipped' as const,
+          message: 'Migration directory is unavailable in this runtime',
+          details: { path: migrationsPath },
+        };
+      }
+      throw error;
+    }
+
+    let applied: Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }>;
+    try {
+      applied = await this.prisma.$queryRaw<Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }>>`
+        SELECT migration_name, finished_at, rolled_back_at FROM "_prisma_migrations"
+      `;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const code = (error as { code?: string }).code;
+      if (code === '42P01' || message.includes('_prisma_migrations')) {
+        return {
+          status: 'skipped' as const,
+          message: 'Prisma migrations table is unavailable',
+        };
+      }
+      throw error;
+    }
     const appliedNames = new Set(applied.filter((row) => row.finished_at && !row.rolled_back_at).map((row) => row.migration_name));
     const unapplied = directories.filter((directory) => !appliedNames.has(directory));
     return {
@@ -174,8 +200,11 @@ export class AdminSystemChecksService {
 
   private async checkProviderCredentials() {
     const providers = await this.credentials.list();
+    const failedConfigured = providers.filter(
+      (provider) => provider.status === 'configured' && provider.lastTest?.status === 'error',
+    );
     return {
-      status: providers.some((provider) => provider.status === 'unset') ? ('warn' as const) : ('ok' as const),
+      status: failedConfigured.length ? ('warn' as const) : ('ok' as const),
       message: `${providers.filter((provider) => provider.status === 'configured').length} configured, ${providers.filter((provider) => provider.status === 'env').length} env fallback, ${providers.filter((provider) => provider.status === 'unset').length} unset`,
       details: providers.map((provider) => ({
         provider: provider.provider,
@@ -191,8 +220,14 @@ export class AdminSystemChecksService {
   }
 
   private httpUrl(key: string, fallback: string) {
-    let value = this.url(key, fallback).replace(/^ws(s?):\/\//, 'http$1://').replace(/\/$/, '');
-    if (value === 'http://ollama:11434') value = 'http://localhost:11435';
-    return value;
+    return this.url(key, fallback).replace(/^ws(s?):\/\//, 'http$1://').replace(/\/$/, '');
+  }
+
+  private ollamaUrl() {
+    return (
+      this.config.get<string>('OLLAMA_BASE_URL') ||
+      this.config.get<string>('OLLAMA_URL') ||
+      'http://localhost:11434'
+    ).replace(/\/$/, '');
   }
 }

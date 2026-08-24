@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { auth } from '../../../core/auth/auth';
+import { ADMIN_ROLES, auth } from '../../../core/auth/auth';
 
 interface AdminUserListQuery {
   page?: number;
@@ -210,8 +210,9 @@ export class AdminUsersService {
   }
 
   async setRole(id: string, role: string, headers?: Headers) {
-    if (!role?.trim()) {
-      throw new NotFoundException('Role is required');
+    const normalizedRole = role?.trim();
+    if (!normalizedRole || !ADMIN_ROLES.includes(normalizedRole as (typeof ADMIN_ROLES)[number])) {
+      throw new BadRequestException('Invalid role');
     }
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
@@ -219,7 +220,7 @@ export class AdminUsersService {
     }
 
     await auth.api.setRole({
-      body: { userId: id, role: role.trim() },
+      body: { userId: id, role: normalizedRole },
       headers,
     });
     const updated = await this.syncApplicationUser(id);
@@ -239,18 +240,30 @@ export class AdminUsersService {
     if (!authUser) {
       throw new NotFoundException('Authentication user not found');
     }
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      select: { isSuspended: true, suspendedAt: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('User not found');
+    }
 
     const suspended = Boolean(
       authUser.banned &&
         (!authUser.banExpires || authUser.banExpires.getTime() > Date.now()),
     );
+    const suspendedAt = suspended
+      ? existing.isSuspended && existing.suspendedAt
+        ? existing.suspendedAt
+        : new Date()
+      : null;
     return this.prisma.user.update({
       where: { id },
       data: {
-        isAdmin: ['admin', 'superadmin'].includes(authUser.role || ''),
+        isAdmin: ADMIN_ROLES.includes(authUser.role as (typeof ADMIN_ROLES)[number]),
         adminRole: authUser.role,
         isSuspended: suspended,
-        suspendedAt: suspended ? new Date() : null,
+        suspendedAt,
         suspensionReason: suspended ? authUser.banReason || 'Banned by admin' : null,
       },
     });
