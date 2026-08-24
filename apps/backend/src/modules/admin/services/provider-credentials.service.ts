@@ -37,7 +37,7 @@ export class AdminProviderCredentialsService {
           provider: definition.key,
           label: definition.label,
           status: stored ? 'configured' : hasEnvFallback ? 'env' : 'unset',
-          lastTest: entry
+          lastTest: entry?.lastTestStatus
             ? {
                 status: entry.lastTestStatus,
                 message: entry.lastTestMessage,
@@ -64,11 +64,17 @@ export class AdminProviderCredentialsService {
         scope: 'platform',
         vaultPath: `providerCredentials/platform/${provider}`,
         createdById,
+        lastTestedAt: null,
+        lastTestStatus: null,
+        lastTestMessage: null,
       },
       update: {
         label: definition.label,
         vaultPath: `providerCredentials/platform/${provider}`,
         createdById,
+        lastTestedAt: null,
+        lastTestStatus: null,
+        lastTestMessage: null,
       },
     });
 
