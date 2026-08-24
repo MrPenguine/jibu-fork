@@ -183,7 +183,7 @@ export default function CredentialsPage() {
               ) : (
                 credentials.map((provider) => {
                   const busy = busyProvider === provider.provider;
-                  const lastTest = provider.lastTest;
+                  const lastTest = provider.lastTest?.status ? provider.lastTest : null;
                   return (
                     <tr key={provider.provider} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
