@@ -1,28 +1,107 @@
 "use client"
 
+import * as React from "react"
 import { Card } from "@libs/shadcn-ui/components/ui/card"
-import { FileText } from "lucide-react"
+import { Button } from "@libs/shadcn-ui/components/ui/button"
+import { Input } from "@libs/shadcn-ui/components/ui/input"
+import { fetchAPI } from "../../../utils/api"
 
 export default function LogsPage() {
+  const [filters, setFilters] = React.useState({ action: "", targetType: "", from: "", to: "" })
+  const [page, setPage] = React.useState(1)
+  const [data, setData] = React.useState<any>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+
+  const loadLogs = React.useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const params = new URLSearchParams({ page: String(page), pageSize: "25" })
+      Object.entries(filters).forEach(([key, value]) => value && params.set(key, value))
+      setData(await fetchAPI(`/admin/audit-logs?${params.toString()}`))
+    } catch (err: any) {
+      setError(err?.message || "Unable to load audit logs")
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, page])
+
+  React.useEffect(() => { void loadLogs() }, [loadLogs])
+
   return (
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">System Logs & Monitoring</h1>
         <p className="text-sm text-gray-600 mt-1">
-          API logs, application logs, and job queue monitoring
+          Review platform administrator actions and safe request details.
         </p>
       </div>
 
-      <Card className="p-12">
-        <div className="text-center max-w-md mx-auto">
-          <div className="flex items-center justify-center w-16 h-16 bg-amber-100 rounded-full mx-auto mb-4">
-            <FileText className="h-8 w-8 text-amber-600" />
+      <Card className="p-4">
+        <form className="grid gap-3 md:grid-cols-5" onSubmit={(event) => {
+          event.preventDefault()
+          setPage(1)
+          void loadLogs()
+        }}>
+          {(["action", "targetType", "from", "to"] as const).map((field) => (
+            <Input
+              key={field}
+              type={field === "from" || field === "to" ? "date" : "text"}
+              placeholder={field === "targetType" ? "Target type" : field === "action" ? "Action" : field === "from" ? "From" : "To"}
+              value={filters[field]}
+              onChange={(event) => setFilters((current) => ({ ...current, [field]: event.target.value }))}
+            />
+          ))}
+          <Button type="submit">Apply filters</Button>
+        </form>
+      </Card>
+
+      <Card>
+        {error ? (
+          <div className="p-12 text-center text-sm text-red-600">{error}</div>
+        ) : loading ? (
+          <div className="p-12 text-center text-sm text-gray-500">Loading audit logs…</div>
+        ) : !data?.items?.length ? (
+          <div className="p-12 text-center text-sm text-gray-500">No audit log entries match these filters.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px]">
+              <thead className="border-b bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">When</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Administrator</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Action</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Target</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {data.items.map((item: any) => (
+                  <tr key={item.id}>
+                    <td className="px-4 py-3 text-sm text-gray-600">{new Date(item.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="font-medium">{item.admin?.fullName || [item.admin?.firstName, item.admin?.lastName].filter(Boolean).join(" ") || "Unknown"}</div>
+                      <div className="text-xs text-gray-500">{item.admin?.email}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium">{item.action}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{item.targetType || "—"} {item.targetId || ""}</td>
+                    <td className="max-w-sm px-4 py-3 text-xs text-gray-600"><pre className="whitespace-pre-wrap">{JSON.stringify(item.details || {})}</pre></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">System Logs Coming Soon</h2>
-          <p className="text-gray-600 mb-6">
-            Monitor API usage, view application logs, and manage background job queues.
-          </p>
-        </div>
+        )}
+        {data && data.totalPages > 1 && (
+          <div className="flex items-center justify-between border-t p-4 text-sm">
+            <span>Page {data.page} of {data.totalPages}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
+              <Button variant="outline" disabled={page >= data.totalPages} onClick={() => setPage((current) => current + 1)}>Next</Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

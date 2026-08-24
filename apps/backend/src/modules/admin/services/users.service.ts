@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { auth } from '../../../core/auth/auth';
 
 interface AdminUserListQuery {
   page?: number;
@@ -165,20 +166,20 @@ export class AdminUsersService {
     };
   }
 
-  async suspend(id: string, reason?: string) {
+  async suspend(id: string, reason?: string, headers?: Headers) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        isSuspended: true,
-        suspendedAt: new Date(),
-        suspensionReason: reason ?? existing.suspensionReason ?? 'Suspended by admin',
+    await auth.api.banUser({
+      body: {
+        userId: id,
+        banReason: reason ?? existing.suspensionReason ?? 'Suspended by admin',
       },
+      headers,
     });
+    const updated = await this.syncApplicationUser(id);
 
     return {
       id: updated.id,
@@ -188,20 +189,17 @@ export class AdminUsersService {
     };
   }
 
-  async unsuspend(id: string) {
+  async unsuspend(id: string, headers?: Headers) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        isSuspended: false,
-        suspendedAt: null,
-        suspensionReason: null,
-      },
+    await auth.api.unbanUser({
+      body: { userId: id },
+      headers,
     });
+    const updated = await this.syncApplicationUser(id);
 
     return {
       id: updated.id,
@@ -209,5 +207,52 @@ export class AdminUsersService {
       suspendedAt: updated.suspendedAt,
       suspensionReason: updated.suspensionReason,
     };
+  }
+
+  async setRole(id: string, role: string, headers?: Headers) {
+    if (!role?.trim()) {
+      throw new NotFoundException('Role is required');
+    }
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('User not found');
+    }
+
+    await auth.api.setRole({
+      body: { userId: id, role: role.trim() },
+      headers,
+    });
+    const updated = await this.syncApplicationUser(id);
+
+    return {
+      id: updated.id,
+      isAdmin: updated.isAdmin,
+      adminRole: updated.adminRole,
+    };
+  }
+
+  private async syncApplicationUser(id: string) {
+    const authUser = await this.prisma.authUser.findUnique({
+      where: { id },
+      select: { role: true, banned: true, banReason: true, banExpires: true },
+    });
+    if (!authUser) {
+      throw new NotFoundException('Authentication user not found');
+    }
+
+    const suspended = Boolean(
+      authUser.banned &&
+        (!authUser.banExpires || authUser.banExpires.getTime() > Date.now()),
+    );
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        isAdmin: ['admin', 'superadmin'].includes(authUser.role || ''),
+        adminRole: authUser.role,
+        isSuspended: suspended,
+        suspendedAt: suspended ? new Date() : null,
+        suspensionReason: suspended ? authUser.banReason || 'Banned by admin' : null,
+      },
+    });
   }
 }

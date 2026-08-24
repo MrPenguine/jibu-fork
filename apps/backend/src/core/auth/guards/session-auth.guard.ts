@@ -47,10 +47,28 @@ export class SessionAuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
+    const authUser = session.user as typeof session.user & {
+      role?: string | null;
+      banned?: boolean;
+      banReason?: string | null;
+      banExpires?: Date | string | null;
+    };
+    const banExpires = authUser.banExpires ? new Date(authUser.banExpires) : null;
+    const isBanned = Boolean(
+      authUser.banned && (!banExpires || banExpires.getTime() > Date.now()),
+    );
+    if (isBanned || user.isSuspended) {
+      throw new UnauthorizedException('Account suspended');
+    }
+
+    const adminRole = authUser.role || user.adminRole;
+    const isAdmin = ['admin', 'superadmin'].includes(adminRole || '');
     request.session = session;
     request.user = {
       ...session.user,
       ...user,
+      isAdmin,
+      adminRole,
       userId: user.id,
       workspaceId: user.lastWorkspaceId,
       workspaceRole: undefined,

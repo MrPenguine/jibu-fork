@@ -58,6 +58,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async ping(): Promise<boolean> {
+    try {
+      return (await this.redisClient.ping()) === 'PONG';
+    } catch (error) {
+      console.error('Error pinging Redis:', error);
+      return false;
+    }
+  }
+
   /**
    * Set a value in Redis with optional expiration time
    */

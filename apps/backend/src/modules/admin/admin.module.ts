@@ -19,9 +19,14 @@ import { AdminAnalyticsService } from './services/analytics.service';
 import { AdminProviderCredentialsController } from './controllers/provider-credentials.controller';
 import { AdminProviderCredentialsService } from './services/provider-credentials.service';
 import { ProviderCredentialsModule } from '../../core/provider-credentials/provider-credentials.module';
+import { RedisModule } from '../../core/redis/redis.module';
+import { AdminAuditLogsController } from './controllers/audit-logs.controller';
+import { AdminSystemChecksController } from './controllers/system-checks.controller';
+import { AdminAuditLogsService } from './services/audit-logs.service';
+import { AdminSystemChecksService } from './services/system-checks.service';
 
 @Module({
-  imports: [DatabaseModule, ProviderCredentialsModule],
+  imports: [DatabaseModule, ProviderCredentialsModule, RedisModule],
   controllers: [
     AdminDashboardController,
     AdminUsersController,
@@ -30,6 +35,8 @@ import { ProviderCredentialsModule } from '../../core/provider-credentials/provi
     AdminSubscriptionsController,
     AdminAnalyticsController,
     AdminProviderCredentialsController,
+    AdminAuditLogsController,
+    AdminSystemChecksController,
   ],
   providers: [
     AdminDashboardService,
@@ -43,6 +50,8 @@ import { ProviderCredentialsModule } from '../../core/provider-credentials/provi
     AdminRoleGuard,
     AdminAuditMiddleware,
     AdminProviderCredentialsService,
+    AdminAuditLogsService,
+    AdminSystemChecksService,
   ],
 })
 export class AdminModule implements NestModule {

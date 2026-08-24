@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../core/auth/guards/admin.guard';
@@ -36,12 +36,30 @@ export class AdminUsersController {
   async suspend(
     @Param('id') id: string,
     @Body() body: { reason?: string },
+    @Req() req: any,
   ) {
-    return this.usersService.suspend(id, body?.reason);
+    return this.usersService.suspend(id, body?.reason, this.toHeaders(req));
   }
 
   @Patch(':id/unsuspend')
-  async unsuspend(@Param('id') id: string) {
-    return this.usersService.unsuspend(id);
+  async unsuspend(@Param('id') id: string, @Req() req: any) {
+    return this.usersService.unsuspend(id, this.toHeaders(req));
+  }
+
+  @Patch(':id/role')
+  async setRole(
+    @Param('id') id: string,
+    @Body() body: { role?: string },
+    @Req() req: any,
+  ) {
+    return this.usersService.setRole(id, body?.role || '', this.toHeaders(req));
+  }
+
+  private toHeaders(req: any): Headers {
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers || {})) {
+      if (value) headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+    }
+    return headers;
   }
 }
