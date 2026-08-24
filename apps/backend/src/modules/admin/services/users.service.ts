@@ -211,7 +211,11 @@ export class AdminUsersService {
 
   async setRole(id: string, role: string, headers?: Headers) {
     const normalizedRole = role?.trim();
-    if (!normalizedRole || !ADMIN_ROLES.includes(normalizedRole as (typeof ADMIN_ROLES)[number])) {
+    if (
+      !normalizedRole ||
+      (normalizedRole !== 'user' &&
+        !ADMIN_ROLES.includes(normalizedRole as (typeof ADMIN_ROLES)[number]))
+    ) {
       throw new BadRequestException('Invalid role');
     }
     const existing = await this.prisma.user.findUnique({ where: { id } });

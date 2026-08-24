@@ -118,7 +118,10 @@ export class AdminSystemChecksService {
     const response = await fetch(`${this.ollamaUrl()}/api/tags`);
     if (!response.ok) return { status: 'fail' as const, message: `Ollama returned HTTP ${response.status}` };
     const body = (await response.json()) as { models?: Array<{ name?: string }> };
-    const model = this.config.get<string>('EMBEDDING_MODEL', 'gemini-embedding-001');
+    const model = this.config.get<string>(
+      'WORKER_EMBEDDING_MODEL',
+      'qwen3-embedding:0.6b',
+    );
     const present = (body.models || []).some((item) => item.name === model);
     return {
       status: present ? ('ok' as const) : ('warn' as const),
