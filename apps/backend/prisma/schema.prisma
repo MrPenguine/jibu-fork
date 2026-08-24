@@ -54,6 +54,10 @@ model AuthUser {
   email         String        @unique
   emailVerified Boolean       @default(false)
   image         String?
+  role          String?
+  banned        Boolean       @default(false)
+  banReason     String?
+  banExpires    DateTime?
   createdAt     DateTime
   updatedAt     DateTime
   sessions      AuthSession[]
@@ -72,6 +76,7 @@ model AuthSession {
   ipAddress String?
   userAgent String?
   activeOrganizationId String?
+  impersonatedBy String?
   userId    String
   user      AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -92,6 +97,7 @@ model AuthAccount {
   refreshTokenExpiresAt DateTime?
   scope                 String?
   password              String?
+  issuer                String    @default("")
   createdAt             DateTime
   updatedAt             DateTime
 

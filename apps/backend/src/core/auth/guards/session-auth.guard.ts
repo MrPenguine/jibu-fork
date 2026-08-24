@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { auth, provisionApplicationUser } from '../auth';
+import { ADMIN_ROLES, auth, provisionApplicationUser } from '../auth';
 import { PrismaService } from '../../database/prisma.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
@@ -47,10 +47,28 @@ export class SessionAuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
 
+    const authUser = session.user as typeof session.user & {
+      role?: string | null;
+      banned?: boolean;
+      banReason?: string | null;
+      banExpires?: Date | string | null;
+    };
+    const banExpires = authUser.banExpires ? new Date(authUser.banExpires) : null;
+    const isBanned = Boolean(
+      authUser.banned && (!banExpires || banExpires.getTime() > Date.now()),
+    );
+    if (isBanned || user.isSuspended) {
+      throw new UnauthorizedException('Account suspended');
+    }
+
+    const adminRole = authUser.role || user.adminRole;
+    const isAdmin = ADMIN_ROLES.includes(adminRole as (typeof ADMIN_ROLES)[number]);
     request.session = session;
     request.user = {
       ...session.user,
       ...user,
+      isAdmin,
+      adminRole,
       userId: user.id,
       workspaceId: user.lastWorkspaceId,
       workspaceRole: undefined,

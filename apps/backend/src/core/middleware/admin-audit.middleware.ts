@@ -28,7 +28,7 @@ export class AdminAuditMiddleware implements NestMiddleware {
                 path: req.path,
                 statusCode: res.statusCode,
                 duration: Date.now() - startTime,
-                query: req.query,
+                query: this.sanitizeBody(req.query),
                 body: this.sanitizeBody((req as any).body),
               },
               ipAddress: this.getClientIP(req as any),
@@ -60,16 +60,19 @@ export class AdminAuditMiddleware implements NestMiddleware {
 
   private sanitizeBody(body: any): any {
     if (!body) return null;
+    if (Array.isArray(body)) return body.map((value) => this.sanitizeBody(value));
+    if (typeof body !== 'object') return body;
 
-    const sanitized = { ...body };
-    const sensitiveFields = ['password', 'token', 'apiKey', 'secret'];
-
-    for (const field of sensitiveFields) {
-      if (sanitized[field]) {
+    const sanitized: Record<string, unknown> = {};
+    for (const [field, value] of Object.entries(body)) {
+      if (
+        /password|token|api.?key|secret|credential|authorization/i.test(field)
+      ) {
         sanitized[field] = '[REDACTED]';
+      } else {
+        sanitized[field] = this.sanitizeBody(value);
       }
     }
-
     return sanitized;
   }
 

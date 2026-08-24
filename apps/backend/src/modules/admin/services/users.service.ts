@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { ADMIN_ROLES, auth } from '../../../core/auth/auth';
 
 interface AdminUserListQuery {
   page?: number;
@@ -165,20 +166,20 @@ export class AdminUsersService {
     };
   }
 
-  async suspend(id: string, reason?: string) {
+  async suspend(id: string, reason?: string, headers?: Headers) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        isSuspended: true,
-        suspendedAt: new Date(),
-        suspensionReason: reason ?? existing.suspensionReason ?? 'Suspended by admin',
+    await auth.api.banUser({
+      body: {
+        userId: id,
+        banReason: reason ?? existing.suspensionReason ?? 'Suspended by admin',
       },
+      headers,
     });
+    const updated = await this.syncApplicationUser(id);
 
     return {
       id: updated.id,
@@ -188,20 +189,17 @@ export class AdminUsersService {
     };
   }
 
-  async unsuspend(id: string) {
+  async unsuspend(id: string, headers?: Headers) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: {
-        isSuspended: false,
-        suspendedAt: null,
-        suspensionReason: null,
-      },
+    await auth.api.unbanUser({
+      body: { userId: id },
+      headers,
     });
+    const updated = await this.syncApplicationUser(id);
 
     return {
       id: updated.id,
@@ -209,5 +207,69 @@ export class AdminUsersService {
       suspendedAt: updated.suspendedAt,
       suspensionReason: updated.suspensionReason,
     };
+  }
+
+  async setRole(id: string, role: string, headers?: Headers) {
+    const normalizedRole = role?.trim();
+    if (
+      !normalizedRole ||
+      (normalizedRole !== 'user' &&
+        !ADMIN_ROLES.includes(normalizedRole as (typeof ADMIN_ROLES)[number]))
+    ) {
+      throw new BadRequestException('Invalid role');
+    }
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException('User not found');
+    }
+
+    await auth.api.setRole({
+      body: { userId: id, role: normalizedRole },
+      headers,
+    });
+    const updated = await this.syncApplicationUser(id);
+
+    return {
+      id: updated.id,
+      isAdmin: updated.isAdmin,
+      adminRole: updated.adminRole,
+    };
+  }
+
+  private async syncApplicationUser(id: string) {
+    const authUser = await this.prisma.authUser.findUnique({
+      where: { id },
+      select: { role: true, banned: true, banReason: true, banExpires: true },
+    });
+    if (!authUser) {
+      throw new NotFoundException('Authentication user not found');
+    }
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      select: { isSuspended: true, suspendedAt: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('User not found');
+    }
+
+    const suspended = Boolean(
+      authUser.banned &&
+        (!authUser.banExpires || authUser.banExpires.getTime() > Date.now()),
+    );
+    const suspendedAt = suspended
+      ? existing.isSuspended && existing.suspendedAt
+        ? existing.suspendedAt
+        : new Date()
+      : null;
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        isAdmin: ADMIN_ROLES.includes(authUser.role as (typeof ADMIN_ROLES)[number]),
+        adminRole: authUser.role,
+        isSuspended: suspended,
+        suspendedAt,
+        suspensionReason: suspended ? authUser.banReason || 'Banned by admin' : null,
+      },
+    });
   }
 }

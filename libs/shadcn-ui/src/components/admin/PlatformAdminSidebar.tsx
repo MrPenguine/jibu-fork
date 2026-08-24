@@ -170,6 +170,9 @@ export function PlatformAdminSidebar({
             <NavItem href="/admin/credentials" icon={<Key />}>
               Credentials
             </NavItem>
+            <NavItem href="/admin/system-checks" icon={<Activity />}>
+              System Checks
+            </NavItem>
             <NavItem href="/admin/analytics" icon={<BarChart3 />}>
               Analytics
             </NavItem>

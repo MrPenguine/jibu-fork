@@ -1,6 +1,12 @@
 import { prismaAdapter } from '@better-auth/prisma-adapter';
-import { betterAuth, type BetterAuthOptions, type User as BetterAuthUser } from 'better-auth';
-import { organization } from 'better-auth/plugins';
+import {
+  betterAuth,
+  type BetterAuthOptions,
+  type BetterAuthPlugin,
+  type User as BetterAuthUser,
+} from 'better-auth';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { admin, createAccessControl, organization } from 'better-auth/plugins';
 import { getSharedPrismaService } from '../database/prisma.service';
 
 const authPrisma = getSharedPrismaService();
@@ -17,6 +23,59 @@ if (!configuredSecret && runtimeEnv === 'production') {
 }
 
 const betterAuthSecret = configuredSecret || 'development-only-better-auth-secret';
+export const ADMIN_ROLES = ['admin', 'superadmin'] as const;
+const adminAccessControl = createAccessControl({
+  user: [
+    'create',
+    'list',
+    'set-role',
+    'ban',
+    'impersonate',
+    'impersonate-admins',
+    'delete',
+    'set-password',
+    'set-email',
+    'get',
+    'update',
+  ],
+  session: ['list', 'revoke', 'delete'],
+});
+const adminRole = adminAccessControl.newRole({
+  user: [
+    'create',
+    'list',
+    'set-role',
+    'ban',
+    'delete',
+    'set-password',
+    'set-email',
+    'get',
+    'update',
+  ],
+  session: ['list', 'revoke', 'delete'],
+});
+const userRole = adminAccessControl.newRole({ user: [], session: [] });
+
+interface AdminApi {
+  banUser(input: {
+    body: { userId: string; banReason?: string; banExpiresIn?: number };
+    headers?: Headers;
+  }): Promise<unknown>;
+  unbanUser(input: { body: { userId: string }; headers?: Headers }): Promise<unknown>;
+  setRole(input: {
+    body: { userId: string; role: string | string[] };
+    headers?: Headers;
+  }): Promise<unknown>;
+}
+
+function platformAdminEmails(): Set<string> {
+  return new Set(
+    (process.env.PLATFORM_ADMIN_EMAILS || '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
 
 const socialProviders =
   googleClientId && googleClientSecret
@@ -31,6 +90,32 @@ const socialProviders =
 export async function provisionApplicationUser(createdUser: BetterAuthUser): Promise<void> {
   const name = createdUser.name || createdUser.email;
   const firstName = name.split(' ')[0] || createdUser.email;
+  const configuredAdmin = platformAdminEmails().has(createdUser.email.toLowerCase());
+  let authUser = await authPrisma.authUser.findUnique({
+    where: { id: createdUser.id },
+    select: { role: true, banned: true, banReason: true, banExpires: true },
+  });
+
+  if (configuredAdmin && !ADMIN_ROLES.includes(authUser?.role as (typeof ADMIN_ROLES)[number])) {
+    await authPrisma.authUser.update({
+      where: { id: createdUser.id },
+      data: { role: 'admin' },
+    });
+    authUser = { ...authUser, role: 'admin' };
+  }
+
+  const suspended = Boolean(
+    authUser?.banned && (!authUser.banExpires || authUser.banExpires > new Date()),
+  );
+  const existingApplicationUser = await authPrisma.user.findUnique({
+    where: { id: createdUser.id },
+    select: { isSuspended: true, suspendedAt: true },
+  });
+  const suspendedAt = suspended
+    ? existingApplicationUser?.isSuspended && existingApplicationUser.suspendedAt
+      ? existingApplicationUser.suspendedAt
+      : new Date()
+    : null;
 
   await authPrisma.$transaction(async (tx) => {
     const user = await tx.user.upsert({
@@ -42,12 +127,22 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
         fullName: name,
         firstName,
         providerIds: [],
+        isAdmin: ADMIN_ROLES.includes(authUser?.role as (typeof ADMIN_ROLES)[number]),
+        adminRole: authUser?.role,
+        isSuspended: suspended,
+        suspendedAt,
+        suspensionReason: suspended ? authUser?.banReason || 'Banned by admin' : null,
       },
       update: {
         email: createdUser.email.toLowerCase(),
         emailConfirmed: Boolean(createdUser.emailVerified),
         fullName: name,
         firstName,
+        isAdmin: ADMIN_ROLES.includes(authUser?.role as (typeof ADMIN_ROLES)[number]),
+        adminRole: authUser?.role,
+        isSuspended: suspended,
+        suspendedAt,
+        suspensionReason: suspended ? authUser?.banReason || 'Banned by admin' : null,
       },
     });
     const membership = await tx.workspaceMembership.findFirst({
@@ -76,6 +171,36 @@ export async function provisionApplicationUser(createdUser: BetterAuthUser): Pro
       where: { id: user.id },
       data: { lastWorkspaceId: workspace.id },
     });
+  });
+}
+
+export async function syncApplicationUserFromAuth(userId: string): Promise<void> {
+  const authUser = await authPrisma.authUser.findUnique({
+    where: { id: userId },
+    select: { role: true, banned: true, banReason: true, banExpires: true },
+  });
+  if (!authUser) return;
+  const suspended = Boolean(
+    authUser.banned && (!authUser.banExpires || authUser.banExpires > new Date()),
+  );
+  const applicationUser = await authPrisma.user.findUnique({
+    where: { id: userId },
+    select: { isSuspended: true, suspendedAt: true },
+  });
+  const suspendedAt = suspended
+    ? applicationUser?.isSuspended && applicationUser.suspendedAt
+      ? applicationUser.suspendedAt
+      : new Date()
+    : null;
+  await authPrisma.user.updateMany({
+    where: { id: userId },
+    data: {
+      isAdmin: ADMIN_ROLES.includes(authUser.role as (typeof ADMIN_ROLES)[number]),
+      adminRole: authUser.role,
+      isSuspended: suspended,
+      suspendedAt,
+      suspensionReason: suspended ? authUser.banReason || 'Banned by admin' : null,
+    },
   });
 }
 
@@ -147,6 +272,12 @@ async function resolveOrCreateWorkspace(userId: string): Promise<string | null> 
 const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
   user: {
     create: {
+      before: async (createdUser) => {
+        if (platformAdminEmails().has(createdUser.email.toLowerCase())) {
+          return { data: { ...createdUser, role: 'admin' } };
+        }
+        return { data: createdUser };
+      },
       after: async (createdUser) => {
         await provisionApplicationUser(createdUser);
       },
@@ -171,7 +302,7 @@ const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
   },
 };
 
-export const auth = betterAuth({
+const authInstance = betterAuth({
   secret: betterAuthSecret,
   baseURL: backendUrl,
   trustedOrigins: [frontendUrl, backendUrl],
@@ -213,6 +344,11 @@ export const auth = betterAuth({
   },
   socialProviders,
   plugins: [
+    admin({
+      defaultRole: 'user',
+      adminRoles: [...ADMIN_ROLES],
+      roles: { admin: adminRole, superadmin: adminRole, user: userRole },
+    }) as unknown as BetterAuthPlugin,
     organization({
       creatorRole: 'owner',
       allowUserToCreateOrganization: true,
@@ -251,5 +387,47 @@ export const auth = betterAuth({
       },
     }),
   ],
+  hooks: {
+    before: createAuthMiddleware(async (context) => {
+      // User impersonation is deliberately disabled for this application.
+      if (context.path === '/admin/impersonate-user') {
+        throw APIError.from('FORBIDDEN', {
+          code: 'IMPERSONATION_DISABLED',
+          message: 'User impersonation is disabled',
+        });
+      }
+    }),
+    after: createAuthMiddleware(async (context) => {
+      if (!['/admin/ban-user', '/admin/unban-user', '/admin/set-role'].includes(context.path)) return;
+      const session = context.context.session;
+      const body = context.body as { userId?: string; role?: string | string[] } | undefined;
+      if (!session?.user?.id || !body?.userId) return;
+      await syncApplicationUserFromAuth(body.userId);
+
+      const actionByPath: Record<string, string> = {
+        '/admin/ban-user': 'BAN_USER',
+        '/admin/unban-user': 'UNBAN_USER',
+        '/admin/set-role': 'SET_ROLE',
+      };
+      await authPrisma.adminAuditLog.create({
+        data: {
+          adminUserId: session.user.id,
+          action: actionByPath[context.path],
+          targetType: 'User',
+          targetId: body.userId,
+          details: {
+            role: body.role,
+          },
+          ipAddress: session.session.ipAddress || null,
+          userAgent: session.session.userAgent || null,
+        },
+      });
+    }),
+  },
   databaseHooks,
 });
+
+// Admin plugin endpoints require this minimal cast because its nested core type is incompatible.
+export const auth = authInstance as typeof authInstance & {
+  api: typeof authInstance.api & AdminApi;
+};
