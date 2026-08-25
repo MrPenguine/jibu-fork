@@ -177,32 +177,47 @@ else
     MISSING_DEPS+=("Docker Compose")
 fi
 
+# Helper for commands requiring root
+SUDO=""
+if [ "$EUID" -ne 0 ]; then
+    SUDO="sudo"
+fi
+
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     log_error "Missing required system dependencies: ${MISSING_DEPS[*]}"
     
     if [ "$AUTO_INSTALL_DEPS" = true ]; then
         log_info "Auto-installing missing dependencies via apt..."
-        sudo apt-get update -y
-        sudo apt-get install -y git curl build-essential python3 python3-pip python3-venv
+        $SUDO apt-get update -y
+        $SUDO apt-get install -y git curl build-essential python3 python3-pip python3-venv
         
         if [[ " ${MISSING_DEPS[*]} " =~ " Node.js " ]]; then
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            sudo apt-get install -y nodejs
+            log_info "Installing Node.js 20 LTS..."
+            curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -
+            $SUDO apt-get install -y nodejs
         fi
         
         if [[ " ${MISSING_DEPS[*]} " =~ " pnpm " ]]; then
-            curl -fsSL https://get.pnpm.io/install.sh | sh -
+            log_info "Installing pnpm..."
+            $SUDO npm install -g pnpm
             export PNPM_HOME="$HOME/.local/share/pnpm"
-            export PATH="$PNPM_HOME:$PATH"
+            export PATH="$PNPM_HOME:/usr/local/bin:$PATH"
         fi
         
         if [[ " ${MISSING_DEPS[*]} " =~ " Docker " ]]; then
+            log_info "Installing Docker..."
             curl -fsSL https://get.docker.com | sh
-            sudo usermod -aG docker "$USER" || true
-            sudo systemctl enable --now docker
+            if [ -n "$SUDO" ]; then
+                $SUDO usermod -aG docker "$USER" || true
+            fi
+            $SUDO systemctl enable --now docker
         fi
+        
+        # Verify and refresh path
+        export PATH="/usr/bin:/usr/local/bin:$HOME/.local/share/pnpm:$PATH"
+        log_success "Dependencies installed successfully."
     else
-        echo -e "\nTo auto-install dependencies on Ubuntu, run:\n  ${YELLOW}sudo $0 --install-deps${NC}\n"
+        echo -e "\nTo auto-install dependencies on Ubuntu, run:\n  ${YELLOW}./start.sh --install-deps${NC}\n"
         exit 1
     fi
 fi
