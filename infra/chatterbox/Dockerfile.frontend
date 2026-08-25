@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Switch to alpine and apk to bypass Debian apt-get DNS timeout bugs on Windows Docker
+RUN apk add --no-cache git \
+    && git clone --branch stable https://github.com/travisvn/chatterbox-tts-api.git . \
+    || git clone https://github.com/travisvn/chatterbox-tts-api.git .
+
+WORKDIR /app/frontend
+
+RUN npm install
+
+ENV VITE_API_URL=http://localhost:4123
+
+RUN npm run build
+
+RUN npm install -g serve
+
+EXPOSE 4321
+
+CMD ["serve", "-s", "dist", "-l", "4321"]

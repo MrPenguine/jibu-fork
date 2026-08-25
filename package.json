@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "bash ./start.sh",
+    "start:daemon": "bash ./start.sh --daemon",
+    "stop": "bash ./start.sh --stop",
     "test": "nx run-many --target=test --all",
     "test:watch": "nx run-many --target=test --all --watch",
     "test:coverage": "nx run-many --target=test --all --coverage",
