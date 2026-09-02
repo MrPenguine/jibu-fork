@@ -6,6 +6,8 @@ import { Card } from "@libs/shadcn-ui/components/ui/card";
 import { Button } from "@libs/shadcn-ui/components/ui/button";
 import { Badge } from "@libs/shadcn-ui/components/ui/badge";
 import { ArrowLeft, Shield, KeyRound, AlertTriangle, Users } from "lucide-react";
+import { useApi } from "../../../../utils/apiContext";
+import { toast } from "@libs/shadcn-ui/components/ui/use-toast";
 
 interface AdminUser {
   id: string;
@@ -52,12 +54,14 @@ export default function AdminUserDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const userId = params?.id;
+  const { user: currentUser } = useApi();
 
   const [user, setUser] = React.useState<AdminUser | null>(null);
   const [stats, setStats] = React.useState<AdminUserStats | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = React.useState(false);
+  const [updatingRole, setUpdatingRole] = React.useState(false);
 
   React.useEffect(() => {
     if (!userId) return;
@@ -127,9 +131,7 @@ export default function AdminUserDetailPage() {
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(
-          body.error || body.message || "Failed to update user status",
-        );
+        throw new Error(body.error || body.message || "Failed to update user status");
       }
 
       const updated = await response.json();
@@ -144,9 +146,70 @@ export default function AdminUserDetailPage() {
           : prev,
       );
     } catch (err: any) {
-      setError(err?.message || "Failed to update user status");
+      const message = err?.message || "Failed to update user status";
+      setError(message);
+      toast({
+        title: "Could not update user status",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleRoleChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!userId || !user) return;
+
+    const role = event.target.value;
+    const currentRole = user.adminRole || (user.isAdmin ? "admin" : "user");
+    if (role === currentRole) return;
+    if (
+      !window.confirm(
+        `Change ${displayName}'s role from ${currentRole} to ${role}?`,
+      )
+    ) {
+      event.target.value = currentRole;
+      return;
+    }
+
+    try {
+      setUpdatingRole(true);
+      setError(null);
+      const response = await fetch(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || body.message || "Failed to update user role");
+      }
+
+      const updated = await response.json();
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              adminRole: updated.adminRole,
+              isAdmin: updated.isAdmin,
+            }
+          : prev,
+      );
+      toast({ title: `User role changed to ${role}` });
+    } catch (err: any) {
+      const message = err?.message || "Failed to update user role";
+      setError(message);
+      toast({
+        title: "Could not update user role",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingRole(false);
     }
   };
 
@@ -155,6 +218,8 @@ export default function AdminUserDetailPage() {
     (user?.firstName && user?.lastName
       ? `${user.firstName} ${user.lastName}`
       : user?.firstName || user?.email || "User");
+  const isOwnAccount = Boolean(currentUser?.id && currentUser.id === user?.id);
+  const currentRole = user?.adminRole || (user?.isAdmin ? "admin" : "user");
 
   return (
     <div className="p-6 space-y-6">
@@ -181,7 +246,7 @@ export default function AdminUserDetailPage() {
               {user.isAdmin && (
                 <Badge className="bg-violet-100 text-violet-700">
                   <Shield className="h-3 w-3 mr-1" />
-                  Admin
+                  {currentRole}
                 </Badge>
               )}
               <Badge
@@ -198,10 +263,36 @@ export default function AdminUserDetailPage() {
         </div>
         {user && (
           <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <label htmlFor="admin-role" className="text-xs font-medium text-gray-600">
+                Role
+              </label>
+              <select
+                id="admin-role"
+                value={currentRole}
+                onChange={handleRoleChange}
+                disabled={isOwnAccount || updatingRole || updatingStatus}
+                title={
+                  isOwnAccount
+                    ? "You cannot change your own admin role"
+                    : "Change user role"
+                }
+                className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+                <option value="superadmin">Superadmin</option>
+              </select>
+            </div>
             <Button
               variant={user.isSuspended ? "outline" : "destructive"}
               onClick={handleSuspendToggle}
-              disabled={updatingStatus}
+              disabled={isOwnAccount || updatingStatus || updatingRole}
+              title={
+                isOwnAccount
+                  ? "You cannot suspend your own account"
+                  : "Suspend or unsuspend this user"
+              }
               className="h-9 px-3 text-sm"
             >
               {updatingStatus
@@ -215,6 +306,11 @@ export default function AdminUserDetailPage() {
                 <AlertTriangle className="h-3 w-3 mt-0.5" />
                 <span>{user.suspensionReason}</span>
               </div>
+            )}
+            {isOwnAccount && (
+              <p className="text-xs text-gray-500 max-w-xs text-right">
+                You cannot suspend or change the role of your own account.
+              </p>
             )}
           </div>
         )}

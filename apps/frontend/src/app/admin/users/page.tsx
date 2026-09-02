@@ -117,7 +117,6 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Coming Soon Card */}
       <Card className="p-0 overflow-hidden border-gray-200">
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-500">

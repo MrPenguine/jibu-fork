@@ -7,8 +7,7 @@ import { SidebarInset } from "@libs/shadcn-ui/components/ui/sidebar"
 import { Toaster } from "@libs/shadcn-ui/components/ui/toaster"
 import { usePathname, useRouter } from "next/navigation"
 import { useMemo, useEffect, useState } from "react"
-import { Shield, AlertTriangle } from "lucide-react"
-import { fetchAPI } from "../../utils/api"
+import { Shield } from "lucide-react"
 import { logout } from "../../utils/auth/actions"
 import { useApi } from "../../utils/apiContext"
 
@@ -48,42 +47,6 @@ export default function AdminLayout({
 
   // Check if user is platform admin
   useEffect(() => {
-    // TODO: Uncomment this when backend is ready
-    // let mounted = true;
-    // const checkAdminAccess = async () => {
-    //   try {
-    //     const data = await fetchAPI('/users/me');
-    //     if (!mounted) return;
-    //     
-    //     const name =
-    //       data?.fullName ||
-    //       (data?.firstName && data?.lastName ? `${data.firstName} ${data.lastName}` : data?.firstName) ||
-    //       data?.email ||
-    //       'Admin';
-    //     const avatar = data?.imageUrl || '';
-    //     const email = data?.email || '';
-    //     const isPlatformAdmin = data?.isPlatformAdmin || false;
-    //     
-    //     setUserInfo({ name, email, avatar, isPlatformAdmin });
-    //     
-    //     // if (!isPlatformAdmin) {
-    //     //   router.push('/workspace');
-    //     // }
-    //     
-    //     setIsLoading(false);
-    //   } catch (e) {
-    //     if (mounted) {
-    //       setUserInfo({ name: 'Admin', email: '', avatar: '', isPlatformAdmin: false });
-    //       setIsLoading(false);
-    //       // router.push('/workspace');
-    //     }
-    //   }
-    // };
-    // checkAdminAccess();
-    // return () => {
-    //   mounted = false;
-    // };
-
     let mounted = true;
 
     const checkAdminAccess = () => {
@@ -143,28 +106,6 @@ export default function AdminLayout({
       </div>
     );
   }
-
-  // TODO: Uncomment when backend is ready
-  // Non-admin warning (temporary - will redirect when backend is ready)
-  // if (!userInfo?.isPlatformAdmin) {
-  //   return (
-  //     <div className="flex items-center justify-center h-screen bg-gray-50">
-  //       <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
-  //         <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-  //         <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-  //         <p className="text-sm text-gray-600 mb-4">
-  //           You need platform admin privileges to access this area.
-  //         </p>
-  //         <button
-  //           onClick={() => router.push('/workspace')}
-  //           className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
-  //         >
-  //           Return to Workspace
-  //         </button>
-  //       </div>
-  //     </div>
-  //   );
-  // }
 
   return (
     <div className="relative flex h-screen w-full flex-row overflow-hidden">
