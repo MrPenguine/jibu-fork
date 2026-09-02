@@ -38,7 +38,12 @@ export class AdminUsersController {
     @Body() body: { reason?: string },
     @Req() req: any,
   ) {
-    return this.usersService.suspend(id, body?.reason, this.toHeaders(req));
+    return this.usersService.suspend(
+      id,
+      body?.reason,
+      this.toHeaders(req),
+      req.user?.id,
+    );
   }
 
   @Patch(':id/unsuspend')
@@ -52,7 +57,12 @@ export class AdminUsersController {
     @Body() body: { role?: string },
     @Req() req: any,
   ) {
-    return this.usersService.setRole(id, body?.role || '', this.toHeaders(req));
+    return this.usersService.setRole(
+      id,
+      body?.role || '',
+      this.toHeaders(req),
+      req.user?.id,
+    );
   }
 
   private toHeaders(req: any): Headers {

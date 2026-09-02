@@ -166,11 +166,20 @@ export class AdminUsersService {
     };
   }
 
-  async suspend(id: string, reason?: string, headers?: Headers) {
+  async suspend(
+    id: string,
+    reason?: string,
+    headers?: Headers,
+    actingAdminId?: string,
+  ) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
     }
+    if (id === actingAdminId) {
+      throw new BadRequestException('You cannot suspend your own account');
+    }
+    await this.assertNotLastAdmin(existing.isAdmin);
 
     await auth.api.banUser({
       body: {
@@ -209,7 +218,12 @@ export class AdminUsersService {
     };
   }
 
-  async setRole(id: string, role: string, headers?: Headers) {
+  async setRole(
+    id: string,
+    role: string,
+    headers?: Headers,
+    actingAdminId?: string,
+  ) {
     const normalizedRole = role?.trim();
     if (
       !normalizedRole ||
@@ -221,6 +235,12 @@ export class AdminUsersService {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');
+    }
+    if (normalizedRole === 'user' && id === actingAdminId) {
+      throw new BadRequestException('You cannot demote your own account');
+    }
+    if (normalizedRole === 'user') {
+      await this.assertNotLastAdmin(existing.isAdmin);
     }
 
     await auth.api.setRole({
@@ -271,5 +291,18 @@ export class AdminUsersService {
         suspensionReason: suspended ? authUser.banReason || 'Banned by admin' : null,
       },
     });
+  }
+
+  private async assertNotLastAdmin(targetIsAdmin: boolean) {
+    if (!targetIsAdmin) {
+      return;
+    }
+
+    const adminCount = await this.prisma.user.count({
+      where: { isAdmin: true },
+    });
+    if (adminCount <= 1) {
+      throw new BadRequestException('Cannot modify the last remaining admin');
+    }
   }
 }

@@ -92,7 +92,7 @@ export default function UsersPage() {
         <div className="flex items-center gap-2">
           <form onSubmit={onSearchSubmit} className="flex items-center gap-2">
             <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
                 value={search}
@@ -117,7 +117,6 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Coming Soon Card */}
       <Card className="p-0 overflow-hidden border-border">
         {loading ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
@@ -160,7 +159,7 @@ export default function UsersPage() {
                 {data.items.map((user) => (
                   <tr
                     key={user.id}
-                    className="border-b border-gray-100 hover:bg-background cursor-pointer"
+                    className="border-b border-border hover:bg-background cursor-pointer"
                     onClick={() => router.push(`/admin/users/${user.id}`)}
                   >
                     <td className="px-4 py-2">
@@ -189,10 +188,10 @@ export default function UsersPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-gray-700">
+                    <td className="px-4 py-2 text-foreground">
                       {user.membershipsCount}
                     </td>
-                    <td className="px-4 py-2 text-gray-700">
+                    <td className="px-4 py-2 text-foreground">
                       {user.apiKeysCount}
                     </td>
                     <td className="px-4 py-2 text-muted-foreground text-xs">
@@ -207,7 +206,7 @@ export default function UsersPage() {
                 ))}
               </tbody>
             </table>
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-background text-xs text-muted-foreground">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-background text-xs text-muted-foreground">
               <div>
                 Page {data.page} of {data.totalPages}
               </div>
