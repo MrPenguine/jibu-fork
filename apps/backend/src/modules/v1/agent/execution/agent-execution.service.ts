@@ -42,46 +42,15 @@ export class AgentExecutionService {
       workspaceId: agentInfo?.workspaceId
     })}`);
     
-    // Load published workflow and inject nodes/edges/startNodeId from the published WorkflowVersion
-    let startNodeId: string | undefined = undefined;
-    try {
-      const workflow = await this.prisma.workflow.findFirst({
-        where: {
-          agentId,
-          workspaceId,
-        },
-        orderBy: { updatedAt: 'desc' },
-        include: { publishedVersion: true },
-      });
-
-      if (workflow && (workflow as any).publishedVersion) {
-        let wfJson: any = (workflow as any).publishedVersion?.workflowJson;
-        wfJson = typeof wfJson === 'string' ? JSON.parse(wfJson) : wfJson;
-        const nodes = Array.isArray(wfJson?.nodes) ? wfJson.nodes : (wfJson?.nodes ? Object.values(wfJson.nodes) : []);
-        const edges = Array.isArray(wfJson?.edges) ? wfJson.edges : (wfJson?.edges ? Object.values(wfJson.edges) : []);
-        (agent as any).nodes = nodes || [];
-        (agent as any).edges = edges || [];
-        (agent as any).startNodeId = wfJson?.startNodeId || '';
-        startNodeId = (agent as any).startNodeId;
-      } else {
-        // No published workflow found; default to empty
-        (agent as any).nodes = [];
-        (agent as any).edges = [];
-        (agent as any).startNodeId = '';
-        startNodeId = '';
-      }
-    } catch (e) {
-      // On error, keep defaults to avoid crash
-      (agent as any).nodes = [];
-      (agent as any).edges = [];
-      (agent as any).startNodeId = '';
-      startNodeId = '';
-      this.logger.warn(`[AGENT_EXEC] Failed to load workflowJson for agent ${agentId}: ${e.message}`);
-    }
-
     if (!agent) {
       throw new NotFoundException(`Agent with ID ${agentId} not found or not published`);
     }
+
+    // Node-graph workflows were removed; the agent runs with an empty graph.
+    (agent as any).nodes = [];
+    (agent as any).edges = [];
+    (agent as any).startNodeId = '';
+    const startNodeId = '';
 
     // Create a new session
     const session = await this.prisma.agentSession.create({
@@ -109,34 +78,9 @@ export class AgentExecutionService {
       include: { agent: true },
     }) as unknown as AgentSession & { agent: Agent };
     
-    // Ensure agent has the necessary workflow properties; load from published WorkflowVersion if missing
-    if (session?.agent && (!('nodes' in (session.agent as any)) || !('edges' in (session.agent as any)))) {
-      try {
-        const workflow = await this.prisma.workflow.findFirst({
-          where: {
-            agentId: (session.agent as any).id,
-            workspaceId: (session.agent as any).workspaceId,
-          },
-          orderBy: { updatedAt: 'desc' },
-          include: { publishedVersion: true },
-        });
-        if (workflow && (workflow as any).publishedVersion) {
-          let wfJson: any = (workflow as any).publishedVersion?.workflowJson;
-          wfJson = typeof wfJson === 'string' ? JSON.parse(wfJson) : wfJson;
-          const nodes = Array.isArray(wfJson?.nodes) ? wfJson.nodes : (wfJson?.nodes ? Object.values(wfJson.nodes) : []);
-          const edges = Array.isArray(wfJson?.edges) ? wfJson.edges : (wfJson?.edges ? Object.values(wfJson.edges) : []);
-          (session.agent as any).nodes = nodes || [];
-          (session.agent as any).edges = edges || [];
-          (session.agent as any).startNodeId = wfJson?.startNodeId || (session.agent as any).startNodeId || '';
-        } else {
-          (session.agent as any).nodes = (session.agent as any).nodes || [];
-          (session.agent as any).edges = (session.agent as any).edges || [];
-        }
-      } catch (e) {
-        this.logger.warn(`[AGENT_EXEC] Failed to load published workflow during continue for session ${sessionId}: ${e.message}`);
-        (session.agent as any).nodes = (session.agent as any).nodes || [];
-        (session.agent as any).edges = (session.agent as any).edges || [];
-      }
+    if (session?.agent) {
+      (session.agent as any).nodes = (session.agent as any).nodes || [];
+      (session.agent as any).edges = (session.agent as any).edges || [];
     }
 
     if (!session) {

@@ -10,7 +10,6 @@ export interface ExtendedAgent extends PrismaAgent {
   edges?: any;
   startNodeId?: string;
   isPublished?: boolean;
-  workflows?: any[];
   
   // Ensure all Prisma fields are properly typed
   id: string;
@@ -20,6 +19,5 @@ export interface ExtendedAgent extends PrismaAgent {
   description: string | null;
   metadata: any | null;
   workspaceId: string;
-  n8nWorkflowId: string | null;
   folderId: string | null;
 }

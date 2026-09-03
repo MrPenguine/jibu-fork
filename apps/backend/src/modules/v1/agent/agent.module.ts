@@ -3,7 +3,6 @@ import { HttpModule } from '@nestjs/axios';
 import { PrismaModule } from '../../../core/database/prisma.module';
 import { RedisModule } from '../../../core/redis/redis.module';
 import { ChatsModule } from '../chats/chats.module';
-import { WorkflowModule } from '../workflow/workflow.module';
 
 
 import { AgentController } from './controllers/agent.controller';
@@ -20,7 +19,6 @@ import { AgentRuntimeModule } from '../../../integrations/agent/agent-runtime.mo
     HttpModule,
     RedisModule,
     ChatsModule,
-    WorkflowModule,
     AgentRuntimeModule
   ],
   controllers: [AgentController],

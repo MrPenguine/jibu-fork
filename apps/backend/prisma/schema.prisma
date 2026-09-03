@@ -132,7 +132,6 @@ model Workspace {
   files                File[] // Reverse relation
   usersLastWorkspace   User[]                   @relation("UserLastWorkspace") // Users who have this as their last workspace
   invitations          Invitation[] // Invitations for this workspace
-  workflows            Workflow[] // Relation to workflows
   apiKeys              ApiKey[] // API keys belonging to this workspace
   knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this workspace
   knowledgeBaseSources KnowledgeBaseSource[] // Knowledge base sources belonging to this workspace
@@ -140,10 +139,7 @@ model Workspace {
   tools                Tool[] // Tools belonging to this workspace
   agents               Agent[] // Agents belonging to this workspace
   agentSessions        AgentSession[] // Agent sessions belonging to this workspace
-  n8nWorkflows         N8nWorkflow[] // N8n workflows for this workspace
   folders              Folder[] // Folders belonging to this workspace
-  webhooks             Webhook[]
-  webhookInvocations   WebhookInvocation[]
   assistants           Assistant[] // Assistants belonging to this workspace
   voices               Voice[] // Cloned/custom voices belonging to this workspace
 
@@ -380,24 +376,20 @@ model Chat {
   name           String? // Optional name for the chat
   workspaceId String
   agentId        String? // Optional: For agent-based chats
-  workflowId     String? // Optional: For associating chats with workflows
   sessionId      String // Required: For calls: phone number, For chats: user identifier or anonymous session
   sessionType    String         @default("chat") // "chat" or "call"
-  nodeType       AgentNodeType? // Store the current node type for agent workflows
   metadata       Json? // Additional metadata for the chat/call session
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   agent         Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
-  workflow      Workflow?      @relation(fields: [workflowId], references: [id], onDelete: SetNull)
   messages      Message[]
   agentSessions AgentSession[] // Agent sessions associated with this chat
 
   @@unique([agentId, sessionId])
   @@index([workspaceId])
   @@index([agentId])
-  @@index([workflowId])
   @@index([sessionId])
   @@index([sessionType])
 }
@@ -470,24 +462,6 @@ model ToolExecution {
   @@index([status])
 }
 
-// --- Enums for Agent ---
-enum AgentNodeType {
-  START
-  END
-  MESSAGE // Send a message (text, or for voice: TTS)
-  LISTEN // Wait for user input (text, or for voice: ASR + VAD)
-  CHOICE // Present options to the user (buttons for text, DTMF/spoken for voice)
-  CONDITION // Branch logic based on variables or input
-  SET_VARIABLE // Set/modify conversation variables
-  API_CALL // Make an HTTP request
-  TOOL_CALL // Execute one of your existing custom Tools
-  FUNCTION_CALL // More generic than TOOL_CALL, might execute a predefined server-side function
-  TRANSFER // For voice: transfer call (e.g., to SIP URI, phone number)
-  RECORD // For voice: record audio
-  PLAY_AUDIO // For voice: play a pre-recorded audio URL
-  WORKFLOW_CALL // Execute a secondary workflow
-}
-
 
 // --- New Enums for Agent-level defaults ---
 enum LlmProvider {
@@ -558,22 +532,15 @@ model Agent {
   metadata                   Json? // For storing agent-specific settings, like system prompts
 
   // --- Optional links retained ---
-  n8nWorkflowId  String?
-  n8nWorkflow    N8nWorkflow?   @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
   chats          Chat[]
   sessions       AgentSession[]
   usageRecords   UsageRecord[]
   apiKeys        ApiKey[]
-  workflows      Workflow[]
   assistants     Assistant[] // Added back-relation to Assistant
 
   // --- Single-brain config links (source of truth for runtime) ---
   tools          AgentTool[]
   knowledgeBases AgentKnowledgeBase[]
-
-  // --- Primary Workflow Link ---
-  primaryWorkflowId String?   @unique
-  primaryWorkflow   Workflow? @relation("PrimaryAgentWorkflow", fields: [primaryWorkflowId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([folderId])
@@ -687,138 +654,6 @@ model AgentSession {
   @@index([workspaceId])
 }
 
-model Workflow {
-  id                 String       @id @default(uuid())
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  name               String
-  description        String?
-
-  // Agent & Workspace relations
-  agentId            String
-  agent              Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  workspaceId        String
-  workspace          Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  // Workflow classification
-  isPrimary          Boolean      @default(false)
-
-  // n8n link
-  n8nWorkflowId      String?
-  n8nWorkflow        N8nWorkflow? @relation(fields: [n8nWorkflowId], references: [id], onDelete: SetNull)
-
-  // Versioning pointers
-  publishedVersionId String?          @unique
-  publishedVersion   WorkflowVersion? @relation("PublishedWorkflowVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
-
-  draftVersionId     String?          @unique
-  draftVersion       WorkflowVersion? @relation("DraftWorkflowVersion", fields: [draftVersionId], references: [id], onDelete: SetNull)
-
-  // Reverse relations
-  versions           WorkflowVersion[]
-  agentAsPrimary     Agent?       @relation("PrimaryAgentWorkflow")
-  chats              Chat[]
-  webhooks           Webhook[]
-
-  @@index([agentId])
-  @@index([workspaceId])
-  @@index([n8nWorkflowId])
-}
-
-// WorkflowNode and WorkflowEdge models have been removed.
-
-// Enum for N8nWorkflow type (primary/secondary)
-enum N8nWorkflowType {
-  PRIMARY
-  SECONDARY
-}
-
-// N8nWorkflow model for managing n8n workflow integration
-model N8nWorkflow {
-  id              String          @id @default(uuid())
-  n8nWorkflowId   String?         @unique // The ID of the workflow in n8n (optional until worker creates it)
-  webhookUrl      String? // The webhook URL for this workflow
-  workflowJson    Json? // The complete workflow JSON definition
-  isActive        Boolean         @default(false) // Whether the workflow is active in n8n
-  workflowType    N8nWorkflowType @default(PRIMARY) // Type of workflow (primary/secondary)
-  lastValidatedAt DateTime        @default(now()) // Last time the workflow was validated
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-
-  // Relations
-  workspaceId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  // Reverse relations - these are defined by the foreign keys on Assistant and Agent models
-  agents     Agent[] // Agents that use this workflow (can be PRIMARY or SECONDARY)
-  workflows  Workflow[] // Workflows linked to this n8n workflow
-
-  @@index([workspaceId])
-  @@index([n8nWorkflowId])
-  @@index([isActive])
-  @@index([workflowType]) // Add index for the new field
-}
-
-
-// New model: WorkflowVersion for versioned workflow JSON snapshots
-model WorkflowVersion {
-  id           String   @id @default(uuid())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  workflowId   String
-  workflow     Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-
-  version      Int
-  workflowJson Json
-
-  status       String   @default("draft") // "draft" | "published" | "archived"
-  publishedAt  DateTime?
-
-  // Back-links for pointers on Workflow
-  workflowAsPublishedVersion Workflow? @relation("PublishedWorkflowVersion")
-  workflowAsDraftVersion     Workflow? @relation("DraftWorkflowVersion")
-
-  @@unique([workflowId, version])
-  @@index([workflowId])
-}
-
-model Webhook {
-  id             String             @id @default(uuid())
-  name           String
-  description    String?
-  workflowId     String?            // Optional link to a workflow
-  workspaceId String
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  
-  // Relations
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  workflow       Workflow?          @relation(fields: [workflowId], references: [id], onDelete: SetNull)
-  invocations    WebhookInvocation[]
-
-  @@index([workspaceId])
-  @@index([workflowId])
-}
-
-model WebhookInvocation {
-  id             String   @id @default(uuid())
-  webhookId      String
-  payload        Json
-  headers        Json
-  status         String   @default("pending") // pending, completed, failed
-  error          String?
-  workspaceId String
-  createdAt      DateTime @default(now())
-  
-  // Relations
-  webhook        Webhook      @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([webhookId])
-  @@index([workspaceId])
-  @@index([status])
-}
 
 model Plan {
   id              String         @id @default(cuid())

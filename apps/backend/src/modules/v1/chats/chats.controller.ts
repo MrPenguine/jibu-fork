@@ -73,26 +73,13 @@ export class ChatsController {
     const sessionId = dto.sessionId || `session-${Date.now()}`;
     const sessionType = dto.sessionType || 'chat';
 
-    let workflowId = dto.workflowId || null;
-
-    // If no workflowId provided but we have an agent, try to infer from agent.primaryWorkflow
-    if (!workflowId && dto.agentId) {
-      const agent = await this.prisma.agent.findFirst({
-        where: { id: dto.agentId, workspaceId },
-        select: { primaryWorkflowId: true },
-      });
-      workflowId = agent?.primaryWorkflowId || null;
-    }
-
     const chat = await this.prisma.chat.create({
       data: {
         name: dto.name,
         workspaceId,
         agentId: dto.agentId,
-        workflowId: workflowId || undefined,
         sessionId,
         sessionType,
-        nodeType: dto.nodeType,
         metadata: dto.metadata,
       },
     });
