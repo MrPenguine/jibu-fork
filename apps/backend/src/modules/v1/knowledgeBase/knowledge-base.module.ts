@@ -6,6 +6,7 @@ import { QueueModule } from '../../../core/queue/queue.module';
 import { FileModule } from '../file/file.module';
 import { AgentRuntimeModule } from '../../../integrations/agent/agent-runtime.module';
 import { VectorDbService } from '../../../../../worker/src/vector-db/vector-db.service';
+import { SourceEventsService } from './source-events.service';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { VectorDbService } from '../../../../../worker/src/vector-db/vector-db.s
     AgentRuntimeModule, // Provides RagService for the retrieval test endpoint
   ],
   controllers: [KnowledgeBaseController],
-  providers: [KnowledgeBaseService, VectorDbService],
+  providers: [KnowledgeBaseService, VectorDbService, SourceEventsService],
   exports: [KnowledgeBaseService],
 })
 export class KnowledgeBaseModule {} 

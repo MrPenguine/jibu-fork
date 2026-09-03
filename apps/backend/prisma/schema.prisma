@@ -333,6 +333,9 @@ model KnowledgeBaseSource {
   refreshInterval   String?         // never | daily | weekly | monthly (url/sitemap only)
   lastIndexedAt     DateTime?
   indexingStatus    String          @default("PENDING")
+  lastError         String?
+  progress          Int?
+  chunkCount        Int?
   hasIndexedContent Boolean         @default(false)
   folderId          String?
   chunkConfig       Json?           // Per-source chunking config: { strategies, chunkSize, chunkOverlap }
@@ -341,6 +344,7 @@ model KnowledgeBaseSource {
   file              File?           @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
   folder            Folder?         @relation(fields: [folderId], references: [id])
   chunks            ChunkMetadata[] // Relation to chunks
+  events            KnowledgeBaseSourceEvent[]
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -348,6 +352,22 @@ model KnowledgeBaseSource {
   @@index([workspaceId])
   @@index([sourcePointer])
   @@index([folderId])
+}
+
+model KnowledgeBaseSourceEvent {
+  id          String   @id @default(uuid())
+  sourceId    String
+  workspaceId String
+  stage       String
+  level       String   @default("info")
+  message     String
+  progress    Int?
+  meta        Json?
+  createdAt   DateTime @default(now())
+  source      KnowledgeBaseSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, createdAt])
+  @@index([workspaceId, createdAt])
 }
 
 model ChunkMetadata {

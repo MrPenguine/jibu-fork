@@ -5,7 +5,7 @@ import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
 import { Button } from "../ui/button";
-import { FolderPlus, Download, Trash2, FileText, Folder as FolderIcon, ChevronDown, ChevronRight, Loader2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { FolderPlus, Download, Trash2, FileText, Folder as FolderIcon, ChevronDown, ChevronRight, Loader2, CheckCircle2, AlertCircle, Clock, RotateCcw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,9 @@ export interface KnowledgeBaseSource {
   mimeType?: string;
   sizeBytes?: number;
   indexingStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'INDEXED' | 'FAILED' | string;
+  progress?: number | null;
+  lastError?: string | null;
+  chunkCount?: number | null;
 }
 
 interface KnowledgeBaseListProps {
@@ -37,6 +40,9 @@ interface KnowledgeBaseListProps {
   onDownload?: (fileId: string, fileName: string) => void;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  eventsBySource?: Record<string, Array<{ id: string; stage: string; message: string; createdAt: string; progress: number | null }>>;
+  latestBySource?: Record<string, { stage: string; message: string; progress: number | null }>;
+  onRetry?: (sourceId: string) => void;
 }
 
 const formatFileSize = (bytes?: number) => {
@@ -48,14 +54,14 @@ const formatFileSize = (bytes?: number) => {
 };
 
 const statusMeta: Record<string, { label: string; color: string; icon: React.ReactNode; progress?: number }> = {
-  PENDING: { label: "Pending", color: "bg-amber-50 text-amber-700 border-amber-100", icon: <Clock className="h-3 w-3" />, progress: 15 },
-  PROCESSING: { label: "Chunking", color: "bg-indigo-50 text-indigo-700 border-indigo-100", icon: <Loader2 className="h-3 w-3 animate-spin" />, progress: 55 },
+  PENDING: { label: "Pending", color: "bg-slate-50 text-slate-700 border-slate-200", icon: <Clock className="h-3 w-3" />, progress: 0 },
+  PROCESSING: { label: "Processing", color: "bg-amber-50 text-amber-700 border-amber-100", icon: <Loader2 className="h-3 w-3 animate-spin" />, progress: 55 },
   COMPLETED: { label: "Ready", color: "bg-emerald-50 text-emerald-700 border-emerald-100", icon: <CheckCircle2 className="h-3 w-3" />, progress: 100 },
   INDEXED: { label: "Ready", color: "bg-emerald-50 text-emerald-700 border-emerald-100", icon: <CheckCircle2 className="h-3 w-3" />, progress: 100 },
   FAILED: { label: "Failed", color: "bg-red-50 text-red-700 border-red-100", icon: <AlertCircle className="h-3 w-3" />, progress: 0 },
 };
 
-export function KnowledgeBaseList({ sources, onCreateFolder, onDelete, onDownload, isExpanded = true, onToggleExpand }: KnowledgeBaseListProps) {
+export function KnowledgeBaseList({ sources, onCreateFolder, onDelete, onDownload, isExpanded = true, onToggleExpand, eventsBySource, latestBySource, onRetry }: KnowledgeBaseListProps) {
   if (!sources || sources.length === 0) return null;
   const activeCount = sources.filter((s) => s.indexingStatus === 'PENDING' || s.indexingStatus === 'PROCESSING').length;
   return (
@@ -102,10 +108,19 @@ export function KnowledgeBaseList({ sources, onCreateFolder, onDelete, onDownloa
               </thead>
               <tbody>
                 {sources.map((s) => {
-                  const status = statusMeta[s.indexingStatus || 'PENDING'] || statusMeta.PENDING;
-                  const isProcessing = s.indexingStatus === 'PENDING' || s.indexingStatus === 'PROCESSING';
+                  const latest = latestBySource?.[s.id];
+                  const effectiveStatus = latest?.stage === 'COMPLETED' ? 'COMPLETED'
+                    : latest?.stage === 'FAILED' ? 'FAILED'
+                    : latest?.stage === 'QUEUED' ? 'PENDING'
+                    : latest?.stage && latest.stage !== 'DEINDEXED' ? 'PROCESSING'
+                    : s.indexingStatus || 'PENDING';
+                  const status = statusMeta[effectiveStatus] || statusMeta.PENDING;
+                  const isProcessing = effectiveStatus === 'PENDING' || effectiveStatus === 'PROCESSING';
+                  const progress = latest?.progress ?? s.progress ?? status.progress;
+                  const timeline = eventsBySource?.[s.id] || [];
                   return (
-                    <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors relative">
+                    <React.Fragment key={s.id}>
+                    <tr className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors relative">
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-primary flex-shrink-0" />
@@ -127,8 +142,10 @@ export function KnowledgeBaseList({ sources, onCreateFolder, onDelete, onDownloa
                             {status.label}
                           </Badge>
                           {isProcessing && (
-                            <Progress value={status.progress} className="h-1.5 rounded-full bg-slate-100" />
+                            <Progress value={progress} className="h-1.5 rounded-full bg-slate-100" />
                           )}
+                          {latest && <span className="text-[11px] text-slate-500">{latest.message}</span>}
+                          {effectiveStatus === 'FAILED' && s.lastError && <span className="text-[11px] text-red-600">{s.lastError}</span>}
                         </div>
                       </td>
                       <td className="p-3">
@@ -169,9 +186,31 @@ export function KnowledgeBaseList({ sources, onCreateFolder, onDelete, onDownloa
                               </AlertDialogContent>
                             </AlertDialog>
                           )}
+                          {effectiveStatus === 'FAILED' && onRetry && (
+                            <Button variant="outline" size="sm" className="h-8 rounded-lg border-slate-200" onClick={() => onRetry(s.id)}>
+                              <RotateCcw className="h-3 w-3 mr-1" /> Retry
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
+                    {timeline.length > 0 && (
+                      <tr className="border-b border-slate-100">
+                        <td colSpan={6} className="px-6 py-2">
+                          <details>
+                            <summary className="cursor-pointer text-xs text-slate-500">View indexing timeline ({timeline.length})</summary>
+                            <div className="mt-2 space-y-1 border-l-2 border-slate-100 pl-3">
+                              {timeline.map((event) => (
+                                <div key={event.id} className="text-xs text-slate-600">
+                                  <span className="font-medium">{event.stage}</span> · {new Date(event.createdAt).toLocaleString()} — {event.message}
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

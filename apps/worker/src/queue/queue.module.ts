@@ -11,6 +11,7 @@ import { FileModule } from '../../../backend/src/modules/v1/file/file.module';
 import { ChunkingModule } from '../chunking/chunking.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { VectorDbModule } from '../vector-db/vector-db.module';
+import { SourceEventsService } from './source-events.service';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { VectorDbModule } from '../vector-db/vector-db.module';
   providers: [
     QueueProcessor, 
     IndexingProcessor,
+    SourceEventsService,
   ],
   exports: [BullModule],
 })

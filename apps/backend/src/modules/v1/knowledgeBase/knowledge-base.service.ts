@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { ConfigService } from '@nestjs/config';
+import { SourceEventsService } from './source-events.service';
 import { ProviderCredentialsResolver } from '../../../core/provider-credentials/provider-credentials.resolver';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
@@ -104,6 +105,7 @@ export class KnowledgeBaseService {
     private readonly vectorDb: VectorDbService,
     private readonly configService: ConfigService,
     private readonly providerCredentials: ProviderCredentialsResolver,
+    private readonly sourceEvents: SourceEventsService,
   ) {
     const ollamaChatUrl = this.configService.get<string>('OLLAMA_URL') || this.configService.get<string>('OLLAMA_HOST') || 'http://localhost:11434';
     this.ollamaChat = new OpenAI({
@@ -334,18 +336,18 @@ export class KnowledgeBaseService {
       try {
         this.logger.log(`Adding source ${source.id} to Bull indexing queue`);
 
-        await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+        const job = await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
           knowledgeBaseSourceId: source.id,
           workspaceId: workspaceId,
           chunkConfig: normalizedChunkConfig,
         });
 
         this.logger.log(`Successfully added indexing job for source ${source.id} to Bull queue`);
-
-        await this.prisma.knowledgeBaseSource.update({
-          where: { id: source.id },
-          data: { indexingStatus: 'PROCESSING' },
-        });
+        await this.sourceEvents.emit(
+          source,
+          'QUEUED',
+          `Queued for indexing (job ${job.id})`,
+        );
       } catch (queueError) {
         this.logger.error(`Failed to queue indexing job: ${queueError.message}`, queueError.stack);
       }
@@ -447,17 +449,14 @@ export class KnowledgeBaseService {
       throw new NotFoundException(`Source with ID ${sourceId} not found`);
     }
 
-    await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+    const job = await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
       knowledgeBaseSourceId: sourceId,
       workspaceId: workspaceId,
     });
 
     this.logger.log(`Added indexing job for source ${sourceId} to queue`);
 
-    await this.prisma.knowledgeBaseSource.update({
-      where: { id: source.id },
-      data: { indexingStatus: 'PROCESSING' },
-    });
+    await this.sourceEvents.emit(source, 'QUEUED', `Queued for indexing (job ${job.id})`);
 
     return { success: true };
   }
@@ -594,6 +593,8 @@ export class KnowledgeBaseService {
           fileSizeBytes: sourceFile?.sizeBytes || 0,
           chunkCount: sourceChunkCount,
           indexingStatus: source.indexingStatus,
+          progress: source.progress,
+          lastError: source.lastError,
         };
       }),
     );
@@ -664,15 +665,16 @@ export class KnowledgeBaseService {
       });
 
       try {
-        await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+        const job = await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
           knowledgeBaseSourceId: source.id,
           workspaceId,
           chunkConfig: normalizedChunkConfig,
         });
-        await this.prisma.knowledgeBaseSource.update({
-          where: { id: source.id },
-          data: { indexingStatus: 'PROCESSING' },
-        });
+        await this.sourceEvents.emit(
+          source,
+          'QUEUED',
+          `Queued for indexing (job ${job.id})`,
+        );
 
         if (refreshRate !== 'never') {
           await this.scheduleUrlRefresh(source.id, workspaceId, refreshRate, normalizedChunkConfig);
@@ -832,11 +834,16 @@ export class KnowledgeBaseService {
           where: { id: s.id },
           data: { indexingStatus: 'PENDING', hasIndexedContent: false },
         });
-        await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+        const job = await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
           knowledgeBaseSourceId: s.id,
           workspaceId,
           chunkConfig: (s as any).chunkConfig || undefined,
         });
+        await this.sourceEvents.emit(
+          s,
+          'QUEUED',
+          `Queued for indexing (job ${job.id})`,
+        );
         reindexed++;
       }
     }

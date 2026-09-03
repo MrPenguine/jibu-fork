@@ -67,6 +67,20 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async publish(channel: string, message: string): Promise<boolean> {
+    try {
+      await this.redisClient.publish(channel, message);
+      return true;
+    } catch (error) {
+      console.error(`Error publishing to Redis channel ${channel}:`, error);
+      return false;
+    }
+  }
+
+  duplicate() {
+    return this.redisClient.duplicate();
+  }
+
   /**
    * Set a value in Redis with optional expiration time
    */

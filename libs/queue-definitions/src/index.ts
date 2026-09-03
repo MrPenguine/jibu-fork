@@ -5,6 +5,42 @@
 import type { WebhookPayload } from './webhook-payload';
 export * from './webhook-payload';
 
+export const SOURCE_EVENT_STAGES = [
+  'QUEUED',
+  'DOWNLOADING',
+  'EXTRACTING',
+  'CHUNKING',
+  'EMBEDDING',
+  'UPSERTING',
+  'COMPLETED',
+  'FAILED',
+  'DEINDEXED',
+] as const;
+
+export type SourceEventStage = typeof SOURCE_EVENT_STAGES[number];
+
+export interface SourceEvent {
+  id: string;
+  sourceId: string;
+  knowledgeBaseId: string;
+  workspaceId: string;
+  stage: SourceEventStage;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  progress: number | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export const kbEventsChannel = (workspaceId: string) => `kb:events:${workspaceId}`;
+
+export const sourceEventIndexingStatus = (stage: SourceEventStage) => {
+  if (stage === 'QUEUED' || stage === 'DEINDEXED') return 'PENDING';
+  if (stage === 'COMPLETED') return 'COMPLETED';
+  if (stage === 'FAILED') return 'FAILED';
+  return 'PROCESSING';
+};
+
 // Queue names
 export const QUEUE_NAMES = {
   DEFAULT: 'default',
