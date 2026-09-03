@@ -145,6 +145,7 @@ model Workspace {
   webhooks             Webhook[]
   webhookInvocations   WebhookInvocation[]
   assistants           Assistant[] // Assistants belonging to this workspace
+  voices               Voice[] // Cloned/custom voices belonging to this workspace
 
   subscription         Subscription?
   usageRecords         UsageRecord[]
@@ -233,9 +234,28 @@ model File {
   workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   knowledgeBaseSources KnowledgeBaseSource[] // Relationship to knowledge base sources
+  voices               Voice[] // Voices using this file as their sample
 
   @@index([workspaceId])
   @@index([userId])
+}
+
+model Voice {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  language    String?  @default("en")
+  type        String   @default("cloned")
+  fileId      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  file      File?     @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
 }
 
 model Folder {
