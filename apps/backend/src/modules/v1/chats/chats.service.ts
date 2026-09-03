@@ -1,9 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { WebhookUrlService } from '../../../core/webhook/webhook-url.service';
-import { MessageQueueService } from '../../../core/services/message-queue.service';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { PayloadBuilderService } from '@jibu/payload-builder';
 import { AgentRuntimeService } from '../../../integrations/agent/agent-runtime.service';
 
 export interface CreateMessageOptions {
@@ -22,20 +19,8 @@ export class ChatsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly webhookUrlService: WebhookUrlService,
-    private readonly messageQueueService: MessageQueueService,
-    private readonly payloadBuilder: PayloadBuilderService,
     private readonly agentRuntime: AgentRuntimeService,
   ) {}
-
-  private normalizeWebhookUrl(url: string | null): string | null {
-    if (!url) return url;
-    const parts = url.split('://');
-    if (parts.length !== 2) return url;
-    const [scheme, rest] = parts;
-    const normalizedRest = rest.replace(/\/+/, '/').replace(/\/+/g, '/');
-    return `${scheme}://${normalizedRest}`;
-  }
 
   async getChatsByAgentId(workspaceId: string, agentId: string) {
     this.logger.log(`[DIAGNOSTIC][ChatsService] Listing chats for agent ${agentId} in workspace ${workspaceId}`);
@@ -88,8 +73,6 @@ export class ChatsService {
     options: CreateMessageOptions = {},
   ) {
     const generateReply = options.generateReply ?? true;
-    // Resolve the workflow directly from the Chat record so we always
-    // use the workflow linked in Prisma (Chat -> Workflow -> N8nWorkflow).
     this.logger.log(
       `[DIAGNOSTIC][ChatsService] Starting createMessage for chat ${chatId} in workspace ${workspaceId}`,
     );
@@ -102,23 +85,15 @@ export class ChatsService {
           { sessionId: chatId },
         ],
       },
-      include: {
-        workflow: {
-          include: {
-            n8nWorkflow: true,
-          },
-        },
-      },
     });
 
     if (!chat) {
       const msg =
-        '⚠️ No Chat record found for this chatId/sessionId. Workflow cannot be resolved from schema.';
+        '⚠️ No Chat record found for this chatId/sessionId.';
       this.logger.warn(`[DIAGNOSTIC][ChatsService] ${msg}`);
       throw new BadRequestException(msg);
     }
 
-    const workflowId = chat.workflowId || null;
     const agentId = chat.agentId || null;
     const sessionId = chat.sessionId || chatId;
 
@@ -135,7 +110,7 @@ export class ChatsService {
     });
 
     this.logger.log(
-      `[DIAGNOSTIC][ChatsService] Message persisted to DB for chat ${chat.id} with agentId=${agentId ?? 'none'} workflowId=${workflowId ?? 'unknown'}`,
+      `[DIAGNOSTIC][ChatsService] Message persisted to DB for chat ${chat.id} with agentId=${agentId ?? 'none'}`,
     );
 
     // Persistence-only callers (or non-user turns) stop here.
@@ -178,46 +153,10 @@ export class ChatsService {
       }
     }
 
-    if (workflowId) {
-      try {
-        // Build canonical payload and enqueue to n8n via WEBHOOK_DELIVERY queue — identical path as voice
-        const payload = await this.payloadBuilder.buildMessagePayload({
-          workflowId,
-          sessionId,
-          text: message.content,
-          isVoice: false,
-          extra: {
-            workspaceId,
-            chatId: chat.id,
-          },
-        });
+    this.logger.warn(
+      `[DIAGNOSTIC][ChatsService] ⚠️ No agent linked to chat ${chat.id}; no reply generated`,
+    );
 
-        await this.messageQueueService.sendMessageToWorkflow(
-          workflowId,
-          sessionId,
-          message.content,
-          undefined,
-          undefined,
-          payload,
-        );
-
-        this.logger.log(
-          `[DIAGNOSTIC][ChatsService] ✅ Queue enqueue succeeded for workflow ${workflowId} and chat ${chat.id}`,
-        );
-      } catch (error) {
-        const errMsg = `❌ Queue enqueue failed for workflow ${workflowId}: ${(error as Error).message}`;
-        this.logger.error(
-          `[DIAGNOSTIC][ChatsService] ${errMsg}`,
-          (error as Error).stack,
-        );
-      }
-    } else {
-      this.logger.warn(
-        `[DIAGNOSTIC][ChatsService] ⚠️ Queue enqueue skipped: no workflowId linked to chat ${chat.id}`,
-      );
-    }
-
-    // Chat messages now follow exact same path as voice: DB → PayloadBuilder → WEBHOOK_DELIVERY
     return createdMessage;
   }
 }

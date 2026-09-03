@@ -11,7 +11,6 @@ import { Request } from 'express';
 import { AgentRequest, AgentResponse } from '../../../../integrations/agent/interfaces/agent.interface';
 import { PassThrough } from 'stream';
 import { ChatsService } from '../../chats/chats.service';
-import { WorkflowService } from '../../workflow/services/workflow.service';
 import { CreateMessageDto } from '../../chats/dto/create-message.dto';
 
 // Define a custom interface for our streaming response
@@ -39,7 +38,6 @@ export class AgentController {
     private readonly agentService: AgentService,
     private readonly integrationsAgentService: IntegrationsAgentService,
     private readonly chatsService: ChatsService,
-    private readonly workflowService: WorkflowService,
   ) {}
 
   @Post()
@@ -150,12 +148,10 @@ export class AgentController {
       throw new NotFoundException(`Agent with ID ${id} not found`);
     }
 
-    const workflows = await this.workflowService.getAgentWorkflows(id, workspaceId);
     const chats = await this.chatsService.getChatsByAgentId(workspaceId, id);
 
     return {
       ...agent,
-      workflows,
       chats,
     };
   }
@@ -210,18 +206,6 @@ export class AgentController {
       throw new BadRequestException('No workspace selected');
     }
     return this.agentService.unpublish(id, workspaceId);
-  }
-
-  @Get(':id/workflows')
-  @ApiOperation({ summary: 'Get all workflows for an agent' })
-  @ApiResponse({ status: 200, description: 'Return all workflows for the agent.' })
-  async getAgentWorkflows(@Param('id') id: string, @Req() req): Promise<any[]> {
-    const workspaceId = req.user.lastWorkspaceId;
-    if (!workspaceId) {
-      throw new BadRequestException('No workspace selected');
-    }
-    this.logger.log(`Getting workflows for agent ${id} in workspace ${workspaceId}`);
-    return this.workflowService.getAgentWorkflows(id, workspaceId);
   }
 
   // Agent query processing endpoints

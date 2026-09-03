@@ -5,18 +5,13 @@ import { CreateAgentDto } from '../dto/create-agent.dto';
 import { PrismaService } from '../../../../core/database/prisma.service';
 import { UpdateAgentDto } from '../dto/update-agent.dto';
 import { UpdateAgentConfigDto } from '../dto/update-agent-config.dto';
-import { WorkflowService } from '../../workflow/services/workflow.service';
-import { CreateWorkflowDto } from '../../workflow/dto/create-workflow.dto';
 import { LlmProvider, TtsProvider, SttProvider } from '@prisma/client';
 
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly workflowService: WorkflowService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // Legacy no-op: assistants are removed
   private extractAssistantIdFromNodes(_: any): string | undefined {
@@ -57,23 +52,6 @@ export class AgentService {
         },
       }) as unknown as ExtendedAgent;
 
-      try {
-        const agentData = newAgent as unknown as { id: string; name: string };
-        this.logger.log(`Creating master workflow for agent: ${agentData.id}`);
-
-        const workflowData: CreateWorkflowDto = {
-          name: `${agentData.name} Workflow`,
-          description: `Master workflow for ${agentData.name}`,
-          workspaceId: workspaceId,
-          assistantId: agentData.id,
-        };
-
-        const workflow = await this.workflowService.create(workflowData);
-        this.logger.log(`Master workflow created successfully: ${workflow.id}`);
-      } catch (workflowError) {
-        this.logger.error(`Error creating master workflow: ${workflowError.message}`);
-      }
-
       return newAgent;
     } catch (error) {
       this.logger.error(`Error creating agent: ${error.message}`);
@@ -88,9 +66,6 @@ export class AgentService {
       where: {
         workspaceId: workspaceId,
       },
-      include: {
-        workflows: true,
-      },
       orderBy: {
         updatedAt: 'desc',
       },
@@ -98,8 +73,7 @@ export class AgentService {
 
     return agents.map(agent => ({
       ...agent,
-      // Derive published status from presence of a published version on any workflow
-      isPublished: agent.workflows?.some((w: any) => !!w.publishedVersionId) ?? false,
+      isPublished: false,
     })) as unknown as ExtendedAgent[];
   }
 
@@ -115,19 +89,15 @@ export class AgentService {
         id,
         workspaceId,
       },
-      include: {
-        workflows: true,
-      },
     });
 
     if (!agent) {
       throw new NotFoundException(`Agent with ID ${id} not found in this workspace`);
     }
 
-    // Calculate isPublished based on whether any workflow has a publishedVersionId
     return {
       ...agent,
-      isPublished: agent.workflows?.some((w: any) => !!w.publishedVersionId) ?? false,
+      isPublished: false,
     } as unknown as ExtendedAgent;
   }
 
