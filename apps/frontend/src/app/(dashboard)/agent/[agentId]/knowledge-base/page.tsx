@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   createKnowledgeBase,
@@ -20,10 +20,12 @@ import {
   updateKnowledgeBaseChunk,
   deleteKnowledgeBaseChunk,
   retrieveTestKnowledgeBase,
+  retryKnowledgeBaseSource,
   type KnowledgeBaseSettings,
   type ChunkMetadata,
   type RefreshRate,
 } from "../../../../../utils/knowledgebaseApi";
+import { useKnowledgeBaseEvents } from "../../../../../hooks/useKnowledgeBaseEvents";
 import { listAgentKnowledgeBases, linkAgentKnowledgeBase } from "../../../../../utils/agentConfigApi";
 import { uploadFile, getFileDownloadUrl } from "../../../../../utils/fileApi";
 import { useWorkspace } from "../../../../../utils/workspaceContext";
@@ -89,6 +91,9 @@ export default function AgentKnowledgeBasePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [allSourcesExpanded, setAllSourcesExpanded] = useState(true);
+  const [uploadProgressItems, setUploadProgressItems] = useState<Array<{ name: string; status: "uploading" | "queued" | "error" }>>([]);
+  const { eventsBySource, latestBySource, connected } = useKnowledgeBaseEvents(knowledgeBaseId);
+  const refreshedTerminalEvents = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const load = async () => {
@@ -272,14 +277,16 @@ export default function AgentKnowledgeBasePage() {
     [sources],
   );
 
-  // Poll source statuses while anything is being indexed so the progress bars update.
+  // Refresh persisted source fields after terminal events; live status comes from SSE.
   useEffect(() => {
-    if (!knowledgeBaseId || processingCount === 0) return;
-    const timer = setInterval(() => {
-      loadSources(knowledgeBaseId);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [knowledgeBaseId, processingCount]);
+    if (!knowledgeBaseId) return;
+    const terminalEvent = Object.values(latestBySource).find((event) =>
+      event.stage === "COMPLETED" || event.stage === "FAILED" || event.stage === "DEINDEXED");
+    if (!terminalEvent || refreshedTerminalEvents.current.has(terminalEvent.id)) return;
+    refreshedTerminalEvents.current.add(terminalEvent.id);
+    const timer = setTimeout(() => loadSources(knowledgeBaseId), 500);
+    return () => clearTimeout(timer);
+  }, [knowledgeBaseId, latestBySource]);
 
   const loadFolders = async (kbId: string) => {
     try {
@@ -307,6 +314,9 @@ export default function AgentKnowledgeBasePage() {
         mimeType: source.file?.mimeType,
         sizeBytes: source.file?.sizeBytes,
         indexingStatus: source.indexingStatus,
+        progress: source.progress,
+        lastError: source.lastError,
+        chunkCount: source.chunkCount,
         createdAt: source.createdAt,
       }));
       
@@ -405,12 +415,16 @@ export default function AgentKnowledgeBasePage() {
     }
 
     setIsUploading(true);
+    setUploadProgressItems(payload.files.map((file) => ({ name: file.name, status: "queued" })));
     let successCount = 0;
     let failCount = 0;
 
     try {
-      // Upload each file
-      for (const file of payload.files) {
+      let next = 0;
+      const worker = async () => {
+        while (next < payload.files.length) {
+          const file = payload.files[next++];
+          setUploadProgressItems((items) => items.map((item) => item.name === file.name ? { ...item, status: "uploading" } : item));
         try {
           console.log('[handleUploadFiles] Uploading file:', file.name);
           console.log('[handleUploadFiles] Payload folderId:', payload.folderId);
@@ -453,12 +467,16 @@ export default function AgentKnowledgeBasePage() {
           console.log('[handleUploadFiles] File linked to KB');
 
           successCount++;
+          setUploadProgressItems((items) => items.map((item) => item.name === file.name ? { ...item, status: "queued" } : item));
         } catch (error: any) {
           console.error('[handleUploadFiles] Error uploading file:', file.name, error);
           console.error('[handleUploadFiles] Error details:', error?.message || error);
           failCount++;
+          setUploadProgressItems((items) => items.map((item) => item.name === file.name ? { ...item, status: "error" } : item));
         }
-      }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, payload.files.length) }, worker));
 
       // Show result toast
       if (successCount > 0) {
@@ -667,6 +685,12 @@ export default function AgentKnowledgeBasePage() {
         onOpenAddDataSource={() => setOpenAddDataSource(true)}
         processingCount={processingCount}
       />
+      <div className="px-6 pt-4 text-sm text-slate-500">
+        {sources.filter((source) => (latestBySource[source.id]?.stage || source.indexingStatus) === "COMPLETED" || source.indexingStatus === "INDEXED").length} ready ·{" "}
+        {sources.filter((source) => ["QUEUED", "DOWNLOADING", "EXTRACTING", "CHUNKING", "EMBEDDING", "UPSERTING"].includes(latestBySource[source.id]?.stage || "") || source.indexingStatus === "PENDING" || source.indexingStatus === "PROCESSING").length} indexing ·{" "}
+        {sources.filter((source) => (latestBySource[source.id]?.stage || source.indexingStatus) === "FAILED").length} failed
+        <span className="ml-2 text-xs">{connected ? "Live updates connected" : "Reconnecting…"}</span>
+      </div>
 
       <div className="px-6 pb-6 space-y-6">
         {/* Folders Section */}
@@ -711,8 +735,15 @@ export default function AgentKnowledgeBasePage() {
                           </thead>
                           <tbody>
                             {folderFiles.map((source) => {
-                              const status = source.indexingStatus || 'PENDING';
+                              const latest = latestBySource[source.id];
+                              const status = latest?.stage === 'COMPLETED' ? 'COMPLETED'
+                                : latest?.stage === 'FAILED' ? 'FAILED'
+                                : latest?.stage === 'QUEUED' ? 'PENDING'
+                                : latest?.stage && latest.stage !== 'DEINDEXED' ? 'PROCESSING'
+                                : source.indexingStatus || 'PENDING';
                               const isProcessing = status === 'PENDING' || status === 'PROCESSING';
+                              const progress = latest?.progress ?? source.progress ?? (status === 'COMPLETED' ? 100 : 0);
+                              const timeline = eventsBySource[source.id] || [];
                               return (
                                 <tr key={source.id} className="border-b border-slate-100 hover:bg-white transition-colors">
                                   <td className="p-3">
@@ -737,16 +768,24 @@ export default function AgentKnowledgeBasePage() {
                                         status === 'COMPLETED' || status === 'INDEXED'
                                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
                                           : isProcessing
-                                          ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                          ? 'bg-amber-50 text-amber-700 border-amber-100'
                                           : status === 'FAILED'
                                           ? 'bg-red-50 text-red-700 border-red-100'
-                                          : 'bg-amber-50 text-amber-700 border-amber-100'
+                                          : 'bg-slate-50 text-slate-700 border-slate-200'
                                       }`}>
                                         {isProcessing && <Loader2 className="h-3 w-3 animate-spin" />}
                                         {status === 'COMPLETED' || status === 'INDEXED' ? 'Ready' : status}
                                       </span>
                                       {isProcessing && (
-                                        <Progress value={55} className="h-1.5 rounded-full bg-slate-100" />
+                                        <Progress value={progress} className="h-1.5 rounded-full bg-slate-100" />
+                                      )}
+                                      {latest && <span className="text-[11px] text-slate-500">{latest.message}</span>}
+                                      {status === 'FAILED' && source.lastError && <span className="text-[11px] text-red-600">{source.lastError}</span>}
+                                      {timeline.length > 0 && (
+                                        <details className="text-[11px] text-slate-500">
+                                          <summary className="cursor-pointer">Timeline ({timeline.length})</summary>
+                                          {timeline.map((event) => <div key={event.id}>{event.stage} · {new Date(event.createdAt).toLocaleString()} — {event.message}</div>)}
+                                        </details>
                                       )}
                                     </div>
                                   </td>
@@ -762,6 +801,20 @@ export default function AgentKnowledgeBasePage() {
                                         >
                                           <Download className="h-3 w-3 mr-1" />
                                           Download
+                                        </Button>
+                                      )}
+                                      {status === 'FAILED' && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 rounded-lg border-slate-200"
+                                          onClick={async () => {
+                                            if (!knowledgeBaseId) return;
+                                            const ok = await retryKnowledgeBaseSource(knowledgeBaseId, source.id);
+                                            toast({ title: ok ? "Retry queued" : "Retry failed", variant: ok ? undefined : "destructive" });
+                                          }}
+                                        >
+                                          Retry
                                         </Button>
                                       )}
                                       <AlertDialog>
@@ -820,6 +873,14 @@ export default function AgentKnowledgeBasePage() {
             onDownload={handleDownloadFile}
             isExpanded={allSourcesExpanded}
             onToggleExpand={handleToggleAllSources}
+            eventsBySource={eventsBySource}
+            latestBySource={latestBySource}
+            onRetry={async (sourceId) => {
+              if (!knowledgeBaseId) return;
+              const ok = await retryKnowledgeBaseSource(knowledgeBaseId, sourceId);
+              toast({ title: ok ? "Retry queued" : "Retry failed", description: ok ? "Indexing has been queued again." : "Could not queue indexing.", variant: ok ? undefined : "destructive" });
+              if (ok) await loadSources(knowledgeBaseId);
+            }}
           />
         )}
       </div>
@@ -830,6 +891,7 @@ export default function AgentKnowledgeBasePage() {
         onOpenChange={setOpenAddDataSource}
         folders={folders}
         onUploadFiles={handleUploadFiles}
+        progressItems={isUploading ? uploadProgressItems : undefined}
         onImportUrls={handleImportUrls}
         onImportSitemap={(payload: SitemapImportPayload) => {
           console.log('Sitemap import:', payload, 'agent', agentId);

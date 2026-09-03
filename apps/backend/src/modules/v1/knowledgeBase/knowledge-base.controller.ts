@@ -10,6 +10,8 @@ import {
   Req,
   Logger,
   NotFoundException,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
@@ -24,6 +26,9 @@ import { UpdateChunkDto, RetrieveTestDto } from './dto/update-chunk.dto';
 import { Query } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { PassThrough } from 'stream';
+import { kbEventsChannel } from '@jibu/queue-definitions';
+import { SourceEventsService } from './source-events.service';
 
 @ApiTags('Knowledge Bases')
 @ApiBearerAuth()
@@ -35,7 +40,8 @@ export class KnowledgeBaseController {
   constructor(
     private readonly knowledgeBaseService: KnowledgeBaseService,
     private readonly prisma: PrismaService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly sourceEvents: SourceEventsService,
   ) {}
 
   @Post()
@@ -499,6 +505,93 @@ export class KnowledgeBaseController {
     }
   }
 
+  @Get(':id/events')
+  @ApiOperation({ summary: 'List indexing events for a knowledge base' })
+  async listEvents(
+    @Req() req,
+    @Param('id') id: string,
+    @Query('since') since?: string,
+    @Query('sourceId') sourceId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const workspaceId =
+      req.headers['x-workspace-id'] ||
+      req.headers['organization-id'] ||
+      req.headers['x-force-organization-id'] ||
+      req.user.orgId;
+    if (!workspaceId) throw new NotFoundException('Organization ID is required');
+    const parsedSince = since ? new Date(since) : undefined;
+    const parsedLimit = limit ? Number(limit) : 200;
+    const events = await this.sourceEvents.listForKnowledgeBase(id, workspaceId, {
+      since: parsedSince && !Number.isNaN(parsedSince.getTime()) ? parsedSince : undefined,
+      sourceId,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : 200,
+    });
+    if (!events) throw new NotFoundException(`Knowledge base with ID ${id} not found`);
+    return events;
+  }
+
+  @Get(':id/events/stream')
+  @ApiOperation({ summary: 'Stream indexing events for a knowledge base' })
+  async streamEvents(
+    @Req() req,
+    @Res({ passthrough: true }) response,
+    @Param('id') id: string,
+    @Query('workspaceId') workspaceIdQuery?: string,
+  ) {
+    const workspaceId =
+      req.headers['x-workspace-id'] ||
+      req.headers['organization-id'] ||
+      req.headers['x-force-organization-id'] ||
+      workspaceIdQuery ||
+      req.user.orgId;
+    if (!workspaceId) throw new NotFoundException('Organization ID is required');
+    const kb = await this.prisma.knowledgeBase.findFirst({
+      where: { id, workspaceId },
+      select: { id: true },
+    });
+    if (!kb) throw new NotFoundException(`Knowledge base with ID ${id} not found`);
+
+    const stream = new PassThrough();
+    response.setHeader('Cache-Control', 'no-cache');
+    response.setHeader('Connection', 'keep-alive');
+    response.setHeader('X-Accel-Buffering', 'no');
+    const subscriber = this.redisSubscriber();
+    let closed = false;
+    const heartbeat = setInterval(() => {
+      if (!closed) stream.write(': heartbeat\n\n');
+    }, 15_000);
+    const cleanup = async () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(heartbeat);
+      subscriber.removeAllListeners('message');
+      await subscriber.unsubscribe(kbEventsChannel(workspaceId));
+      await subscriber.quit();
+      stream.end();
+    };
+    subscriber.on('message', (_channel: string, raw: string) => {
+      try {
+        const event = JSON.parse(raw);
+        if (event.knowledgeBaseId === id) {
+          stream.write(`event: source-event\ndata: ${JSON.stringify(event)}\n\n`);
+        }
+      } catch {
+        this.logger.warn('Ignoring malformed knowledge-base event');
+      }
+    });
+    await subscriber.subscribe(kbEventsChannel(workspaceId));
+    req.on('close', cleanup);
+    return new StreamableFile(stream, {
+      type: 'text/event-stream',
+      disposition: 'inline',
+    });
+  }
+
+  private redisSubscriber() {
+    return this.sourceEvents.duplicateRedis();
+  }
+
   @Post(':kbId/folders')
   @ApiOperation({ summary: 'Create a folder in workspace for knowledge base organization' })
   @ApiResponse({ status: 201, description: 'Folder created' })
@@ -604,7 +697,7 @@ export class KnowledgeBaseController {
     @Param('sourceId') sourceId: string,
     @Req() req
   ) {
-    const orgId = req.headers['x-workspace-id'];
+    const orgId = req.headers['x-workspace-id'] || req.headers['organization-id'] || req.headers['x-force-organization-id'] || req.user.orgId;
     
     // Find the source - use knowledgeBaseService or direct Prisma
     // @ts-ignore - PrismaClient models are not properly typed
@@ -619,13 +712,6 @@ export class KnowledgeBaseController {
     if (!source) {
       return { error: 'Source not found' };
     }
-
-    // Manually update the source status to PROCESSING
-    // @ts-ignore - PrismaClient models are not properly typed
-    await this.prisma.knowledgeBaseSource.update({
-      where: { id: sourceId },
-      data: { indexingStatus: 'PROCESSING' },
-    });
 
     // Add to indexing queue
     try {

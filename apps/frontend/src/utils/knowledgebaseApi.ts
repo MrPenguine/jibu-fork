@@ -1,6 +1,7 @@
 import { authClient } from './auth/client';
 import { getActiveWorkspaceId } from './fileApi';
 import { fetchAPI, API_BASE_URL } from './api';
+import type { SourceEvent as SharedSourceEvent } from '@jibu/queue-definitions';
 
 // Import workspace context for types only
 import { useWorkspace } from './workspaceContext';
@@ -101,8 +102,51 @@ export interface KnowledgeBaseSource {
   knowledgeBaseId: string;
   sourceType: string;
   indexingStatus: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'INDEXED' | 'FAILED'; 
+  progress?: number | null;
+  lastError?: string | null;
+  chunkCount?: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type SourceEvent = SharedSourceEvent;
+
+export async function listKnowledgeBaseEvents(
+  knowledgeBaseId: string,
+  options: { since?: string; sourceId?: string } = {},
+): Promise<SourceEvent[]> {
+  const workspaceId = getCurrentWorkspaceId();
+  if (!workspaceId) return [];
+  const headers = await getAuthHeaders(workspaceId);
+  const params = new URLSearchParams();
+  if (options.since) params.set('since', options.since);
+  if (options.sourceId) params.set('sourceId', options.sourceId);
+  const query = params.toString();
+  const response = await fetch(
+    `${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/events${query ? `?${query}` : ''}`,
+    { headers },
+  );
+  if (!response.ok) throw new Error(`Failed to list knowledge-base events (${response.status})`);
+  return response.json();
+}
+
+export function knowledgeBaseEventsStreamUrl(knowledgeBaseId: string): string {
+  const workspaceId = getCurrentWorkspaceId();
+  const query = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
+  return `${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/events/stream${query}`;
+}
+
+export async function retryKnowledgeBaseSource(
+  knowledgeBaseId: string,
+  sourceId: string,
+): Promise<boolean> {
+  const workspaceId = getCurrentWorkspaceId();
+  if (!workspaceId) return false;
+  const response = await fetch(
+    `${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}/sources/${sourceId}/index`,
+    { method: 'POST', headers: await getAuthHeaders(workspaceId) },
+  );
+  return response.ok;
 }
 
 // Wrapper around getActiveWorkspaceId for better logging

@@ -43,6 +43,11 @@ export interface UploadFilePayload {
   folderId?: string;
 }
 
+export interface UploadProgressItem {
+  name: string;
+  status: 'uploading' | 'queued' | 'error';
+}
+
 export interface UrlImportPayload {
   urls: string[];
   refreshRate: string;
@@ -154,6 +159,7 @@ interface AddDataSourceDrawerProps {
   onOpenChange: (v: boolean) => void;
   folders?: { id: string; name: string }[];
   onUploadFiles?: (payload: UploadFilePayload) => void | Promise<void>;
+  progressItems?: UploadProgressItem[];
   onImportUrls?: (payload: UrlImportPayload) => void | Promise<void>;
   onImportSitemap?: (payload: SitemapImportPayload) => void | Promise<void>;
   onImportPlainText?: (payload: PlainTextPayload) => void | Promise<void>;
@@ -271,6 +277,7 @@ export function AddDataSourceDrawer({
   onOpenChange,
   folders = [],
   onUploadFiles,
+  progressItems,
   onImportUrls,
   onImportSitemap,
   onImportPlainText,
@@ -578,7 +585,11 @@ export function AddDataSourceDrawer({
                               <X className="h-4 w-4" />
                             </button>
                           </div>
-                          {uploadSubmitting ? (
+                          {progressItems ? (
+                            <div className="text-xs text-slate-500">
+                              {progressItems.find((item) => item.name === file.name)?.status || 'queued'}
+                            </div>
+                          ) : uploadSubmitting ? (
                             <div className="space-y-1">
                               <Progress value={progress} className="h-1.5 rounded-full bg-slate-100" />
                               <div className="flex items-center justify-between text-[11px] text-slate-500">

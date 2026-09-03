@@ -18,6 +18,7 @@ import {
 import { randomUUID } from 'crypto';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import { SourceEventsService } from './source-events.service';
 // Don't directly import pdf-parse to allow for dynamic loading
 // We'll check if it's available and install it if needed
 
@@ -33,6 +34,7 @@ export class IndexingProcessor {
     private readonly strategyChunkingService: StrategyChunkingService,
     private readonly embeddingService: EmbeddingService,
     private readonly vectorDbService: VectorDbService,
+    private readonly sourceEvents: SourceEventsService,
     @InjectQueue(QUEUE_NAMES.INDEXING) private readonly indexingQueue: Queue
   ) {
     // Store queue in global for access from other methods
@@ -49,6 +51,8 @@ export class IndexingProcessor {
       `Processing index job ${job.id} for source: ${job.data.knowledgeBaseSourceId} in workspace: ${job.data.workspaceId}`
     );
     
+    let eventSource: { id: string; knowledgeBaseId: string; workspaceId: string } | null = null;
+    let failureContext = 'source';
     try {
       // 1. Get the source from the database
       // @ts-ignore - PrismaClient models are not properly typed
@@ -66,12 +70,12 @@ export class IndexingProcessor {
 
       const sourceType = (source as any).sourceType || 'file';
       const isUrlSource = sourceType === 'url' || sourceType === 'sitemap';
-
-      // Update status to PROCESSING
-      await this.prisma.knowledgeBaseSource.update({
-        where: { id: source.id },
-        data: { indexingStatus: 'PROCESSING' }
-      });
+      failureContext = sourceType;
+      eventSource = {
+        id: source.id,
+        knowledgeBaseId: source.knowledgeBaseId,
+        workspaceId: source.workspaceId,
+      };
 
       // Text extraction differs by source type: files are downloaded from
       // storage, while url/sitemap sources are fetched over HTTP and stripped
@@ -81,6 +85,7 @@ export class IndexingProcessor {
       let filePointer: string | null;
       let textContent = '';
 
+      await this.sourceEvents.emit(eventSource, 'DOWNLOADING', isUrlSource ? 'Downloading source URL' : 'Downloading source file');
       if (isUrlSource) {
         const url = (source as any).sourceUrl;
         if (!url) {
@@ -89,15 +94,13 @@ export class IndexingProcessor {
         sourceName = (source as any).title || url;
         filePointer = null;
         mimeType = 'text/html';
+        failureContext = `${sourceType} (${mimeType})`;
         this.logger.debug(`Fetching URL source: ${url}`);
         try {
+          await this.sourceEvents.emit(eventSource, 'EXTRACTING', `Extracting ${sourceName} (${mimeType})`);
           textContent = await this.fetchAndExtractUrl(url);
         } catch (error) {
           this.logger.error(`URL fetch/extract failed for "${url}": ${error.message}`);
-          await this.prisma.knowledgeBaseSource.update({
-            where: { id: source.id },
-            data: { indexingStatus: 'FAILED' },
-          });
           throw error;
         }
       } else {
@@ -106,6 +109,7 @@ export class IndexingProcessor {
         }
         this.logger.debug(`Found source with file: ${source.file.name}`);
         mimeType = source.file.mimeType;
+        failureContext = `${sourceType} (${mimeType || 'unknown mime type'})`;
         sourceName = source.file.name || '';
         filePointer = source.sourcePointer;
 
@@ -124,6 +128,7 @@ export class IndexingProcessor {
         this.logger.debug(`Downloaded file content, size: ${fileContent.length} bytes`);
 
         try {
+          await this.sourceEvents.emit(eventSource, 'EXTRACTING', `Extracting ${sourceName} (${mimeType})`);
           textContent = await this.extractTextFromFile(
             Buffer.from(fileContent),
             mimeType,
@@ -132,10 +137,6 @@ export class IndexingProcessor {
           );
         } catch (error) {
           this.logger.error(`Text extraction failed for "${sourceName}" (${mimeType}): ${error.message}`);
-          await this.prisma.knowledgeBaseSource.update({
-            where: { id: source.id },
-            data: { indexingStatus: 'FAILED' },
-          });
           throw error;
         }
       }
@@ -147,6 +148,10 @@ export class IndexingProcessor {
       // 4. Split text into chunks using the configured strategy pipeline
       const chunkConfig = job.data.chunkConfig || (source as any).chunkConfig || {};
       this.logger.debug(`Chunking with config: ${JSON.stringify(chunkConfig)}`);
+      const strategies = Array.isArray((chunkConfig as any).strategies)
+        ? (chunkConfig as any).strategies.join(', ')
+        : 'default';
+      await this.sourceEvents.emit(eventSource, 'CHUNKING', `Chunking source with strategies: ${strategies}`);
       const chunkResults = await this.strategyChunkingService.chunk(textContent, mimeType, chunkConfig);
       const chunks = chunkResults.map((c) => c.text);
       this.logger.debug(`Split text into ${chunks.length} chunks`);
@@ -189,11 +194,16 @@ export class IndexingProcessor {
             where: { id: s.id },
             data: { indexingStatus: 'PENDING', hasIndexedContent: false },
           });
-          await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
+          const reindexJob = await this.indexingQueue.add(JOB_NAMES.INDEX_FILE_SOURCE, {
             knowledgeBaseSourceId: s.id,
             workspaceId: s.workspaceId,
             chunkConfig: (s as any).chunkConfig || undefined,
           });
+          await this.sourceEvents.emit(
+            s,
+            'QUEUED',
+            `Queued for indexing (job ${reindexJob.id})`,
+          );
         }
       }
       
@@ -213,10 +223,29 @@ export class IndexingProcessor {
       }
       
       // 6. Generate embeddings for each chunk using the KB's model
-      const embeddings = await this.embeddingService.embedDocuments(
-        chunks.map(chunk => ({ text: chunk })),
-        { model: embeddingModel },
+      const embeddings: number[][] = [];
+      const EMBEDDING_BATCH_SIZE = 25;
+      await this.sourceEvents.emit(
+        eventSource,
+        'EMBEDDING',
+        `Embedding 0/${chunks.length} chunks (${embeddingModel || 'default'})`,
+        { progress: 0 },
       );
+      for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH_SIZE) {
+        const batch = chunks.slice(i, i + EMBEDDING_BATCH_SIZE);
+        const batchEmbeddings = await this.embeddingService.embedDocuments(
+          batch.map(chunk => ({ text: chunk })),
+          { model: embeddingModel },
+        );
+        embeddings.push(...batchEmbeddings);
+        const embedded = Math.min(i + batch.length, chunks.length);
+        await this.sourceEvents.emit(
+          eventSource,
+          'EMBEDDING',
+          `Embedded ${embedded}/${chunks.length} chunks (${embeddingModel || 'default'})`,
+          { progress: chunks.length ? Math.round((embedded / chunks.length) * 100) : 100 },
+        );
+      }
       this.logger.debug(`Generated ${embeddings.length} embeddings (model: ${embeddingModel || 'default'}, dim: ${embeddingDimension})`);
       
       // Log sample embedding data
@@ -248,6 +277,7 @@ export class IndexingProcessor {
         };
       });
       
+      await this.sourceEvents.emit(eventSource, 'UPSERTING', `Upserting ${points.length} vectors`);
       await this.vectorDbService.upsert(collectionName, { points, dimension: embeddingDimension } as any);
       this.logger.debug(`Stored ${points.length} vector points in collection ${collectionName}`);
       
@@ -426,10 +456,19 @@ export class IndexingProcessor {
         await this.prisma.knowledgeBaseSource.update({
           where: { id: source.id },
           data: { 
-            indexingStatus: chunkCount > 0 ? 'COMPLETED' : 'FAILED',
             hasIndexedContent: chunkCount > 0
           }
         });
+        if (chunkCount > 0) {
+          await this.sourceEvents.emit(
+            eventSource,
+            'COMPLETED',
+            `Indexing completed with ${chunkCount} chunks`,
+            { progress: 100, meta: { chunkCount } },
+          );
+        } else {
+          throw new Error('No chunks were stored for source');
+        }
 
         // Get all sources in this knowledge base to check overall status
         const allSources = await this.prisma.knowledgeBaseSource.findMany({
@@ -468,33 +507,18 @@ export class IndexingProcessor {
       } catch (error) {
         this.logger.error(`Error updating source status: ${error.message}`);
         
-        // Attempt to mark as failed if the previous update failed
-        try {
-          await this.prisma.knowledgeBaseSource.update({
-            where: { id: source.id },
-            data: { 
-              indexingStatus: 'FAILED',
-              hasIndexedContent: false
-            }
-          });
-        } catch (updateError) {
-          this.logger.error(`Failed to mark source as failed: ${updateError.message}`);
-        }
-        
         throw error;
       }
     } catch (error) {
       this.logger.error(`Error processing indexing job ${job.id}: ${error.message}`, error.stack);
       
-      // Update the source status to ERROR
-      try {
-        // @ts-ignore - PrismaClient models are not properly typed
-        await this.prisma.knowledgeBaseSource.update({
-          where: { id: job.data.knowledgeBaseSourceId },
-          data: { indexingStatus: 'ERROR' }
-        });
-      } catch (updateError) {
-        this.logger.error(`Failed to update source status: ${updateError.message}`);
+      if (eventSource) {
+        await this.sourceEvents.emit(
+          eventSource,
+          'FAILED',
+          `${(error as Error).message} [${failureContext}]`,
+          { level: 'error', meta: { sourceType: failureContext } },
+        );
       }
       
       throw error;
@@ -656,6 +680,16 @@ export class IndexingProcessor {
         this.logger.debug(`Deleted chunk metadata for source ${job.data.knowledgeBaseSourceId}`);
       }
       
+      const sourceForEvent = await this.prisma.knowledgeBaseSource.findUnique({
+        where: { id: job.data.knowledgeBaseSourceId },
+        select: { id: true, knowledgeBaseId: true, workspaceId: true },
+      });
+      if (sourceForEvent) {
+        await this.sourceEvents.emit(sourceForEvent, 'DEINDEXED', 'Source deindexed', { progress: 100 });
+      } else {
+        this.logger.debug(`Source ${job.data.knowledgeBaseSourceId} was removed before DEINDEXED event emission`);
+      }
+
       this.logger.debug(`Deindexing job ${job.id} completed successfully`);
       return { 
         success: true, 
