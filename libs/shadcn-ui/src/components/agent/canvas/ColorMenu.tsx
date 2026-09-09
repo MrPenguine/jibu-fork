@@ -164,7 +164,7 @@ export function ColorMenu(props: ColorMenuProps) {
 
   return (
     <div
-      className="absolute bg-white border border-gray-200 rounded-md shadow-lg z-50 text-sm select-none"
+      className="absolute bg-card border border-border rounded-md shadow-lg z-50 text-sm select-none"
       style={{ left: x, top: y, minWidth: 220 }}
       ref={colorMenuRef}
     >
@@ -181,7 +181,7 @@ export function ColorMenu(props: ColorMenuProps) {
             }}
           />
           <button
-            className="w-6 h-6 rounded-full border text-slate-700 flex items-center justify-center"
+            className="w-6 h-6 rounded-full border text-gray-700 flex items-center justify-center"
             title="Apply color"
             onClick={() => {
               const c = hslToHex(hue, 0.9, 0.5);
@@ -218,7 +218,7 @@ export function ColorMenu(props: ColorMenuProps) {
           </button>
         </div>
         {/* no extra styles needed for custom slider */}
-        <div className="text-xs text-slate-500 mt-1">Color themes</div>
+        <div className="text-xs text-muted-foreground mt-1">Color themes</div>
         <div className="flex items-center gap-3">
           {swatches.map((c) => (
             <button
@@ -258,7 +258,7 @@ export function ColorMenu(props: ColorMenuProps) {
             >
               <span className="w-6 h-6 rounded-full border inline-block" style={{ backgroundColor: c }} />
               {selectedSwatch === c ? (
-                <span className="absolute -inset-1 rounded-full ring-2 ring-slate-700 pointer-events-none" />
+                <span className="absolute -inset-1 rounded-full ring-2 ring-gray-700 pointer-events-none" />
               ) : null}
             </button>
           ))}

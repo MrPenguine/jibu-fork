@@ -477,7 +477,7 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
   // If showing chat list view, render the chat list component
   if (isChatListView) {
     return (
-      <div className="fixed bottom-5 right-5 w-96 h-[500px] z-50 flex flex-col bg-background rounded-lg shadow-lg">
+      <div className="fixed bottom-5 right-5 w-96 h-[500px] z-50 flex flex-col bg-background rounded-lg shadow-sm">
         <div className="flex items-center justify-between p-3 border-b">
           <div className="flex items-center">
             <FaRobot className="mr-2" size={16} />
@@ -578,7 +578,7 @@ export function AssistantChat({ assistantId, assistantName, knowledgeBaseId, cha
   }
 
   return (
-    <div className="fixed bottom-5 right-5 w-96 h-[70vh] z-50 bg-white rounded-lg shadow-lg flex flex-col">
+    <div className="fixed bottom-5 right-5 w-96 h-[70vh] z-50 bg-card rounded-lg shadow-sm flex flex-col">
       {/* Chat header */}
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center">

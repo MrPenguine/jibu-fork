@@ -42,10 +42,10 @@ export function LiveKitRoomComponent({
 
   if (!token || !serverUrl) {
     return (
-      <div className="flex items-center justify-center h-64 border rounded-md bg-gray-50">
+      <div className="flex items-center justify-center h-64 border rounded-md bg-background">
         <div className="text-center">
           <h3 className="text-lg font-medium">Missing Configuration</h3>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-muted-foreground mt-2">
             LiveKit token and server URL are required
           </p>
         </div>
@@ -184,7 +184,7 @@ function VoiceDetectionControls() {
             value={[threshold]}
             onValueChange={(values: number[]) => setThreshold(values[0])}
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>0</span>
             <span>0.2</span>
           </div>
@@ -200,7 +200,7 @@ function VoiceDetectionControls() {
             value={[debounceTime]}
             onValueChange={(values: number[]) => setDebounceTime(values[0])}
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>100ms</span>
             <span>1000ms</span>
           </div>
@@ -214,15 +214,15 @@ function VoiceDetectionControls() {
             <div
               className={cn(
                 "h-full transition-all duration-100",
-                audioLevel > threshold ? "bg-green-500" : "bg-blue-500"
+                audioLevel > threshold ? "bg-green-500" : "bg-primary"
               )}
               style={{ width: `${Math.min(audioLevel * 100, 100)}%` }}
             />
           </div>
         </div>
         
-        <div className="p-3 bg-gray-50 rounded-md">
-          <p className="text-sm text-gray-600">
+        <div className="p-3 bg-background rounded-md">
+          <p className="text-sm text-muted-foreground">
             <strong>Tips:</strong> Lower threshold values make voice detection more sensitive.
             Higher debounce values reduce flickering but increase detection delay.
           </p>

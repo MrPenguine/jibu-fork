@@ -112,10 +112,10 @@ export function PendingInvitations({ workspaceId, refreshMembers }: PendingInvit
       <CustomCardContent>
         <div className="space-y-4">
           {invitations.map((invite) => (
-            <div key={invite.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+            <div key={invite.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted dark:hover:bg-gray-800">
               <div className="flex items-center gap-4">
-                <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">
-                  <Mail className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <div className="p-2 bg-muted dark:bg-gray-700 rounded-full">
+                  <Mail className="h-5 w-5 text-muted-foreground dark:text-gray-400" />
                 </div>
                 <div>
                   <p className="font-medium">{invite.email}</p>

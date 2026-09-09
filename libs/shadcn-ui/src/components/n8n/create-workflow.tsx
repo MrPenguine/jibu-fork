@@ -121,7 +121,7 @@ export function CreateWorkflow({ onWorkflowCreated }: CreateWorkflowProps) {
                   <p><strong>Status:</strong> {success.active ? 'Active' : 'Inactive'}</p>
                   <p><strong>Nodes:</strong> {success.nodes.length} nodes created</p>
                   {success.webhookUrl && (
-                    <p><strong>Webhook URL:</strong> <code className="text-xs bg-gray-100 px-1 rounded">{success.webhookUrl}</code></p>
+                    <p><strong>Webhook URL:</strong> <code className="text-xs bg-background px-1 rounded">{success.webhookUrl}</code></p>
                   )}
                 </div>
               </div>
@@ -156,7 +156,7 @@ export function CreateWorkflow({ onWorkflowCreated }: CreateWorkflowProps) {
           )}
         </div>
 
-        <div className="text-sm text-gray-600 space-y-1">
+        <div className="text-sm text-muted-foreground space-y-1">
           <p><strong>This workflow will include:</strong></p>
           <ul className="list-disc list-inside space-y-1 ml-2">
             <li>Webhook trigger for incoming requests</li>

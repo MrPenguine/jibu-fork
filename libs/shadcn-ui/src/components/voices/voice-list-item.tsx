@@ -53,7 +53,7 @@ export const VoiceListItem: React.FC<VoiceListItemProps> = ({
   
   return (
     <div 
-      className="flex items-center justify-between p-4 mb-4 rounded-xl transition-all duration-200" 
+      className="flex items-center justify-between p-4 mb-4 rounded-md transition-all duration-200" 
       style={{ 
         width: '100%', 
         margin: '0 0 1rem 0',
@@ -93,7 +93,7 @@ export const VoiceListItem: React.FC<VoiceListItemProps> = ({
               </span>
             )}
             {tags.map((tag, index) => (
-              <span key={index} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+              <span key={index} className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded-full">
                 {tag !== 'generated' ? tag : null}
               </span>
             )).filter(tag => tag !== null)}
@@ -133,7 +133,7 @@ export const VoiceListItem: React.FC<VoiceListItemProps> = ({
             
             {/* Tooltip */}
             {showModelTooltip && (
-              <div className="absolute z-10 p-2 mt-2 bg-white rounded-md shadow-lg text-xs w-48 right-0">
+              <div className="absolute z-10 p-2 mt-2 bg-card rounded-md shadow-lg text-xs w-48 right-0">
                 <div className="font-medium mb-1">Available models:</div>
                 <ul className="list-disc pl-4">
                   {highQualityBaseModelIds.map((model, index) => (
@@ -150,7 +150,7 @@ export const VoiceListItem: React.FC<VoiceListItemProps> = ({
         {/* Three-dot menu button */}
         <button 
           onClick={(e) => { e.stopPropagation(); if (onMenuOpen) onMenuOpen(); }}
-          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100"
+          className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="1"></circle>

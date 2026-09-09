@@ -9,7 +9,7 @@ const CustomCard = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <Card
     ref={ref}
-    className={cn("rounded-xl shadow-sm border-0 bg-slate-50/70 dark:bg-slate-900/40", className)}
+    className={cn("rounded-lg border border-border bg-card shadow-sm", className)}
     {...props}
   />
 ))
@@ -22,7 +22,7 @@ const CustomDangerCard = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <Card
     ref={ref}
-    className={cn("rounded-xl shadow-sm border-0 bg-red-50/70 dark:bg-red-900/20", className)}
+    className={cn("rounded-lg border border-brand-cinnabar/30 bg-red-50 shadow-sm", className)}
     {...props}
   />
 ))

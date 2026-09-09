@@ -86,7 +86,7 @@ export function JoinWorkspaceModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] rounded-xl border-0">
+      <DialogContent className="sm:max-w-[425px] rounded-lg ">
         <DialogHeader>
           <DialogTitle>Join Workspace</DialogTitle>
           <DialogDescription>
@@ -96,7 +96,7 @@ export function JoinWorkspaceModal({
         
         <div className="py-4">
           {error && (
-            <div className="text-sm text-red-500 bg-red-50 p-3 rounded-xl mb-4">
+            <div className="text-sm text-red-500 bg-red-50 p-3 rounded-lg mb-4">
               {error}
             </div>
           )}
@@ -112,7 +112,7 @@ export function JoinWorkspaceModal({
             variant="outline" 
             onClick={handleDecline}
             disabled={isSubmitting}
-            className="rounded-xl border-0"
+            className="rounded-md border-0"
           >
             {isSubmitting ? (
               <>
@@ -127,7 +127,7 @@ export function JoinWorkspaceModal({
             type="button"
             onClick={handleAccept}
             disabled={isSubmitting}
-            className="rounded-xl border-0"
+            className="rounded-md border-0"
           >
             {isSubmitting ? (
               <>

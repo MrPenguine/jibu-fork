@@ -67,7 +67,7 @@ function NavItem({
     <SidebarMenuItem>
       <div className={cn(
         "w-full flex items-center gap-2.5 text-sm px-3 py-2 rounded-lg transition-all duration-150",
-        isActive ? "bg-[#E6F7F0] text-[#009959] font-semibold" : "text-[#3a3f44] hover:bg-gray-100 hover:text-[#009959]"
+        isActive ? "bg-[#E6F7F0] text-[#009959] font-semibold" : "text-[#3a3f44] hover:bg-background hover:text-[#009959]"
       )}>
         <Link href={href} className="w-full flex items-center gap-2">
           {React.cloneElement(icon, {
@@ -153,7 +153,7 @@ export function CustomAppSidebar({
         </div>
         {!isCollapsed && (
           <div className="px-4 py-2 mt-1 mb-2">
-            <div className="p-1 bg-gray-50 rounded-xl">
+            <div className="p-1 bg-background rounded-lg">
               <WorkspaceSwitcher />
             </div>
           </div>

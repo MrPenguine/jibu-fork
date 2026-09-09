@@ -23,14 +23,14 @@ export default function SecretsSettingsPage() {
       <Card className="max-w-2xl">
         <CardContent className="py-10">
           <div className="flex flex-col items-center text-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center">
+            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path d="M12 3a5 5 0 00-5 5v2H6a2 2 0 00-2 2v6a2 2 0 002 2h12a2 2 0 002-2v-6a2 2 0 00-2-2h-1V8a5 5 0 00-5-5zM9 10V8a3 3 0 016 0v2H9z" fill="currentColor" className="text-gray-400"/>
               </svg>
             </div>
             <div className="space-y-1">
               <div className="font-medium">No secrets exist</div>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted-foreground">
                 Add your secrets so your team can start using them.{' '}
                 <Link href="#" className="underline">Learn more</Link>
               </div>

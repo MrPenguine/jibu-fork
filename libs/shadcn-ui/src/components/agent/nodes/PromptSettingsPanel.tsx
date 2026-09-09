@@ -80,14 +80,14 @@ export const PromptSettingsPanel: React.FC<PromptSettingsPanelProps> = ({
   }, []);
 
   return (
-    <div className={"flex flex-col h-full bg-white " + (className || '')}>
+    <div className={"flex flex-col h-full bg-card " + (className || '')}>
       {/* Header */}
       {showHeader && (
         <div className="p-4 border-b flex items-center justify-between">
           <h3 className="text-sm font-medium">Prompt settings</h3>
           {onClose && (
-            <button onClick={onClose} className="rounded-full p-1 hover:bg-slate-100 transition-colors" aria-label="Close panel">
-              <X className="h-5 w-5 text-slate-500" />
+            <button onClick={onClose} className="rounded-full p-1 hover:bg-muted transition-colors" aria-label="Close panel">
+              <X className="h-5 w-5 text-muted-foreground" />
             </button>
           )}
         </div>
@@ -95,7 +95,7 @@ export const PromptSettingsPanel: React.FC<PromptSettingsPanelProps> = ({
 
       {/* Model dropdown */}
       <div className="p-4 border-b">
-        <label className="block text-xs text-slate-500 mb-1">AI model</label>
+        <label className="block text-xs text-muted-foreground mb-1">AI model</label>
         <Select
           value={currentModel?.provider && currentModel?.model ? `${currentModel.provider}::${currentModel.model}` : undefined}
           onValueChange={(v) => {
@@ -122,7 +122,7 @@ export const PromptSettingsPanel: React.FC<PromptSettingsPanelProps> = ({
             <span className="text-sm">{temperature.toFixed(1)}</span>
           </div>
           <div className="relative">
-            <div className="flex items-center justify-between text-xs text-slate-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Deterministic</span>
               <span>Random</span>
             </div>
@@ -133,7 +133,7 @@ export const PromptSettingsPanel: React.FC<PromptSettingsPanelProps> = ({
               step="0.1"
               value={temperature}
               onChange={(e) => setTemperature(parseFloat(e.target.value))}
-              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
             />
           </div>
         </div>
@@ -144,7 +144,7 @@ export const PromptSettingsPanel: React.FC<PromptSettingsPanelProps> = ({
             <span className="text-sm">{maxTokens}</span>
           </div>
           <div className="relative">
-            <div className="flex items-center justify-between text-xs text-slate-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>10</span>
               <span>24000</span>
             </div>
@@ -155,7 +155,7 @@ export const PromptSettingsPanel: React.FC<PromptSettingsPanelProps> = ({
               step="10"
               value={maxTokens}
               onChange={(e) => setMaxTokens(parseInt(e.target.value, 10))}
-              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
             />
           </div>
         </div>

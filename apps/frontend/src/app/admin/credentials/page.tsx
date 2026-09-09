@@ -26,7 +26,7 @@ interface ProviderCredential {
 function StatusBadge({ status }: { status: CredentialStatus }) {
   if (status === "configured") {
     return (
-      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+      <Badge variant="success">
         <CheckCircle2 className="mr-1 h-3 w-3" />
         Configured
       </Badge>
@@ -34,14 +34,14 @@ function StatusBadge({ status }: { status: CredentialStatus }) {
   }
   if (status === "env") {
     return (
-      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+      <Badge variant="warning">
         <CircleDashed className="mr-1 h-3 w-3" />
         Env fallback
       </Badge>
     );
   }
   return (
-    <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-600">
+    <Badge variant="neutral">
       Unset
     </Badge>
   );
@@ -150,8 +150,8 @@ export default function CredentialsPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Platform Credentials</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-foreground">Platform Credentials</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage third-party provider credentials shared across all workspaces.
         </p>
       </div>
@@ -159,36 +159,36 @@ export default function CredentialsPage() {
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[780px]">
-            <thead className="border-b bg-gray-50">
+            <thead className="border-b bg-background">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Provider</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Set or replace</th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Last test</th>
-                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Provider</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Set or replace</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Last test</th>
+                <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y bg-white">
+            <tbody className="divide-y bg-card">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">
                     <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />
                     Loading provider credentials…
                   </td>
                 </tr>
               ) : credentials.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">No providers registered.</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground">No providers registered.</td>
                 </tr>
               ) : (
                 credentials.map((provider) => {
                   const busy = busyProvider === provider.provider;
                   const lastTest = provider.lastTest?.status ? provider.lastTest : null;
                   return (
-                    <tr key={provider.provider} className="hover:bg-gray-50">
+                    <tr key={provider.provider} className="hover:bg-background">
                       <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900">{provider.label}</div>
-                        <div className="text-xs text-gray-500">{provider.provider}</div>
+                        <div className="font-medium text-foreground">{provider.label}</div>
+                        <div className="text-xs text-muted-foreground">{provider.provider}</div>
                       </td>
                       <td className="px-6 py-4"><StatusBadge status={provider.status} /></td>
                       <td className="px-6 py-4">
@@ -206,16 +206,16 @@ export default function CredentialsPage() {
                           </Button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
                         {lastTest ? (
                           <div className="space-y-1">
                             <div className="flex items-center gap-1">
                               {lastTest.status === "ok" ? (
                                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                               ) : lastTest.status === "unsupported" ? (
-                                <Info className="h-4 w-4 text-gray-500" />
+                                <Info className="h-4 w-4 text-muted-foreground" />
                               ) : (
-                                <XCircle className="h-4 w-4 text-red-600" />
+                                <XCircle className="h-4 w-4 text-destructive" />
                               )}
                               <span>{lastTest.message || (lastTest.status === "ok" ? "Passed" : "Failed")}</span>
                             </div>
@@ -226,7 +226,7 @@ export default function CredentialsPage() {
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => void testCredential(provider)} disabled={busy}>Test</Button>
-                          <Button variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => void removeCredential(provider)} disabled={busy || provider.status !== "configured"} aria-label={`Remove ${provider.label} credential`}>
+                          <Button variant="ghost" className="text-destructive hover:text-destructive" onClick={() => void removeCredential(provider)} disabled={busy || provider.status !== "configured"} aria-label={`Remove ${provider.label} credential`}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -240,12 +240,12 @@ export default function CredentialsPage() {
         </div>
       </Card>
 
-      <Card className="border-blue-200 bg-blue-50 p-4">
+      <Card className="border-brand-mint bg-brand-mint p-4">
         <div className="flex gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand-navy" />
           <div>
-            <h2 className="text-sm font-medium text-blue-900">Credentials are write-only</h2>
-            <p className="mt-1 text-sm text-blue-700">
+            <h2 className="text-sm font-medium text-brand-navy">Credentials are write-only</h2>
+            <p className="mt-1 text-sm text-primary">
               Stored values are kept in Vault and can only be replaced or removed. They are never displayed or returned by the API.
             </p>
           </div>

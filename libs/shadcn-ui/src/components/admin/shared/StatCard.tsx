@@ -34,31 +34,31 @@ export function StatCard({
   const getTrendColor = () => {
     if (!trend) return "";
     if (trend.value > 0) return "text-green-600";
-    if (trend.value < 0) return "text-red-600";
-    return "text-gray-600";
+    if (trend.value < 0) return "text-destructive";
+    return "text-muted-foreground";
   };
 
   return (
     <Card className={cn("p-6", className)}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-2">{value}</p>
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-2xl font-bold text-foreground mt-2">{value}</p>
           {trend && (
             <div className={cn("flex items-center gap-1 mt-2 text-xs font-medium", getTrendColor())}>
               {getTrendIcon()}
               <span>{Math.abs(trend.value)}%</span>
-              <span className="text-gray-500">{trend.label}</span>
+              <span className="text-muted-foreground">{trend.label}</span>
             </div>
           )}
         </div>
         <div className={cn(
           "flex items-center justify-center w-12 h-12 rounded-lg",
-          iconClassName || "bg-violet-100"
+          iconClassName || "bg-accent"
         )}>
           <Icon className={cn(
             "h-6 w-6",
-            iconClassName ? "" : "text-violet-600"
+            iconClassName ? "" : "text-primary"
           )} />
         </div>
       </div>

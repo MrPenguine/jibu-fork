@@ -19,7 +19,7 @@ export function KnowledgeBaseTester() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="p-0 w-[380px] sm:w-[420px]">
           <div className="flex h-full flex-col">
-            <div className="p-3 bg-blue-600 text-white rounded-t-lg">
+            <div className="p-3 bg-primary text-white rounded-t-lg">
               <div className="flex items-center justify-between">
                 <SheetTitle className="text-white">Demo agent</SheetTitle>
                 <div className="flex items-center gap-2 opacity-80">
@@ -30,14 +30,14 @@ export function KnowledgeBaseTester() {
             </div>
             <div className="p-4">
               <div className="flex items-center justify-center mb-3">
-                <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">⚙️</div>
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">⚙️</div>
               </div>
               <div className="text-center">
-                <div className="font-semibold text-slate-900">Demo agent</div>
-                <div className="text-xs text-slate-500">Learn the Voiceflow basics</div>
+                <div className="font-semibold text-foreground">Demo agent</div>
+                <div className="text-xs text-muted-foreground">Learn the Voiceflow basics</div>
               </div>
               <div className="mt-4">
-                <div className="rounded-md bg-slate-100 inline-block px-3 py-2 text-sm text-slate-700">Hi, I'm Connor. An AI agent that will demonstrate some key c</div>
+                <div className="rounded-md bg-background inline-block px-3 py-2 text-sm text-gray-700">Hi, I'm Connor. An AI agent that will demonstrate some key c</div>
               </div>
             </div>
             <div className="mt-auto p-4">
@@ -46,7 +46,7 @@ export function KnowledgeBaseTester() {
                 <Input placeholder="Message..." className="flex-1" />
                 <Button className="shrink-0">➤</Button>
               </div>
-              <div className="mt-2 text-[10px] text-slate-400 text-center">Powered by Voiceflow</div>
+              <div className="mt-2 text-[10px] text-gray-400 text-center">Powered by Voiceflow</div>
             </div>
           </div>
         </SheetContent>

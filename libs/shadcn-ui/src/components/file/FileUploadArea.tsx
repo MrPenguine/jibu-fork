@@ -54,7 +54,7 @@ export function FileUploadArea({
           <h2 className="text-sm font-semibold">Files</h2>
         </div>
         {organizationName && (
-          <div className="flex items-center text-xs text-gray-500">
+          <div className="flex items-center text-xs text-muted-foreground">
             <Building2 className="h-3 w-3 mr-1" />
             <span>Uploading to: {organizationName}</span>
           </div>
@@ -62,8 +62,8 @@ export function FileUploadArea({
       </div>
       
       <div
-        className={`border border-dashed border-gray-300 rounded-xl ${compact ? 'p-4' : 'p-8'} flex flex-col items-center justify-center text-center transition-colors ${
-          isDragging ? 'bg-primary/5 border-primary/30' : 'bg-white hover:bg-gray-50'
+        className={`border border-dashed border-border rounded-lg ${compact ? 'p-4' : 'p-8'} flex flex-col items-center justify-center text-center transition-colors ${
+          isDragging ? 'bg-primary/5 border-primary/30' : 'bg-card hover:bg-background'
         }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -74,7 +74,7 @@ export function FileUploadArea({
         </div>
         
         {!compact && (
-          <p className="text-sm text-gray-600 mb-3">
+          <p className="text-sm text-muted-foreground mb-3">
             Drag and drop a file here or browse files
             {organizationName && <span className="block text-xs mt-1">Files will be uploaded to {organizationName}</span>}
           </p>
@@ -84,7 +84,7 @@ export function FileUploadArea({
           <Button
             variant="default"
             size="sm"
-            className="bg-primary hover:bg-primary/90 text-white px-4 py-2 h-auto rounded-xl flex items-center gap-2 shadow-sm"
+            className="bg-primary hover:bg-primary/90 text-white px-4 py-2 h-auto rounded-md flex items-center gap-2 shadow-sm"
             onClick={() => document.getElementById(`file-upload-${organizationId || 'default'}`)?.click()}
           >
             <Upload className="h-4 w-4" />
@@ -94,7 +94,7 @@ export function FileUploadArea({
             <Button
               variant="outline"
               size="sm"
-              className="bg-transparent rounded-xl border-gray-300 hover:bg-gray-50 px-4 py-2 h-auto text-gray-600"
+              className="bg-transparent rounded-md border-border hover:bg-background px-4 py-2 h-auto text-muted-foreground"
             >
               Documentation
             </Button>
@@ -111,13 +111,13 @@ export function FileUploadArea({
       {!compact && (
         <div className="mt-6">
           <h3 className="text-sm font-medium mb-2">Supported file types</h3>
-          <ul className="text-xs text-gray-500 space-y-1 pl-1">
+          <ul className="text-xs text-muted-foreground space-y-1 pl-1">
             <li>• PDF documents (up to 25MB)</li>
             <li>• Word documents (up to 25MB)</li>
             <li>• Text files (up to 10MB)</li>
             <li>• Spreadsheets (up to 25MB)</li>
           </ul>
-          <p className="text-xs text-gray-500 mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             Upload files to provide additional context for your assistants during conversations.
           </p>
         </div>

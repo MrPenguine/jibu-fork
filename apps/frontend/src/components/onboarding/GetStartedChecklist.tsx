@@ -43,7 +43,7 @@ const GetStartedChecklist: React.FC<Props> = ({ status, workspaceId }) => {
   ] as const;
 
   return (
-    <Card className="rounded-xl">
+    <Card className="rounded-lg">
       <CardHeader>
         <CardTitle>Get started</CardTitle>
         <CardDescription>Complete these steps to set up your workspace</CardDescription>
@@ -51,7 +51,7 @@ const GetStartedChecklist: React.FC<Props> = ({ status, workspaceId }) => {
       <CardContent>
         <ul className="space-y-4">
           {items.map((item) => (
-            <li key={item.key} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+            <li key={item.key} className="flex items-center justify-between p-3 bg-background dark:bg-gray-900 rounded-lg">
               <div className="flex items-center gap-3">
                 {item.done ? (
                   <CheckCircle2 className="w-5 h-5 text-green-500" />

@@ -32,8 +32,8 @@ export default function LogsPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">System Logs & Monitoring</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">System Logs & Monitoring</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Review platform administrator actions and safe request details.
         </p>
       </div>
@@ -59,34 +59,34 @@ export default function LogsPage() {
 
       <Card>
         {error ? (
-          <div className="p-12 text-center text-sm text-red-600">{error}</div>
+          <div className="p-12 text-center text-sm text-destructive">{error}</div>
         ) : loading ? (
-          <div className="p-12 text-center text-sm text-gray-500">Loading audit logs…</div>
+          <div className="p-12 text-center text-sm text-muted-foreground">Loading audit logs…</div>
         ) : !data?.items?.length ? (
-          <div className="p-12 text-center text-sm text-gray-500">No audit log entries match these filters.</div>
+          <div className="p-12 text-center text-sm text-muted-foreground">No audit log entries match these filters.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[850px]">
-              <thead className="border-b bg-gray-50">
+              <thead className="border-b bg-background">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">When</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Administrator</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Action</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Target</th>
-                  <th className="px-4 py-3 text-left text-xs uppercase text-gray-500">Details</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-muted-foreground">When</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-muted-foreground">Administrator</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-muted-foreground">Action</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-muted-foreground">Target</th>
+                  <th className="px-4 py-3 text-left text-xs uppercase text-muted-foreground">Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {data.items.map((item: any) => (
                   <tr key={item.id}>
-                    <td className="px-4 py-3 text-sm text-gray-600">{new Date(item.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm">
                       <div className="font-medium">{item.admin?.fullName || [item.admin?.firstName, item.admin?.lastName].filter(Boolean).join(" ") || "Unknown"}</div>
-                      <div className="text-xs text-gray-500">{item.admin?.email}</div>
+                      <div className="text-xs text-muted-foreground">{item.admin?.email}</div>
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">{item.action}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{item.targetType || "—"} {item.targetId || ""}</td>
-                    <td className="max-w-sm px-4 py-3 text-xs text-gray-600"><pre className="whitespace-pre-wrap">{JSON.stringify(item.details || {})}</pre></td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">{item.targetType || "—"} {item.targetId || ""}</td>
+                    <td className="max-w-sm px-4 py-3 text-xs text-muted-foreground"><pre className="whitespace-pre-wrap">{JSON.stringify(item.details || {})}</pre></td>
                   </tr>
                 ))}
               </tbody>

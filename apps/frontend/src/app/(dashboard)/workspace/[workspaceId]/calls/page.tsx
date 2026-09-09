@@ -89,13 +89,13 @@ export default function CallsPage() {
     <div className="flex h-[calc(100vh-4rem)] w-full flex-col items-center px-4 py-6">
       <div className="w-full max-w-2xl">
         <h1 className="mb-1 text-2xl font-semibold text-[#22262A]">Calls</h1>
-        <p className="mb-6 text-sm text-gray-500">
+        <p className="mb-6 text-sm text-muted-foreground">
           Start a live voice call with one of your agents. Pick an agent and connect — the agent
           answers in the room with its configured voice, model and tools.
         </p>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -147,7 +147,7 @@ export default function CallsPage() {
             video={false}
             onDisconnected={handleEnd}
             data-lk-theme="default"
-            className="rounded-xl border border-gray-200 bg-white"
+            className="rounded-md border border-border bg-card"
           >
             <RoomAudioRenderer />
             <CallStage agentName={selectedAgent?.name || session.agent?.name || "Agent"} onEnd={handleEnd} />
@@ -209,7 +209,7 @@ function CallStage({ agentName, onEnd }: { agentName: string; onEnd: () => void 
     <div className="flex flex-col gap-4 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-sm text-gray-500">In call with</div>
+          <div className="text-sm text-muted-foreground">In call with</div>
           <div className="text-lg font-semibold text-[#22262A]">{agentName}</div>
         </div>
         <span className="rounded-full bg-[#E6F7F0] px-3 py-1 text-xs font-medium capitalize text-[#009959]">
@@ -217,7 +217,7 @@ function CallStage({ agentName, onEnd }: { agentName: string; onEnd: () => void 
         </span>
       </div>
 
-      <div className="flex h-28 items-center justify-center rounded-lg bg-gray-50">
+      <div className="flex h-28 items-center justify-center rounded-lg bg-background">
         <BarVisualizer
           state={state}
           barCount={7}
@@ -229,7 +229,7 @@ function CallStage({ agentName, onEnd }: { agentName: string; onEnd: () => void 
 
       <div
         ref={scrollRef}
-        className="h-56 space-y-2 overflow-y-auto rounded-lg border border-gray-100 bg-white p-3"
+        className="h-56 space-y-2 overflow-y-auto rounded-lg border border-gray-100 bg-card p-3"
       >
         {lines.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-gray-400">
@@ -243,7 +243,7 @@ function CallStage({ agentName, onEnd }: { agentName: string; onEnd: () => void 
                   "inline-block max-w-[80%] rounded-lg px-3 py-1.5 text-sm " +
                   (l.speaker === "you"
                     ? "bg-[#009959] text-white"
-                    : "bg-gray-100 text-[#22262A]")
+                    : "bg-background text-[#22262A]")
                 }
               >
                 {l.text}
@@ -258,7 +258,7 @@ function CallStage({ agentName, onEnd }: { agentName: string; onEnd: () => void 
           {micOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
           {micOn ? "Mute" : "Unmute"}
         </Button>
-        <Button onClick={onEnd} className="gap-2 bg-red-600 hover:bg-red-700">
+        <Button onClick={onEnd} className="gap-2 bg-destructive hover:bg-red-700">
           <PhoneOff className="h-4 w-4" /> End call
         </Button>
       </div>

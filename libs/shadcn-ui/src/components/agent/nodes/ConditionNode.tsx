@@ -24,13 +24,13 @@ export const ConditionNode = memo(({ id, data, selected }: NodeProps) => {
           id: 'in',
           type: 'target',
           position: Position.Left,
-          className: 'w-2 h-2 bg-yellow-500 invisible',
+          className: 'w-2 h-2 bg-brand-saffron invisible',
         },
         {
           id: 'false',
           type: 'source',
           position: Position.Right,
-          className: 'w-2 h-2 bg-red-500 top-[60%] right-0 translate-x-1/2',
+          className: 'w-2 h-2 bg-destructive top-[60%] right-0 translate-x-1/2',
         },
         {
           id: 'true',

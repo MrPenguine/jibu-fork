@@ -224,16 +224,16 @@ export default function BehaviourSettingsPage() {
 
       {/* Behaviour Tabs: only General active for now */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mb-4">
-        <TabsList className="bg-gray-100">
-          <TabsTrigger value="general" className="data-[state=active]:bg-white data-[state=active]:shadow">General</TabsTrigger>
-          <TabsTrigger value="chat" className="data-[state=active]:bg-white data-[state=active]:shadow">Chat</TabsTrigger>
-          <TabsTrigger value="voice" className="data-[state=active]:bg-white data-[state=active]:shadow">Voice</TabsTrigger>
+        <TabsList className="bg-background">
+          <TabsTrigger value="general" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">General</TabsTrigger>
+          <TabsTrigger value="chat" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">Chat</TabsTrigger>
+          <TabsTrigger value="voice" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">Voice</TabsTrigger>
         </TabsList>
       </Tabs>
       {activeTab === "general" && (
       <div className="max-w-3xl space-y-3">
       {/* Global no match */}
-      <Card className="mb-3 border-gray-200 shadow-sm">
+      <Card className="mb-3 border-border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between py-4">
           <div>
             <CardTitle>Global no match</CardTitle>
@@ -244,7 +244,7 @@ export default function BehaviourSettingsPage() {
       </Card>
 
       {/* Global no reply */}
-      <Card className="mb-3 border-gray-200 shadow-sm">
+      <Card className="mb-3 border-border shadow-sm">
         <CardHeader className="py-4">
           <CardTitle>Global no reply</CardTitle>
           <CardDescription>How to respond if the user says nothing for 10s.</CardDescription>
@@ -261,7 +261,7 @@ export default function BehaviourSettingsPage() {
       </Card>
 
       {/* Max turns saved to memory */}
-      <Card className="mb-3 border-gray-200 shadow-sm">
+      <Card className="mb-3 border-border shadow-sm">
         <CardHeader className="py-4">
           <CardTitle>Max. number of turns saved to memory</CardTitle>
           <CardDescription>
@@ -272,7 +272,7 @@ export default function BehaviourSettingsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span>{settings.maxTurns} turns</span>
-              <span className="inline-flex items-center justify-center h-7 px-2 rounded-md bg-gray-100 text-gray-700 font-medium">{settings.maxTurns}</span>
+              <span className="inline-flex items-center justify-center h-7 px-2 rounded-md bg-muted text-gray-700 font-medium">{settings.maxTurns}</span>
             </div>
             <Slider
               value={[settings.maxTurns]}
@@ -290,7 +290,7 @@ export default function BehaviourSettingsPage() {
       </Card>
 
       {/* LLM model fallback */}
-      <Card className="border-gray-200 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="py-4">
           <CardTitle>LLM model fallback</CardTitle>
           <CardDescription>Automatically switch to a different language model provider during outages.</CardDescription>
@@ -332,7 +332,7 @@ export default function BehaviourSettingsPage() {
 
       {activeTab === "chat" && (
         <div className="max-w-md">
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Message delay</CardTitle>
               <CardDescription>The default time delay (ms) between your agent's responses.</CardDescription>
@@ -360,7 +360,7 @@ export default function BehaviourSettingsPage() {
       {activeTab === "voice" && (
         <div className="max-w-3xl space-y-3">
           {/* Voice output */}
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Voice output</CardTitle>
             </CardHeader>
@@ -399,7 +399,7 @@ export default function BehaviourSettingsPage() {
                 <div className="flex items-center gap-2">
                   {settings.elevenLabsApiKey ? (
                     <>
-                      <span className="rounded-md bg-emerald-50 text-emerald-700 text-xs px-2 py-1">Connected</span>
+                      <span className="rounded-md bg-green-50 text-green-700 text-xs px-2 py-1">Connected</span>
                       <Button variant="secondary" size="sm" onClick={() => { setApiKeyDraft(settings.elevenLabsApiKey); setConnectVoiceOpen(true); }}>Manage</Button>
                     </>
                   ) : (
@@ -422,7 +422,7 @@ export default function BehaviourSettingsPage() {
           </Card>
 
           {/* Background & audio cue */}
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Background audio</CardTitle>
             </CardHeader>
@@ -459,7 +459,7 @@ export default function BehaviourSettingsPage() {
           </Card>
 
           {/* Sliders */}
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Talking speed</CardTitle>
               <CardDescription>Adjusts the speed of the voice as it talks to the user.</CardDescription>
@@ -475,7 +475,7 @@ export default function BehaviourSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Stability</CardTitle>
               <CardDescription>Higher stability is more consistent but may sound monotone.</CardDescription>
@@ -489,7 +489,7 @@ export default function BehaviourSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Similarity boost</CardTitle>
               <CardDescription>How closely the AI should adhere to the original voice when replicating it.</CardDescription>
@@ -504,7 +504,7 @@ export default function BehaviourSettingsPage() {
           </Card>
 
           {/* Voice input */}
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Voice input</CardTitle>
             </CardHeader>
@@ -549,7 +549,7 @@ export default function BehaviourSettingsPage() {
           </Card>
 
           {/* Recognition settings */}
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Recognition accuracy vs. response speed</CardTitle>
               <CardDescription>Adjust the balance or fine-tune advanced timings.</CardDescription>
@@ -609,7 +609,7 @@ export default function BehaviourSettingsPage() {
           </Card>
 
           {/* Webhook */}
-          <Card className="border-gray-200 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardHeader className="py-4">
               <CardTitle>Call events webhook</CardTitle>
             </CardHeader>
@@ -676,7 +676,7 @@ export default function BehaviourSettingsPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm">Max tokens</Label>
-                  <span className="inline-flex items-center justify-center h-6 px-2 rounded-md bg-gray-100 text-gray-700 text-xs font-medium">{settings.genMaxTokens ?? DEFAULTS.genMaxTokens}</span>
+                  <span className="inline-flex items-center justify-center h-6 px-2 rounded-md bg-muted text-gray-700 text-xs font-medium">{settings.genMaxTokens ?? DEFAULTS.genMaxTokens}</span>
                 </div>
                 <Slider value={[settings.genMaxTokens ?? DEFAULTS.genMaxTokens]} min={10} max={24000} step={10} onValueChange={([v]) => persist({ ...settings, genMaxTokens: v })} />
                 <div className="flex items-center justify-between text-xs text-muted-foreground">

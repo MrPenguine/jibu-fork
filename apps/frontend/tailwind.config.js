@@ -26,6 +26,29 @@ module.exports = {
   theme: {
   	extend: {
   		colors: {
+  			brand: {
+  				green: '#009959',
+  				navy: '#222e50',
+  				seasalt: '#f9f9f9',
+  				charcoal: '#22262a',
+  				mint: '#cbf2f0',
+  				saffron: '#f9c22e',
+  				palatinate: '#491344',
+  				cinnabar: '#f2542d',
+  				imperial: '#f71735'
+  			},
+  			green: {
+  				50: '#eaf7f1',
+  				100: '#d0eede',
+  				200: '#a3ddbf',
+  				300: '#6cc79c',
+  				400: '#33b077',
+  				500: '#009959',
+  				600: '#00804a',
+  				700: '#00663b',
+  				800: '#004d2d',
+  				900: '#00331e'
+  			},
   			border: 'var(--border)',
   			input: 'var(--input)',
   			ring: 'var(--ring)',
@@ -78,15 +101,20 @@ module.exports = {
   			}
   		},
   		borderRadius: {
-  			lg: '`var(--radius)`',
-  			md: '`calc(var(--radius) - 2px)`',
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		fontFamily: {
   			sans: [
   				'var(--font-sans)',
                     ...fontFamily.sans
-                ]
+                ],
+  			display: [
+  				'var(--font-display)',
+  				'var(--font-sans)',
+  				...fontFamily.sans
+  			]
   		},
   		keyframes: {
   			'accordion-down': {

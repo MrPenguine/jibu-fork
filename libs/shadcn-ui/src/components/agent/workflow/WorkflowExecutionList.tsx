@@ -37,29 +37,29 @@ export function WorkflowExecutionList({ agentId, filters = {} }: WorkflowExecuti
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-500" />;
       case 'running':
-        return <Clock className="h-4 w-4 text-blue-500" />;
+        return <Clock className="h-4 w-4 text-brand-navy" />;
       default:
-        return <AlertCircle className="h-4 w-4 text-gray-500" />;
+        return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Completed</Badge>;
+        return <Badge variant="success">Completed</Badge>;
       case 'failed':
-        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Failed</Badge>;
+        return <Badge variant="danger">Failed</Badge>;
       case 'running':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Running</Badge>;
+        return <Badge variant="info">Running</Badge>;
       default:
-        return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Pending</Badge>;
+        return <Badge variant="neutral">Pending</Badge>;
     }
   };
 
   if (loading && executions.length === 0) {
     return (
       <div className="flex justify-center items-center p-8">
-        <Spinner className="text-blue-500 h-8 w-8" />
+        <Spinner className="text-primary h-8 w-8" />
         <span className="ml-2">Loading executions...</span>
       </div>
     );
@@ -67,7 +67,7 @@ export function WorkflowExecutionList({ agentId, filters = {} }: WorkflowExecuti
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-md p-4 text-destructive">
         <p>Failed to load executions. Please try again.</p>
       </div>
     );
@@ -78,7 +78,7 @@ export function WorkflowExecutionList({ agentId, filters = {} }: WorkflowExecuti
       <div className="text-center p-8 border border-dashed rounded-md">
         <AlertCircle className="h-10 w-10 text-gray-400 mx-auto mb-2" />
         <h3 className="text-lg font-medium">No executions found</h3>
-        <p className="text-gray-500">No workflow executions match your current filters.</p>
+        <p className="text-muted-foreground">No workflow executions match your current filters.</p>
       </div>
     );
   }
@@ -111,7 +111,7 @@ export function WorkflowExecutionList({ agentId, filters = {} }: WorkflowExecuti
                 >
                   {execution.workflowName}
                 </Link>
-                <div className="text-xs text-gray-500">ID: {execution.id.substring(0, 8)}...</div>
+                <div className="text-xs text-muted-foreground">ID: {execution.id.substring(0, 8)}...</div>
               </div>
             </TableCell>
             <TableCell>

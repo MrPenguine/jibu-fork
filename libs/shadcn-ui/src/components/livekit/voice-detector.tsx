@@ -205,12 +205,12 @@ export function VoiceDetector({
       
       {/* Audio level meter */}
       <div className="w-full mt-2">
-        <div className="text-xs text-gray-500 mb-1">Audio Level: {Math.round(audioLevel * 100)}%</div>
+        <div className="text-xs text-muted-foreground mb-1">Audio Level: {Math.round(audioLevel * 100)}%</div>
         <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
           <div 
             className={cn(
               "h-full rounded-full transition-all duration-100",
-              isTalking ? "bg-green-500" : "bg-blue-500"
+              isTalking ? "bg-green-500" : "bg-primary"
             )}
             style={{ width: `${Math.min(audioLevel * 100, 100)}%` }}
           />
@@ -222,11 +222,11 @@ export function VoiceDetector({
         <>
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-blue-500 transition-all duration-100"
+              className="h-full bg-primary transition-all duration-100"
               style={{ width: `${audioLevel * 100}%` }}
             />
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-red-300"
               style={{ width: `${threshold * 100}%` }}
@@ -234,7 +234,7 @@ export function VoiceDetector({
           </div>
         </>
       ) : (
-        <div className="text-xs text-gray-500 italic">
+        <div className="text-xs text-muted-foreground italic">
           Connect to a LiveKit room to use voice detection
         </div>
       )}

@@ -44,11 +44,11 @@ export function FileList({ files, selectedFileId, onSelectFile, organizationId }
   if (!filteredFiles || filteredFiles.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
-        <div className="bg-gray-100 rounded-full p-3 mb-2">
+        <div className="bg-muted rounded-full p-3 mb-2">
           <FolderClosed className="h-6 w-6 text-gray-400" />
         </div>
-        <h3 className="text-sm font-medium text-gray-600">No files found</h3>
-        <p className="text-xs text-gray-500 mt-1">
+        <h3 className="text-sm font-medium text-muted-foreground">No files found</h3>
+        <p className="text-xs text-muted-foreground mt-1">
           Upload files to this organization to get started
         </p>
       </div>
@@ -61,7 +61,7 @@ export function FileList({ files, selectedFileId, onSelectFile, organizationId }
       return <FileText className="h-5 w-5 text-primary" />
     }
     if (fileType.toLowerCase().includes('word') || fileType.toLowerCase().includes('doc')) {
-      return <File className="h-5 w-5 text-blue-500" />
+      return <File className="h-5 w-5 text-primary" />
     }
     if (fileType.toLowerCase().includes('spreadsheet') || fileType.toLowerCase().includes('excel')) {
       return <FileSpreadsheet className="h-5 w-5 text-green-500" />
@@ -79,17 +79,17 @@ export function FileList({ files, selectedFileId, onSelectFile, organizationId }
             className={`flex items-center p-3 rounded-lg cursor-pointer transition-all ${
               selectedFileId === file.id 
                 ? 'bg-primary/10 border-l-2 border-primary' 
-                : 'hover:bg-gray-50 border-l-2 border-transparent'
+                : 'hover:bg-background border-l-2 border-transparent'
             }`}
           >
             <div className={`p-2 rounded-lg mr-3 ${
-              selectedFileId === file.id ? 'bg-primary/20' : 'bg-gray-100'
+              selectedFileId === file.id ? 'bg-primary/20' : 'bg-background'
             }`}>
               {getFileIcon(file.type)}
             </div>
             <div className="overflow-hidden flex-1">
               <p className="text-sm font-medium truncate">{file.name}</p>
-              <p className="text-xs text-gray-500">{file.type}</p>
+              <p className="text-xs text-muted-foreground">{file.type}</p>
             </div>
           </div>
         ))}

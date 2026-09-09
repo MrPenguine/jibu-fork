@@ -299,7 +299,7 @@ export function GoogleSheetsCard() {
 
             <div>
               <Label htmlFor="tool-description">Description</Label>
-              <div className="flex justify-end text-xs text-gray-500 mt-1">
+              <div className="flex justify-end text-xs text-muted-foreground mt-1">
                 <span>{descriptionLength}/1000</span>
               </div>
               <Textarea
@@ -334,7 +334,7 @@ export function GoogleSheetsCard() {
                     placeholder="Enter Spreadsheet ID"
                     className="mt-1"
                   />
-                  <p className="text-xs text-gray-500 mt-1">The ID of the Google Sheet to append data to</p>
+                  <p className="text-xs text-muted-foreground mt-1">The ID of the Google Sheet to append data to</p>
                 </div>
 
                 <div>
@@ -348,7 +348,7 @@ export function GoogleSheetsCard() {
                     placeholder="Enter Range (e.g., Sheet1!A:Z)"
                     className="mt-1"
                   />
-                  <p className="text-xs text-gray-500 mt-1">The range where the data should be appended (e.g., Sheet1, Sheet1!A:Z)</p>
+                  <p className="text-xs text-muted-foreground mt-1">The range where the data should be appended (e.g., Sheet1, Sheet1!A:Z)</p>
                 </div>
               </div>
             </div>
@@ -369,10 +369,10 @@ export function GoogleSheetsCard() {
           </Button>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 mb-4">Configure messages to be spoken during different stages of tool execution</p>
+          <p className="text-sm text-muted-foreground mb-4">Configure messages to be spoken during different stages of tool execution</p>
           
           {messages.length === 0 ? (
-            <div className="border border-dashed border-gray-300 rounded-md p-6 text-center text-gray-500">
+            <div className="border border-dashed border-border rounded-md p-6 text-center text-muted-foreground">
               No messages configured. Click "Add Message" to add your first message.
             </div>
           ) : (
@@ -412,13 +412,13 @@ export function GoogleSheetsCard() {
       </Card>
 
       {!status?.connected && (
-        <Card className="w-full bg-gray-50">
+        <Card className="w-full bg-card">
           <CardContent className="pt-6">
             <div className="py-4 flex flex-col items-center">
               <div className="text-center mb-6">
                 <FileSpreadsheet className="h-12 w-12 text-gray-300 mx-auto mb-2" />
                 <h3 className="text-lg font-medium">Connect to Google Sheets</h3>
-                <p className="text-gray-500 text-sm max-w-md mx-auto">
+                <p className="text-muted-foreground text-sm max-w-md mx-auto">
                   Connect your Google account to use Google Sheets with this tool.
                 </p>
               </div>
@@ -452,7 +452,7 @@ export function GoogleSheetsCard() {
               variant="outline" 
               onClick={testAppendToSheet}
               disabled={loading || !spreadsheetId || !range}
-              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              className="bg-accent border-green-200 text-primary hover:bg-accent"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Table className="h-4 w-4 mr-2" />}
               Test Append

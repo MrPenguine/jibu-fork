@@ -262,7 +262,7 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
       
       {/* Filter panel */}
       <div 
-        className="relative w-[30%] bg-white h-full overflow-y-auto shadow-xl animate-slide-in-right"
+        className="relative w-[30%] bg-card h-full overflow-y-auto shadow-sm animate-slide-in-right"
         style={{ 
           animation: 'slideInRight 0.3s ease-out',
         }}
@@ -273,13 +273,13 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
             <div className="flex gap-2">
               <button 
                 onClick={handleReset}
-                className="px-4 py-2 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                className="px-4 py-2 rounded-full bg-muted text-gray-700 hover:bg-gray-200 transition-colors"
               >
                 Reset
               </button>
               <button 
                 onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -299,7 +299,7 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
                   setLanguage(e.target.value);
                   setAccent(''); // Reset accent when language changes
                 }}
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg appearance-none pr-10"
+                className="w-full p-3 bg-background border border-border rounded-lg appearance-none pr-10"
               >
                 <option value="">Select a language</option>
                 <option value="english">English</option>
@@ -321,7 +321,7 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
               <select 
                 value={accent}
                 onChange={(e) => setAccent(e.target.value)}
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg appearance-none pr-10"
+                className="w-full p-3 bg-background border border-border rounded-lg appearance-none pr-10"
                 disabled={!language} // Disable if no language selected
               >
                 {getAccents().map(acc => (
@@ -342,9 +342,9 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
             <div className="grid grid-cols-3 gap-3">
               <div 
                 onClick={() => handleGenderToggle('female')}
-                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('female') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('female') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
               >
-                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('female') ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('female') ? 'border-primary bg-primary' : 'border-border'}`}>
                   {gender.includes('female') && (
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"></polyline>
@@ -356,9 +356,9 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
               
               <div 
                 onClick={() => handleGenderToggle('male')}
-                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('male') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('male') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
               >
-                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('male') ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('male') ? 'border-primary bg-primary' : 'border-border'}`}>
                   {gender.includes('male') && (
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"></polyline>
@@ -370,9 +370,9 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
               
               <div 
                 onClick={() => handleGenderToggle('neutral')}
-                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('neutral') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('neutral') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
               >
-                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('neutral') ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('neutral') ? 'border-primary bg-primary' : 'border-border'}`}>
                   {gender.includes('neutral') && (
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"></polyline>
@@ -392,9 +392,9 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
                 <div 
                   key={provider}
                   onClick={() => handleProviderToggle(provider)}
-                  className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${providers.includes(provider) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+                  className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${providers.includes(provider) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
                 >
-                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${providers.includes(provider) ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${providers.includes(provider) ? 'border-primary bg-primary' : 'border-border'}`}>
                     {providers.includes(provider) && (
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
@@ -416,9 +416,9 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
                   <div 
                     key={model}
                     onClick={() => handleModelToggle(model)}
-                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${models.includes(model) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${models.includes(model) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
                   >
-                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${models.includes(model) ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${models.includes(model) ? 'border-primary bg-primary' : 'border-border'}`}>
                       {models.includes(model) && (
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12"></polyline>
@@ -433,7 +433,7 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
           )}
           
           {/* Filter Summary */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <div className="mb-6 p-4 bg-background rounded-lg">
             <h3 className="font-medium mb-2">Current Filters:</h3>
             <ul className="space-y-1 text-sm">
               {language && <li>• Language: <span className="font-medium">{language}</span></li>}
@@ -451,7 +451,7 @@ export const SideFilterModal: React.FC<SideFilterModalProps> = ({ isOpen, onClos
                 <li>• Models: <span className="font-medium">{models.join(', ')}</span></li>
               )}
               {!language && !accent && gender.length === 0 && (providers.includes('All') || providers.length === 0) && selectedProvider === 'All' && models.length === 0 && (
-                <li className="text-gray-500">No filters applied</li>
+                <li className="text-muted-foreground">No filters applied</li>
               )}
             </ul>
           </div>

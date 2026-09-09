@@ -32,7 +32,7 @@ export default function CurrentWorkspace() {
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+      <div className="p-4 bg-red-50 border border-red-200 text-destructive rounded-md">
         <p className="font-medium">Error</p>
         <p>{error}</p>
       </div>

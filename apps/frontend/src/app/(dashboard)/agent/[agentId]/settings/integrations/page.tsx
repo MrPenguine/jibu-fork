@@ -103,13 +103,13 @@ export default function IntegrationsSettingsPage() {
           <Card key={item.key} className="overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-md bg-gray-50 flex items-center justify-center overflow-hidden">
+                <div className="h-10 w-10 rounded-md bg-background flex items-center justify-center overflow-hidden">
                   {/* Using img to avoid layout shifts and keep deps minimal */}
                   <img src={item.icon} alt={`${item.name} logo`} className="h-8 w-8 object-contain" />
                 </div>
                 <div>
                   <CardTitle className="text-base">{item.name}</CardTitle>
-                  <Label className="text-xs text-gray-500 font-normal">{item.description}</Label>
+                  <Label className="text-xs text-muted-foreground font-normal">{item.description}</Label>
                 </div>
               </div>
             </CardHeader>

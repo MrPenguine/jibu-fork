@@ -43,26 +43,26 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
   const getLogIcon = (level: string) => {
     switch (level) {
       case 'info':
-        return <Info className="h-4 w-4 text-blue-500" />;
+        return <Info className="h-4 w-4 text-brand-navy" />;
       case 'warn':
         return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       case 'error':
         return <AlertCircle className="h-4 w-4 text-red-500" />;
       default:
-        return <Info className="h-4 w-4 text-gray-500" />;
+        return <Info className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getLogClass = (level: string) => {
     switch (level) {
       case 'info':
-        return 'border-blue-200 bg-blue-50';
+        return 'border-brand-mint bg-brand-mint';
       case 'warn':
         return 'border-yellow-200 bg-yellow-50';
       case 'error':
         return 'border-red-200 bg-red-50';
       default:
-        return 'border-gray-200 bg-gray-50';
+        return 'border-border bg-background';
     }
   };
 
@@ -118,7 +118,7 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
   if (loading && !executionDetails) {
     return (
       <div className="flex justify-center items-center p-8">
-        <Spinner className="text-blue-500 h-8 w-8" />
+        <Spinner className="text-primary h-8 w-8" />
         <span className="ml-2">Loading execution logs...</span>
       </div>
     );
@@ -126,7 +126,7 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-700">
+      <div className="bg-red-50 border border-red-200 rounded-md p-4 text-destructive">
         <p>Failed to load execution logs. Please try again.</p>
       </div>
     );
@@ -137,7 +137,7 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
       <div className="text-center p-8 border border-dashed rounded-md">
         <AlertCircle className="h-10 w-10 text-gray-400 mx-auto mb-2" />
         <h3 className="text-lg font-medium">No logs available</h3>
-        <p className="text-gray-500">This execution does not have any logs.</p>
+        <p className="text-muted-foreground">This execution does not have any logs.</p>
       </div>
     );
   }
@@ -146,7 +146,7 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-grow">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search logs..."
@@ -191,8 +191,8 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
         </div>
       </div>
 
-      <div className="border border-gray-200 rounded-md overflow-hidden">
-        <div className="bg-gray-50 border-b border-gray-200 p-2 text-sm font-medium">
+      <div className="border border-border rounded-md overflow-hidden">
+        <div className="bg-background border-b border-border p-2 text-sm font-medium">
           <div className="grid grid-cols-12 gap-2">
             <div className="col-span-2">Timestamp</div>
             <div className="col-span-1">Level</div>
@@ -203,33 +203,33 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
         
         <div className="overflow-auto max-h-[500px]">
           {filteredLogs.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-muted-foreground">
               No logs match your current filters
             </div>
           ) : (
             filteredLogs.map((log: ExecutionLog, index: number) => (
               <div
                 key={`${log.timestamp}-${index}`}
-                className={`border-b border-gray-200 p-2 text-sm ${getLogClass(log.level)}`}
+                className={`border-b border-border p-2 text-sm ${getLogClass(log.level)}`}
               >
                 <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-2 text-gray-600">
+                  <div className="col-span-2 text-muted-foreground">
                     {format(new Date(log.timestamp), 'HH:mm:ss.SSS')}
                   </div>
                   <div className="col-span-1 flex items-center">
                     {getLogIcon(log.level)}
                   </div>
-                  <div className="col-span-2 text-gray-600 truncate">
+                  <div className="col-span-2 text-muted-foreground truncate">
                     {log.nodeId || 'system'}
                   </div>
                   <div className="col-span-7">
                     <div>{log.message}</div>
                     {log.data && (
                       <details className="mt-1">
-                        <summary className="cursor-pointer text-xs text-gray-500">
+                        <summary className="cursor-pointer text-xs text-muted-foreground">
                           View details
                         </summary>
-                        <pre className="mt-1 p-2 bg-white border border-gray-200 rounded text-xs overflow-auto max-h-40">
+                        <pre className="mt-1 p-2 bg-card border border-border rounded text-xs overflow-auto max-h-40">
                           {JSON.stringify(log.data, null, 2)}
                         </pre>
                       </details>
@@ -243,7 +243,7 @@ export function WorkflowExecutionLogs({ agentId, executionId }: WorkflowExecutio
         </div>
       </div>
       
-      <div className="text-sm text-gray-500 text-right">
+      <div className="text-sm text-muted-foreground text-right">
         Showing {filteredLogs.length} of {executionDetails.logs.length} logs
       </div>
     </div>

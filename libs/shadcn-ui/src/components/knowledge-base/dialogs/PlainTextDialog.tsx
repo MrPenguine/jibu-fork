@@ -81,7 +81,7 @@ export function PlainTextDialog({ open, onOpenChange, onImport }: PlainTextDialo
             </Select>
             <button
               type="button"
-              className="self-start text-sm text-blue-600 hover:underline"
+              className="self-start text-sm text-primary hover:underline"
               onClick={() => {
                 const name = window.prompt("Enter folder name");
                 if (name) console.log("Create folder:", name);

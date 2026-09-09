@@ -117,7 +117,7 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
 
   return (
     <Dialog open={open} onOpenChange={(val) => (!val ? onClose() : null)}>
-      <DialogContent className="max-w-screen-xl w-[90vw] h-[85vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl">
+      <DialogContent className="max-w-screen-xl w-[90vw] h-[85vh] p-0 overflow-hidden rounded-lg  shadow-2xl">
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3">
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -139,14 +139,14 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
 
         <div className="flex h-[calc(85vh-49px)]">
           {/* Left: read-only canvas preview area */}
-          <div className="flex-1 bg-gray-50 flex items-center justify-center relative">
+          <div className="flex-1 bg-background flex items-center justify-center relative">
             {selected ? (
               <div className="w-full h-full">
                 {loadingPreview && (
-                  <div className="absolute top-2 left-2 text-xs text-gray-500">Loading preview…</div>
+                  <div className="absolute top-2 left-2 text-xs text-muted-foreground">Loading preview…</div>
                 )}
                 {previewError && (
-                  <div className="p-4 text-sm text-red-600">{previewError}</div>
+                  <div className="p-4 text-sm text-destructive">{previewError}</div>
                 )}
                 <ReactFlow
                   nodes={previewNodes as any}
@@ -184,7 +184,7 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
           </div>
 
           {/* Right: versions navigation */}
-          <aside className="w-96 h-full overflow-y-auto p-3 bg-gray-50">
+          <aside className="w-96 h-full overflow-y-auto p-3 bg-background">
             <div className="text-sm font-semibold mb-2">{filter === 'live' ? 'Live versions' : 'Draft versions'}</div>
             <div className="space-y-4">
               {Object.keys(grouped).map((label) => {
@@ -195,10 +195,10 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                 const latestTime = latestDate.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
                 return (
                   <div key={label}>
-                    <div className="text-xs text-gray-500 mb-2">{label}</div>
+                    <div className="text-xs text-muted-foreground mb-2">{label}</div>
                     {/* Top card for the day (always visible) */}
                     <button
-                      className={`w-full text-left rounded-xl bg-white shadow-sm hover:shadow transition-shadow ${selected?.id === latest.id ? 'ring-2 ring-indigo-500' : ''}`}
+                      className={`w-full text-left rounded-md bg-card shadow-sm hover:shadow transition-shadow ${selected?.id === latest.id ? 'ring-2 ring-ring' : ''}`}
                       onClick={() => handleSelectVersion(latest)}
                     >
                       <div className="flex items-start justify-between p-3">
@@ -206,21 +206,21 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                           <div className="text-sm font-medium">
                             {latestDate.toLocaleDateString(undefined, { month: "long", day: "numeric" })}, {latestTime}
                           </div>
-                          <div className="text-xs text-gray-500 flex items-center gap-2">
+                          <div className="text-xs text-muted-foreground flex items-center gap-2">
                             <span>{latest.title || "Saved version"}</span>
                             {/* Mark as current version only if it's the first item in the filtered list */}
                             {Object.values(grouped)[0] === list && list.indexOf(latest) === 0 && (
-                              <span className="px-2 py-0.5 text-[10px] rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Current version</span>
+                              <span className="px-2 py-0.5 text-[10px] rounded-full bg-green-50 text-green-700 border border-green-200">Current version</span>
                             )}
                           </div>
                           {latest.author && (
-                            <div className="text-xs text-gray-500 mt-1">{latest.author}</div>
+                            <div className="text-xs text-muted-foreground mt-1">{latest.author}</div>
                           )}
                         </div>
                         <span
                           role="button"
                           tabIndex={0}
-                          className="p-1 text-gray-500 hover:text-gray-700"
+                          className="p-1 text-muted-foreground hover:text-gray-700"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenGroups((s) => ({ ...s, [label]: !s[label] }));
@@ -236,9 +236,9 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                           aria-pressed={openGroups[label]}
                         >
                           {openGroups[label] ? (
-                            <ChevronDown className="w-4 h-4 mt-1 text-gray-500" />
+                            <ChevronDown className="w-4 h-4 mt-1 text-muted-foreground" />
                           ) : (
-                            <ChevronRight className="w-4 h-4 mt-1 text-gray-500" />
+                            <ChevronRight className="w-4 h-4 mt-1 text-muted-foreground" />
                           )}
                         </span>
                       </div>
@@ -253,7 +253,7 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                           return (
                             <button
                               key={v.id}
-                              className={`w-full text-left rounded-xl bg-white shadow-sm hover:shadow transition-shadow ${selected?.id === v.id ? 'ring-2 ring-indigo-500' : ''}`}
+                              className={`w-full text-left rounded-md bg-card shadow-sm hover:shadow transition-shadow ${selected?.id === v.id ? 'ring-2 ring-ring' : ''}`}
                               onClick={() => handleSelectVersion(v)}
                             >
                               <div className="flex items-start justify-between p-3">
@@ -261,12 +261,12 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
                                   <div className="text-sm font-medium">
                                     {d.toLocaleDateString(undefined, { month: "long", day: "numeric" })}, {time}
                                   </div>
-                                  <div className="text-xs text-gray-500 flex items-center gap-2">
+                                  <div className="text-xs text-muted-foreground flex items-center gap-2">
                                     <span>{v.title || "Saved version"}</span>
                                     {/* Never show current version tag for older versions */}
                                   </div>
                                   {v.author && (
-                                    <div className="text-xs text-gray-500 mt-1">{v.author}</div>
+                                    <div className="text-xs text-muted-foreground mt-1">{v.author}</div>
                                   )}
                                 </div>
                               </div>
@@ -282,7 +282,7 @@ export function VersionHistoryModal({ open, onClose, versions, currentVersionId,
 
             <div className="mt-4">
               <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input type="checkbox" className="accent-blue-600" defaultChecked />
+                <input type="checkbox" className="accent-primary" defaultChecked />
                 Highlight changes
               </label>
             </div>

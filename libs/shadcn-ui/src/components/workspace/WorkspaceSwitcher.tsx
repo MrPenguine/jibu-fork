@@ -253,13 +253,13 @@ export function WorkspaceSwitcher() {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton size="lg" className="p-0 bg-[#E6F7F0] rounded-xl">
-            <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-[#009959]/10 text-[#009959]">
+          <SidebarMenuButton size="lg" className="p-0 bg-[#E6F7F0] rounded-md">
+            <div className="flex aspect-square size-12 items-center justify-center rounded-md bg-[#009959]/10 text-[#009959]">
               <Loader2 className="h-5 w-5 animate-spin" />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight max-w-[160px] ml-3">
               <span className="truncate font-semibold">Loading...</span>
-              <span className="truncate text-xs text-gray-500">Please wait</span>
+              <span className="truncate text-xs text-muted-foreground">Please wait</span>
             </div>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -276,14 +276,14 @@ export function WorkspaceSwitcher() {
           <SidebarMenuButton 
             size="lg"
             onClick={handleCreateWorkspace}
-            className="p-0 bg-[#E6F7F0] rounded-xl"
+            className="p-0 bg-[#E6F7F0] rounded-md"
           >
-            <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-[#009959]/10 text-[#009959]">
+            <div className="flex aspect-square size-12 items-center justify-center rounded-lg bg-[#009959]/10 text-[#009959]">
               <Plus className="size-5" />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight max-w-[160px] ml-3">
               <span className="truncate font-semibold">Create Workspace</span>
-              <span className="truncate text-xs text-gray-500">You don't have any workspaces yet</span>
+              <span className="truncate text-xs text-muted-foreground">You don't have any workspaces yet</span>
             </div>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -299,20 +299,20 @@ export function WorkspaceSwitcher() {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
-                className="data-[state=open]:bg-[#E6F7F0] data-[state=open]:text-foreground p-0 bg-[#E6F7F0] rounded-xl"
+                className="data-[state=open]:bg-[#E6F7F0] data-[state=open]:text-foreground p-0 bg-[#E6F7F0] rounded-md"
               >
-                <div className="flex aspect-square size-12 items-center justify-center rounded-xl bg-[#009959]/10 text-[#009959] font-medium">
+                <div className="flex aspect-square size-12 items-center justify-center rounded-lg bg-[#009959]/10 text-[#009959] font-medium">
                   {activeWorkspace.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight max-w-[160px] ml-3">
                   <span className="truncate font-semibold">
                     {activeWorkspace.name}
                   </span>
-                  <span className="truncate text-xs text-gray-500 capitalize">{activeWorkspace.role}</span>
+                  <span className="truncate text-xs text-muted-foreground capitalize">{activeWorkspace.role}</span>
                 </div>
                 <div className="relative ml-auto">
                   {totalPendingCount > 0 && (
-                    <span className="absolute -left-1 -top-3 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white shadow-sm ring-1 ring-white dark:ring-gray-800">
+                    <span className="absolute -left-1 -top-3 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-white shadow-sm ring-1 ring-white dark:ring-gray-800">
                       {totalPendingCount}
                     </span>
                   )}
@@ -321,7 +321,7 @@ export function WorkspaceSwitcher() {
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-[--radix-dropdown-menu-trigger-width] min-w-[240px] rounded-xl bg-gray-50 dark:bg-gray-900"
+              className="w-[--radix-dropdown-menu-trigger-width] min-w-[240px] rounded-md bg-background dark:bg-gray-900"
               align="start"
               side={isMobile ? "bottom" : "right"}
               sideOffset={4}
@@ -334,16 +334,16 @@ export function WorkspaceSwitcher() {
               {activeWorkspace && (
                 <DropdownMenuItem
                   key={`active-${activeWorkspace.id}`}
-                  className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer bg-[#E6F7F0] hover:bg-[#009959]/20 rounded-xl mb-1"
+                  className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer bg-[#E6F7F0] hover:bg-[#009959]/20 rounded-lg mb-1"
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-[#009959]/20 text-[#009959] font-medium">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg border-0 bg-[#009959]/20 text-[#009959] font-medium">
                         {activeWorkspace.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="max-w-[140px]">
                         <p className="text-sm font-medium truncate">{activeWorkspace.name}</p>
-                        <p className="text-xs text-gray-500 capitalize">{activeWorkspace.role}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{activeWorkspace.role}</p>
                       </div>
                     </div>
                     <div className="flex items-center">
@@ -378,16 +378,16 @@ export function WorkspaceSwitcher() {
                           target.classList.remove('opacity-50', 'pointer-events-none');
                         });
                     }}
-                    className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer rounded-lg hover:bg-background dark:hover:bg-gray-800"
                   >
                     <div className="flex items-center justify-between w-full">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl border-0 bg-gray-100 text-[#009959] font-medium">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg border-0 bg-background text-[#009959] font-medium">
                           {ws.name.charAt(0).toUpperCase()}
                         </div>
                         <div className="max-w-[140px]">
                           <p className="text-sm font-medium truncate">{ws.name}</p>
-                          <p className="text-xs text-gray-500 capitalize">{ws.role}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{ws.role}</p>
                         </div>
                       </div>
                       <div className="flex items-center">
@@ -404,7 +404,7 @@ export function WorkspaceSwitcher() {
                   <DropdownMenuLabel className="text-xs text-muted-foreground mb-1 flex items-center">
                     <Bell className="h-3 w-3 mr-1 text-red-500" /> PENDING INVITATIONS
                     {totalPendingCount > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[10px] font-medium dark:bg-red-900/30 dark:text-red-400">
+                      <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-100 text-destructive text-[10px] font-medium dark:bg-red-900/30 dark:text-red-400">
                         {totalPendingCount}
                       </span>
                     )}
@@ -416,7 +416,7 @@ export function WorkspaceSwitcher() {
                     .map((item) => (
                       <DropdownMenuItem
                         key={item.id}
-                        className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl mb-1"
+                        className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-background dark:hover:bg-gray-800 rounded-md mb-1"
                         onSelect={(e) => {
                           // Prevent the dropdown from closing when selecting this item
                           e.preventDefault();
@@ -426,9 +426,9 @@ export function WorkspaceSwitcher() {
                         <div className="flex flex-col w-full">
                         <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-3">
-                              <div className={`flex h-8 w-8 items-center justify-center rounded-xl border-0 
+                              <div className={`flex h-8 w-8 items-center justify-center rounded-lg border-0 
                                 ${item.type === 'direct' 
-                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                                  ? 'bg-accent dark:bg-blue-900/30 text-primary dark:text-blue-400' 
                                   : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'} font-medium`}
                               >
                                 {item.name.charAt(0).toUpperCase()}
@@ -436,7 +436,7 @@ export function WorkspaceSwitcher() {
                               <div className="max-w-[140px]">
                                 <p className="text-sm font-medium truncate">{item.name}</p>
                                 {item.type === 'direct' ? (
-                                  <p className="text-xs text-gray-500 truncate">
+                                  <p className="text-xs text-muted-foreground truncate">
                                     Invited as {item.role}
                                   </p>
                                 ) : (
@@ -460,7 +460,7 @@ export function WorkspaceSwitcher() {
                             <Button
                               size="sm"
                               variant="outline"
-                                className="h-6 px-2 text-xs rounded-xl border-0 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
+                                className="h-6 px-2 text-xs rounded-md border-0 bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
@@ -487,7 +487,7 @@ export function WorkspaceSwitcher() {
                             <Button
                               size="sm"
                               variant="outline"
-                                className="h-6 px-2 text-xs rounded-xl border-0 bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+                                className="h-6 px-2 text-xs rounded-md border-0 bg-red-100 text-destructive hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
@@ -535,10 +535,10 @@ export function WorkspaceSwitcher() {
               <DropdownMenuSeparator />
               
               <DropdownMenuItem 
-                className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="flex items-center justify-center gap-2 py-1.5 px-3 cursor-pointer rounded-lg hover:bg-background dark:hover:bg-gray-800"
                 onClick={handleCreateWorkspace}
               >
-                <div className="flex size-8 items-center justify-center rounded-xl border-0 bg-gray-100 text-[#009959]">
+                <div className="flex size-8 items-center justify-center rounded-lg border-0 bg-background text-[#009959]">
                   <Plus className="size-3.5" />
                 </div>
                 <div className="font-medium text-sm truncate">Create workspace</div>

@@ -33,7 +33,7 @@ export function FileDetails({ file }: FileDetailsProps) {
   if (!file) {
     return (
       <div className="w-full h-full flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Select a file to view details</p>
+        <p className="text-muted-foreground text-sm">Select a file to view details</p>
       </div>
     )
   }
@@ -49,8 +49,8 @@ export function FileDetails({ file }: FileDetailsProps) {
   return (
     <div className="w-full h-full flex flex-col">
       {/* File preview */}
-      <div className="w-full bg-gray-50 rounded-lg flex items-center justify-center p-8 mb-4">
-        <div className="bg-white p-6 rounded-md shadow-sm">
+      <div className="w-full bg-background rounded-lg flex items-center justify-center p-8 mb-4">
+        <div className="bg-card p-6 rounded-md shadow-sm">
           <FileIcon className="h-12 w-12 text-primary" />
         </div>
       </div>
@@ -58,7 +58,7 @@ export function FileDetails({ file }: FileDetailsProps) {
       {/* File info */}
       <div className="w-full">
         <h2 className="text-lg font-semibold mb-1">{file.name}</h2>
-        <p className="text-sm text-gray-500 mb-4">{file.size} • {file.type}</p>
+        <p className="text-sm text-muted-foreground mb-4">{file.size} • {file.type}</p>
         
         {/* Action buttons */}
         <div className="flex gap-2 mb-6">
@@ -82,7 +82,7 @@ export function FileDetails({ file }: FileDetailsProps) {
           <Button 
             variant="outline" 
             size="sm" 
-            className="gap-1 text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
+            className="gap-1 text-red-500 hover:text-destructive hover:bg-red-50 ml-auto"
           >
             <Trash className="h-4 w-4" />
             Delete
@@ -93,13 +93,13 @@ export function FileDetails({ file }: FileDetailsProps) {
         <div className="space-y-2">
           <h3 className="text-sm font-medium">File details</h3>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="text-gray-500">ID</div>
+            <div className="text-muted-foreground">ID</div>
             <div className="font-mono text-xs overflow-hidden text-ellipsis">{file.id}</div>
-            <div className="text-gray-500">Created</div>
+            <div className="text-muted-foreground">Created</div>
             <div>{file.createdAt}</div>
             {file.metadata && Object.entries(file.metadata).map(([key, value]) => (
               <React.Fragment key={key}>
-                <div className="text-gray-500">{key}</div>
+                <div className="text-muted-foreground">{key}</div>
                 <div>{String(value)}</div>
               </React.Fragment>
             ))}

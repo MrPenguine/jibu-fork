@@ -150,7 +150,7 @@ export default function AgentWorkflowsPage() {
 
   if (isLoading) {
     return (
-      <div className="w-full px-6 pb-6 pt-0 bg-white text-slate-900">
+      <div className="w-full px-6 pb-6 pt-0 bg-background text-foreground">
         <Skeleton className="h-10 w-1/3" />
         <div className="mt-6">
           <Skeleton className="h-64 w-full" />
@@ -160,23 +160,23 @@ export default function AgentWorkflowsPage() {
   }
 
   return (
-    <div className="w-full px-6 pb-6 pt-0 bg-white text-slate-900">
+    <div className="w-full px-6 pb-6 pt-0 bg-background text-foreground">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
-          <p className="text-gray-600">Manage workflows for {agentName || 'this agent'}</p>
+          <p className="text-muted-foreground">Manage workflows for {agentName || 'this agent'}</p>
         </div>
       </div>
 
       {/* Master Workflow */}
       {masterWorkflow ? (
         <div className="mb-8">
-          <Card className="rounded-2xl border border-gray-200 shadow-sm bg-gray-50 hover:bg-gray-100 hover:shadow-md transition-all overflow-hidden">
+          <Card className="rounded-lg border border-border shadow-sm bg-card hover:bg-background transition-all overflow-hidden">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-gray-900 text-xl">Main Agent Workflow</CardTitle>
-                  <CardDescription className="text-gray-600">{masterWorkflow.description || 'Primary workflow for this agent'}</CardDescription>
+                  <CardTitle className="text-foreground text-xl">Main Agent Workflow</CardTitle>
+                  <CardDescription className="text-muted-foreground">{masterWorkflow.description || 'Primary workflow for this agent'}</CardDescription>
                 </div>
                 <div className="flex gap-2 items-center">
                   <Button
@@ -191,15 +191,15 @@ export default function AgentWorkflowsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-gray-500 mb-4">Last updated: {masterWorkflow?.updatedAt ? new Date(masterWorkflow.updatedAt).toLocaleDateString() : '—'}</div>
+              <div className="text-sm text-muted-foreground mb-4">Last updated: {masterWorkflow?.updatedAt ? new Date(masterWorkflow.updatedAt).toLocaleDateString() : '—'}</div>
               <div className="flex gap-2">
-                <Button type="button" size="sm" className="bg-[#009959] hover:bg-[#007a47] text-white rounded-xl" onClick={() => handleEditWorkflow(masterWorkflow.id)}>
+                <Button type="button" size="sm" className="bg-[#009959] hover:bg-[#007a47] text-white rounded-md" onClick={() => handleEditWorkflow(masterWorkflow.id)}>
                   <Edit className="h-4 w-4 mr-2" /> Edit
                 </Button>
-                <Button type="button" size="sm" className="bg-[#F9C116] hover:bg-[#e0ad13] text-[#22262A] rounded-xl" onClick={() => handleRunWorkflow(masterWorkflow.id)}>
+                <Button type="button" size="sm" className="bg-[#F9C116] hover:bg-[#e0ad13] text-[#22262A] rounded-md" onClick={() => handleRunWorkflow(masterWorkflow.id)}>
                   <Play className="h-4 w-4 mr-2" /> Run
                 </Button>
-                <Button type="button" size="sm" className="bg-[#ED1B33] hover:bg-[#d11829] text-white rounded-xl" onClick={() => openDeleteConfirm(masterWorkflow.id)}>
+                <Button type="button" size="sm" className="bg-[#ED1B33] hover:bg-[#d11829] text-white rounded-md" onClick={() => openDeleteConfirm(masterWorkflow.id)}>
                   <Trash2 className="h-4 w-4 mr-2" /> Delete
                 </Button>
               </div>
@@ -208,10 +208,10 @@ export default function AgentWorkflowsPage() {
         </div>
       ) : (
         <div className="mb-8">
-          <Card className="rounded-2xl border border-gray-200 shadow-sm">
+          <Card className="rounded-lg border border-border shadow-sm">
             <CardContent className="py-8 text-center">
-              <p className="text-gray-600 mb-4">No main workflow yet</p>
-              <Button className="bg-[#009959] hover:bg-[#007a47] rounded-xl" onClick={handleCreateWorkflow}>
+              <p className="text-muted-foreground mb-4">No main workflow yet</p>
+              <Button className="bg-[#009959] hover:bg-[#007a47] rounded-md" onClick={handleCreateWorkflow}>
                 <Plus className="mr-2 h-4 w-4" /> Create Master Workflow
               </Button>
             </CardContent>
@@ -222,16 +222,16 @@ export default function AgentWorkflowsPage() {
       {/* Secondary Workflows */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Secondary Workflows</h2>
-        <Button className="bg-[#009959] hover:bg-[#007a47] rounded-xl" onClick={handleCreateWorkflow}>
+        <Button className="bg-[#009959] hover:bg-[#007a47] rounded-md" onClick={handleCreateWorkflow}>
           <Plus className="mr-2 h-4 w-4" /> Create Workflow
         </Button>
       </div>
 
       {secondaryWorkflows.length === 0 ? (
-        <Card className="rounded-2xl">
+        <Card className="rounded-lg">
           <CardContent className="flex flex-col items-center justify-center py-10">
-            <p className="text-gray-600 mb-4">No secondary workflows found</p>
-            <Button className="bg-[#009959] hover:bg-[#007a47] rounded-xl" onClick={handleCreateWorkflow}>
+            <p className="text-muted-foreground mb-4">No secondary workflows found</p>
+            <Button className="bg-[#009959] hover:bg-[#007a47] rounded-md" onClick={handleCreateWorkflow}>
               <Plus className="mr-2 h-4 w-4" /> Create Secondary Workflow
             </Button>
           </CardContent>
@@ -240,21 +240,21 @@ export default function AgentWorkflowsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {secondaryWorkflows.map((workflow, index) => {
             return (
-            <Card key={workflow.id} className="rounded-2xl border border-gray-200 bg-gray-50 hover:bg-gray-100 shadow-sm hover:shadow-md transition-all overflow-hidden">
+            <Card key={workflow.id} className="rounded-lg border border-border bg-card hover:bg-background shadow-sm transition-all overflow-hidden">
               <CardHeader>
-                <CardTitle className="text-gray-900 text-lg">{workflow.name}</CardTitle>
-                <CardDescription className="text-gray-600 line-clamp-2">{workflow.description || 'Secondary workflow'}</CardDescription>
+                <CardTitle className="text-foreground text-lg">{workflow.name}</CardTitle>
+                <CardDescription className="text-muted-foreground line-clamp-2">{workflow.description || 'Secondary workflow'}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-gray-500 mb-4">Last updated: {workflow?.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString() : '—'}</div>
+                <div className="text-sm text-muted-foreground mb-4">Last updated: {workflow?.updatedAt ? new Date(workflow.updatedAt).toLocaleDateString() : '—'}</div>
                 <div className="flex gap-2">
-                  <Button type="button" size="sm" className="flex-1 bg-[#009959] hover:bg-[#007a47] text-white rounded-xl" onClick={() => handleEditWorkflow(workflow.id)}>
+                  <Button type="button" size="sm" className="flex-1 bg-[#009959] hover:bg-[#007a47] text-white rounded-md" onClick={() => handleEditWorkflow(workflow.id)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button type="button" size="sm" className="flex-1 bg-[#F9C116] hover:bg-[#e0ad13] text-[#22262A] rounded-xl" onClick={() => handleRunWorkflow(workflow.id)}>
+                  <Button type="button" size="sm" className="flex-1 bg-[#F9C116] hover:bg-[#e0ad13] text-[#22262A] rounded-md" onClick={() => handleRunWorkflow(workflow.id)}>
                     <Play className="h-4 w-4" />
                   </Button>
-                  <Button type="button" size="sm" className="flex-1 bg-[#ED1B33] hover:bg-[#d11829] text-white rounded-xl" onClick={() => openDeleteConfirm(workflow.id)}>
+                  <Button type="button" size="sm" className="flex-1 bg-[#ED1B33] hover:bg-[#d11829] text-white rounded-md" onClick={() => openDeleteConfirm(workflow.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

@@ -39,7 +39,7 @@ export function ZendeskDialog({ open, onOpenChange }: ZendeskDialogProps) {
           <div className="grid gap-2">
             <Label>Subdomain URL</Label>
             <Input placeholder="Enter url" />
-            <p className="text-xs text-slate-500">e.g. https://company.zendesk.com</p>
+            <p className="text-xs text-muted-foreground">e.g. https://company.zendesk.com</p>
           </div>
         </div>
         <DialogFooter>

@@ -332,8 +332,8 @@ export default function BillingPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Billing & Finance</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">Billing & Finance</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Revenue dashboard, costs, subscriptions, and plan management
         </p>
       </div>
@@ -349,58 +349,58 @@ export default function BillingPage() {
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <LineChart className="h-5 w-5 text-violet-500" />
+                <LineChart className="h-5 w-5 text-primary" />
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Revenue overview</p>
+                  <p className="text-xs font-medium text-muted-foreground">Revenue overview</p>
                   <p className="text-xs text-gray-400">Last {revenue?.periodDays ?? 30} days</p>
                 </div>
               </div>
               {revenue && (
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">MRR</p>
-                  <p className="text-lg font-semibold text-gray-900">${revenue.mrrUsd.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">MRR</p>
+                  <p className="text-lg font-semibold text-foreground">${revenue.mrrUsd.toFixed(2)}</p>
                 </div>
               )}
             </div>
 
             {loadingRevenue ? (
-              <div className="text-sm text-gray-500 text-center">Loading revenue metrics...</div>
+              <div className="text-sm text-muted-foreground text-center">Loading revenue metrics...</div>
             ) : revenueError ? (
-              <div className="text-sm text-red-600 text-center">{revenueError}</div>
+              <div className="text-sm text-destructive text-center">{revenueError}</div>
             ) : !revenue ? (
-              <div className="text-sm text-gray-500 text-center">No revenue data yet.</div>
+              <div className="text-sm text-muted-foreground text-center">No revenue data yet.</div>
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-xs text-gray-500">MRR</p>
-                    <p className="text-base font-semibold text-gray-900">${revenue.mrrUsd.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">MRR</p>
+                    <p className="text-base font-semibold text-foreground">${revenue.mrrUsd.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">ARR</p>
-                    <p className="text-base font-semibold text-gray-900">${revenue.arrUsd.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">ARR</p>
+                    <p className="text-base font-semibold text-foreground">${revenue.arrUsd.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Active subscriptions</p>
-                    <p className="text-base font-semibold text-gray-900">{revenue.activeSubscriptions}</p>
+                    <p className="text-xs text-muted-foreground">Active subscriptions</p>
+                    <p className="text-base font-semibold text-foreground">{revenue.activeSubscriptions}</p>
                   </div>
                 </div>
 
                 {revenue.byPlan && revenue.byPlan.length > 0 && (
                   <div className="w-full overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b border-gray-200">
+                      <thead className="bg-background border-b border-border">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Plan
                           </th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             Active Subs
                           </th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             MRR
                           </th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                             ARR
                           </th>
                         </tr>
@@ -408,7 +408,7 @@ export default function BillingPage() {
                       <tbody>
                         {revenue.byPlan.map((plan) => (
                           <tr key={plan.planId} className="border-b border-gray-100">
-                            <td className="px-4 py-2 text-xs text-gray-800">{plan.planName}</td>
+                            <td className="px-4 py-2 text-xs text-foreground">{plan.planName}</td>
                             <td className="px-4 py-2 text-right text-xs text-gray-700">{plan.activeSubscriptions}</td>
                             <td className="px-4 py-2 text-right text-xs text-gray-700">${plan.mrrUsd.toFixed(2)}</td>
                             <td className="px-4 py-2 text-right text-xs text-gray-700">${plan.arrUsd.toFixed(2)}</td>
@@ -424,34 +424,34 @@ export default function BillingPage() {
 
           <Card className="p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800">Subscriptions</h2>
-              <p className="text-xs text-gray-500">First 50 subscriptions</p>
+              <h2 className="text-sm font-semibold text-foreground">Subscriptions</h2>
+              <p className="text-xs text-muted-foreground">First 50 subscriptions</p>
             </div>
 
             {loadingSubscriptions ? (
-              <div className="text-sm text-gray-500 text-center">Loading subscriptions...</div>
+              <div className="text-sm text-muted-foreground text-center">Loading subscriptions...</div>
             ) : subscriptionsError ? (
-              <div className="text-sm text-red-600 text-center">{subscriptionsError}</div>
+              <div className="text-sm text-destructive text-center">{subscriptionsError}</div>
             ) : subscriptions.length === 0 ? (
-              <div className="text-sm text-gray-500 text-center">No subscriptions yet.</div>
+              <div className="text-sm text-muted-foreground text-center">No subscriptions yet.</div>
             ) : (
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-background border-b border-border">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Workspace
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Plan
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Credits
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Renews / Ends
                       </th>
                     </tr>
@@ -470,18 +470,18 @@ export default function BillingPage() {
 
                       return (
                         <tr key={sub.id} className="border-b border-gray-100">
-                          <td className="px-4 py-2 text-xs text-gray-800">
+                          <td className="px-4 py-2 text-xs text-foreground">
                             <div className="flex flex-col">
                               <span className="font-medium">{workspaceLabel}</span>
                               {sub.workspace?.email && (
-                                <span className="text-[11px] text-gray-500">{sub.workspace.email}</span>
+                                <span className="text-[11px] text-muted-foreground">{sub.workspace.email}</span>
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-2 text-xs text-gray-800">{planLabel}</td>
-                          <td className="px-4 py-2 text-xs text-gray-800">{sub.status}</td>
-                          <td className="px-4 py-2 text-right text-xs text-gray-800">{creditsLabel}</td>
-                          <td className="px-4 py-2 text-right text-xs text-gray-800">{periodEnd}</td>
+                          <td className="px-4 py-2 text-xs text-foreground">{planLabel}</td>
+                          <td className="px-4 py-2 text-xs text-foreground">{sub.status}</td>
+                          <td className="px-4 py-2 text-right text-xs text-foreground">{creditsLabel}</td>
+                          <td className="px-4 py-2 text-right text-xs text-foreground">{periodEnd}</td>
                         </tr>
                       )
                     })}
@@ -496,39 +496,39 @@ export default function BillingPage() {
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <PieChart className="h-5 w-5 text-emerald-500" />
+                <PieChart className="h-5 w-5 text-green-500" />
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Provider costs</p>
+                  <p className="text-xs font-medium text-muted-foreground">Provider costs</p>
                   <p className="text-xs text-gray-400">Last {costs?.days ?? 30} days</p>
                 </div>
               </div>
               {costs && (
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">Total cost</p>
-                  <p className="text-lg font-semibold text-gray-900">${costs.totalCostUsd.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">Total cost</p>
+                  <p className="text-lg font-semibold text-foreground">${costs.totalCostUsd.toFixed(2)}</p>
                 </div>
               )}
             </div>
 
             {loadingCosts ? (
-              <div className="text-sm text-gray-500 text-center">Loading cost metrics...</div>
+              <div className="text-sm text-muted-foreground text-center">Loading cost metrics...</div>
             ) : costsError ? (
-              <div className="text-sm text-red-600 text-center">{costsError}</div>
+              <div className="text-sm text-destructive text-center">{costsError}</div>
             ) : !costs ? (
-              <div className="text-sm text-gray-500 text-center">No usage cost data yet.</div>
+              <div className="text-sm text-muted-foreground text-center">No usage cost data yet.</div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="text-xs font-semibold text-gray-700 mb-2">By provider</h3>
                   {costs.byProvider.length === 0 ? (
-                    <p className="text-xs text-gray-500">No provider costs yet.</p>
+                    <p className="text-xs text-muted-foreground">No provider costs yet.</p>
                   ) : (
                     <table className="w-full text-sm">
                       <tbody>
                         {costs.byProvider.map((row) => (
                           <tr key={row.provider} className="border-b border-gray-100">
-                            <td className="px-2 py-1 text-xs text-gray-800">{row.provider}</td>
-                            <td className="px-2 py-1 text-right text-xs text-gray-800">${row.costUsd.toFixed(4)}</td>
+                            <td className="px-2 py-1 text-xs text-foreground">{row.provider}</td>
+                            <td className="px-2 py-1 text-right text-xs text-foreground">${row.costUsd.toFixed(4)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -539,14 +539,14 @@ export default function BillingPage() {
                 <div>
                   <h3 className="text-xs font-semibold text-gray-700 mb-2">By type</h3>
                   {costs.byType.length === 0 ? (
-                    <p className="text-xs text-gray-500">No type breakdown yet.</p>
+                    <p className="text-xs text-muted-foreground">No type breakdown yet.</p>
                   ) : (
                     <table className="w-full text-sm">
                       <tbody>
                         {costs.byType.map((row) => (
                           <tr key={row.type} className="border-b border-gray-100">
-                            <td className="px-2 py-1 text-xs text-gray-800">{row.type}</td>
-                            <td className="px-2 py-1 text-right text-xs text-gray-800">${row.costUsd.toFixed(4)}</td>
+                            <td className="px-2 py-1 text-xs text-foreground">{row.type}</td>
+                            <td className="px-2 py-1 text-right text-xs text-foreground">${row.costUsd.toFixed(4)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -559,28 +559,28 @@ export default function BillingPage() {
 
           <Card className="p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800">Top workspaces by spend</h2>
-              <p className="text-xs text-gray-500">Last {topWorkspaces?.days ?? costs?.days ?? 30} days</p>
+              <h2 className="text-sm font-semibold text-foreground">Top workspaces by spend</h2>
+              <p className="text-xs text-muted-foreground">Last {topWorkspaces?.days ?? costs?.days ?? 30} days</p>
             </div>
 
             {loadingCosts ? (
-              <div className="text-sm text-gray-500 text-center">Loading top workspaces...</div>
+              <div className="text-sm text-muted-foreground text-center">Loading top workspaces...</div>
             ) : costsError ? (
-              <div className="text-sm text-red-600 text-center">{costsError}</div>
+              <div className="text-sm text-destructive text-center">{costsError}</div>
             ) : !topWorkspaces || topWorkspaces.items.length === 0 ? (
-              <div className="text-sm text-gray-500 text-center">No high-spend workspaces yet.</div>
+              <div className="text-sm text-muted-foreground text-center">No high-spend workspaces yet.</div>
             ) : (
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-background border-b border-border">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Workspace
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Email
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Cost (USD)
                       </th>
                     </tr>
@@ -588,9 +588,9 @@ export default function BillingPage() {
                   <tbody>
                     {topWorkspaces.items.map((item) => (
                       <tr key={item.workspaceId} className="border-b border-gray-100">
-                        <td className="px-4 py-2 text-xs text-gray-800">{item.workspaceName || item.workspaceId}</td>
-                        <td className="px-4 py-2 text-xs text-gray-800">{item.workspaceEmail || "—"}</td>
-                        <td className="px-4 py-2 text-right text-xs text-gray-800">${item.totalCostUsd.toFixed(4)}</td>
+                        <td className="px-4 py-2 text-xs text-foreground">{item.workspaceName || item.workspaceId}</td>
+                        <td className="px-4 py-2 text-xs text-foreground">{item.workspaceEmail || "—"}</td>
+                        <td className="px-4 py-2 text-right text-xs text-foreground">${item.totalCostUsd.toFixed(4)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -603,7 +603,7 @@ export default function BillingPage() {
         <TabsContent value="plans" className="space-y-4">
           <Card className="p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800">Plans</h2>
+              <h2 className="text-sm font-semibold text-foreground">Plans</h2>
               <Button
                 variant="outline"
                 size="sm"
@@ -666,7 +666,7 @@ export default function BillingPage() {
                   name="features"
                   value={formValues.features}
                   onChange={handleFormChange}
-                  className="w-full border border-gray-200 rounded-md text-xs px-2 py-1 font-mono h-20 resize-y"
+                  className="w-full border border-border rounded-md text-xs px-2 py-1 font-mono h-20 resize-y"
                 />
               </div>
               <div className="flex items-end md:col-span-1">
@@ -685,40 +685,40 @@ export default function BillingPage() {
             </form>
 
             {planError && (
-              <p className="text-xs text-red-600 mt-2">{planError}</p>
+              <p className="text-xs text-destructive mt-2">{planError}</p>
             )}
           </Card>
 
-          <Card className="p-0 overflow-hidden border-gray-200">
+          <Card className="p-0 overflow-hidden border-border">
             {loadingPlans ? (
-              <div className="p-6 text-center text-sm text-gray-500">
+              <div className="p-6 text-center text-sm text-muted-foreground">
                 Loading plans...
               </div>
             ) : plans.length === 0 ? (
-              <div className="p-6 text-center text-sm text-gray-500">
+              <div className="p-6 text-center text-sm text-muted-foreground">
                 No plans configured yet.
               </div>
             ) : (
               <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-background border-b border-border">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Plan
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Pricing
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Credits
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Active Subs
                       </th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -728,8 +728,8 @@ export default function BillingPage() {
                       <tr key={plan.id} className="border-b border-gray-100">
                         <td className="px-4 py-2">
                           <div className="flex flex-col">
-                            <span className="font-medium text-gray-900">{plan.name}</span>
-                            <span className="text-xs text-gray-500">
+                            <span className="font-medium text-foreground">{plan.name}</span>
+                            <span className="text-xs text-muted-foreground">
                               ID: {plan.id.slice(0, 8)}...
                             </span>
                           </div>
@@ -740,7 +740,7 @@ export default function BillingPage() {
                               {plan.priceMonthly != null ? `$${plan.priceMonthly}/mo` : "Custom"}
                             </span>
                             {plan.priceYearly != null && (
-                              <span className="text-[11px] text-gray-500">
+                              <span className="text-[11px] text-muted-foreground">
                                 ${plan.priceYearly}/yr
                               </span>
                             )}
@@ -768,7 +768,7 @@ export default function BillingPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 px-2 text-red-600 border-red-200 hover:bg-red-50"
+                              className="h-7 px-2 text-destructive border-red-200 hover:bg-red-50"
                               onClick={() => onDeactivatePlan(plan.id)}
                               disabled={!plan.isActive}
                             >

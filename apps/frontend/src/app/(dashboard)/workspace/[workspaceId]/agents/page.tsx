@@ -177,22 +177,22 @@ export default function AgentsPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Agents</h1>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Create and manage automated conversation flows
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="rounded-xl" onClick={() => alert('Create folder functionality coming soon')}>
+          <Button variant="outline" className="rounded-md" onClick={() => alert('Create folder functionality coming soon')}>
             <FolderPlus className="mr-2 h-4 w-4" />
             New Folder
           </Button>
-          <Button variant="outline" className="rounded-xl" onClick={() => alert('Import functionality coming soon')}>
+          <Button variant="outline" className="rounded-md" onClick={() => alert('Import functionality coming soon')}>
             <Upload className="mr-2 h-4 w-4" />
             Import
           </Button>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-[#009959] hover:bg-[#007a47] rounded-xl" onClick={() => setIsCreateModalOpen(true)}>
+            <Button className="bg-[#009959] hover:bg-[#007a47] rounded-md" onClick={() => setIsCreateModalOpen(true)}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Create Agent
             </Button>
@@ -244,7 +244,7 @@ export default function AgentsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input 
             placeholder="Search agents..." 
-            className="pl-10 rounded-xl border-gray-200 focus:border-[#009959] focus:ring-[#009959]" 
+            className="pl-10 rounded-md border-border focus:border-[#009959] focus:ring-[#009959]" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -263,7 +263,7 @@ export default function AgentsPage() {
               <p className="text-sm text-muted-foreground">
                 Get started by creating your first agent
               </p>
-              <Button className="bg-[#009959] hover:bg-[#007a47] rounded-xl" onClick={() => setIsCreateModalOpen(true)}>
+              <Button className="bg-[#009959] hover:bg-[#007a47] rounded-md" onClick={() => setIsCreateModalOpen(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Create Agent
               </Button>
@@ -282,7 +282,7 @@ export default function AgentsPage() {
             const colorScheme = colors[index % colors.length];
             
             return (
-            <Card key={agent.id} className={`rounded-2xl border-0 ${colorScheme.bg} ${colorScheme.hover} ${colorScheme.text} shadow-md transition-all duration-200 hover:shadow-xl hover:scale-105 cursor-pointer overflow-hidden`}
+            <Card key={agent.id} className={`rounded-lg ${colorScheme.bg} ${colorScheme.hover} ${colorScheme.text} transition-all duration-200 hover:scale-105 cursor-pointer overflow-hidden`}
               onClick={() => handleOpenAgent(agent.id)}
             >
               <CardHeader className="pb-3">

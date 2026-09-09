@@ -250,10 +250,10 @@ export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent 
-        className="w-[96vw] max-w-[1400px] h-[66vh] p-0 overflow-hidden rounded-2xl border-0"
+        className="w-[96vw] max-w-[1400px] h-[66vh] p-0 overflow-hidden rounded-lg "
         onInteractOutside={() => { allowCloseRef.current = true; }}
       >
-        <DialogHeader className="px-4 py-2.5 w-full bg-slate-300/60">
+        <DialogHeader className="px-4 py-2.5 w-full bg-gray-300/60">
           <div className="flex items-center gap-1.5 w-full">
             {isEditingName && (
               // Visually hidden for a11y to ensure a DialogTitle exists
@@ -279,7 +279,7 @@ export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
               />
             ) : (
               <DialogTitle
-                className="cursor-pointer hover:text-blue-600 transition-colors"
+                className="cursor-pointer hover:text-primary transition-colors"
                 onDoubleClick={() => setIsEditingName(true)}
               >
                 {localData?.name || assistantData?.name || 'Sales helper'}
@@ -300,7 +300,7 @@ export const AssistantConfigModal: React.FC<AssistantConfigModalProps> = ({
               <div>
                 <h3 className="font-medium mb-2">Instructions</h3>
                 <Textarea 
-                  className="min-h-[500px] font-normal text-sm bg-slate-50 w-full rounded-md" 
+                  className="min-h-[500px] font-normal text-sm bg-background w-full rounded-md" 
                   value={(localData?.systemMessage ?? assistantData?.systemMessage) || `### Role
 The chat agent assists users by providing information and support related to sales. It is responsible for answering questions, offering product recommendations, and guiding users through the sales process to enhance their purchasing experience.
 
@@ -322,8 +322,8 @@ The primary goal is to effectively address user inquiries and concerns regarding
                 <h3 className="font-medium mb-2">Generation settings</h3>
                 <div className="space-y-3">
                   {/* AI model selector */}
-                  <div className="bg-slate-100 rounded-lg px-3 py-2">
-                    <label className="block text-xs text-slate-500 mb-1">AI model</label>
+                  <div className="bg-background rounded-lg px-3 py-2">
+                    <label className="block text-xs text-muted-foreground mb-1">AI model</label>
                     <Select
                       value={(localData?.model?.provider && localData?.model?.model) ? `${localData.model.provider}::${localData.model.model}` : undefined}
                       onValueChange={(v) => {
@@ -365,7 +365,7 @@ The primary goal is to effectively address user inquiries and concerns regarding
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-center justify-between gap-3 bg-slate-100 rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between gap-3 bg-background rounded-lg px-3 py-2">
                     <label className="text-sm text-muted-foreground">Temperature</label>
                     <Input
                       type="number"
@@ -377,7 +377,7 @@ The primary goal is to effectively address user inquiries and concerns regarding
                       onChange={(e) => handleModelConfigChange('temperature', e.target.value)}
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-3 bg-slate-100 rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between gap-3 bg-background rounded-lg px-3 py-2">
                     <label className="text-sm text-muted-foreground">Max tokens</label>
                     <Input
                       type="number"
@@ -392,35 +392,35 @@ The primary goal is to effectively address user inquiries and concerns regarding
               <div>
                 <h3 className="font-medium mb-2">Tools</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
-                    <div className="w-5 h-5 flex items-center justify-center bg-blue-200 rounded-full text-blue-900 text-xs">Z</div>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
+                    <div className="w-5 h-5 flex items-center justify-center bg-blue-200 rounded-full text-green-800 text-xs">Z</div>
                     <span className="text-xs">Zendesk</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
                     <div className="w-5 h-5 flex items-center justify-center bg-green-200 rounded-full text-green-900 text-xs">G</div>
                     <span className="text-xs">Google Sheets</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
-                    <div className="w-5 h-5 flex items-center justify-center bg-blue-200 rounded-full text-blue-900 text-xs">S</div>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
+                    <div className="w-5 h-5 flex items-center justify-center bg-blue-200 rounded-full text-green-800 text-xs">S</div>
                     <span className="text-xs">Salesforce</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
                     <div className="w-5 h-5 flex items-center justify-center bg-red-200 rounded-full text-red-900 text-xs">G</div>
                     <span className="text-xs">Gmail</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
-                    <div className="w-5 h-5 flex items-center justify-center bg-purple-200 rounded-full text-purple-900 text-xs">A</div>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
+                    <div className="w-5 h-5 flex items-center justify-center bg-purple-200 rounded-full text-green-800 text-xs">A</div>
                     <span className="text-xs">Airtable</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
-                    <div className="w-5 h-5 flex items-center justify-center bg-indigo-200 rounded-full text-indigo-900 text-xs">M</div>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
+                    <div className="w-5 h-5 flex items-center justify-center bg-indigo-200 rounded-full text-green-800 text-xs">M</div>
                     <span className="text-xs">Make</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
                     <div className="w-5 h-5 flex items-center justify-center bg-cyan-200 rounded-full text-cyan-900 text-xs">T</div>
                     <span className="text-xs">Twilio</span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-slate-200">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-200">
                     <div className="w-5 h-5 flex items-center justify-center bg-orange-200 rounded-full text-orange-900 text-xs">H</div>
                     <span className="text-xs">Hubspot</span>
                   </div>
@@ -429,7 +429,7 @@ The primary goal is to effectively address user inquiries and concerns regarding
               
               <div>
                 <h3 className="font-medium mb-2">Knowledge base</h3>
-                <div className="flex items-center justify-between bg-slate-100 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
                   <span className="text-sm">Enabled</span>
                   <Switch id="kb-sidebar" />
                 </div>
@@ -437,7 +437,7 @@ The primary goal is to effectively address user inquiries and concerns regarding
               
               <div>
                 <h3 className="font-medium mb-2">Buttons</h3>
-                <div className="flex items-center justify-between bg-slate-100 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
                   <span className="text-sm">Enabled</span>
                   <Switch id="buttons-enabled" />
                 </div>
@@ -445,7 +445,7 @@ The primary goal is to effectively address user inquiries and concerns regarding
               
               <div>
                 <h3 className="font-medium mb-2">Cards</h3>
-                <div className="flex items-center justify-between bg-slate-100 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
                   <span className="text-sm">Enabled</span>
                   <Switch id="cards-enabled" />
                 </div>
@@ -453,7 +453,7 @@ The primary goal is to effectively address user inquiries and concerns regarding
               
               <div>
                 <h3 className="font-medium mb-2">Carousels</h3>
-                <div className="flex items-center justify-between bg-slate-100 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
                   <span className="text-sm">Enabled</span>
                   <Switch id="carousels-enabled" />
                 </div>
@@ -461,7 +461,7 @@ The primary goal is to effectively address user inquiries and concerns regarding
               
               <div>
                 <h3 className="font-medium mb-2">Exit conditions</h3>
-                <div className="flex items-center justify-between bg-slate-100 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between bg-background rounded-lg px-3 py-2">
                   <span className="text-sm">New exit condition (inactive)</span>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0 rounded-full">
                     <Plus className="h-4 w-4" />

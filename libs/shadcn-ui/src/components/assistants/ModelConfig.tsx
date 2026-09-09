@@ -378,7 +378,7 @@ export function ModelConfig({
   };
   
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
+    <div className="bg-card rounded-lg shadow-sm p-6">
       {/* Autosave status indicator */}
       {assistantId && assistantId !== 'new' && (
         <div className="flex items-center justify-end text-sm text-muted-foreground mb-4">
@@ -516,7 +516,7 @@ export function ModelConfig({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full bg-white rounded-full border justify-between">
+                <Button variant="outline" className="w-full bg-card rounded-full border justify-between">
                   {currentProviderName}
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
                     <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
@@ -581,7 +581,7 @@ export function ModelConfig({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full bg-white rounded-full border justify-between py-3">
+                <Button variant="outline" className="w-full bg-card rounded-full border justify-between py-3">
                   {isLoading ? "Loading..." : currentModelName}
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
                     <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>

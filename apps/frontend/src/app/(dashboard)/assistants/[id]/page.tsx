@@ -182,12 +182,12 @@ export default function AssistantDetailPage() {
     common: [
       { name: "Jibu Fixed Cost", color: "bg-green-500" },
       { name: "deepgram", color: "bg-orange-500" },
-      { name: "gpt-4o", color: "bg-yellow-500" },
-      { name: "Jibu", color: "bg-blue-500" },
+      { name: "gpt-4o", color: "bg-brand-saffron" },
+      { name: "Jibu", color: "bg-primary" },
     ],
-    web: { name: "Web", color: "bg-purple-500" },
-    twilio: { name: "Twilio", color: "bg-purple-500" },
-    vonage: { name: "Vonage", color: "bg-purple-500" }
+    web: { name: "Web", color: "bg-primary" },
+    twilio: { name: "Twilio", color: "bg-primary" },
+    vonage: { name: "Vonage", color: "bg-primary" }
   }
 
   // Debounced save function
@@ -428,7 +428,7 @@ export default function AssistantDetailPage() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-500">Loading assistant...</p>
+          <p className="mt-2 text-sm text-muted-foreground">Loading assistant...</p>
         </div>
       </div>
     );
@@ -453,7 +453,7 @@ export default function AssistantDetailPage() {
       />
 
       {/* Main Tabs */}
-      <div className="bg-white">
+      <div className="bg-background">
         <Tabs defaultValue="model" className="w-full">
           <TabsList className="w-full justify-start bg-[#f7f7f8]">
             <TabsTrigger 
@@ -554,7 +554,7 @@ export default function AssistantDetailPage() {
               {/* Main Configuration Area */}
               <TabsContent value="model" className="space-y-4">
                 <div id="model-section" className="mb-4">
-                  <h2 className="text-xl font-bold border-b-2 border-gray-200 pb-2">Model Configuration</h2>
+                  <h2 className="text-xl font-bold border-b-2 border-border pb-2">Model Configuration</h2>
                 </div>
                 <ModelConfig
                   firstMessage={firstMessage}
@@ -580,16 +580,16 @@ export default function AssistantDetailPage() {
               
               <TabsContent value="transcriber" className="space-y-4">
                 <div id="transcriber-section" className="mb-4">
-                  <h2 className="text-xl font-bold border-b-2 border-gray-200 pb-2">Transcriber Configuration</h2>
+                  <h2 className="text-xl font-bold border-b-2 border-border pb-2">Transcriber Configuration</h2>
                 </div>
-                <div className="p-4 bg-white rounded-lg shadow-sm">
+                <div className="p-4 bg-card rounded-lg shadow-sm">
                   <p className="text-sm text-muted-foreground">Configure the transcription settings.</p>
                 </div>
               </TabsContent>
               
               <TabsContent value="voice" className="space-y-4">
                 <div id="voice-section" className="mb-4">
-                  <h2 className="text-xl font-bold border-b-2 border-gray-200 pb-2">Voice Configuration</h2>
+                  <h2 className="text-xl font-bold border-b-2 border-border pb-2">Voice Configuration</h2>
                 </div>
                 <VoiceConfig
                   voiceProvider={voiceProvider}
@@ -606,27 +606,27 @@ export default function AssistantDetailPage() {
               
               <TabsContent value="tools" className="space-y-4">
                 <div id="tools-section" className="mb-4">
-                  <h2 className="text-xl font-bold border-b-2 border-gray-200 pb-2">Tools Configuration</h2>
+                  <h2 className="text-xl font-bold border-b-2 border-border pb-2">Tools Configuration</h2>
                 </div>
-                <div className="p-4 bg-white rounded-lg shadow-sm">
+                <div className="p-4 bg-card rounded-lg shadow-sm">
                   <p className="text-sm text-muted-foreground">Configure the available tools.</p>
                 </div>
               </TabsContent>
               
               <TabsContent value="analysis" className="space-y-4">
                 <div id="analysis-section" className="mb-4">
-                  <h2 className="text-xl font-bold border-b-2 border-gray-200 pb-2">Analysis Configuration</h2>
+                  <h2 className="text-xl font-bold border-b-2 border-border pb-2">Analysis Configuration</h2>
                 </div>
-                <div className="p-4 bg-white rounded-lg shadow-sm">
+                <div className="p-4 bg-card rounded-lg shadow-sm">
                   <p className="text-sm text-muted-foreground">Configure the analysis settings.</p>
                 </div>
               </TabsContent>
               
               <TabsContent value="advanced" className="space-y-4">
                 <div id="advanced-section" className="mb-4">
-                  <h2 className="text-xl font-bold border-b-2 border-gray-200 pb-2">Advanced Configuration</h2>
+                  <h2 className="text-xl font-bold border-b-2 border-border pb-2">Advanced Configuration</h2>
                 </div>
-                <div className="p-4 bg-white rounded-lg shadow-sm">
+                <div className="p-4 bg-card rounded-lg shadow-sm">
                   <p className="text-sm text-muted-foreground">Configure advanced settings.</p>
                 </div>
               </TabsContent>

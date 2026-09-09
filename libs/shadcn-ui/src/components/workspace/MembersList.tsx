@@ -105,7 +105,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
       case 'rejected':
         return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+        return 'bg-background text-foreground dark:bg-gray-900/30 dark:text-gray-400'
     }
   }
 
@@ -114,7 +114,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
       case 'owner':
         return <Crown className="h-4 w-4 text-yellow-500" />
       case 'admin':
-        return <Shield className="h-4 w-4 text-blue-600" />
+        return <Shield className="h-4 w-4 text-primary" />
       default:
         return <User className="h-4 w-4" />
     }
@@ -325,10 +325,10 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
             {members.map((member) => {
               const isCurrentUser = member.email === currentUserEmail;
               return (
-                <div key={member.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                <div key={member.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-background dark:hover:bg-gray-800">
                   <div className="flex items-center gap-4">
-                    <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full">
-                      <User className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <div className="p-2 bg-muted dark:bg-gray-700 rounded-full">
+                      <User className="h-5 w-5 text-muted-foreground dark:text-gray-400" />
                     </div>
                     <div>
                       <p className="font-medium flex items-center gap-2">
@@ -347,7 +347,7 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
                               {getRoleIcon(member.role)} {member.role} <ChevronDown className="h-3 w-3 ml-1" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-40 rounded-xl">
+                          <DropdownMenuContent align="start" className="w-40 rounded-md">
                             {getAvailableRoles().map((role) => (
                               <DropdownMenuItem key={role} className="capitalize" onClick={() => changeMemberRole(member.id, role)}>
                                 {getRoleIcon(role)} {role}
@@ -370,15 +370,15 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
                           <ChevronDown className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                      <DropdownMenuContent align="end" className="w-48 rounded-md">
                         {canDeleteMember(member) && (
-                          <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => { setMemberToDelete(member); setIsDeleteDialogOpen(true); }}>
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => { setMemberToDelete(member); setIsDeleteDialogOpen(true); }}>
                             <UserMinus className="mr-2 h-4 w-4" />
                             Remove Member
                           </DropdownMenuItem>
                         )}
                         {isCurrentUser && canLeaveWorkspace() && (
-                          <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setIsLeaveDialogOpen(true)} >
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setIsLeaveDialogOpen(true)} >
                             <LogOut className="mr-2 h-4 w-4" />
                             Leave Workspace
                           </DropdownMenuItem>

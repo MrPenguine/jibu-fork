@@ -406,7 +406,7 @@ export function GoogleCalendarCard() {
           </div>
         ) : (
           <div className="text-center py-2">
-            <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+            <div className="flex items-center justify-center gap-2 text-muted-foreground mb-4">
               <div className="h-3 w-3 rounded-full bg-gray-400"></div>
               <span>Not connected to Google Calendar</span>
             </div>

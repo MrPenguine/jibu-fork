@@ -36,7 +36,7 @@ export default function MembersPage() {
           </div>
 
           <Button
-            className="rounded-xl"
+            className="rounded-md"
             onClick={() => setShowInviteModal(true)}
             disabled={!canInviteMembers}
             title={!canInviteMembers ? "Only owners and admins can invite members" : ""}

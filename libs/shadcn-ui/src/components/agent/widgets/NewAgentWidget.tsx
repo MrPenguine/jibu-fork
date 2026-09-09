@@ -28,7 +28,7 @@ export function NewAgentWidget({ onCreateAgent }: NewAgentWidgetProps) {
   }
 
   return (
-    <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+    <Card className="bg-card shadow-sm transition-shadow">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">New Agent</CardTitle>
         <CardDescription>Create a new AI agent</CardDescription>

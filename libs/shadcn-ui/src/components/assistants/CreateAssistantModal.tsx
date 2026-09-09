@@ -29,7 +29,7 @@ const assistantTemplates: Template[] = [
     id: "customer-support",
     name: "Customer Support",
     description: "Handle customer inquiries and support requests",
-    icon: <Headset className="h-10 w-10 text-blue-500" />
+    icon: <Headset className="h-10 w-10 text-primary" />
   },
   {
     id: "sales",
@@ -41,7 +41,7 @@ const assistantTemplates: Template[] = [
     id: "scheduling",
     name: "Scheduling Assistant",
     description: "Manage appointments and scheduling",
-    icon: <Calendar className="h-10 w-10 text-purple-500" />
+    icon: <Calendar className="h-10 w-10 text-primary" />
   },
   {
     id: "education",
@@ -59,7 +59,7 @@ const assistantTemplates: Template[] = [
     id: "personal",
     name: "Personal Assistant",
     description: "Manage personal tasks and reminders",
-    icon: <UserCircle className="h-10 w-10 text-indigo-500" />
+    icon: <UserCircle className="h-10 w-10 text-primary" />
   },
   {
     id: "content",
@@ -147,7 +147,7 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[450px] rounded-2xl">
+      <DialogContent className="sm:max-w-[450px] rounded-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Create a new assistant</DialogTitle>
           <DialogDescription>
@@ -167,7 +167,7 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
                 setAssistantName(e.target.value)
                 if (e.target.value.trim()) setNameError("")
               }}
-              className={`w-full rounded-xl ${nameError ? "border-red-500" : ""}`}
+              className={`w-full rounded-lg ${nameError ? "border-red-500" : ""}`}
               placeholder="My Assistant"
             />
             {nameError && <p className="text-red-500 text-xs mt-1">{nameError}</p>}
@@ -178,10 +178,10 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
             
             {/* Blank template */}
             <div
-              className={`flex items-start space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+              className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
                 isUsingBlank 
                   ? "border-primary bg-primary/5" 
-                  : "border-gray-100 hover:bg-gray-50"
+                  : "border-gray-100 hover:bg-background"
               }`}
               onClick={() => handleTemplateSelect("blank")}
             >
@@ -192,7 +192,7 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
                 >
                   {blankTemplate.name}
                 </Label>
-                <p className="text-gray-500 text-xs">
+                <p className="text-muted-foreground text-xs">
                   {blankTemplate.description}
                 </p>
                 {isUsingBlank && (
@@ -205,16 +205,16 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
             </div>
             
             {/* Template collection */}
-            <div className="rounded-xl border-2 border-gray-100 p-4">
+            <div className="rounded-lg border-2 border-gray-100 p-4">
               <h3 className="text-sm font-medium mb-3">Pre-built Templates</h3>
               <div className="max-h-[360px] overflow-y-auto pr-1 space-y-3 rounded-lg">
                 {assistantTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className={`flex items-start space-x-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    className={`flex items-start space-x-3 p-3 rounded-md border cursor-pointer transition-colors ${
                       selectedTemplate === template.id 
                         ? "border-primary bg-primary/5" 
-                        : "border-gray-100 hover:bg-gray-50"
+                        : "border-gray-100 hover:bg-background"
                     }`}
                     onClick={() => handleTemplateSelect(template.id)}
                   >
@@ -225,7 +225,7 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
                       >
                         {template.name}
                       </Label>
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-muted-foreground text-xs">
                         {template.description}
                       </p>
                       {selectedTemplate === template.id && (
@@ -245,7 +245,7 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
             <Button
               type="button"
               variant="outline"
-              className="rounded-xl"
+              className="rounded-md"
               onClick={onClose}
               disabled={isCreating}
             >
@@ -253,7 +253,7 @@ export function CreateAssistantModal({ isOpen, onClose, onCreateAssistant }: Cre
             </Button>
             <Button 
               type="submit" 
-              className="rounded-xl"
+              className="rounded-md"
               disabled={isCreating}
             >
               {isCreating ? (

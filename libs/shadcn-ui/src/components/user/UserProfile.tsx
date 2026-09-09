@@ -46,7 +46,7 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="p-4 bg-white rounded shadow">
+    <div className="p-4 bg-card rounded shadow">
       <h2 className="text-xl font-bold mb-4">User Profile</h2>
       <div className="mb-2">
         <span className="font-semibold">ID:</span> {user.id}

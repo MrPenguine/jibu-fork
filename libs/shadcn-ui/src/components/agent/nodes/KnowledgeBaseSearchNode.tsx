@@ -214,10 +214,10 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
           {data.knowledgeBaseId ? (
             <div className="mb-2">
               <div className="font-medium text-sm">{data.knowledgeBaseName}</div>
-              <div className="text-xs text-gray-500">{data.knowledgeBaseId}</div>
+              <div className="text-xs text-muted-foreground">{data.knowledgeBaseId}</div>
             </div>
           ) : (
-            <div className="text-sm text-amber-600 mb-2">
+            <div className="text-sm text-brand-cinnabar mb-2">
               No knowledge base selected
             </div>
           )}
@@ -231,9 +231,9 @@ export const KnowledgeBaseSearchNode = memo(({ id, data, selected }: NodeProps<K
           </Button>
         </div>
         
-        <div className="mt-4 p-2 border border-gray-100 rounded bg-gray-50">
+        <div className="mt-4 p-2 border border-gray-100 rounded bg-background">
           <div className="text-sm font-medium">Output Settings</div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-muted-foreground mt-1">
             Search results will be stored in the workflow variable.
           </div>
         </div>

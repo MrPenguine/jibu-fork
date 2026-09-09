@@ -52,7 +52,7 @@ export function ChatList({ chats, isLoading, onSelectChat, onDeleteChat, onNewCh
   };
 
   return (
-    <div className="h-full flex flex-col bg-background rounded-lg shadow-lg">
+    <div className="h-full flex flex-col bg-card border border-border rounded-lg shadow-sm">
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex space-x-2">
           {onNewChat && (
@@ -86,7 +86,7 @@ export function ChatList({ chats, isLoading, onSelectChat, onDeleteChat, onNewCh
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
           </div>
         ) : chats.length === 0 ? (
-          <div className="text-center p-8 text-gray-500">
+          <div className="text-center p-8 text-muted-foreground">
             <p className="mb-2">No previous conversations found</p>
             {onNewChat && (
               <Button 

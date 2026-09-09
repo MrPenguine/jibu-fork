@@ -96,12 +96,12 @@ export function RealtimeTranscript({ className }: RealtimeTranscriptProps) {
           </div>
           
           {error && (
-            <div className="p-2 bg-red-50 text-red-700 text-sm rounded">
+            <div className="p-2 bg-red-50 text-destructive text-sm rounded">
               {error}
             </div>
           )}
           
-          <div className="min-h-[100px] max-h-[200px] overflow-y-auto p-3 bg-gray-50 rounded border text-sm">
+          <div className="min-h-[100px] max-h-[200px] overflow-y-auto p-3 bg-background rounded border text-sm">
             {transcript ? (
               <p>{transcript}</p>
             ) : (

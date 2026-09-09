@@ -148,9 +148,9 @@ export default function AgentAnalyticsPage({ params }: { params: Promise<{ agent
                   <div key={item.name} className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <span className="w-20">{item.name}</span>
-                      <div className="flex-1 h-8 bg-gray-100 rounded-md overflow-hidden">
+                      <div className="flex-1 h-8 bg-background rounded-md overflow-hidden">
                         <div 
-                          className={`h-full ${item.name === 'Success' ? 'bg-green-500' : 'bg-red-500'}`}
+                          className={`h-full ${item.name === 'Success' ? 'bg-green-500' : 'bg-destructive'}`}
                           style={{ width: `${item.value}%` }}
                         />
                       </div>

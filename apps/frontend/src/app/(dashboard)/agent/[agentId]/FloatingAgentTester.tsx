@@ -251,10 +251,10 @@ export function FloatingAgentTester() {
       {isOpen && (
         <div
           className={cn(
-            "fixed z-50 bg-[#F8FAFC] shadow-2xl flex flex-col transition-all duration-350 border-0",
+            "fixed z-50 bg-[#F8FAFC] shadow-2xl flex flex-col transition-all duration-350 ",
             isFullscreen
               ? "inset-0 rounded-none"
-              : "bottom-6 right-6 w-[420px] h-[600px] rounded-2xl overflow-hidden"
+              : "bottom-6 right-6 w-[420px] h-[600px] rounded-lg overflow-hidden"
           )}
         >
           {/* Header */}
@@ -307,11 +307,11 @@ export function FloatingAgentTester() {
 
             {!loadingHistory && allMessages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center p-6">
-                <div className="h-10 w-10 bg-[#E6F7F0] text-[#009959] rounded-xl flex items-center justify-center mb-3">
+                <div className="h-10 w-10 bg-[#E6F7F0] text-[#009959] rounded-lg flex items-center justify-center mb-3">
                   <Sparkles className="h-5 w-5" />
                 </div>
-                <h4 className="text-xs font-bold text-gray-800">Start testing {config?.name || "your agent"}</h4>
-                <p className="text-[10px] text-gray-500 max-w-[200px] mt-1 leading-normal">
+                <h4 className="text-xs font-bold text-foreground">Start testing {config?.name || "your agent"}</h4>
+                <p className="text-[10px] text-muted-foreground max-w-[200px] mt-1 leading-normal">
                   Type a text prompt below, or connect WebRTC voice stage to speak directly.
                 </p>
               </div>
@@ -322,7 +322,7 @@ export function FloatingAgentTester() {
               if (m.role === "system") {
                 return (
                   <div key={m.id} className="flex justify-center my-2">
-                    <span className="text-[9px] bg-slate-200/95 text-slate-600 px-3 py-1 rounded-full font-semibold shadow-sm tracking-wider uppercase">
+                    <span className="text-[9px] bg-gray-200/95 text-muted-foreground px-3 py-1 rounded-full font-semibold shadow-sm tracking-wider uppercase">
                       {m.content}
                     </span>
                   </div>
@@ -333,18 +333,18 @@ export function FloatingAgentTester() {
                 <div key={m.id} className={cn("flex items-start gap-2.5", isUser && "flex-row-reverse")}>
                   <div
                     className={cn(
-                      "h-8 w-8 rounded-xl shadow-sm flex items-center justify-center flex-shrink-0 text-xs transition-all",
-                      isUser ? "bg-[#009959] text-white" : "bg-white border border-gray-200 text-[#009959]"
+                      "h-8 w-8 rounded-lg shadow-sm flex items-center justify-center flex-shrink-0 text-xs transition-all",
+                      isUser ? "bg-[#009959] text-white" : "bg-card border border-border text-[#009959]"
                     )}
                   >
                     {isUser ? <User className="h-4.5 w-4.5" /> : <Bot className="h-4.5 w-4.5" />}
                   </div>
                   <div
                     className={cn(
-                      "max-w-[75%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed shadow-sm whitespace-pre-wrap transition-all",
+                      "max-w-[75%] rounded-lg px-4 py-2.5 text-xs leading-relaxed shadow-sm whitespace-pre-wrap transition-all",
                       isUser
                         ? "bg-[#009959] text-white rounded-tr-none"
-                        : "bg-white border border-gray-150 text-gray-850 rounded-tl-none"
+                        : "bg-card border border-gray-150 text-gray-850 rounded-tl-none"
                     )}
                   >
                     {m.content}
@@ -394,10 +394,10 @@ export function FloatingAgentTester() {
             {/* Bouncing Dots Typing Indicator */}
             {sending && (
               <div className="flex items-start gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-white border border-gray-200 text-[#009959] flex items-center justify-center shadow-sm">
+                <div className="h-8 w-8 rounded-lg bg-card border border-border text-[#009959] flex items-center justify-center shadow-sm">
                   <Bot className="h-4 w-4" />
                 </div>
-                <div className="rounded-2xl bg-white border border-gray-150 px-4 py-3 shadow-sm rounded-tl-none flex items-center">
+                <div className="rounded-lg bg-card border border-gray-150 px-4 py-3 shadow-sm rounded-tl-none flex items-center">
                   <span className="flex gap-1.5 items-center h-3">
                     <span className="h-2 w-2 animate-bounce rounded-full bg-[#009959] [animation-delay:-0.3s]" />
                     <span className="h-2 w-2 animate-bounce rounded-full bg-[#009959] [animation-delay:-0.15s]" />
@@ -410,11 +410,11 @@ export function FloatingAgentTester() {
           </div>{/* end outer scroll container */}
 
           {/* Composer Footer */}
-          <div className="p-4 bg-white border-t border-gray-100 flex flex-col gap-2.5 shadow-md">
+          <div className="p-4 bg-card border-t border-gray-100 flex flex-col gap-2.5 shadow-sm">
             {/* Input / Display Bar */}
-            <div className="flex items-center gap-2.5 bg-slate-50 border border-gray-150 rounded-xl px-3 py-2 transition-all">
+            <div className="flex items-center gap-2.5 bg-background border border-gray-150 rounded-md px-3 py-2 transition-all">
               {voiceConnecting ? (
-                <div className="flex-1 flex items-center gap-2 text-xs text-slate-500 font-semibold py-1">
+                <div className="flex-1 flex items-center gap-2 text-xs text-muted-foreground font-semibold py-1">
                   <Loader2 className="h-4 w-4 animate-spin text-[#009959]" />
                   Connecting to voice...
                 </div>
@@ -423,7 +423,7 @@ export function FloatingAgentTester() {
                   <div className="flex items-center gap-2">
                     <span className={cn(
                       "h-2 w-2 rounded-full",
-                      agentState === "speaking" ? "bg-amber-400 animate-pulse" : "bg-emerald-500 animate-ping"
+                      agentState === "speaking" ? "bg-amber-400 animate-pulse" : "bg-green-500 animate-ping"
                     )} />
                     <span className="text-xs font-bold text-gray-700">
                       {micMuted ? "Muted" : agentState === "speaking" ? "Agent speaking..." : "Speak now"}
@@ -432,7 +432,7 @@ export function FloatingAgentTester() {
                   {/* Wave Visualizer using Lucide colors simulation */}
                   <div className="flex items-center gap-0.5 h-4">
                     <span className="w-0.5 h-2 bg-yellow-400 rounded-full animate-bounce [animation-delay:-0.4s]" />
-                    <span className="w-0.5 h-4 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.2s]" />
+                    <span className="w-0.5 h-4 bg-green-500 rounded-full animate-bounce [animation-delay:-0.2s]" />
                     <span className="w-0.5 h-3 bg-red-400 rounded-full animate-bounce" />
                   </div>
                 </div>
@@ -457,7 +457,7 @@ export function FloatingAgentTester() {
                       size="icon"
                       onClick={() => setMicMuted(!micMuted)}
                       className={cn(
-                        "h-8 w-8 rounded-lg text-slate-500 hover:bg-slate-200 shrink-0",
+                        "h-8 w-8 rounded-lg text-muted-foreground hover:bg-gray-200 shrink-0",
                         micMuted && "text-red-500 bg-red-50 hover:bg-red-100"
                       )}
                     >
@@ -465,7 +465,7 @@ export function FloatingAgentTester() {
                     </Button>
                     <Button
                       onClick={handleEndVoice}
-                      className="bg-red-500 hover:bg-red-600 text-white rounded-lg h-8 px-3 text-xs gap-1 shadow-sm font-semibold shrink-0"
+                      className="bg-destructive hover:bg-destructive text-white rounded-lg h-8 px-3 text-xs gap-1 shadow-sm font-semibold shrink-0"
                     >
                       <PhoneOff className="h-3.5 w-3.5" /> End Call
                     </Button>
@@ -485,7 +485,7 @@ export function FloatingAgentTester() {
                       disabled={voiceConnecting}
                       size="icon"
                       variant="outline"
-                      className="h-8 w-8 rounded-lg border-gray-250 hover:bg-slate-100 shrink-0 text-slate-600"
+                      className="h-8 w-8 rounded-lg border-gray-250 hover:bg-background shrink-0 text-muted-foreground"
                     >
                       <Mic className="h-4 w-4" />
                     </Button>

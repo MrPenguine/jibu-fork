@@ -15,7 +15,7 @@ export type ControlPanelProps = {
 
 export function ControlPanel({ onZoomOut, onZoomIn, onFitView, onReset, onToggleGrid, onToggleNoteMode }: ControlPanelProps) {
   return (
-    <div className="fixed bottom-4 left-20 flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-1 shadow-sm z-20">
+    <div className="fixed bottom-4 left-20 flex items-center gap-1 bg-card rounded-lg border border-border p-1 shadow-sm z-20">
       <Button variant="ghost" size="sm" className="w-8 h-8 p-0" onClick={onZoomOut}>
         <ZoomOut className="w-4 h-4" />
       </Button>

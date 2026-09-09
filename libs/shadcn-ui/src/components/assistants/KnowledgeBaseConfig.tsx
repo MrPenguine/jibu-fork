@@ -632,16 +632,16 @@ export function KnowledgeBaseConfig({
   const getIndexingStatusBadgeProps = (status: string) => {
     switch (status) {
       case "COMPLETED":
-        return { className: "bg-green-100 text-green-800", label: "Indexed" };
+        return { variant: "success" as const, label: "Indexed" };
       case "PROCESSING":
       case "PENDING":
-        return { className: "bg-yellow-100 text-yellow-800", label: "Indexing..." };
+        return { variant: "warning" as const, label: "Indexing..." };
       case "FAILED":
-        return { className: "bg-red-100 text-red-800", label: "Indexing Failed" };
+        return { variant: "danger" as const, label: "Indexing Failed" };
       case "MIXED":
-        return { className: "bg-orange-100 text-orange-800", label: "Partially Indexed" };
+        return { variant: "warning" as const, label: "Partially Indexed" };
       default:
-        return { className: "bg-gray-100 text-gray-800", label: "Unknown" };
+        return { variant: "neutral" as const, label: "Unknown" };
     }
   };
   
@@ -902,10 +902,10 @@ export function KnowledgeBaseConfig({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Book className="h-5 w-5 text-blue-600" />
+            <Book className="h-5 w-5 text-primary" />
             <span className="text-lg font-medium">{activeKnowledgeBase.name}</span>
-            <Badge className="bg-blue-100 text-blue-800">Connected</Badge>
-            <Badge className={indexingBadge.className}>{indexingBadge.label}</Badge>
+            <Badge variant="success">Connected</Badge>
+            <Badge variant={indexingBadge.variant}>{indexingBadge.label}</Badge>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -950,7 +950,7 @@ export function KnowledgeBaseConfig({
                 <Button 
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-blue-600"
+                  className="h-8 text-primary"
                   onClick={() => setIsEditMode(!isEditMode)}
                 >
                   <Edit3 className="h-4 w-4 mr-1" />
@@ -961,7 +961,7 @@ export function KnowledgeBaseConfig({
                 <Button 
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="h-8 text-destructive hover:text-destructive hover:bg-red-50"
                   onClick={handleUnlinkKnowledgeBase}
                 >
                   <X className="h-4 w-4 mr-1" />
@@ -974,11 +974,11 @@ export function KnowledgeBaseConfig({
         {isEditMode && (
           <Accordion type="single" collapsible defaultValue="kb-files" className="w-full">
             <AccordionItem value="kb-files" className="border-0">
-              <AccordionTrigger className="py-2 hover:bg-gray-50">
+              <AccordionTrigger className="py-2 hover:bg-background">
                 <div className="flex items-center">
                   <FileText className="h-4 w-4 mr-2" />
                   <span>Knowledge Base Files</span>
-                  <Badge className="ml-2 bg-gray-100 text-gray-700">
+                  <Badge className="ml-2 bg-muted text-gray-700">
                     {isLoadingSources ? '...' : knowledgeBaseSources.length}
                   </Badge>
                   <TooltipProvider>
@@ -1027,7 +1027,7 @@ export function KnowledgeBaseConfig({
                             }}
                             aria-disabled={isLoadingSources}
                           >
-                            <RefreshCw className="h-3 w-3 text-blue-600" />
+                            <RefreshCw className="h-3 w-3 text-primary" />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -1053,7 +1053,7 @@ export function KnowledgeBaseConfig({
                       <div className="space-y-2">
                         <div className="text-sm font-medium">Currently linked files:</div>
                         {knowledgeBaseSources.length === 0 ? (
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             No files in this knowledge base.
                           </div>
                         ) : (
@@ -1061,7 +1061,7 @@ export function KnowledgeBaseConfig({
                             {knowledgeBaseSources.map(source => (
                               <div key={source.id} className="flex items-center justify-between py-1">
                                 <div className="flex items-center">
-                                  <File className="h-4 w-4 mr-2 text-blue-500" />
+                                  <File className="h-4 w-4 mr-2 text-primary" />
                                   <span className="text-sm">
                                     {source.file?.name || source.sourcePointer?.substring(0, 8)}
                                     {getSourceStatusIndicator(source)}
@@ -1074,7 +1074,7 @@ export function KnowledgeBaseConfig({
                                         <Button 
                                           variant="ghost" 
                                           size="sm" 
-                                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700"
+                                          className="h-6 px-2 text-xs text-primary hover:text-primary"
                                           onClick={() => requestReindexing(source)}
                                           disabled={isUnlinkingFile || source.indexingStatus === 'PROCESSING' || source.indexingStatus === 'PENDING'}
                                         >
@@ -1090,7 +1090,7 @@ export function KnowledgeBaseConfig({
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
-                                    className="h-6 px-2 text-xs text-red-600 hover:text-red-700" 
+                                    className="h-6 px-2 text-xs text-destructive hover:text-destructive" 
                                     onClick={() => handleRemoveButtonClick(source)}
                                     disabled={isUnlinkingFile}
                                   >
@@ -1121,7 +1121,7 @@ export function KnowledgeBaseConfig({
                   </div>
                 ) : (
                           filteredFiles.length === 0 ? (
-                            <div className="text-center text-gray-500 text-sm py-2">
+                            <div className="text-center text-muted-foreground text-sm py-2">
                               No files found
                       </div>
                     ) : (
@@ -1132,8 +1132,8 @@ export function KnowledgeBaseConfig({
                                   <div
                                     key={file.id}
                                     className={cn(
-                                      "flex items-center justify-between py-1 px-2 hover:bg-gray-50 cursor-pointer",
-                                      isLinked ? "bg-blue-50" : ""
+                                      "flex items-center justify-between py-1 px-2 hover:bg-background cursor-pointer",
+                                      isLinked ? "bg-accent" : ""
                                     )}
                                     onClick={() => toggleFileSelection(file.id)}
                                   >
@@ -1144,10 +1144,10 @@ export function KnowledgeBaseConfig({
                                         readOnly
                                         className="h-4 w-4 mr-2"
                                       />
-                                      <File className="h-4 w-4 mr-2 text-blue-500" />
+                                      <File className="h-4 w-4 mr-2 text-primary" />
                                       <span className="text-sm">{file.name}</span>
                                   </div>
-                                    <span className="text-xs text-gray-500">{file.size}</span>
+                                    <span className="text-xs text-muted-foreground">{file.size}</span>
                             </div>
                           );
                         })}
@@ -1219,15 +1219,15 @@ export function KnowledgeBaseConfig({
     
     // Use string comparison to avoid TypeScript issues
     if (status === 'COMPLETED' || status === 'INDEXED') {
-      return <Badge className="ml-2 bg-green-100 text-green-800 text-xs">Indexed</Badge>;
+      return <Badge variant="success" className="ml-2 text-xs">Indexed</Badge>;
     } else if (status === 'PROCESSING') {
-      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Processing</Badge>;
+      return <Badge variant="warning" className="ml-2 text-xs">Processing</Badge>;
     } else if (status === 'PENDING') {
-      return <Badge className="ml-2 bg-yellow-100 text-yellow-800 text-xs">Pending</Badge>;
+      return <Badge variant="warning" className="ml-2 text-xs">Pending</Badge>;
     } else if (status === 'FAILED') {
-      return <Badge className="ml-2 bg-red-100 text-red-800 text-xs">Failed</Badge>;
+      return <Badge variant="danger" className="ml-2 text-xs">Failed</Badge>;
     } else {
-      return <Badge className="ml-2 bg-gray-100 text-gray-800 text-xs">Unknown</Badge>;
+      return <Badge variant="neutral" className="ml-2 text-xs">Unknown</Badge>;
     }
   };
   
@@ -1249,8 +1249,8 @@ export function KnowledgeBaseConfig({
       
       {/* Show instructions in standalone mode when nothing is selected */}
       {standalone && !knowledgeBaseId && (
-        <div className="p-4 border border-dashed border-gray-300 rounded-md mt-4">
-          <p className="text-sm text-gray-500">
+        <div className="p-4 border border-dashed border-border rounded-md mt-4">
+          <p className="text-sm text-muted-foreground">
             Select or create a knowledge base to use with this node. 
             Once connected, you'll be able to add files and manage the knowledge base directly here.
           </p>

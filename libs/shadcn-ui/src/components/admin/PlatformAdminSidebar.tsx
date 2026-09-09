@@ -51,8 +51,8 @@ function NavItem({
       <div className={cn(
         "w-full flex items-center gap-2 text-sm px-3 py-2 rounded-md transition-colors",
         isActive 
-          ? "bg-violet-100 text-violet-700 font-medium" 
-          : "text-gray-700 hover:bg-gray-100 hover:text-violet-600"
+          ? "bg-accent text-primary font-medium" 
+          : "text-gray-700 hover:bg-background hover:text-primary"
       )}>
         <Link href={href} className="w-full flex items-center gap-2">
           {React.cloneElement(icon, {
@@ -60,7 +60,7 @@ function NavItem({
           })}
           <span className="flex-1">{children}</span>
           {badge && (
-            <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-violet-600 text-white">
+            <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-primary text-white">
               {badge}
             </span>
           )}
@@ -85,7 +85,7 @@ export function PlatformAdminSidebar({
   return (
     <Sidebar
       collapsible="none"
-      className={cn("!border-0 !bg-[#FAFAFA] text-gray-900", className)}
+      className={cn("!border-0 !bg-[#FAFAFA] text-foreground", className)}
       {...sidebarProps}
     >
       <SidebarHeader className="border-0 flex-col !p-0">
@@ -98,15 +98,15 @@ export function PlatformAdminSidebar({
           )}
         >
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-600">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-brand-navy">
               <Shield className="h-5 w-5 text-white" />
             </div>
             {!isCollapsed && (
               <div>
-                <h2 className="text-sm font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+                <h2 className="text-sm font-bold bg-gradient-to-r from-primary to-brand-navy bg-clip-text text-transparent">
                   Aura Control Center
                 </h2>
-                <p className="text-xs text-gray-500">Platform Admin</p>
+                <p className="text-xs text-muted-foreground">Platform Admin</p>
               </div>
             )}
           </div>
@@ -140,7 +140,7 @@ export function PlatformAdminSidebar({
         {/* Core Management */}
         <SidebarGroup>
           <div className="px-3 py-1.5">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Management
             </p>
           </div>
@@ -162,7 +162,7 @@ export function PlatformAdminSidebar({
         {/* Platform */}
         <SidebarGroup>
           <div className="px-3 py-1.5">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Platform
             </p>
           </div>

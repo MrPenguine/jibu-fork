@@ -27,7 +27,7 @@ export default function PhoneNumbersPage({ params }: { params: { workspaceId: st
       </div>
 
       {/* Empty state */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border p-8 text-center">
+      <div className="bg-card dark:bg-gray-800 rounded-lg border p-8 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 dark:bg-gray-700">
           <Phone className="h-6 w-6 text-primary" />
         </div>

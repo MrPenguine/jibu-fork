@@ -151,8 +151,8 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
     if (trigger === 'Start') {
       return (
         <div className="flex items-center">
-          <div className="mr-2 bg-blue-100 p-1 rounded">
-            <Play className="h-3 w-3 text-blue-600" />
+          <div className="mr-2 bg-accent p-1 rounded">
+            <Play className="h-3 w-3 text-primary" />
           </div>
           <span>{trigger}</span>
         </div>
@@ -161,8 +161,8 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
     
     return (
       <div className="flex items-center">
-        <div className="mr-2 bg-blue-100 p-1 rounded">
-          <WorkflowIcon className="h-3 w-3 text-blue-600" />
+        <div className="mr-2 bg-brand-mint p-1 rounded">
+          <WorkflowIcon className="h-3 w-3 text-brand-navy" />
         </div>
         <span>{trigger}</span>
       </div>
@@ -172,7 +172,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
   const getStatusClassName = (status: string) => {
     return status === 'Active' || status === 'In progress'
       ? 'px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800'
-      : 'px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800';
+      : 'px-2 py-1 rounded-full text-xs font-medium bg-muted text-foreground';
   };
 
   // Open the create workflow modal
@@ -246,7 +246,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
       <div className="p-8 text-center flex flex-col items-center">
         <p className="mb-4">No workflows found matching your criteria.</p>
         <button 
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors"
           onClick={handleCreateSecondaryWorkflow}
         >
           Create Secondary Workflow
@@ -259,7 +259,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
   const renderWorkflowTable = (workflows: WorkflowType[]) => (
     <div className="overflow-x-auto">
       <table className="w-full text-left">
-        <thead className="bg-gray-50 text-xs uppercase font-medium text-gray-500">
+        <thead className="bg-background text-xs uppercase font-medium text-muted-foreground">
           <tr>
             <th className="px-8 py-3 w-12 rounded-tl-md">
               <input 
@@ -290,7 +290,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
           {workflows.map((workflow) => (
             <tr 
               key={workflow.id}
-              className="hover:bg-gray-50 cursor-pointer"
+              className="hover:bg-background cursor-pointer"
               onClick={() => onSelectWorkflow(workflow.id)}
             >
               <td className="px-6 py-3" onClick={(e) => e.stopPropagation()}>
@@ -302,7 +302,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
                 />
               </td>
               <td className="px-6 py-3 font-medium">{workflow.name}</td>
-              <td className="px-6 py-3 text-gray-500 text-sm">{workflow.description || '—'}</td>
+              <td className="px-6 py-3 text-muted-foreground text-sm">{workflow.description || '—'}</td>
               <td className="px-6 py-3">{renderTriggerCell(workflow.trigger || 'Start')}</td>
               <td className="px-6 py-3">
                 <span className={getStatusClassName(workflow.status || 'None')}>
@@ -322,13 +322,13 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
       {/* Create Secondary Workflow Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+          <div className="bg-card p-6 rounded-lg shadow-sm max-w-md w-full">
             <h3 className="text-lg font-medium mb-4">Create Secondary Workflow</h3>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
               <input 
                 type="text" 
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-ring focus:border-ring" 
                 value={newWorkflowName}
                 onChange={(e) => setNewWorkflowName(e.target.value)}
                 placeholder="Enter workflow name"
@@ -337,7 +337,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
               <textarea 
-                className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                className="w-full p-2 border rounded focus:ring-2 focus:ring-ring focus:border-ring" 
                 value={newWorkflowDescription}
                 onChange={(e) => setNewWorkflowDescription(e.target.value)}
                 placeholder="Enter workflow description"
@@ -346,13 +346,13 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
             </div>
             <div className="flex justify-end gap-2">
               <button 
-                className="px-4 py-2 border rounded hover:bg-gray-50"
+                className="px-4 py-2 border rounded hover:bg-background"
                 onClick={() => setShowCreateModal(false)}
               >
                 Cancel
               </button>
               <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
                 onClick={handleCreateSecondaryWorkflow}
               >
                 Create
@@ -367,7 +367,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
         {/* Master Workflow Section */}
         <div>
           <h2 className="text-xl font-medium mb-4 px-6">Master Workflow</h2>
-          <div className="bg-white rounded-lg">
+          <div className="bg-card rounded-lg">
             {isLoading ? (
               <div className="py-8 text-center">
                 <p>Loading workflows...</p>
@@ -387,14 +387,14 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-medium px-6">Secondary Workflows</h2>
             <button 
-              className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+              className="flex items-center gap-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm font-medium"
               onClick={openCreateModal}
             >
               Create Secondary Workflow
             </button>
           </div>
           
-          <div className="bg-white rounded-lg">
+          <div className="bg-card rounded-lg">
             {isLoading ? (
               <div className="py-8 text-center">
                 <p>Loading workflows...</p>
@@ -402,7 +402,7 @@ export function WorkflowsList({ agentId, searchQuery, onSelectWorkflow }: Workfl
             ) : secondaryWorkflows.length === 0 ? (
               <div className="py-8 text-center rounded-lg">
                 <p className="mb-2">No secondary workflows found.</p>
-                <p className="text-sm text-gray-600 mb-4">Create secondary workflows to add more functionality to your agent.</p>
+                <p className="text-sm text-muted-foreground mb-4">Create secondary workflows to add more functionality to your agent.</p>
               </div>
             ) : (
               renderWorkflowTable(secondaryWorkflows)
