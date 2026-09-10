@@ -63,7 +63,7 @@ export function SitemapImportDialog({ open, onOpenChange, onImport }: SitemapImp
               onChange={(e) => setSitemapUrl(e.target.value)}
               placeholder="Enter sitemap URL"
             />
-            <p className="text-sm text-slate-500">e.g. https://www.domain.com/sitemap.xml</p>
+            <p className="text-sm text-muted-foreground">e.g. https://www.domain.com/sitemap.xml</p>
           </div>
 
           {/* Refresh Rate */}
@@ -80,7 +80,7 @@ export function SitemapImportDialog({ open, onOpenChange, onImport }: SitemapImp
                 <SelectItem value="monthly">Monthly</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-sm text-slate-500">How often will the data source sync.</p>
+            <p className="text-sm text-muted-foreground">How often will the data source sync.</p>
           </div>
 
           {/* LLM Chunking Strategy (multi-select in dropdown) */}
@@ -102,7 +102,7 @@ export function SitemapImportDialog({ open, onOpenChange, onImport }: SitemapImp
             </Select>
             <button
               type="button"
-              className="self-start text-sm text-blue-600 hover:underline"
+              className="self-start text-sm text-primary hover:underline"
               onClick={() => {
                 const name = window.prompt("Enter folder name");
                 if (name) console.log("Create folder:", name);

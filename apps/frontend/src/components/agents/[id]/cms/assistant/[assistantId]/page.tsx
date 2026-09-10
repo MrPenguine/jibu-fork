@@ -92,7 +92,7 @@ export default function AssistantDetailPage() {
     return (
       <div className="p-6 bg-red-50 rounded-lg m-6">
         <h3 className="text-lg font-medium text-red-800 mb-2">Error</h3>
-        <p className="text-red-600">{error}</p>
+        <p className="text-destructive">{error}</p>
         <Button className="mt-4" onClick={handleBackToList}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Assistants
@@ -102,7 +102,7 @@ export default function AssistantDetailPage() {
   }
   
   return (
-    <div className="p-6 bg-gray-50 h-full">
+    <div className="p-6 bg-background h-full">
       <div className="flex items-center mb-4">
         <Button variant="ghost" onClick={handleBackToList} className="mr-2">
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -110,7 +110,7 @@ export default function AssistantDetailPage() {
         </Button>
         <h1 className="text-2xl font-semibold flex-1">Assistant Configuration</h1>
         {lastSaved && (
-          <span className="text-sm text-gray-500 mr-4">
+          <span className="text-sm text-muted-foreground mr-4">
             Last saved: {lastSaved.toLocaleTimeString()}
           </span>
         )}

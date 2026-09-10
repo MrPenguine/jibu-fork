@@ -47,13 +47,13 @@ export default function WorkspaceList() {
   }
 
   return (
-    <div className="p-4 bg-white rounded shadow">
+    <div className="p-4 bg-card rounded shadow">
       <h2 className="text-xl font-bold mb-4">My Workspaces</h2>
       <ul className="space-y-2">
         {workspaces.map((ws) => (
-          <li key={ws.id} className="p-3 border rounded hover:bg-gray-50">
+          <li key={ws.id} className="p-3 border rounded hover:bg-background">
             <div className="font-semibold">{ws.name}</div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               Role: <span className="font-medium">{ws.role}</span>
             </div>
           </li>

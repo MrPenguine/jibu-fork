@@ -268,7 +268,7 @@ export const VoicesList: React.FC<VoicesListProps> = ({
           <span className="text-primary text-2xl">+</span>
         </div>
         <h3 className="text-lg font-medium mb-2">No custom voices yet</h3>
-        <p className="text-gray-500 mb-6 text-center max-w-md">Create your first custom voice to get started</p>
+        <p className="text-muted-foreground mb-6 text-center max-w-md">Create your first custom voice to get started</p>
         <button 
           className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
           onClick={() => console.log('Start creating voice')}
@@ -284,7 +284,7 @@ export const VoicesList: React.FC<VoicesListProps> = ({
     return (
       <div className="py-8 text-center">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-        <p className="mt-4 text-gray-500">Loading voices...</p>
+        <p className="mt-4 text-muted-foreground">Loading voices...</p>
       </div>
     );
   }
@@ -335,7 +335,7 @@ export const VoicesList: React.FC<VoicesListProps> = ({
           )}
         </>
       ) : (
-        <div className="py-8 text-center text-gray-500">
+        <div className="py-8 text-center text-muted-foreground">
           {activeTab === 'library' ? 'No voices found for the selected filter.' : 'No custom voices found.'}
         </div>
       )}

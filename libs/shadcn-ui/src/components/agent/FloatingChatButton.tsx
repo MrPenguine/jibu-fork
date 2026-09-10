@@ -75,7 +75,7 @@ export const FloatingChatButton = ({
             onClose={() => setIsOpen(false)}
           />
         ) : (
-          <div className="fixed bottom-5 right-5 w-96 h-[300px] z-50 bg-white rounded-lg shadow-lg flex flex-col">
+          <div className="fixed bottom-5 right-5 w-96 h-[300px] z-50 bg-card rounded-lg shadow-sm flex flex-col">
             {/* Chat header */}
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center">
@@ -96,7 +96,7 @@ export const FloatingChatButton = ({
             <div className="flex-grow p-4 flex flex-col items-center justify-center text-center">
               <FaRobot size={40} className="text-gray-300 mb-4" />
               <h3 className="text-lg font-medium mb-2">Agent not ready</h3>
-              <p className="text-gray-500">
+              <p className="text-muted-foreground">
                 This agent is not published or fully configured. 
                 Please publish both the workflow and agent before running.
               </p>

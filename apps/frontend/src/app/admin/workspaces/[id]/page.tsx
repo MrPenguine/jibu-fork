@@ -171,7 +171,7 @@ export default function AdminWorkspaceDetailPage() {
       <button
         type="button"
         onClick={() => router.push("/admin/workspaces")}
-        className="flex items-center text-xs text-gray-500 hover:text-gray-700 mb-2"
+        className="flex items-center text-xs text-muted-foreground hover:text-gray-700 mb-2"
       >
         <ArrowLeft className="h-3 w-3 mr-1" />
         Back to Workspaces
@@ -179,26 +179,22 @@ export default function AdminWorkspaceDetailPage() {
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <WorkspaceTitleIcon />
             <span>{workspace?.name || "Workspace"}</span>
           </h1>
           {workspace?.email && (
-            <p className="text-sm text-gray-600 mt-1">{workspace.email}</p>
+            <p className="text-sm text-muted-foreground mt-1">{workspace.email}</p>
           )}
           {workspace && (
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge
-                className={
-                  workspace.isSuspended
-                    ? "bg-red-100 text-red-700"
-                    : "bg-emerald-100 text-emerald-700"
-                }
+                variant={workspace.isSuspended ? "danger" : "success"}
               >
                 {workspace.isSuspended ? "Suspended" : "Active"}
               </Badge>
               {workspace.subscription && (
-                <Badge className="bg-blue-100 text-blue-700">
+                <Badge variant="info">
                   {workspace.subscription.planName || "Plan"} (
                   {workspace.subscription.status})
                 </Badge>
@@ -221,7 +217,7 @@ export default function AdminWorkspaceDetailPage() {
                 : "Suspend Workspace"}
             </Button>
             {workspace.isSuspended && workspace.suspensionReason && (
-              <div className="flex items-start gap-1 text-xs text-red-700 max-w-xs">
+              <div className="flex items-start gap-1 text-xs text-destructive max-w-xs">
                 <AlertTriangle className="h-3 w-3 mt-0.5" />
                 <span>{workspace.suspensionReason}</span>
               </div>
@@ -231,16 +227,16 @@ export default function AdminWorkspaceDetailPage() {
       </div>
 
       {loading ? (
-        <Card className="p-6 text-sm text-gray-500">Loading workspace...</Card>
+        <Card className="p-6 text-sm text-muted-foreground">Loading workspace...</Card>
       ) : error ? (
-        <Card className="p-6 text-sm text-red-600">{error}</Card>
+        <Card className="p-6 text-sm text-destructive">{error}</Card>
       ) : !workspace ? (
-        <Card className="p-6 text-sm text-gray-500">Workspace not found.</Card>
+        <Card className="p-6 text-sm text-muted-foreground">Workspace not found.</Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="p-5 space-y-3 col-span-1">
-            <h2 className="text-sm font-semibold text-gray-800">Overview</h2>
-            <div className="text-xs text-gray-600 space-y-1">
+            <h2 className="text-sm font-semibold text-foreground">Overview</h2>
+            <div className="text-xs text-muted-foreground space-y-1">
               <p>
                 <span className="font-medium">Created:</span>{" "}
                 {new Date(workspace.createdAt).toLocaleString()}
@@ -277,28 +273,28 @@ export default function AdminWorkspaceDetailPage() {
 
           <Card className="p-5 space-y-3 col-span-1 lg:col-span-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                <Users className="h-4 w-4 text-gray-500" />
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
                 Members
               </h2>
             </div>
             {workspace.members.length === 0 ? (
-              <p className="text-xs text-gray-500">No members.</p>
+              <p className="text-xs text-muted-foreground">No members.</p>
             ) : (
               <div className="border border-gray-100 rounded-md overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-background">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Member
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Role
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Status
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Joined
                       </th>
                     </tr>
@@ -307,7 +303,7 @@ export default function AdminWorkspaceDetailPage() {
                     {workspace.members.map((m) => (
                       <tr key={m.id} className="border-t border-gray-100">
                         <td className="px-3 py-2">
-                          <span className="text-gray-800">
+                          <span className="text-foreground">
                             {m.email || m.userId || "Member"}
                           </span>
                         </td>
@@ -330,22 +326,22 @@ export default function AdminWorkspaceDetailPage() {
 
           <Card className="p-5 space-y-3 col-span-1 lg:col-span-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                <Bot className="h-4 w-4 text-gray-500" />
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Bot className="h-4 w-4 text-muted-foreground" />
                 Agents
               </h2>
             </div>
             {workspace.agents.length === 0 ? (
-              <p className="text-xs text-gray-500">No agents.</p>
+              <p className="text-xs text-muted-foreground">No agents.</p>
             ) : (
               <div className="border border-gray-100 rounded-md overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-background">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Agent
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Created
                       </th>
                     </tr>
@@ -353,7 +349,7 @@ export default function AdminWorkspaceDetailPage() {
                   <tbody>
                     {workspace.agents.map((a) => (
                       <tr key={a.id} className="border-t border-gray-100">
-                        <td className="px-3 py-2 text-gray-800">{a.name}</td>
+                        <td className="px-3 py-2 text-foreground">{a.name}</td>
                         <td className="px-3 py-2 text-gray-700 text-xs">
                           {new Date(a.createdAt).toLocaleDateString()}
                         </td>
@@ -366,23 +362,23 @@ export default function AdminWorkspaceDetailPage() {
           </Card>
 
           <Card className="p-5 space-y-3 col-span-1 lg:col-span-3">
-            <h2 className="text-sm font-semibold text-gray-800">
+            <h2 className="text-sm font-semibold text-foreground">
               Recent Sessions
             </h2>
             {workspace.recentSessions.length === 0 ? (
-              <p className="text-xs text-gray-500">No recent sessions.</p>
+              <p className="text-xs text-muted-foreground">No recent sessions.</p>
             ) : (
               <div className="border border-gray-100 rounded-md overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-background">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         ID
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Status
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Started
                       </th>
                     </tr>
@@ -390,7 +386,7 @@ export default function AdminWorkspaceDetailPage() {
                   <tbody>
                     {workspace.recentSessions.map((s) => (
                       <tr key={s.id} className="border-t border-gray-100">
-                        <td className="px-3 py-2 text-gray-800">{s.id}</td>
+                        <td className="px-3 py-2 text-foreground">{s.id}</td>
                         <td className="px-3 py-2 text-gray-700 text-xs">
                           {s.status}
                         </td>
@@ -412,7 +408,7 @@ export default function AdminWorkspaceDetailPage() {
 
 function WorkspaceTitleIcon() {
   return (
-    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700">
+    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-accent text-primary">
       <Building2 className="h-4 w-4" />
     </span>
   );

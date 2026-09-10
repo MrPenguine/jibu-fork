@@ -171,14 +171,14 @@ export function LoginForm({
   return (
     <div className={cn("flex flex-col gap-6 relative", className)} {...props}>
       {isLoggingIn && (
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-2xl">
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-lg">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="mt-4 text-center text-sm font-medium">Logging in...</p>
           <p className="text-center text-xs text-muted-foreground mt-1">Fetching your workspace</p>
         </div>
       )}
       
-      <Card className="border-none rounded-2xl shadow-sm">
+      <Card className="border-none rounded-lg shadow-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">{titles[mode]}</CardTitle>
           <CardDescription>
@@ -189,7 +189,7 @@ export function LoginForm({
           <form onSubmit={handleSubmit}>
             <div className="grid gap-6">
               {error && (
-                <div className="rounded-xl bg-red-50 p-3 text-sm text-red-500">
+                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-500">
                   {error}
                 </div>
               )}
@@ -199,7 +199,7 @@ export function LoginForm({
                   <Button 
                     type="button" 
                     variant="outline" 
-                    className="w-full rounded-xl" 
+                    className="w-full rounded-md" 
                     onClick={handleGoogleSignIn}
                     disabled={isLoading}
                   >
@@ -233,7 +233,7 @@ export function LoginForm({
                       type="email"
                       placeholder="name@example.com"
                       required
-                      className="rounded-xl"
+                      className="rounded-lg"
                       disabled={isLoading}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -262,7 +262,7 @@ export function LoginForm({
                         type="password"
                         placeholder="••••••••" 
                         required
-                        className="rounded-xl" 
+                        className="rounded-lg" 
                         disabled={isLoading}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -272,7 +272,7 @@ export function LoginForm({
                   
                   <Button 
                     type="submit" 
-                    className="w-full mt-2 rounded-xl" 
+                    className="w-full mt-2 rounded-md" 
                     size="lg"
                     disabled={isLoading}
                   >

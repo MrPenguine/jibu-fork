@@ -93,7 +93,7 @@ export function CredentialModal({ credentialType, onSave, onCancel }: Credential
         
         {loading ? (
           <div className="flex justify-center items-center py-8">
-            <Spinner className="text-blue-500" />
+            <Spinner className="text-primary" />
             <span className="ml-2">Loading credential schema...</span>
           </div>
         ) : error ? (
@@ -128,7 +128,7 @@ export function CredentialModal({ credentialType, onSave, onCancel }: Credential
                   disabled={saving}
                 />
                 {prop.description && (
-                  <p className="text-xs text-gray-500">{prop.description}</p>
+                  <p className="text-xs text-muted-foreground">{prop.description}</p>
                 )}
               </div>
             ))}

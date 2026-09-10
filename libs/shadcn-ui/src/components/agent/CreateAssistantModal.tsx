@@ -39,20 +39,20 @@ export const CreateAssistantModal: React.FC<CreateAssistantModalProps> = ({ open
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-md shadow-lg w-full max-w-md p-4">
+      <div className="bg-card rounded-md shadow-sm w-full max-w-md p-4">
         <div className="flex items-center justify-between pb-2 border-b mb-3">
           <h3 className="text-lg font-semibold">Create Assistant</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-gray-700">✕</button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="assistantName">Name</Label>
             <Input id="assistantName" placeholder="e.g. Customer support agent" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-          {error && <div className="text-sm text-red-600">{error}</div>}
+          {error && <div className="text-sm text-destructive">{error}</div>}
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={loading || !name.trim()}>
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={loading || !name.trim()}>
               {loading ? 'Creating...' : 'Create'}
             </Button>
           </div>

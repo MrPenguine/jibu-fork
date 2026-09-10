@@ -291,7 +291,7 @@ export default function N8nManagementPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">N8N Management</h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-muted-foreground mt-2">
             Create and manage N8N workflows for AI-powered automation
           </p>
         </div>
@@ -338,9 +338,9 @@ export default function N8nManagementPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <p className="text-center text-gray-500">Loading workflows...</p>
+                <p className="text-center text-muted-foreground">Loading workflows...</p>
               ) : workflows.length === 0 ? (
-                <p className="text-center text-gray-500">No workflows found</p>
+                <p className="text-center text-muted-foreground">No workflows found</p>
               ) : (
                 <div className="space-y-4">
                   {workflows.map((workflow) => (
@@ -348,7 +348,7 @@ export default function N8nManagementPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="font-medium">{workflow.name}</h3>
-                          <p className="text-sm text-gray-500">ID: {workflow.id}</p>
+                          <p className="text-sm text-muted-foreground">ID: {workflow.id}</p>
                         </div>
                         <Badge variant={workflow.active ? 'default' : 'secondary'}>
                           {workflow.active ? 'Active' : 'Inactive'}
@@ -360,7 +360,7 @@ export default function N8nManagementPage() {
                         {workflow.webhookUrl && (
                           <p className="break-all">
                             <strong>Webhook:</strong> 
-                            <code className="text-xs bg-gray-100 px-1 rounded ml-1">
+                            <code className="text-xs bg-background px-1 rounded ml-1">
                               {workflow.webhookUrl}
                             </code>
                           </p>
@@ -447,7 +447,7 @@ export default function N8nManagementPage() {
                   
                   <div>
                     <p className="text-sm font-medium mb-1">Response:</p>
-                    <div className="bg-gray-100 p-3 rounded-md overflow-x-auto">
+                    <div className="bg-background p-3 rounded-md overflow-x-auto">
                       <pre className="text-xs">{JSON.stringify(testResult, null, 2)}</pre>
                     </div>
                   </div>
@@ -463,7 +463,7 @@ export default function N8nManagementPage() {
           <CardHeader>
             <CardTitle>About This Test Page</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-gray-600 space-y-2">
+          <CardContent className="text-sm text-muted-foreground space-y-2">
             <p>
               This is a test page for creating and managing N8N workflows. Each workflow created here includes:
             </p>

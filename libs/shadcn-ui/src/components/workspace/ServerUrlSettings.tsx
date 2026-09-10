@@ -113,7 +113,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
             value={serverUrl} 
             onChange={(e) => setServerUrl(e.target.value)} 
             placeholder="No Server URL"
-            className="mt-1 rounded-xl"
+            className="mt-1 rounded-lg"
             readOnly={readOnly}
             disabled={readOnly}
           />
@@ -146,7 +146,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
             min="1"
             max="120"
             type="number"
-            className="rounded-xl"
+            className="rounded-lg"
             readOnly={readOnly}
             disabled={readOnly}
           />
@@ -181,7 +181,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
                     value={header.name} 
                     onChange={(e) => updateHeader(header.id, "name", e.target.value)}
                     placeholder="Header Name"
-                    className="flex-1 rounded-xl"
+                    className="flex-1 rounded-md"
                     readOnly={readOnly}
                     disabled={readOnly}
                   />
@@ -189,7 +189,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
                     value={header.value} 
                     onChange={(e) => updateHeader(header.id, "value", e.target.value)} 
                     placeholder="Header Value"
-                    className="flex-1 rounded-xl"
+                    className="flex-1 rounded-md"
                     readOnly={readOnly}
                     disabled={readOnly}
                   />
@@ -198,7 +198,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
                       variant="ghost" 
                       size="icon" 
                       onClick={() => removeHeader(header.id)}
-                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-0 flex items-center justify-center"
+                      className="h-8 w-8 text-red-500 hover:text-destructive hover:bg-red-50 rounded-full p-0 flex items-center justify-center"
                     >
                       ✕
                     </Button>
@@ -212,7 +212,7 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
             <Button 
               variant="outline" 
               onClick={addRow}
-              className="flex items-center rounded-xl"
+              className="flex items-center rounded-md"
             >
               <PlusCircle className="h-4 w-4 mr-2 text-primary" />
               Add Row
@@ -226,14 +226,14 @@ export default function ServerUrlSettings({ readOnly = false }: ServerUrlSetting
           <Button 
             variant="outline" 
             onClick={clearAll}
-            className="rounded-xl border-0"
+            className="rounded-md border-0"
           >
             Clear
           </Button>
           <Button 
             onClick={saveSettings}
             disabled={isSaving}
-            className="gap-2 rounded-xl border-0"
+            className="gap-2 rounded-md border-0"
           >
             {isSaving ? (
               <>

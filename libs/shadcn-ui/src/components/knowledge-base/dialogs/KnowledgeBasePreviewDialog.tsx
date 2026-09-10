@@ -42,19 +42,19 @@ interface KnowledgeBasePreviewDialogProps {
 const PROVIDER_PRESETS: Record<string, { label: string; color: string; defaultModel: string; examples: string }> = {
   google: {
     label: "Gemini",
-    color: "bg-blue-50 text-blue-700 border-blue-100",
+    color: "bg-accent text-primary border-green-200",
     defaultModel: "gemini-2.0-flash",
     examples: "gemini-2.0-flash, gemini-1.5-pro",
   },
   openrouter: {
     label: "OpenRouter",
-    color: "bg-violet-50 text-violet-700 border-violet-100",
+    color: "bg-accent text-primary border-green-200",
     defaultModel: "openai/gpt-4o-mini",
     examples: "openai/gpt-4o-mini, anthropic/claude-3.5-sonnet",
   },
   ollama: {
     label: "Ollama",
-    color: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    color: "bg-green-50 text-green-700 border-green-100",
     defaultModel: "llama3.2",
     examples: "llama3.2, qwen2.5, mistral",
   },
@@ -120,10 +120,10 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
 
   return (
     <Sheet open={open} onOpenChange={(v) => !loading && onOpenChange(v)} modal={false}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl max-h-[100vh] overflow-y-auto border-l-0 bg-white p-0 shadow-2xl">
-        <SheetHeader className="sticky top-0 z-10 bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-5 text-white">
+      <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-3xl max-h-[100vh] overflow-y-auto border-l-0 bg-card p-0 shadow-2xl">
+        <SheetHeader className="sticky top-0 z-10 bg-gradient-to-r from-primary to-brand-navy px-6 py-5 text-white">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-white/20 p-2">
+            <div className="rounded-lg bg-white/20 p-2">
               <Search className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -136,22 +136,22 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
         </SheetHeader>
 
         <div className="px-6 py-5 space-y-5">
-          <Card className="border-0 shadow-sm bg-slate-50/60 rounded-xl overflow-hidden">
+            <Card className="shadow-sm bg-card/60 rounded-lg overflow-hidden">
             <CardHeader className="pb-3 pt-4 px-5">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                <Bot className="h-4 w-4 text-violet-500" />
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <Bot className="h-4 w-4 text-primary" />
                 Answer model
               </CardTitle>
             </CardHeader>
             <CardContent className="px-5 pb-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-slate-700 text-sm">Provider</Label>
+                  <Label className="text-gray-700 text-sm">Provider</Label>
                   <Select value={answerProvider} onValueChange={setAnswerProvider} disabled={loading}>
-                    <SelectTrigger className="rounded-xl border-slate-200 bg-white focus:ring-indigo-500">
+                    <SelectTrigger className="rounded-md border-border bg-card focus:ring-ring">
                       <SelectValue placeholder="Select provider" />
                     </SelectTrigger>
-                    <SelectContent className="rounded-xl">
+                    <SelectContent className="rounded-md">
                       {Object.entries(PROVIDER_PRESETS).map(([key, p]) => (
                         <SelectItem key={key} value={key} className="rounded-lg">
                           <div className="flex items-center gap-2">
@@ -166,23 +166,23 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-700 text-sm">Model</Label>
+                  <Label className="text-gray-700 text-sm">Model</Label>
                   <Input
                     value={answerModel}
                     onChange={(e) => setAnswerModel(e.target.value)}
                     placeholder={preset.defaultModel}
-                    className="rounded-xl border-slate-200 bg-white focus-visible:ring-indigo-500"
+                    className="rounded-lg border-border bg-card focus-visible:ring-ring"
                     disabled={loading}
                   />
-                  <p className="text-[11px] text-slate-400">Examples: {preset.examples}</p>
+                  <p className="text-[11px] text-gray-400">Examples: {preset.examples}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <div className="space-y-2">
-            <Label className="text-slate-700 font-medium flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-indigo-500" />
+            <Label className="text-gray-700 font-medium flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" />
               Question
             </Label>
             <div className="flex gap-2">
@@ -194,12 +194,12 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
                   if (e.key === "Enter") run();
                 }}
                 disabled={loading}
-                className="rounded-xl border-slate-200 focus-visible:ring-indigo-500"
+                className="rounded-md border-border focus-visible:ring-ring"
               />
               <Button
                 onClick={run}
                 disabled={loading || !question.trim()}
-                className="shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                className="shrink-0 rounded-md bg-primary hover:bg-primary/90 text-white gap-2"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 {loading ? "Searching…" : "Ask"}
@@ -209,55 +209,55 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
 
           {loading && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                 <span className="flex items-center gap-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                   Retrieving chunks and generating answer…
                 </span>
                 <span>{Math.round(progress)}%</span>
               </div>
-              <Progress value={progress} className="h-2 rounded-full bg-slate-100" />
+              <Progress value={progress} className="h-2 rounded-full bg-muted" />
             </div>
           )}
 
           {error && (
-            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-100 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-destructive border border-red-100 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
           {result && !loading && (
             <div className="space-y-5">
-              <Card className="border-0 shadow-sm bg-emerald-50/40 rounded-xl overflow-hidden">
+              <Card className=" shadow-sm bg-green-50/40 rounded-lg overflow-hidden">
                 <CardHeader className="pb-2 pt-4 px-5">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2 text-emerald-800">
-                    <Bot className="h-4 w-4 text-emerald-600" />
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2 text-green-800">
+                    <Bot className="h-4 w-4 text-green-600" />
                     Answer
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="px-5 pb-5">
-                  <div className="whitespace-pre-wrap rounded-xl bg-white p-4 text-sm text-slate-800 shadow-sm">
+                  <div className="whitespace-pre-wrap rounded-lg bg-card p-4 text-sm text-foreground shadow-sm">
                     {result.answer || "No answer generated."}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-sm bg-slate-50/60 rounded-xl overflow-hidden">
+              <Card className="shadow-sm bg-card/60 rounded-lg overflow-hidden">
                 <CardHeader className="pb-3 pt-4 px-5">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                      <FileStack className="h-4 w-4 text-indigo-500" />
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                      <FileStack className="h-4 w-4 text-primary" />
                       Retrieved chunks ({result.chunks.length})
                     </CardTitle>
-                    <Badge variant="outline" className="text-slate-500 border-slate-200 bg-white">
+                    <Badge variant="neutral" className="text-muted-foreground border-border bg-card">
                       {result.embeddingModel} · top-K {result.topK}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="px-5 pb-5">
                   {result.chunks.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 bg-white">
+                    <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground bg-card">
                       No chunks matched this query.
                     </div>
                   ) : (
@@ -265,9 +265,9 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
                       {result.chunks.map((c, i) => (
                         <div
                           key={`${c.vectorId}-${i}`}
-                          className="rounded-xl bg-white p-4 shadow-sm border border-slate-100"
+                          className="rounded-lg bg-card p-4 shadow-sm border border-gray-100"
                         >
-                          <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500">
+                          <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
                             <span className="inline-flex items-center gap-2">
                               <Badge variant="secondary" className="font-normal">
                                 {c.chunkType}
@@ -276,9 +276,9 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
                                 {c.fileName || c.sourceUrl || c.vectorId}
                               </span>
                             </span>
-                            <span className="font-mono text-slate-600">score {c.score.toFixed(3)}</span>
+                            <span className="font-mono text-muted-foreground">score {c.score.toFixed(3)}</span>
                           </div>
-                          <p className="text-sm text-slate-700 line-clamp-4 whitespace-pre-wrap">{c.text}</p>
+                          <p className="text-sm text-gray-700 line-clamp-4 whitespace-pre-wrap">{c.text}</p>
                         </div>
                       ))}
                     </div>
@@ -289,8 +289,8 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
           )}
         </div>
 
-        <div className="sticky bottom-0 border-t border-slate-100 bg-white/80 backdrop-blur px-6 py-4 flex justify-end">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl border-slate-200 gap-2">
+        <div className="sticky bottom-0 border-t border-gray-100 bg-card/80 backdrop-blur px-6 py-4 flex justify-end">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-md border-border gap-2">
             <X className="h-4 w-4" />
             Close
           </Button>

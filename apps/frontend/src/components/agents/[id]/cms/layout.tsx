@@ -26,13 +26,13 @@ interface NavItemProps {
 const NavItem = ({ href, icon, label, count, isActive }: NavItemProps) => (
   <Link href={href}>
     <div className={`flex items-center px-3 py-2 rounded-md text-sm group ${
-      isActive ? 'bg-primary/10 text-primary font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+      isActive ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-background'
     }`}>
       <span className="mr-3">{icon}</span>
       <span className="flex-grow">{label}</span>
       {count !== undefined && (
         <span className={`px-2 py-0.5 text-xs rounded-full ${
-          isActive ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600'
+          isActive ? 'bg-primary text-white' : 'bg-gray-200 text-muted-foreground'
         }`}>
           {count}
         </span>
@@ -113,10 +113,10 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-background">
       {/* Left Sidebar */}
-      <div className="w-48 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 font-medium text-gray-800">Content</div>
+      <div className="w-48 bg-card border-r border-border flex flex-col">
+        <div className="p-4 font-medium text-foreground">Content</div>
         <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
           {navItems.map((item) => (
             <NavItem
@@ -131,19 +131,19 @@ export default function CmsLayout({ children }: { children: React.ReactNode }) {
         </div>
         
         {/* Tutorial Section */}
-        <div className="mt-auto border-t border-gray-200">
+        <div className="mt-auto border-t border-border">
           <div className="p-4">
-            <div className="flex items-center justify-between text-sm text-gray-800">
+            <div className="flex items-center justify-between text-sm text-foreground">
               <span>Tutorials</span>
               <span className="bg-gray-200 p-1 rounded">►</span>
             </div>
-            <div className="text-xs text-gray-500 mt-1">Complete an export</div>
+            <div className="text-xs text-muted-foreground mt-1">Complete an export</div>
           </div>
           
           {/* Free Trial Section */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="text-sm text-gray-800">Free trial</div>
-            <div className="text-xs text-gray-500 mt-1">Your trial ends in 7 days.</div>
+          <div className="p-4 border-t border-border">
+            <div className="text-sm text-foreground">Free trial</div>
+            <div className="text-xs text-muted-foreground mt-1">Your trial ends in 7 days.</div>
             <button className="w-full mt-2 bg-primary hover:bg-primary/90 py-2 rounded text-xs font-medium text-white">
               Upgrade now
             </button>

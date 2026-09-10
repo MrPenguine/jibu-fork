@@ -46,24 +46,24 @@ export function FolderCard({
   const isProcessing = processingCount > 0;
 
   return (
-    <div className="rounded-2xl border-0 bg-white shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between p-4 hover:bg-slate-50/60 transition-colors">
+    <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between p-4 hover:bg-background/60 transition-colors">
         <div className="flex items-center gap-3 flex-1 cursor-pointer min-w-0" onClick={handleToggle}>
           {onToggleExpand && (
-            <div className="flex-shrink-0 rounded-lg hover:bg-slate-100 p-1">
+            <div className="flex-shrink-0 rounded-lg hover:bg-background p-1">
               {isExpanded ? (
-                <ChevronDown className="h-4 w-4 text-slate-500" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-slate-500" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               )}
             </div>
           )}
-          <div className="p-2 rounded-xl bg-emerald-50 flex-shrink-0">
+          <div className="p-2 rounded-lg bg-green-50 flex-shrink-0">
             <Folder className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-slate-800 truncate">{name}</h3>
-            <p className="text-sm text-slate-500">
+            <h3 className="font-semibold text-foreground truncate">{name}</h3>
+            <p className="text-sm text-muted-foreground">
               {fileCount} {fileCount === 1 ? 'file' : 'files'}
               {isProcessing && (
                 <span className="ml-2 inline-flex items-center gap-1 text-xs text-primary">
@@ -78,21 +78,21 @@ export function FolderCard({
         <div className="flex items-center gap-2 flex-shrink-0">
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-destructive hover:bg-red-50 rounded-lg">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
+            <AlertDialogContent className="rounded-lg border-0 shadow-2xl">
               <AlertDialogHeader>
-                <AlertDialogTitle className="text-slate-800">Delete folder?</AlertDialogTitle>
-                <AlertDialogDescription className="text-slate-500">
+                <AlertDialogTitle className="text-foreground">Delete folder?</AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground">
                   Are you sure you want to delete the folder "{name}"? This action cannot be undone.
                   Files in this folder will not be deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-xl border-slate-200">Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(id)} className="rounded-xl bg-red-600 text-white hover:bg-red-700">
+                <AlertDialogCancel className="rounded-lg border-border">Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDelete(id)} className="rounded-lg bg-destructive text-white hover:bg-red-700">
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -103,13 +103,13 @@ export function FolderCard({
 
       {isProcessing && (
         <div className="px-4 pb-3">
-          <Progress value={60} className="h-1.5 rounded-full bg-slate-100" />
+          <Progress value={60} className="h-1.5 rounded-full bg-muted" />
         </div>
       )}
 
       {/* Expanded content - show files in this folder */}
       {isExpanded && children && (
-        <div className="border-t border-slate-100 bg-slate-50/40 p-4">
+        <div className="border-t border-gray-100 bg-background/40 p-4">
           {children}
         </div>
       )}

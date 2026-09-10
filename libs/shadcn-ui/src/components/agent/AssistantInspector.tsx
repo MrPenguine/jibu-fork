@@ -108,9 +108,9 @@ export const AssistantInspector: React.FC<AssistantInspectorProps> = ({
   };
 
   return (
-    <div className="p-4 space-y-4 h-full overflow-y-auto bg-white">
+    <div className="p-4 space-y-4 h-full overflow-y-auto bg-card">
       <div className="flex items-center justify-between border-b pb-2 mb-2">
-        <h2 className="text-xl font-bold text-slate-800">Assistant</h2>
+        <h2 className="text-xl font-bold text-foreground">Assistant</h2>
       </div>
       
       {/* Assistant selection dropdown */}
@@ -129,11 +129,11 @@ export const AssistantInspector: React.FC<AssistantInspectorProps> = ({
         </div>
         
         {isDropdownOpen && (
-          <div className="absolute w-full mt-1 bg-white border rounded-md shadow-lg z-10">
+          <div className="absolute w-full mt-1 bg-card border rounded-md shadow-sm z-10">
             {assistants.map((assistant) => (
               <div 
                 key={assistant.id}
-                className="p-2 hover:bg-gray-100 cursor-pointer"
+                className="p-2 hover:bg-background cursor-pointer"
                 onClick={() => {
                   // Update both fields atomically to prevent race conditions
                   setLocalData((prev) => ({
@@ -149,7 +149,7 @@ export const AssistantInspector: React.FC<AssistantInspectorProps> = ({
               </div>
             ))}
             <div 
-              className="p-2 hover:bg-gray-100 cursor-pointer border-t text-blue-600"
+              className="p-2 hover:bg-background cursor-pointer border-t text-primary"
               onClick={() => {
                 setIsDropdownOpen(false);
                 setShowCreate(true);
@@ -163,7 +163,7 @@ export const AssistantInspector: React.FC<AssistantInspectorProps> = ({
       
       {/* Edit agent button */}
       <Button 
-        className="w-full bg-blue-500 hover:bg-blue-600"
+        className="w-full bg-primary hover:bg-primary/90"
         onClick={(e) => {
           if (onOpenAssistantConfig) onOpenAssistantConfig(node.id, e as any);
         }}

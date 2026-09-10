@@ -83,7 +83,7 @@ export const PillNodeShell = memo(function PillNodeShell(props: PillNodeShellPro
 
   return (
     <div
-      className={`w-96 p-4 rounded-2xl group transition-colors cursor-pointer ${selected ? 'ring-2 ring-slate-400' : ''}`}
+      className={`w-96 p-4 rounded-lg group transition-colors cursor-pointer ${selected ? 'ring-2 ring-gray-400' : ''}`}
       style={{ backgroundColor: bgColor }}
       onDoubleClick={(e) => {
         e.preventDefault();
@@ -131,12 +131,12 @@ export const PillNodeShell = memo(function PillNodeShell(props: PillNodeShellPro
 
       {/* Header with hover Play */}
       <div className="mb-3 relative flex items-center justify-between">
-        <h3 className="text-slate-600 font-medium text-sm">{title}</h3>
+        <h3 className="text-muted-foreground font-medium text-sm">{title}</h3>
         <div className="flex items-center gap-2">
           {customHeaderContent}
           <div className="opacity-0 group-hover:opacity-100 transition-opacity">
             <div
-              className="w-4 h-4 bg-slate-400 rounded-sm flex items-center justify-center"
+              className="w-4 h-4 bg-gray-400 rounded-sm flex items-center justify-center"
               onClick={(e) => {
                 e.stopPropagation();
                 onTest?.(id);
@@ -151,23 +151,23 @@ export const PillNodeShell = memo(function PillNodeShell(props: PillNodeShellPro
       </div>
 
       {/* Content Card */}
-      <Card className="p-4 bg-white shadow-sm rounded-xl border-0">
+      <Card className="p-4 bg-card shadow-sm rounded-lg">
         <div className="flex items-start gap-3">
           {/* Icon */}
           {Icon ? (
             <div className="flex-shrink-0 mt-0.5">
-              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center">
-                <Icon className="w-3 h-3 text-slate-600" />
+              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
+                <Icon className="w-3 h-3 text-muted-foreground" />
               </div>
             </div>
           ) : null}
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-slate-900 text-sm mb-1">{roleTitle}</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-1">{roleTitle}</h4>
             {description ? (
-              <div className="bg-slate-50 p-3 rounded-lg">
-                <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">{description}</p>
+              <div className="bg-background p-3 rounded-lg">
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{description}</p>
               </div>
             ) : null}
           </div>

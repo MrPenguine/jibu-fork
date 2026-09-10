@@ -125,7 +125,7 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
               placeholder="Variable name for results"
               className="mt-1"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               This variable will contain the search results
             </p>
           </div>
@@ -786,7 +786,7 @@ export const AgentNodeInspector: React.FC<AgentNodeInspectorProps> = ({
                 disabled={!!assistantId}
               />
             </div>
-            <div className="p-4 bg-blue-50 rounded-md text-blue-800">
+            <div className="p-4 bg-accent rounded-md text-green-800">
               <p>Double-click the assistant node in the canvas to edit its configuration.</p>
             </div>
           </div>

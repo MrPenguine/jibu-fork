@@ -192,14 +192,14 @@ export default function AgentPlaygroundPage() {
   return (
     <div className="flex h-screen flex-col bg-[#F8FAFC]">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
+      <header className="flex items-center justify-between border-b border-border bg-card px-6 py-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F7F0] text-[#009959]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E6F7F0] text-[#009959]">
             <Bot className="h-6 w-6" />
           </div>
           <div className="leading-tight">
-            <h1 className="text-base font-semibold text-gray-900">{config?.name || "Agent"} · Sandbox Playground</h1>
-            <p className="text-xs text-gray-500">
+            <h1 className="text-base font-semibold text-foreground">{config?.name || "Agent"} · Sandbox Playground</h1>
+            <p className="text-xs text-muted-foreground">
               {config?.provider ? (
                 <>
                   <span className="capitalize">{config.provider}</span>
@@ -211,7 +211,7 @@ export default function AgentPlaygroundPage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={startNewConversation} className="gap-2 border-gray-200 hover:bg-gray-50">
+        <Button variant="outline" size="sm" onClick={startNewConversation} className="gap-2 border-border hover:bg-background">
           <Plus className="h-4 w-4" /> New conversation
         </Button>
       </header>
@@ -219,15 +219,15 @@ export default function AgentPlaygroundPage() {
       {/* Main Body Layout */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 overflow-hidden">
         {/* Left Column: Chat Sandbox */}
-        <div className="lg:col-span-2 flex flex-col border-r border-gray-200 overflow-hidden bg-white">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto bg-slate-50/30">
+        <div className="lg:col-span-2 flex flex-col border-r border-border overflow-hidden bg-card">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto bg-background/30">
             {isEmpty ? (
               <div className="mx-auto flex h-full max-w-xl flex-col items-center justify-center px-6 text-center">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E6F7F0] text-[#009959]">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-[#E6F7F0] text-[#009959]">
                   <Sparkles className="h-7 w-7" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Chat with {config?.name || "your agent"}</h2>
-                <p className="mt-2 text-sm text-gray-500 max-w-sm">
+                <h2 className="text-xl font-bold text-foreground">Chat with {config?.name || "your agent"}</h2>
+                <p className="mt-2 text-sm text-muted-foreground max-w-sm">
                   This uses the same single-brain runtime as production, executing RAG and tools.
                 </p>
                 <div className="mt-8 grid w-full gap-3 sm:grid-cols-3">
@@ -235,7 +235,7 @@ export default function AgentPlaygroundPage() {
                     <button
                       key={s}
                       onClick={() => send(s)}
-                      className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 transition-all hover:border-[#009959] hover:bg-[#E6F7F0]/20 hover:shadow-sm"
+                      className="rounded-md border border-border bg-card px-4 py-3 text-left text-sm text-gray-700 transition-all hover:border-[#009959] hover:bg-[#E6F7F0]/20 hover:shadow-sm"
                     >
                       {s}
                     </button>
@@ -253,17 +253,17 @@ export default function AgentPlaygroundPage() {
                   messages.map((m) => (
                     <div key={m.id} className={`flex items-start gap-3.5 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
                       <div
-                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl shadow-sm ${
+                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg shadow-sm ${
                           m.role === "user" ? "bg-[#222E50] text-white" : "bg-[#E6F7F0] text-[#009959]"
                         }`}
                       >
                         {m.role === "user" ? <User className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
                       </div>
                       <div
-                        className={`max-w-[75%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                        className={`max-w-[75%] whitespace-pre-wrap rounded-lg px-4 py-3 text-sm leading-relaxed shadow-sm ${
                           m.role === "user"
                             ? "bg-[#222E50] text-white rounded-tr-none"
-                            : "bg-white border border-gray-150 text-gray-900 rounded-tl-none"
+                            : "bg-card border border-gray-150 text-foreground rounded-tl-none"
                         }`}
                       >
                         {m.content}
@@ -273,10 +273,10 @@ export default function AgentPlaygroundPage() {
                 )}
                 {sending && (
                   <div className="flex items-start gap-3.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F7F0] text-[#009959] shadow-sm">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#E6F7F0] text-[#009959] shadow-sm">
                       <Bot className="h-5 w-5" />
                     </div>
-                    <div className="rounded-2xl bg-white border border-gray-150 px-4 py-3.5 shadow-sm rounded-tl-none">
+                    <div className="rounded-lg bg-card border border-gray-150 px-4 py-3.5 shadow-sm rounded-tl-none">
                       <span className="flex gap-1.5 items-center h-4">
                         <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-[#009959] [animation-delay:-0.3s]" />
                         <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-[#009959] [animation-delay:-0.15s]" />
@@ -290,9 +290,9 @@ export default function AgentPlaygroundPage() {
           </div>
 
           {/* Composer */}
-          <div className="border-t border-gray-200 bg-white p-4">
+          <div className="border-t border-border bg-card p-4">
             <div className="mx-auto max-w-3xl">
-              <div className="flex items-end gap-2.5 rounded-2xl border border-gray-250 bg-white px-3 py-2.5 shadow-sm focus-within:border-[#009959] focus-within:ring-1 focus-within:ring-[#009959]/20 transition-all">
+              <div className="flex items-end gap-2.5 rounded-lg border border-gray-250 bg-card px-3 py-2.5 shadow-sm focus-within:border-[#009959] focus-within:ring-1 focus-within:ring-[#009959]/20 transition-all">
                 <Textarea
                   ref={textareaRef}
                   value={input}
@@ -306,7 +306,7 @@ export default function AgentPlaygroundPage() {
                   onClick={() => send(input)}
                   disabled={sending || !input.trim()}
                   size="icon"
-                  className="h-9 w-9 flex-shrink-0 rounded-xl bg-[#009959] hover:bg-[#007d49] shadow-sm transition-all"
+                  className="h-9 w-9 flex-shrink-0 rounded-md bg-[#009959] hover:bg-[#007d49] shadow-sm transition-all"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
@@ -319,27 +319,27 @@ export default function AgentPlaygroundPage() {
         </div>
 
         {/* Right Column: Voice Call Sandbox */}
-        <div className="p-6 bg-slate-50 flex flex-col gap-6 overflow-y-auto">
-          <Card className="shadow-md border-0 bg-white rounded-2xl">
+        <div className="p-6 bg-background flex flex-col gap-6 overflow-y-auto">
+          <Card className="  bg-card rounded-lg">
             <CardHeader className="pb-4">
-              <CardTitle className="text-base font-semibold text-gray-900">Voice Sandbox</CardTitle>
+              <CardTitle className="text-base font-semibold text-foreground">Voice Sandbox</CardTitle>
               <CardDescription>Start a real-time WebRTC audio call using local Livekit server.</CardDescription>
             </CardHeader>
             <CardContent>
               {voiceError && (
-                <div className="mb-4 rounded-xl border border-red-150 bg-red-50/50 p-3 text-xs text-red-700">
+                <div className="mb-4 rounded-lg border border-red-150 bg-red-50/50 p-3 text-xs text-destructive">
                   {voiceError}
                 </div>
               )}
 
               {!voiceSession ? (
                 <div className="space-y-4">
-                  <div className="rounded-2xl border-2 border-dashed border-gray-200 p-6 text-center bg-gray-50/50">
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#E6F7F0] text-[#009959]">
+                  <div className="rounded-lg border-2 border-dashed border-border p-6 text-center bg-background/50">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-[#E6F7F0] text-[#009959]">
                       <Phone className="h-6 w-6" />
                     </div>
-                    <h3 className="text-sm font-semibold text-gray-900">Audio Session</h3>
-                    <p className="mt-1 text-xs text-gray-500 max-w-[200px] mx-auto leading-relaxed">
+                    <h3 className="text-sm font-semibold text-foreground">Audio Session</h3>
+                    <p className="mt-1 text-xs text-muted-foreground max-w-[200px] mx-auto leading-relaxed">
                       Connect your mic to speak with {config?.name || "the agent"} dynamically.
                     </p>
                   </div>
@@ -347,7 +347,7 @@ export default function AgentPlaygroundPage() {
                   <Button
                     onClick={handleStartVoice}
                     disabled={voiceConnecting}
-                    className="w-full bg-[#009959] hover:bg-[#007d49] text-white py-5 rounded-xl font-medium gap-2 shadow-sm transition-all"
+                    className="w-full bg-[#009959] hover:bg-[#007d49] text-white py-5 rounded-lg font-medium gap-2 shadow-sm transition-all"
                   >
                     {voiceConnecting ? (
                       <>
@@ -369,7 +369,7 @@ export default function AgentPlaygroundPage() {
                   video={false}
                   onDisconnected={handleEndVoice}
                   data-lk-theme="default"
-                  className="rounded-xl border border-gray-150 bg-slate-50/50 overflow-hidden shadow-inner"
+                  className="rounded-lg border border-gray-150 bg-muted/50 overflow-hidden shadow-inner"
                 >
                   <RoomAudioRenderer />
                   <PlaygroundCallStage agentName={config?.name || "Agent"} onEnd={handleEndVoice} />
@@ -379,22 +379,22 @@ export default function AgentPlaygroundPage() {
           </Card>
 
           {config?.channels.voice && (
-            <Card className="shadow-sm border border-gray-200/60 bg-white rounded-2xl">
+            <Card className="shadow-sm border border-border/60 bg-card rounded-lg">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold text-gray-800">Voice Info</CardTitle>
+                <CardTitle className="text-sm font-semibold text-foreground">Voice Info</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-gray-500 space-y-2">
+              <CardContent className="text-xs text-muted-foreground space-y-2">
                 <div className="flex justify-between">
                   <span>STT Provider:</span>
-                  <span className="font-medium text-gray-800 capitalize">{config.sttProvider || "default"}</span>
+                  <span className="font-medium text-foreground capitalize">{config.sttProvider || "default"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>TTS Provider:</span>
-                  <span className="font-medium text-gray-800 capitalize">{config.ttsProvider || "default"}</span>
+                  <span className="font-medium text-foreground capitalize">{config.ttsProvider || "default"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Voice ID:</span>
-                  <span className="font-mono text-gray-800 font-medium">{config.ttsVoiceId || "default"}</span>
+                  <span className="font-mono text-foreground font-medium">{config.ttsVoiceId || "default"}</span>
                 </div>
               </CardContent>
             </Card>
@@ -457,14 +457,14 @@ function PlaygroundCallStage({ agentName, onEnd }: { agentName: string; onEnd: (
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Active Session</div>
-          <div className="text-base font-bold text-gray-900">{agentName}</div>
+          <div className="text-base font-bold text-foreground">{agentName}</div>
         </div>
         <span className="rounded-full bg-[#E6F7F0] px-2.5 py-1 text-xs font-semibold capitalize text-[#009959]">
           {state || "connecting"}
         </span>
       </div>
 
-      <div className="flex h-24 items-center justify-center rounded-xl bg-white border border-gray-150 shadow-inner">
+      <div className="flex h-24 items-center justify-center rounded-lg bg-card border border-gray-150 shadow-inner">
         <BarVisualizer
           state={state}
           barCount={7}
@@ -476,7 +476,7 @@ function PlaygroundCallStage({ agentName, onEnd }: { agentName: string; onEnd: (
 
       <div
         ref={scrollRef}
-        className="h-44 space-y-2.5 overflow-y-auto rounded-xl border border-gray-200/80 bg-white p-3 shadow-sm"
+        className="h-44 space-y-2.5 overflow-y-auto rounded-lg border border-border/80 bg-card p-3 shadow-sm"
       >
         {lines.length === 0 ? (
           <div className="flex h-full items-center justify-center text-center text-xs text-gray-400 px-4">
@@ -487,10 +487,10 @@ function PlaygroundCallStage({ agentName, onEnd }: { agentName: string; onEnd: (
             <div key={l.id} className={l.speaker === "you" ? "text-right" : "text-left"}>
               <span
                 className={
-                  "inline-block max-w-[85%] rounded-2xl px-3 py-1.5 text-xs " +
+                  "inline-block max-w-[85%] rounded-lg px-3 py-1.5 text-xs " +
                   (l.speaker === "you"
                     ? "bg-[#009959] text-white rounded-tr-none"
-                    : "bg-slate-100 text-gray-900 rounded-tl-none")
+                    : "bg-background text-foreground rounded-tl-none")
                 }
               >
                 {l.text}
@@ -501,11 +501,11 @@ function PlaygroundCallStage({ agentName, onEnd }: { agentName: string; onEnd: (
       </div>
 
       <div className="flex items-center justify-center gap-2">
-        <Button variant="outline" size="sm" onClick={toggleMic} className="flex-1 gap-2 rounded-xl border-gray-250">
+        <Button variant="outline" size="sm" onClick={toggleMic} className="flex-1 gap-2 rounded-md border-gray-250">
           {micOn ? <Mic className="h-3.5 w-3.5 text-[#009959]" /> : <MicOff className="h-3.5 w-3.5 text-red-500" />}
           {micOn ? "Mute" : "Unmute"}
         </Button>
-        <Button onClick={onEnd} size="sm" className="flex-1 gap-2 bg-red-600 hover:bg-red-700 text-white rounded-xl">
+        <Button onClick={onEnd} size="sm" className="flex-1 gap-2 bg-destructive hover:bg-red-700 text-white rounded-md">
           <PhoneOff className="h-3.5 w-3.5" /> End Call
         </Button>
       </div>

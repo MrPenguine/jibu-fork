@@ -685,7 +685,7 @@ export default function AgentKnowledgeBasePage() {
         onOpenAddDataSource={() => setOpenAddDataSource(true)}
         processingCount={processingCount}
       />
-      <div className="px-6 pt-4 text-sm text-slate-500">
+      <div className="px-6 pt-4 text-sm text-muted-foreground">
         {sources.filter((source) => (latestBySource[source.id]?.stage || source.indexingStatus) === "COMPLETED" || source.indexingStatus === "INDEXED").length} ready ·{" "}
         {sources.filter((source) => ["QUEUED", "DOWNLOADING", "EXTRACTING", "CHUNKING", "EMBEDDING", "UPSERTING"].includes(latestBySource[source.id]?.stage || "") || source.indexingStatus === "PENDING" || source.indexingStatus === "PROCESSING").length} indexing ·{" "}
         {sources.filter((source) => (latestBySource[source.id]?.stage || source.indexingStatus) === "FAILED").length} failed
@@ -725,12 +725,12 @@ export default function AgentKnowledgeBasePage() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b border-slate-100 bg-slate-50/40">
-                              <th className="text-left p-3 font-semibold text-slate-700">File Name</th>
-                              <th className="text-left p-3 font-semibold text-slate-700">Type</th>
-                              <th className="text-left p-3 font-semibold text-slate-700">File Size</th>
-                              <th className="text-left p-3 font-semibold text-slate-700">Status</th>
-                              <th className="text-right p-3 font-semibold text-slate-700">Actions</th>
+                            <tr className="border-b border-gray-100 bg-background/40">
+                              <th className="text-left p-3 font-semibold text-gray-700">File Name</th>
+                              <th className="text-left p-3 font-semibold text-gray-700">Type</th>
+                              <th className="text-left p-3 font-semibold text-gray-700">File Size</th>
+                              <th className="text-left p-3 font-semibold text-gray-700">Status</th>
+                              <th className="text-right p-3 font-semibold text-gray-700">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -745,15 +745,15 @@ export default function AgentKnowledgeBasePage() {
                               const progress = latest?.progress ?? source.progress ?? (status === 'COMPLETED' ? 100 : 0);
                               const timeline = eventsBySource[source.id] || [];
                               return (
-                                <tr key={source.id} className="border-b border-slate-100 hover:bg-white transition-colors">
+                                <tr key={source.id} className="border-b border-gray-100 hover:bg-background transition-colors">
                                   <td className="p-3">
                                     <div className="flex items-center gap-2">
                                       <FileText className="h-4 w-4 text-primary flex-shrink-0" />
-                                      <span className="font-medium text-slate-800 truncate">{source.name}</span>
+                                      <span className="font-medium text-foreground truncate">{source.name}</span>
                                     </div>
                                   </td>
-                                  <td className="p-3 text-slate-600">{source.type || 'N/A'}</td>
-                                  <td className="p-3 text-slate-600">
+                                  <td className="p-3 text-muted-foreground">{source.type || 'N/A'}</td>
+                                  <td className="p-3 text-muted-foreground">
                                     {source.sizeBytes ? (() => {
                                       const bytes = source.sizeBytes;
                                       const k = 1024;
@@ -766,23 +766,23 @@ export default function AgentKnowledgeBasePage() {
                                     <div className="space-y-1.5 min-w-[120px]">
                                       <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
                                         status === 'COMPLETED' || status === 'INDEXED'
-                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                          ? 'bg-green-50 text-green-700 border-green-100'
                                           : isProcessing
                                           ? 'bg-amber-50 text-amber-700 border-amber-100'
                                           : status === 'FAILED'
-                                          ? 'bg-red-50 text-red-700 border-red-100'
-                                          : 'bg-slate-50 text-slate-700 border-slate-200'
+                                          ? 'bg-red-50 text-destructive border-red-100'
+                                          : 'bg-background text-gray-700 border-border'
                                       }`}>
                                         {isProcessing && <Loader2 className="h-3 w-3 animate-spin" />}
                                         {status === 'COMPLETED' || status === 'INDEXED' ? 'Ready' : status}
                                       </span>
                                       {isProcessing && (
-                                        <Progress value={progress} className="h-1.5 rounded-full bg-slate-100" />
+                                        <Progress value={progress} className="h-1.5 rounded-full bg-muted" />
                                       )}
-                                      {latest && <span className="text-[11px] text-slate-500">{latest.message}</span>}
-                                      {status === 'FAILED' && source.lastError && <span className="text-[11px] text-red-600">{source.lastError}</span>}
+                                      {latest && <span className="text-[11px] text-muted-foreground">{latest.message}</span>}
+                                      {status === 'FAILED' && source.lastError && <span className="text-[11px] text-destructive">{source.lastError}</span>}
                                       {timeline.length > 0 && (
-                                        <details className="text-[11px] text-slate-500">
+                                        <details className="text-[11px] text-muted-foreground">
                                           <summary className="cursor-pointer">Timeline ({timeline.length})</summary>
                                           {timeline.map((event) => <div key={event.id}>{event.stage} · {new Date(event.createdAt).toLocaleString()} — {event.message}</div>)}
                                         </details>
@@ -795,7 +795,7 @@ export default function AgentKnowledgeBasePage() {
                                         <Button
                                           variant="outline"
                                           size="sm"
-                                          className="h-8 rounded-lg border-slate-200"
+                                          className="h-8 rounded-lg border-border"
                                           onClick={() => handleDownloadFile(source.fileId!, source.name)}
                                           disabled={isProcessing}
                                         >
@@ -807,7 +807,7 @@ export default function AgentKnowledgeBasePage() {
                                         <Button
                                           variant="outline"
                                           size="sm"
-                                          className="h-8 rounded-lg border-slate-200"
+                                          className="h-8 rounded-lg border-border"
                                           onClick={async () => {
                                             if (!knowledgeBaseId) return;
                                             const ok = await retryKnowledgeBaseSource(knowledgeBaseId, source.id);
@@ -819,21 +819,21 @@ export default function AgentKnowledgeBasePage() {
                                       )}
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                          <Button variant="outline" size="sm" className="h-8 rounded-lg border-slate-200 text-red-600 hover:text-red-700 hover:bg-red-50">
+                                          <Button variant="outline" size="sm" className="h-8 rounded-lg border-border text-destructive hover:text-destructive hover:bg-red-50">
                                             <Trash2 className="h-3 w-3 mr-1" />
                                             Delete
                                           </Button>
                                         </AlertDialogTrigger>
-                                        <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
+                                        <AlertDialogContent className="rounded-lg border-0 shadow-2xl">
                                           <AlertDialogHeader>
-                                            <AlertDialogTitle className="text-slate-800">Delete source?</AlertDialogTitle>
-                                            <AlertDialogDescription className="text-slate-500">
+                                            <AlertDialogTitle className="text-foreground">Delete source?</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-muted-foreground">
                                               Are you sure you want to delete "{source.name}"? This action cannot be undone.
                                             </AlertDialogDescription>
                                           </AlertDialogHeader>
                                           <AlertDialogFooter>
-                                            <AlertDialogCancel className="rounded-xl border-slate-200">Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteSource(source.id)} className="rounded-xl bg-red-600 text-white hover:bg-red-700">
+                                            <AlertDialogCancel className="rounded-lg border-border">Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteSource(source.id)} className="rounded-lg bg-destructive text-white hover:bg-red-700">
                                               Delete
                                             </AlertDialogAction>
                                           </AlertDialogFooter>
@@ -848,7 +848,7 @@ export default function AgentKnowledgeBasePage() {
                         </table>
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500 text-center py-4">
+                      <p className="text-sm text-muted-foreground text-center py-4">
                         No files in this folder yet
                       </p>
                     )}

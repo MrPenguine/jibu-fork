@@ -232,7 +232,7 @@ export function NoteNode({ id, data, selected }: NodeProps<NoteNodeData>) {
   return (
     <div
       ref={containerRef}
-      className="group relative rounded-md shadow-sm border-2 border-blue-300 bg-blue-100 p-0 cursor-default"
+      className="group relative rounded-md shadow-sm border-2 border-blue-300 bg-accent p-0 cursor-default"
       style={{ width, height, transform: `rotate(${rotation}deg)`, transformOrigin: 'center center' }}
       onClick={onContainerClick}
       onMouseDown={(e) => { e.stopPropagation(); }}
@@ -258,7 +258,7 @@ export function NoteNode({ id, data, selected }: NodeProps<NoteNodeData>) {
       {isEditing ? (
         <textarea
           ref={textareaRef}
-          className="nodrag w-full h-full p-3 bg-transparent border-none outline-none resize-none text-gray-800 overflow-hidden text-base font-medium"
+          className="nodrag w-full h-full p-3 bg-transparent border-none outline-none resize-none text-foreground overflow-hidden text-base font-medium"
           value={text}
           placeholder="Type something"
           onChange={(e) => { setText(e.target.value); }}
@@ -272,7 +272,7 @@ export function NoteNode({ id, data, selected }: NodeProps<NoteNodeData>) {
         />
       ) : (
         <div className="w-full h-full p-3">
-          <div className={`text-base font-medium whitespace-pre-wrap break-words ${text ? 'text-gray-800' : 'text-gray-400'}`} style={{ fontSize }}>
+          <div className={`text-base font-medium whitespace-pre-wrap break-words ${text ? 'text-foreground' : 'text-gray-400'}`} style={{ fontSize }}>
             {text || 'Type something'}
           </div>
         </div>
@@ -281,17 +281,17 @@ export function NoteNode({ id, data, selected }: NodeProps<NoteNodeData>) {
       {(selected) && (
         <>
           {/* rotate handle (top center, above) */}
-          <button onMouseDown={onHandleDown('rotate')} className="nodrag absolute -top-3 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-500 rounded-full cursor-grab opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Rotate" />
+          <button onMouseDown={onHandleDown('rotate')} className="nodrag absolute -top-3 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full cursor-grab opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Rotate" />
           {/* side handles */}
-          <button onMouseDown={onHandleDown('left')} className="nodrag absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-sm cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize left" />
-          <button onMouseDown={onHandleDown('right')} className="nodrag absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-sm cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize right" />
-          <button onMouseDown={onHandleDown('top')} className="nodrag absolute -top-1.5 left-1/2 -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-sm cursor-ns-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize top" />
-          <button onMouseDown={onHandleDown('bottom')} className="nodrag absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-sm cursor-ns-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize bottom" />
+          <button onMouseDown={onHandleDown('left')} className="nodrag absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-2 bg-primary rounded-sm cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize left" />
+          <button onMouseDown={onHandleDown('right')} className="nodrag absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-2 bg-primary rounded-sm cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize right" />
+          <button onMouseDown={onHandleDown('top')} className="nodrag absolute -top-1.5 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-sm cursor-ns-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize top" />
+          <button onMouseDown={onHandleDown('bottom')} className="nodrag absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-sm cursor-ns-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize bottom" />
           {/* corner handles (resize + font scaling) */}
-          <button onMouseDown={onHandleDown('tl')} className="nodrag absolute -top-1.5 -left-1.5 w-2 h-2 bg-blue-500 rounded-sm cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize topleft" />
-          <button onMouseDown={onHandleDown('tr')} className="nodrag absolute -top-1.5 -right-1.5 w-2 h-2 bg-blue-500 rounded-sm cursor-ne-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize topright" />
-          <button onMouseDown={onHandleDown('bl')} className="nodrag absolute -bottom-1.5 -left-1.5 w-2 h-2 bg-blue-500 rounded-sm cursor-sw-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize bottomleft" />
-          <button onMouseDown={onHandleDown('br')} className="nodrag absolute -bottom-1.5 -right-1.5 w-2 h-2 bg-blue-500 rounded-sm cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize bottomright" />
+          <button onMouseDown={onHandleDown('tl')} className="nodrag absolute -top-1.5 -left-1.5 w-2 h-2 bg-primary rounded-sm cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize topleft" />
+          <button onMouseDown={onHandleDown('tr')} className="nodrag absolute -top-1.5 -right-1.5 w-2 h-2 bg-primary rounded-sm cursor-ne-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize topright" />
+          <button onMouseDown={onHandleDown('bl')} className="nodrag absolute -bottom-1.5 -left-1.5 w-2 h-2 bg-primary rounded-sm cursor-sw-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize bottomleft" />
+          <button onMouseDown={onHandleDown('br')} className="nodrag absolute -bottom-1.5 -right-1.5 w-2 h-2 bg-primary rounded-sm cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Resize bottomright" />
         </>
       )}
       {/* No flow connection handles for notes */}

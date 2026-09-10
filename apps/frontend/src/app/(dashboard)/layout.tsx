@@ -82,7 +82,7 @@ function DynamicBreadcrumbs() {
           <React.Fragment key={item.path}>
             <BreadcrumbItem className={index === 0 && breadcrumbs.length > 1 ? "hidden md:block" : ""}>
               {item.isLast ? (
-                <BreadcrumbPage className="text-violet-700 dark:text-violet-300">{item.label}</BreadcrumbPage>
+                <BreadcrumbPage className="text-primary dark:text-violet-300">{item.label}</BreadcrumbPage>
               ) : (
                 <BreadcrumbLink href={item.path}>{item.label}</BreadcrumbLink>
               )}
@@ -111,7 +111,7 @@ export default function DashboardLayout({
       <SidebarProvider>
         <WorkspaceProvider>
           <CustomAppSidebar navUserProps={{ onLogout: handleLogout }} />
-          <SidebarInset className="bg-white flex-1 flex flex-col overflow-hidden">
+          <SidebarInset className="bg-background flex-1 flex flex-col overflow-hidden">
             <header className="flex h-16 w-full shrink-0 items-center gap-2 px-4">
               <div className="flex items-center gap-2">
                 {/* Removed breadcrumb navigation */}

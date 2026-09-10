@@ -32,7 +32,7 @@ export function TopRightButtons({
 }: TopRightButtonsProps) {
   return (
     <div className="fixed top-4 right-4 flex items-center gap-2 z-30">
-      <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
         <Plus className="w-4 h-4 mr-1" />
         <span className="text-sm">1</span>
       </Button>
@@ -63,7 +63,7 @@ export function TopRightButtons({
         History
       </Button>
       {lastSavedAt && (
-        <div className="text-xs text-gray-500 ml-1 mr-1 whitespace-nowrap">
+        <div className="text-xs text-muted-foreground ml-1 mr-1 whitespace-nowrap">
           Saved {lastSavedAt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
         </div>
       )}
@@ -71,7 +71,7 @@ export function TopRightButtons({
       {/* Save Button */}
       <Button
         size="sm"
-        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+        className="bg-primary hover:bg-primary/90 text-white"
         onClick={onSave}
         disabled={isSaving || !hasUnsavedChanges}
       >
@@ -83,7 +83,7 @@ export function TopRightButtons({
         Save
       </Button>
 
-      <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={onRun}>
+      <Button size="sm" className="bg-primary hover:bg-primary/90 text-white" onClick={onRun}>
         <Play className="w-4 h-4 mr-2" />
         Run
       </Button>

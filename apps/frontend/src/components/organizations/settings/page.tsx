@@ -38,13 +38,13 @@ export default function WorkspaceSettingsPage() {
           <Skeleton className="h-4 w-2/3 mt-2" />
           <Separator className="mt-6" />
           <div className="flex justify-center mt-8">
-            <Skeleton className="h-[200px] w-2/3 rounded-xl" />
+            <Skeleton className="h-[200px] w-2/3 rounded-lg" />
           </div>
           <div className="flex justify-center mt-8">
-            <Skeleton className="h-[150px] w-2/3 rounded-xl" />
+            <Skeleton className="h-[150px] w-2/3 rounded-lg" />
           </div>
           <div className="flex justify-center mt-8">
-            <Skeleton className="h-[100px] w-2/3 rounded-xl" />
+            <Skeleton className="h-[100px] w-2/3 rounded-lg" />
           </div>
         </div>
       </div>
@@ -67,8 +67,8 @@ export default function WorkspaceSettingsPage() {
 
         {isEditor && (
           <div className="mt-6">
-            <Alert className="bg-blue-50 border-blue-200">
-              <AlertCircle className="h-4 w-4 text-blue-600" />
+            <Alert className="bg-brand-mint border-brand-mint">
+              <AlertCircle className="h-4 w-4 text-brand-navy" />
               <AlertDescription>
                 You have view-only access to workspace settings. Contact an admin or owner for changes.
               </AlertDescription>

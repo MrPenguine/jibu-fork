@@ -77,7 +77,7 @@ export function CreateWorkspaceModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] rounded-xl border-0">
+      <DialogContent className="sm:max-w-[425px] rounded-lg ">
         <DialogHeader>
           <DialogTitle>Create New Workspace</DialogTitle>
           <DialogDescription>
@@ -88,7 +88,7 @@ export function CreateWorkspaceModal({
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             {error && (
-              <div className="text-sm text-red-500 bg-red-50 p-3 rounded-xl">
+              <div className="text-sm text-red-500 bg-red-50 p-3 rounded-lg">
                 {error}
               </div>
             )}
@@ -101,18 +101,18 @@ export function CreateWorkspaceModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isSubmitting}
-                className="rounded-xl border-0"
+                className="rounded-lg border-0"
               />
             </div>
           </div>
           
           <DialogFooter className="gap-2">
             <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={isSubmitting} className="rounded-xl border-0">
+              <Button type="button" variant="outline" disabled={isSubmitting} className="rounded-md border-0">
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={isSubmitting} className="rounded-xl border-0">
+            <Button type="submit" disabled={isSubmitting} className="rounded-md border-0">
               {isSubmitting ? (
                 <>
                   <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />

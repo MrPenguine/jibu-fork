@@ -124,12 +124,12 @@ const OPENROUTER_MODELS: OpenRouterModel[] = [
 
 
 const BADGE_COLORS: Record<string, string> = {
-  Stable:   "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  Stable:   "bg-green-50 text-green-700 border border-green-200",
   Preview:  "bg-amber-50 text-amber-700 border border-amber-200",
-  Free:     "bg-blue-50 text-blue-700 border border-blue-200",
-  Fast:     "bg-purple-50 text-purple-700 border border-purple-200",
-  Smart:    "bg-indigo-50 text-indigo-700 border border-indigo-200",
-  Balanced: "bg-slate-50 text-slate-600 border border-slate-200",
+  Free:     "bg-accent text-primary border border-green-200",
+  Fast:     "bg-accent text-primary border border-green-200",
+  Smart:    "bg-accent text-primary border border-green-200",
+  Balanced: "bg-background text-muted-foreground border border-border",
 };
 
 interface AudioProvider {
@@ -158,9 +158,9 @@ const STT_OPTIONS: AudioProvider[] = [
 ];
 
 const AUDIO_BADGE_COLORS: Record<string, string> = {
-  Free: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  Paid: "bg-slate-100 text-slate-600 border border-slate-200",
-  Best: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+  Free: "bg-green-50 text-green-700 border border-green-200",
+  Paid: "bg-muted text-muted-foreground border border-border",
+  Best: "bg-accent text-primary border border-green-200",
 };
 
 const TTS_PROVIDERS = TTS_OPTIONS.map((o) => o.value);
@@ -291,15 +291,15 @@ export default function AgentConfigPage() {
   if (loading || !config) {
     return (
       <div className="max-w-6xl mx-auto p-8 space-y-6">
-        <Skeleton className="h-12 w-1/3 rounded-xl" />
+        <Skeleton className="h-12 w-1/3 rounded-lg" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <Skeleton className="h-44 w-full rounded-2xl" />
-            <Skeleton className="h-96 w-full rounded-2xl" />
+            <Skeleton className="h-44 w-full rounded-lg" />
+            <Skeleton className="h-96 w-full rounded-lg" />
           </div>
           <div className="space-y-6">
-            <Skeleton className="h-48 w-full rounded-2xl" />
-            <Skeleton className="h-64 w-full rounded-2xl" />
+            <Skeleton className="h-48 w-full rounded-lg" />
+            <Skeleton className="h-64 w-full rounded-lg" />
           </div>
         </div>
       </div>
@@ -311,24 +311,24 @@ export default function AgentConfigPage() {
   return (
     <div className="max-w-6xl mx-auto p-8 space-y-8 bg-[#F8FAFC] min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 pb-5">
+      <div className="flex items-center justify-between border-b border-border pb-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F7F0] text-[#009959]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E6F7F0] text-[#009959]">
             <Sliders className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Configure Agent</h1>
-            <p className="text-xs text-gray-500">Customize prompt instructions, AI models, knowledge, and tools.</p>
+            <h1 className="text-xl font-bold text-foreground">Configure Agent</h1>
+            <p className="text-xs text-muted-foreground">Customize prompt instructions, AI models, knowledge, and tools.</p>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="bg-[#009959] hover:bg-[#007d49] text-white rounded-xl shadow-sm px-5 py-5 gap-2 transition-all">
+        <Button onClick={handleSave} disabled={saving} className="bg-[#009959] hover:bg-[#007d49] text-white rounded-md shadow-sm px-5 py-5 gap-2 transition-all">
           <Save className="h-4 w-4" />
           {saving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
       <Tabs defaultValue="general" className="w-full space-y-6">
-        <TabsList className="bg-gray-100 p-1 rounded-xl flex gap-1 w-full max-w-md">
+        <TabsList className="bg-background p-1 rounded-md flex gap-1 w-full max-w-md">
           <TabsTrigger value="general" className="rounded-lg text-xs font-semibold px-4 py-2 flex-1">
             General & Brain
           </TabsTrigger>
@@ -344,66 +344,66 @@ export default function AgentConfigPage() {
         <TabsContent value="general" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 space-y-8">
-              <Card className="shadow-sm border border-gray-200/60 rounded-2xl bg-white">
+              <Card className="shadow-sm border border-border/60 rounded-lg bg-card">
                 <CardHeader className="border-b border-gray-100 pb-4">
-                  <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                     <Bot className="h-5 w-5 text-[#009959]" /> Basics
                   </CardTitle>
                   <CardDescription>Identity parameters for this agent.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-5">
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-xs font-semibold text-gray-600">Agent Name</Label>
-                    <Input id="name" value={config.name} onChange={(e) => update("name", e.target.value)} className="rounded-xl border-gray-200 focus:border-[#009959] focus:ring-[#009959]/20" />
+                    <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground">Agent Name</Label>
+                    <Input id="name" value={config.name} onChange={(e) => update("name", e.target.value)} className="rounded-md border-border focus:border-[#009959] focus:ring-[#009959]/20" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="description" className="text-xs font-semibold text-gray-600">Description</Label>
-                    <Input id="description" value={config.description} onChange={(e) => update("description", e.target.value)} className="rounded-xl border-gray-200 focus:border-[#009959] focus:ring-[#009959]/20" />
+                    <Label htmlFor="description" className="text-xs font-semibold text-muted-foreground">Description</Label>
+                    <Input id="description" value={config.description} onChange={(e) => update("description", e.target.value)} className="rounded-md border-border focus:border-[#009959] focus:ring-[#009959]/20" />
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="shadow-sm border border-gray-200/60 rounded-2xl bg-white">
+              <Card className="shadow-sm border border-border/60 rounded-lg bg-card">
                 <CardHeader className="border-b border-gray-100 pb-4">
-                  <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                     <Cpu className="h-5 w-5 text-[#009959]" /> AI Engine Brain
                   </CardTitle>
                   <CardDescription>Configure prompt instructions, model and AI provider.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-5">
                   <div className="space-y-2">
-                    <Label htmlFor="systemPrompt" className="text-xs font-semibold text-gray-600">System Instructions / Prompt</Label>
+                    <Label htmlFor="systemPrompt" className="text-xs font-semibold text-muted-foreground">System Instructions / Prompt</Label>
                     <Textarea
                       id="systemPrompt"
                       rows={8}
                       value={config.systemPrompt}
                       onChange={(e) => update("systemPrompt", e.target.value)}
                       placeholder="You are a helpful assistant..."
-                      className="rounded-xl border-gray-200 focus:border-[#009959] focus:ring-[#009959]/20 text-sm leading-relaxed"
+                      className="rounded-lg border-border focus:border-[#009959] focus:ring-[#009959]/20 text-sm leading-relaxed"
                     />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-gray-600">AI Provider</Label>
+                      <Label className="text-xs font-semibold text-muted-foreground">AI Provider</Label>
                       <Select value={config.provider} onValueChange={changeProvider}>
-                        <SelectTrigger className="rounded-xl border-0 bg-slate-50 shadow-sm h-10">
+                        <SelectTrigger className="rounded-md border-0 bg-background shadow-sm h-10">
                           {config.provider ? (
                             (() => {
                               const p = PROVIDERS.find((x) => x.value === config.provider);
                               return p ? (
                                 <div className="flex items-center gap-2 min-w-0 pr-2">
-                                  <span className="font-semibold text-xs text-gray-800">{p.label}</span>
+                                  <span className="font-semibold text-xs text-foreground">{p.label}</span>
                                 </div>
                               ) : <SelectValue placeholder="Select provider" />;
                             })()
                           ) : <SelectValue placeholder="Select provider" />}
                         </SelectTrigger>
-                        <SelectContent className="rounded-2xl shadow-xl border-0 p-1.5 w-[280px]">
+                        <SelectContent className="rounded-lg shadow-xl border-0 p-1.5 w-[280px]">
                           {PROVIDERS.map((p) => (
-                            <SelectItem key={p.value} value={p.value} className="rounded-xl py-2.5 px-3 cursor-pointer focus:bg-slate-50 pr-8">
+                            <SelectItem key={p.value} value={p.value} className="rounded-md py-2.5 px-3 cursor-pointer focus:bg-background pr-8">
                               <div className="flex flex-col gap-0.5 w-full">
-                                <span className="font-semibold text-xs text-gray-800">{p.label}</span>
-                                <span className="text-[10px] text-gray-500 leading-tight">
+                                <span className="font-semibold text-xs text-foreground">{p.label}</span>
+                                <span className="text-[10px] text-muted-foreground leading-tight">
                                   {p.value === "google" && "Gemini 3.5, 3.1 & 2.5 flash/pro"}
                                   {p.value === "xai" && "Grok 3 and Grok 2 reasoning"}
                                   {p.value === "mistral" && "Mistral Large, Medium, Small"}
@@ -418,7 +418,7 @@ export default function AgentConfigPage() {
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="model" className="text-xs font-semibold text-gray-600">Model Version</Label>
+                        <Label htmlFor="model" className="text-xs font-semibold text-muted-foreground">Model Version</Label>
                         {config.provider === "ollama" && (
                           <Button
                             type="button"
@@ -439,36 +439,36 @@ export default function AgentConfigPage() {
                       </div>
                       {config.provider === "openrouter" ? (
                         <Select value={config.model} onValueChange={(v) => update("model", v)}>
-                          <SelectTrigger className="rounded-xl border-0 bg-slate-50 shadow-sm h-10">
+                          <SelectTrigger className="rounded-md border-0 bg-background shadow-sm h-10">
                             {config.model ? (
                               (() => {
                                 const m = OPENROUTER_MODELS.find((x) => x.value === config.model);
                                 return m ? (
                                   <div className="flex items-center gap-2 min-w-0 overflow-hidden pr-2">
-                                    <span className="text-[10px] text-slate-400 font-medium shrink-0">{m.provider}</span>
-                                    <span className="font-semibold text-xs text-gray-800 truncate">{m.label}</span>
+                                    <span className="text-[10px] text-gray-400 font-medium shrink-0">{m.provider}</span>
+                                    <span className="font-semibold text-xs text-foreground truncate">{m.label}</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${BADGE_COLORS[m.badge]}`}>{m.badge}</span>
                                   </div>
-                                ) : <span className="text-xs text-gray-600 truncate">{config.model}</span>;
+                                ) : <span className="text-xs text-muted-foreground truncate">{config.model}</span>;
                               })()
                             ) : <SelectValue placeholder="Select a model" />}
                           </SelectTrigger>
-                          <SelectContent className="rounded-2xl shadow-xl border-0 p-1.5 max-h-[420px] w-[480px]">
+                          <SelectContent className="rounded-lg shadow-xl border-0 p-1.5 max-h-[420px] w-[480px]">
                             {OPENROUTER_MODELS.map((m) => (
                               <SelectItem
                                 key={m.value}
                                 value={m.value}
-                                className="rounded-xl py-2.5 px-3 cursor-pointer focus:bg-slate-50 pr-8"
+                                className="rounded-md py-2.5 px-3 cursor-pointer focus:bg-background pr-8"
                               >
                                 <div className="flex flex-col gap-1 w-full">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide shrink-0 w-14">{m.provider}</span>
-                                    <span className="font-semibold text-xs text-gray-800 flex-1">{m.label}</span>
+                                    <span className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide shrink-0 w-14">{m.provider}</span>
+                                    <span className="font-semibold text-xs text-foreground flex-1">{m.label}</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${BADGE_COLORS[m.badge]}`}>{m.badge}</span>
                                   </div>
                                   <div className="flex items-center gap-2 pl-16">
-                                    <span className="text-[10px] text-gray-500 flex-1 leading-tight">{m.description}</span>
-                                    <span className="text-[9px] font-mono text-emerald-700 shrink-0">in {m.inputPrice}</span>
+                                    <span className="text-[10px] text-muted-foreground flex-1 leading-tight">{m.description}</span>
+                                    <span className="text-[9px] font-mono text-green-700 shrink-0">in {m.inputPrice}</span>
                                     <span className="text-[9px] text-gray-400 shrink-0">·</span>
                                     <span className="text-[9px] font-mono text-rose-600 shrink-0">out {m.outputPrice}</span>
                                   </div>
@@ -489,12 +489,12 @@ export default function AgentConfigPage() {
                                     }
                                   }}
                                   placeholder="e.g. cohere/command-r-plus"
-                                  className="flex-1 h-7 text-xs rounded-lg border-gray-200 bg-white"
+                                  className="flex-1 h-7 text-xs rounded-lg border-border bg-card"
                                 />
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 text-[11px] px-3 rounded-lg border-gray-200"
+                                  className="h-7 text-[11px] px-3 rounded-lg border-border"
                                   onClick={() => {
                                     if (customModelId.trim()) {
                                       update("model", customModelId.trim());
@@ -511,7 +511,7 @@ export default function AgentConfigPage() {
                         </Select>
                       ) : (
                         <Select value={config.model} onValueChange={(v) => update("model", v)}>
-                          <SelectTrigger className="rounded-xl border-0 bg-slate-50 shadow-sm h-10">
+                          <SelectTrigger className="rounded-md border-0 bg-background shadow-sm h-10">
                             {config.model ? (
                               (() => {
                                 const opts = config.provider === "ollama"
@@ -520,14 +520,14 @@ export default function AgentConfigPage() {
                                 const m = opts.find((x) => x.value === config.model);
                                 return m ? (
                                   <div className="flex items-center gap-2 min-w-0 overflow-hidden pr-2">
-                                    <span className="font-semibold text-xs text-gray-800 truncate flex-1">{m.label}</span>
+                                    <span className="font-semibold text-xs text-foreground truncate flex-1">{m.label}</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${BADGE_COLORS[m.badge]}`}>{m.badge}</span>
                                   </div>
-                                ) : <span className="text-xs text-gray-600 truncate">{config.model}</span>;
+                                ) : <span className="text-xs text-muted-foreground truncate">{config.model}</span>;
                               })()
                             ) : <SelectValue placeholder="Select model" />}
                           </SelectTrigger>
-                          <SelectContent className="rounded-2xl shadow-xl border-0 p-1.5 max-h-[360px] w-[360px]">
+                          <SelectContent className="rounded-lg shadow-xl border-0 p-1.5 max-h-[360px] w-[360px]">
                             {(() => {
                               const opts = config.provider === "ollama"
                                 ? [...(MODELS.ollama || []), ...localOllamaModels].filter((v, i, a) => a.findIndex(t => t.value === v.value) === i)
@@ -536,14 +536,14 @@ export default function AgentConfigPage() {
                                 <SelectItem
                                   key={m.value}
                                   value={m.value}
-                                  className="rounded-xl py-2.5 px-3 cursor-pointer focus:bg-slate-50 pr-8"
+                                  className="rounded-md py-2.5 px-3 cursor-pointer focus:bg-background pr-8"
                                 >
                                   <div className="flex flex-col gap-0.5 w-full">
                                     <div className="flex items-center gap-2">
-                                      <span className="font-semibold text-xs text-gray-800 flex-1">{m.label}</span>
+                                      <span className="font-semibold text-xs text-foreground flex-1">{m.label}</span>
                                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${BADGE_COLORS[m.badge]}`}>{m.badge}</span>
                                     </div>
-                                    <span className="text-[10px] text-gray-500 leading-tight">{m.description}</span>
+                                    <span className="text-[10px] text-muted-foreground leading-tight">{m.description}</span>
                                   </div>
                                 </SelectItem>
                               ));
@@ -562,12 +562,12 @@ export default function AgentConfigPage() {
                                       }
                                     }}
                                     placeholder="e.g. mistral:7b-instruct"
-                                    className="flex-1 h-7 text-xs rounded-lg border-gray-200 bg-white"
+                                    className="flex-1 h-7 text-xs rounded-lg border-border bg-card"
                                   />
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-7 text-[11px] px-3 rounded-lg border-gray-200"
+                                    className="h-7 text-[11px] px-3 rounded-lg border-border"
                                     onClick={() => {
                                       if (customModelId.trim()) {
                                         update("model", customModelId.trim());
@@ -592,9 +592,9 @@ export default function AgentConfigPage() {
 
             <div className="space-y-8">
               {/* Channels Card */}
-              <Card className="shadow-sm border border-gray-200/60 rounded-2xl bg-white">
+              <Card className="shadow-sm border border-border/60 rounded-lg bg-card">
                 <CardHeader className="pb-3 border-b border-gray-100">
-                  <CardTitle className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Radio className="h-4 w-4 text-[#009959]" /> Active Channels
                   </CardTitle>
                 </CardHeader>
@@ -612,18 +612,18 @@ export default function AgentConfigPage() {
               </Card>
 
               {/* Voice & Audio Card — always visible */}
-              <Card className="shadow-sm border border-gray-200/60 rounded-2xl bg-white">
+              <Card className="shadow-sm border border-border/60 rounded-lg bg-card">
                 <CardHeader className="pb-3 border-b border-gray-100">
-                  <CardTitle className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Volume2 className="h-4 w-4 text-[#009959]" /> Voice &amp; Audio
                   </CardTitle>
-                  <CardDescription className="text-[11px] text-gray-500 mt-0.5">TTS and STT engines used by LiveKit voice agent</CardDescription>
+                  <CardDescription className="text-[11px] text-muted-foreground mt-0.5">TTS and STT engines used by LiveKit voice agent</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-4">
 
                   {/* TTS Dropdowns */}
                   <div className="space-y-4">
-                    <Label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Text-to-Speech (TTS)</Label>
+                    <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Text-to-Speech (TTS)</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label className="text-[10px] font-semibold text-gray-400">TTS Provider</Label>
@@ -632,27 +632,27 @@ export default function AgentConfigPage() {
                           // Clear or set default voice on provider change
                           update("ttsVoiceId", "");
                         }}>
-                          <SelectTrigger className="rounded-xl border-0 bg-slate-50 shadow-sm h-10">
+                          <SelectTrigger className="rounded-md border-0 bg-background shadow-sm h-10">
                             {(() => {
                               const t = TTS_OPTIONS.find((x) => x.value === config.ttsProvider);
                               return t ? (
                                 <div className="flex items-center gap-2 min-w-0 pr-2">
-                                  <span className="font-semibold text-xs text-gray-800">{t.label}</span>
+                                  <span className="font-semibold text-xs text-foreground">{t.label}</span>
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${AUDIO_BADGE_COLORS[t.badge]}`}>{t.badge}</span>
                                 </div>
                               ) : <SelectValue placeholder="Select TTS Provider" />;
                             })()}
                           </SelectTrigger>
-                          <SelectContent className="rounded-2xl shadow-xl border-0 p-1.5 w-[320px]">
+                          <SelectContent className="rounded-lg shadow-xl border-0 p-1.5 w-[320px]">
                             {TTS_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value} className="rounded-xl py-2.5 px-3 cursor-pointer focus:bg-slate-50 pr-8">
+                              <SelectItem key={opt.value} value={opt.value} className="rounded-md py-2.5 px-3 cursor-pointer focus:bg-background pr-8">
                                 <div className="flex flex-col gap-0.5 w-full">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-xs text-gray-800">{opt.label}</span>
+                                    <span className="font-semibold text-xs text-foreground">{opt.label}</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${AUDIO_BADGE_COLORS[opt.badge]}`}>{opt.badge}</span>
                                   </div>
-                                  <span className="text-[10px] text-gray-500 leading-tight">{opt.description}</span>
-                                  {opt.free && <span className="text-[9px] text-emerald-700 font-semibold mt-0.5">Free: {opt.free}</span>}
+                                  <span className="text-[10px] text-muted-foreground leading-tight">{opt.description}</span>
+                                  {opt.free && <span className="text-[9px] text-green-700 font-semibold mt-0.5">Free: {opt.free}</span>}
                                 </div>
                               </SelectItem>
                             ))}
@@ -663,51 +663,51 @@ export default function AgentConfigPage() {
                       <div className="space-y-1.5">
                         <Label className="text-[10px] font-semibold text-gray-400">Voice / Model ID</Label>
                         <Select value={config.ttsVoiceId || "default"} onValueChange={(v) => update("ttsVoiceId", v === "default" ? "" : v)}>
-                          <SelectTrigger className="rounded-xl border-0 bg-slate-50 shadow-sm h-10">
-                            <span className="font-semibold text-xs text-gray-800 truncate">
+                          <SelectTrigger className="rounded-md border-0 bg-background shadow-sm h-10">
+                            <span className="font-semibold text-xs text-foreground truncate">
                               {config.ttsVoiceId || "Default Voice"}
                             </span>
                           </SelectTrigger>
-                          <SelectContent className="rounded-2xl shadow-xl border-0 p-1.5 w-[280px]">
-                            <SelectItem value="default" className="rounded-xl py-2 px-3 cursor-pointer">Default / Fallback</SelectItem>
+                          <SelectContent className="rounded-lg shadow-xl border-0 p-1.5 w-[280px]">
+                            <SelectItem value="default" className="rounded-md py-2 px-3 cursor-pointer">Default / Fallback</SelectItem>
                             {config.ttsProvider === "ELEVENLABS" && (
                               <>
-                                <SelectItem value="21m00Tcm4TlvDq8ikWAM" className="rounded-xl py-2 px-3 cursor-pointer">Rachel (Female, natural)</SelectItem>
-                                <SelectItem value="AZnzlk1XvdvUeBnXmlld" className="rounded-xl py-2 px-3 cursor-pointer">Domi (Female, energetic)</SelectItem>
-                                <SelectItem value="EXAVITQu4vr4xnSDxMaL" className="rounded-xl py-2 px-3 cursor-pointer">Bella (Female, soft)</SelectItem>
-                                <SelectItem value="ErXwobaYiN019PkySvjV" className="rounded-xl py-2 px-3 cursor-pointer">Antoni (Male, deep)</SelectItem>
+                                <SelectItem value="21m00Tcm4TlvDq8ikWAM" className="rounded-md py-2 px-3 cursor-pointer">Rachel (Female, natural)</SelectItem>
+                                <SelectItem value="AZnzlk1XvdvUeBnXmlld" className="rounded-md py-2 px-3 cursor-pointer">Domi (Female, energetic)</SelectItem>
+                                <SelectItem value="EXAVITQu4vr4xnSDxMaL" className="rounded-md py-2 px-3 cursor-pointer">Bella (Female, soft)</SelectItem>
+                                <SelectItem value="ErXwobaYiN019PkySvjV" className="rounded-md py-2 px-3 cursor-pointer">Antoni (Male, deep)</SelectItem>
                               </>
                             )}
                             {config.ttsProvider === "OPENAI" && (
                               <>
-                                <SelectItem value="alloy" className="rounded-xl py-2 px-3 cursor-pointer">Alloy (Balanced)</SelectItem>
-                                <SelectItem value="echo" className="rounded-xl py-2 px-3 cursor-pointer">Echo (Warm)</SelectItem>
-                                <SelectItem value="fable" className="rounded-xl py-2 px-3 cursor-pointer">Fable (Narrative)</SelectItem>
-                                <SelectItem value="onyx" className="rounded-xl py-2 px-3 cursor-pointer">Onyx (Deep male)</SelectItem>
-                                <SelectItem value="nova" className="rounded-xl py-2 px-3 cursor-pointer">Nova (Bright female)</SelectItem>
-                                <SelectItem value="shimmer" className="rounded-xl py-2 px-3 cursor-pointer">Shimmer (Professional)</SelectItem>
+                                <SelectItem value="alloy" className="rounded-md py-2 px-3 cursor-pointer">Alloy (Balanced)</SelectItem>
+                                <SelectItem value="echo" className="rounded-md py-2 px-3 cursor-pointer">Echo (Warm)</SelectItem>
+                                <SelectItem value="fable" className="rounded-md py-2 px-3 cursor-pointer">Fable (Narrative)</SelectItem>
+                                <SelectItem value="onyx" className="rounded-md py-2 px-3 cursor-pointer">Onyx (Deep male)</SelectItem>
+                                <SelectItem value="nova" className="rounded-md py-2 px-3 cursor-pointer">Nova (Bright female)</SelectItem>
+                                <SelectItem value="shimmer" className="rounded-md py-2 px-3 cursor-pointer">Shimmer (Professional)</SelectItem>
                               </>
                             )}
                             {config.ttsProvider === "CARTESIA" && (
                               <>
-                                <SelectItem value="a0e99841-438c-4a64-b679-ae501e7d6091" className="rounded-xl py-2 px-3 cursor-pointer">Barack Obama (Clone)</SelectItem>
-                                <SelectItem value="2c6a0c5c-7d9b-44c1-8408-ae501e7d6091" className="rounded-xl py-2 px-3 cursor-pointer">News Anchor (Male)</SelectItem>
-                                <SelectItem value="6f9a0c5c-7d9b-44c1-8408-ae501e7d6091" className="rounded-xl py-2 px-3 cursor-pointer">Support Agent (Female)</SelectItem>
+                                <SelectItem value="a0e99841-438c-4a64-b679-ae501e7d6091" className="rounded-md py-2 px-3 cursor-pointer">Barack Obama (Clone)</SelectItem>
+                                <SelectItem value="2c6a0c5c-7d9b-44c1-8408-ae501e7d6091" className="rounded-md py-2 px-3 cursor-pointer">News Anchor (Male)</SelectItem>
+                                <SelectItem value="6f9a0c5c-7d9b-44c1-8408-ae501e7d6091" className="rounded-md py-2 px-3 cursor-pointer">Support Agent (Female)</SelectItem>
                               </>
                             )}
                             {config.ttsProvider === "AZURE" && (
                               <>
-                                <SelectItem value="en-US-JennyNeural" className="rounded-xl py-2 px-3 cursor-pointer">Jenny Neural (Female)</SelectItem>
-                                <SelectItem value="en-US-GuyNeural" className="rounded-xl py-2 px-3 cursor-pointer">Guy Neural (Male)</SelectItem>
-                                <SelectItem value="en-US-AriaNeural" className="rounded-xl py-2 px-3 cursor-pointer">Aria Neural (Female)</SelectItem>
+                                <SelectItem value="en-US-JennyNeural" className="rounded-md py-2 px-3 cursor-pointer">Jenny Neural (Female)</SelectItem>
+                                <SelectItem value="en-US-GuyNeural" className="rounded-md py-2 px-3 cursor-pointer">Guy Neural (Male)</SelectItem>
+                                <SelectItem value="en-US-AriaNeural" className="rounded-md py-2 px-3 cursor-pointer">Aria Neural (Female)</SelectItem>
                               </>
                             )}
                             {config.ttsProvider === "GOOGLE" && (
                               <>
-                                <SelectItem value="en-US-Chirp-HD-F" className="rounded-xl py-2 px-3 cursor-pointer">Chirp HD Female</SelectItem>
-                                <SelectItem value="en-US-Chirp-HD-M" className="rounded-xl py-2 px-3 cursor-pointer">Chirp HD Male</SelectItem>
-                                <SelectItem value="en-US-Wavenet-D" className="rounded-xl py-2 px-3 cursor-pointer">Wavenet Male</SelectItem>
-                                <SelectItem value="en-US-Wavenet-F" className="rounded-xl py-2 px-3 cursor-pointer">Wavenet Female</SelectItem>
+                                <SelectItem value="en-US-Chirp-HD-F" className="rounded-md py-2 px-3 cursor-pointer">Chirp HD Female</SelectItem>
+                                <SelectItem value="en-US-Chirp-HD-M" className="rounded-md py-2 px-3 cursor-pointer">Chirp HD Male</SelectItem>
+                                <SelectItem value="en-US-Wavenet-D" className="rounded-md py-2 px-3 cursor-pointer">Wavenet Male</SelectItem>
+                                <SelectItem value="en-US-Wavenet-F" className="rounded-md py-2 px-3 cursor-pointer">Wavenet Female</SelectItem>
                               </>
                             )}
                           </SelectContent>
@@ -718,34 +718,34 @@ export default function AgentConfigPage() {
 
                   {/* STT Dropdowns */}
                   <div className="space-y-4 pt-4 border-t border-gray-100">
-                    <Label className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Speech-to-Text (STT)</Label>
+                    <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Speech-to-Text (STT)</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label className="text-[10px] font-semibold text-gray-400">STT Provider</Label>
                         <Select value={config.sttProvider} onValueChange={(v) => {
                           update("sttProvider", v);
                         }}>
-                          <SelectTrigger className="rounded-xl border-0 bg-slate-50 shadow-sm h-10">
+                          <SelectTrigger className="rounded-md border-0 bg-background shadow-sm h-10">
                             {(() => {
                               const s = STT_OPTIONS.find((x) => x.value === config.sttProvider);
                               return s ? (
                                 <div className="flex items-center gap-2 min-w-0 pr-2">
-                                  <span className="font-semibold text-xs text-gray-800">{s.label}</span>
+                                  <span className="font-semibold text-xs text-foreground">{s.label}</span>
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${AUDIO_BADGE_COLORS[s.badge]}`}>{s.badge}</span>
                                 </div>
                               ) : <SelectValue placeholder="Select STT Provider" />;
                             })()}
                           </SelectTrigger>
-                          <SelectContent className="rounded-2xl shadow-xl border-0 p-1.5 w-[320px]">
+                          <SelectContent className="rounded-lg shadow-xl border-0 p-1.5 w-[320px]">
                             {STT_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value} className="rounded-xl py-2.5 px-3 cursor-pointer focus:bg-slate-50 pr-8">
+                              <SelectItem key={opt.value} value={opt.value} className="rounded-md py-2.5 px-3 cursor-pointer focus:bg-background pr-8">
                                 <div className="flex flex-col gap-0.5 w-full">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-xs text-gray-800">{opt.label}</span>
+                                    <span className="font-semibold text-xs text-foreground">{opt.label}</span>
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${AUDIO_BADGE_COLORS[opt.badge]}`}>{opt.badge}</span>
                                   </div>
-                                  <span className="text-[10px] text-gray-500 leading-tight">{opt.description}</span>
-                                  {opt.free && <span className="text-[9px] text-emerald-700 font-semibold mt-0.5">Free: {opt.free}</span>}
+                                  <span className="text-[10px] text-muted-foreground leading-tight">{opt.description}</span>
+                                  {opt.free && <span className="text-[9px] text-green-700 font-semibold mt-0.5">Free: {opt.free}</span>}
                                 </div>
                               </SelectItem>
                             ))}
@@ -756,8 +756,8 @@ export default function AgentConfigPage() {
                       <div className="space-y-1.5">
                         <Label className="text-[10px] font-semibold text-gray-400">STT Model / Version</Label>
                         <Select value={config.sttProvider === "DEEPGRAM" ? "nova-3" : "latest"} disabled>
-                          <SelectTrigger className="rounded-xl border-0 bg-slate-50 shadow-sm h-10 opacity-70 cursor-not-allowed">
-                            <span className="font-semibold text-xs text-slate-500">
+                          <SelectTrigger className="rounded-md border-0 bg-background shadow-sm h-10 opacity-70 cursor-not-allowed">
+                            <span className="font-semibold text-xs text-muted-foreground">
                               {config.sttProvider === "DEEPGRAM" && "nova-3 (Nova-3)"}
                               {config.sttProvider === "GOOGLE" && "chirp-2 (Chirp 2)"}
                               {config.sttProvider === "AZURE" && "neural-v4 (Neural)"}
@@ -772,8 +772,8 @@ export default function AgentConfigPage() {
                   {/* Greeting Text Input */}
                   <div className="space-y-3 pt-4 border-t border-gray-100">
                     <div className="space-y-1">
-                      <Label htmlFor="firstMessage" className="text-[11px] font-semibold text-gray-500">First Message / Greeting</Label>
-                      <Input id="firstMessage" value={config.firstMessage} onChange={(e) => update("firstMessage", e.target.value)} className="rounded-xl border-0 bg-slate-50 shadow-sm h-9 text-xs" placeholder="Hello! How can I help you today?" />
+                      <Label htmlFor="firstMessage" className="text-[11px] font-semibold text-muted-foreground">First Message / Greeting</Label>
+                      <Input id="firstMessage" value={config.firstMessage} onChange={(e) => update("firstMessage", e.target.value)} className="rounded-md border-0 bg-background shadow-sm h-9 text-xs" placeholder="Hello! How can I help you today?" />
                     </div>
                   </div>
 
@@ -785,16 +785,16 @@ export default function AgentConfigPage() {
 
         {/* Tab 2: Knowledge Bases */}
         <TabsContent value="knowledge" className="space-y-6">
-          <Card className="shadow-sm border border-gray-200/60 rounded-2xl bg-white max-w-3xl">
+          <Card className="shadow-sm border border-border/60 rounded-lg bg-card max-w-3xl">
             <CardHeader className="pb-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                   <Database className="h-5 w-5 text-[#009959]" /> Knowledge Bases (RAG)
                 </CardTitle>
-                <CardDescription className="text-xs text-gray-500 mt-1">Select the knowledge bases this agent has access to.</CardDescription>
+                <CardDescription className="text-xs text-muted-foreground mt-1">Select the knowledge bases this agent has access to.</CardDescription>
               </div>
               <Link href={`/agent/${agentId}/knowledge-base`}>
-                <Button variant="outline" size="sm" className="text-xs gap-1.5 rounded-xl border-gray-200 text-gray-700 hover:bg-slate-50 transition-colors">
+                <Button variant="outline" size="sm" className="text-xs gap-1.5 rounded-md border-border text-gray-700 hover:bg-background transition-colors">
                   Go to Knowledge Base Manager <ExternalLink className="h-3 w-3" />
                 </Button>
               </Link>
@@ -805,7 +805,7 @@ export default function AgentConfigPage() {
               ) : (
                 <div className="space-y-2">
                   {kbs.map((kb) => (
-                    <label key={kb.id} className="flex items-center justify-between rounded-xl border border-gray-150 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <label key={kb.id} className="flex items-center justify-between rounded-lg border border-gray-150 p-3 cursor-pointer hover:bg-background transition-colors">
                       <span className="text-xs font-medium text-gray-700">{kb.name}</span>
                       <Switch
                         checked={config.knowledgeBaseIds.includes(kb.id)}
@@ -821,13 +821,13 @@ export default function AgentConfigPage() {
 
         {/* Tab 3: Functional Tools */}
         <TabsContent value="tools" className="space-y-6">
-          <Card className="shadow-sm border border-gray-200/60 rounded-2xl bg-white max-w-3xl">
+          <Card className="shadow-sm border border-border/60 rounded-lg bg-card max-w-3xl">
             <CardHeader className="pb-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                   <Wrench className="h-5 w-5 text-[#009959]" /> Functional Tools
                 </CardTitle>
-                <CardDescription className="text-xs text-gray-500 mt-1">Configure functional capabilities this agent can invoke.</CardDescription>
+                <CardDescription className="text-xs text-muted-foreground mt-1">Configure functional capabilities this agent can invoke.</CardDescription>
               </div>
             </CardHeader>
             <CardContent className="pt-5">
@@ -836,7 +836,7 @@ export default function AgentConfigPage() {
               ) : (
                 <div className="space-y-2">
                   {tools.map((tool) => (
-                    <label key={tool.id} className="flex items-center justify-between rounded-xl border border-gray-150 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <label key={tool.id} className="flex items-center justify-between rounded-lg border border-gray-150 p-3 cursor-pointer hover:bg-background transition-colors">
                       <div className="flex flex-col">
                         <span className="text-xs font-semibold text-gray-700">{tool.name}</span>
                         <span className="text-[9px] text-gray-400 font-mono mt-0.5">{tool.type}</span>

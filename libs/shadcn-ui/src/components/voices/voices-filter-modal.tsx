@@ -88,19 +88,19 @@ export const VoicesFilterModal: React.FC<VoicesFilterModalProps> = ({ isOpen, on
   
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Filter Voices</h2>
           <div className="flex gap-2">
             <button 
               onClick={handleReset}
-              className="px-4 py-2 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              className="px-4 py-2 rounded-full bg-muted text-gray-700 hover:bg-gray-200 transition-colors"
             >
               Reset
             </button>
             <button 
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -117,7 +117,7 @@ export const VoicesFilterModal: React.FC<VoicesFilterModalProps> = ({ isOpen, on
             <select 
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg appearance-none pr-10"
+              className="w-full p-3 bg-background border border-border rounded-lg appearance-none pr-10"
             >
               <option value="">Select a language</option>
               {languages.map(lang => (
@@ -139,7 +139,7 @@ export const VoicesFilterModal: React.FC<VoicesFilterModalProps> = ({ isOpen, on
             <select 
               value={accent}
               onChange={(e) => setAccent(e.target.value)}
-              className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg appearance-none pr-10"
+              className="w-full p-3 bg-background border border-border rounded-lg appearance-none pr-10"
             >
               <option value="">Select an accent</option>
               {accents.map(acc => (
@@ -160,9 +160,9 @@ export const VoicesFilterModal: React.FC<VoicesFilterModalProps> = ({ isOpen, on
           <div className="flex gap-4">
             <div 
               onClick={() => handleGenderToggle('female')}
-              className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('female') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+              className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('female') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
             >
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('female') ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('female') ? 'border-primary bg-primary' : 'border-border'}`}>
                 {gender.includes('female') && (
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12"></polyline>
@@ -174,9 +174,9 @@ export const VoicesFilterModal: React.FC<VoicesFilterModalProps> = ({ isOpen, on
             
             <div 
               onClick={() => handleGenderToggle('male')}
-              className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('male') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+              className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${gender.includes('male') ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
             >
-              <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('male') ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${gender.includes('male') ? 'border-primary bg-primary' : 'border-border'}`}>
                 {gender.includes('male') && (
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12"></polyline>
@@ -196,9 +196,9 @@ export const VoicesFilterModal: React.FC<VoicesFilterModalProps> = ({ isOpen, on
               <div 
                 key={category}
                 onClick={() => handleUseCaseToggle(category)}
-                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${useCase.includes(category) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-gray-50 border-gray-200'} border`}
+                className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${useCase.includes(category) ? 'bg-primary bg-opacity-10 border-primary' : 'bg-background border-border'} border`}
               >
-                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${useCase.includes(category) ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${useCase.includes(category) ? 'border-primary bg-primary' : 'border-border'}`}>
                   {useCase.includes(category) && (
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"></polyline>

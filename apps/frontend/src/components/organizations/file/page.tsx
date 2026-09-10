@@ -302,9 +302,9 @@ export default function FilePage() {
   if (!activeWorkspace) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <div className="max-w-md text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="max-w-md text-center p-6 bg-background rounded-lg border border-border">
           <h2 className="text-xl font-semibold mb-2">No Workspace Selected</h2>
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted-foreground mb-4">
             Please select a workspace from the workspace switcher to view and manage files.
           </p>
         </div>
@@ -316,7 +316,7 @@ export default function FilePage() {
   if (isLoading && !isUploading) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <p className="text-gray-500">Loading files...</p>
+        <p className="text-muted-foreground">Loading files...</p>
       </div>
     );
   }
@@ -338,7 +338,7 @@ export default function FilePage() {
           
           {isUploading && (
             <div className="mt-4">
-              <p className="text-sm text-gray-500 mb-2">Uploading {uploadProgress}%</p>
+              <p className="text-sm text-muted-foreground mb-2">Uploading {uploadProgress}%</p>
               <Progress value={uploadProgress} />
             </div>
           )}
@@ -351,14 +351,14 @@ export default function FilePage() {
     <div className="h-screen flex flex-col p-0" key={`file-page-container-${activeWorkspace?.id}-${forceRefresh}`}>
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar - Files section with upload button */}
-        <div className="w-[350px] border-r border-gray-200 flex flex-col p-4">
+        <div className="w-[350px] border-r border-border flex flex-col p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-semibold">Documents ({files.length})</h2>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="bg-gray-50 hover:bg-gray-100 text-gray-500 flex items-center gap-1.5"
+                className="bg-background hover:bg-background text-muted-foreground flex items-center gap-1.5"
                 onClick={() => {
                   console.log('[MANUAL_REFRESH] User triggered manual refresh');
                   setForceRefresh(Date.now());
@@ -400,7 +400,7 @@ export default function FilePage() {
           
           {isUploading && (
             <div className="mb-4">
-              <p className="text-xs text-gray-500 mb-1">Uploading {uploadProgress}%</p>
+              <p className="text-xs text-muted-foreground mb-1">Uploading {uploadProgress}%</p>
               <Progress value={uploadProgress} className="h-1" />
             </div>
           )}
@@ -422,10 +422,10 @@ export default function FilePage() {
         </div>
         
         {/* Main content area - File preview */}
-        <div className="flex-1 overflow-auto p-6 bg-white">
+        <div className="flex-1 overflow-auto p-6 bg-background">
           {selectedFile && (
             <Card className="max-w-4xl mx-auto p-6 shadow-sm">
-              <div className="flex justify-center items-center mb-6 bg-primary/5 p-8 rounded-xl">
+              <div className="flex justify-center items-center mb-6 bg-primary/5 p-8 rounded-md">
                 <div className="text-center">
                   <div className="mx-auto w-[120px] h-[140px] bg-[#8259f4] rounded-lg relative flex items-center justify-center mb-4 shadow-md">
                     <div className="absolute top-0 right-0 w-0 h-0 border-t-[25px] border-t-white border-l-[25px] border-l-transparent transform rotate-90" />
@@ -435,14 +435,14 @@ export default function FilePage() {
                        selectedFile.type.includes('image') ? 'IMG' : 'FILE'}
                     </span>
                   </div>
-                  <p className="text-center text-gray-800 font-medium text-lg mt-3">{selectedFile.name}</p>
+                  <p className="text-center text-foreground font-medium text-lg mt-3">{selectedFile.name}</p>
                 </div>
               </div>
               
               <div className="mt-4">
-                <h2 className="text-base font-medium text-gray-900 mb-2">Filename</h2>
-                <p className="text-gray-800 font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500 mt-1">{selectedFile.type} • {selectedFile.size}</p>
+                <h2 className="text-base font-medium text-foreground mb-2">Filename</h2>
+                <p className="text-foreground font-medium">{selectedFile.name}</p>
+                <p className="text-sm text-muted-foreground mt-1">{selectedFile.type} • {selectedFile.size}</p>
               </div>
               
               <div className="flex gap-3 mt-8">
@@ -468,7 +468,7 @@ export default function FilePage() {
                 <Button 
                   variant="outline"
                   size="default"
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 ml-auto"
+                  className="text-red-500 hover:text-destructive hover:bg-red-50 ml-auto"
                   onClick={handleDeleteFile}
                   disabled={isDeleting}
                 >
@@ -481,31 +481,31 @@ export default function FilePage() {
         </div>
         
         {/* Right sidebar - File metadata */}
-        <div className="w-[400px] p-4 overflow-y-auto border-l border-gray-200 bg-gray-50">
+        <div className="w-[400px] p-4 overflow-y-auto border-l border-border bg-background">
           <div className="mb-6">
-            <h3 className="text-xs text-gray-500 mb-2">ID</h3>
-            <div className="text-sm text-gray-700 p-2 rounded bg-white border border-gray-200 break-all font-mono">
+            <h3 className="text-xs text-muted-foreground mb-2">ID</h3>
+            <div className="text-sm text-gray-700 p-2 rounded bg-card border border-border break-all font-mono">
               {selectedFile?.id || 'N/A'}
             </div>
           </div>
 
           <div className="mb-6">
-            <h3 className="text-xs text-gray-500 mb-2">Workspace</h3>
-            <div className="text-sm text-gray-700 p-2 rounded bg-white border border-gray-200">
+            <h3 className="text-xs text-muted-foreground mb-2">Workspace</h3>
+            <div className="text-sm text-gray-700 p-2 rounded bg-card border border-border">
               {activeWorkspace.name} ({activeWorkspace.id.substring(0, 8)}...)
             </div>
           </div>
           
           <div className="mb-6">
-            <h3 className="text-xs text-gray-500 mb-2">Metadata</h3>
-            <div className="text-sm text-gray-700 p-2 rounded bg-white border border-gray-200">
+            <h3 className="text-xs text-muted-foreground mb-2">Metadata</h3>
+            <div className="text-sm text-gray-700 p-2 rounded bg-card border border-border">
               {selectedFile?.metadata ? JSON.stringify(selectedFile.metadata, null, 2) : 'No metadata available'}
             </div>
           </div>
           
           <div>
-            <h3 className="text-xs text-gray-500 mb-2">Created At</h3>
-            <div className="text-sm text-gray-700 p-2 rounded bg-white border border-gray-200">
+            <h3 className="text-xs text-muted-foreground mb-2">Created At</h3>
+            <div className="text-sm text-gray-700 p-2 rounded bg-card border border-border">
               {selectedFile?.createdAt || 'N/A'}
             </div>
           </div>

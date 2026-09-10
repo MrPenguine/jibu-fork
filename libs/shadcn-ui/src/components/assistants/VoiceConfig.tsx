@@ -464,7 +464,7 @@ export function VoiceConfig({
   }, [testAudioUrl]);
   
   return (
-    <div className="w-full bg-white rounded-lg p-6">
+    <div className="w-full bg-card rounded-lg p-6">
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left Content Area - 2/3 width */}
         <div className="w-full lg:w-2/3 space-y-6">
@@ -480,7 +480,7 @@ export function VoiceConfig({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full bg-white rounded-full border justify-between">
+                <Button variant="outline" className="w-full bg-card rounded-full border justify-between">
                   {VOICE_PROVIDERS.find(provider => provider.id === voiceProvider)?.name || 'Select Provider'}
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
                     <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
@@ -525,12 +525,12 @@ export function VoiceConfig({
                 value={voiceId}
                 onChange={(e) => onVoiceIdChange(e.target.value)}
                 placeholder="Enter voice ID"
-                className="w-full bg-white rounded-full border"
+                className="w-full bg-card rounded-full border"
               />
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full bg-white rounded-full border justify-between">
+                  <Button variant="outline" className="w-full bg-card rounded-full border justify-between">
                     {selectedVoice ? selectedVoice.name : 'Select Voice'}
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
                       <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
@@ -544,7 +544,7 @@ export function VoiceConfig({
                         placeholder="Search voices..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white rounded-md border pl-8"
+                        className="w-full bg-card rounded-md border pl-8"
                       />
                       <svg
                         width="15"
@@ -595,11 +595,11 @@ export function VoiceConfig({
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 w-full flex flex-wrap gap-1">
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                          <span className="px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
                             {voice.gender}
                           </span>
                           {voice.accent && voice.accent !== 'neutral' && (
-                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                            <span className="px-2 py-0.5 bg-accent text-green-800 rounded-full">
                               {voice.accent}
                             </span>
                           )}
@@ -609,7 +609,7 @@ export function VoiceConfig({
                             </span>
                           )}
                           {voice.pricePerMinute && (
-                            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full">
+                            <span className="px-2 py-0.5 bg-accent text-green-800 rounded-full">
                               {voice.pricePerMinute}
                             </span>
                           )}
@@ -661,7 +661,7 @@ export function VoiceConfig({
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full bg-white rounded-full border justify-between">
+                <Button variant="outline" className="w-full bg-card rounded-full border justify-between">
                   {availableModels.find(m => m.value === settings.model)?.label || 'Select Model'}
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4">
                     <path d="M4.5 6.5L7.5 9.5L10.5 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>

@@ -61,7 +61,7 @@ export function LatencyCard({ provider }: LatencyCardProps) {
   }[provider];
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm">
+    <div className="bg-card p-4 rounded-lg shadow-sm">
       <div className="relative">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center">
@@ -94,7 +94,7 @@ export function LatencyCard({ provider }: LatencyCardProps) {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className={`h-full ${currentProportions.gpt4o} bg-yellow-500 cursor-help`}></div>
+                <div className={`h-full ${currentProportions.gpt4o} bg-brand-saffron cursor-help`}></div>
               </TooltipTrigger>
               <TooltipContent className="border-0 shadow-md">
                 <p>gpt-4o</p>
@@ -102,7 +102,7 @@ export function LatencyCard({ provider }: LatencyCardProps) {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className={`h-full ${currentProportions.jibu} bg-blue-500 cursor-help`}></div>
+                <div className={`h-full ${currentProportions.jibu} bg-primary cursor-help`}></div>
               </TooltipTrigger>
               <TooltipContent className="border-0 shadow-md">
                 <p>Jibu</p>
@@ -110,7 +110,7 @@ export function LatencyCard({ provider }: LatencyCardProps) {
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className={`h-full ${currentProportions.provider} bg-purple-500 cursor-help`}></div>
+                <div className={`h-full ${currentProportions.provider} bg-primary cursor-help`}></div>
               </TooltipTrigger>
               <TooltipContent className="border-0 shadow-md">
                 <p>{providerName}</p>

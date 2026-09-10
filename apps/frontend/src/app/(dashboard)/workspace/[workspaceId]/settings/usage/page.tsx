@@ -22,7 +22,7 @@ export default function WorkspaceUsagePage() {
           <Skeleton className="h-4 w-2/3 mt-2" />
           <Separator className="mt-6" />
           <div className="flex justify-center mt-8">
-            <Skeleton className="h-[240px] w-2/3 rounded-xl" />
+            <Skeleton className="h-[240px] w-2/3 rounded-lg" />
           </div>
         </div>
       </div>

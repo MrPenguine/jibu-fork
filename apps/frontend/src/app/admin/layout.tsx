@@ -135,10 +135,10 @@ export default function AdminLayout({
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-background">
         <div className="text-center">
-          <Shield className="h-12 w-12 text-violet-600 mx-auto mb-4 animate-pulse" />
-          <p className="text-sm text-gray-600">Verifying admin access...</p>
+          <Shield className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
+          <p className="text-sm text-muted-foreground">Verifying admin access...</p>
         </div>
       </div>
     );
@@ -148,16 +148,16 @@ export default function AdminLayout({
   // Non-admin warning (temporary - will redirect when backend is ready)
   // if (!userInfo?.isPlatformAdmin) {
   //   return (
-  //     <div className="flex items-center justify-center h-screen bg-gray-50">
-  //       <div className="text-center max-w-md p-6 bg-white rounded-lg shadow-lg">
+  //     <div className="flex items-center justify-center h-screen bg-background">
+  //       <div className="text-center max-w-md p-6 bg-card rounded-lg shadow-lg">
   //         <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
   //         <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-  //         <p className="text-sm text-gray-600 mb-4">
+  //         <p className="text-sm text-muted-foreground mb-4">
   //           You need platform admin privileges to access this area.
   //         </p>
   //         <button
   //           onClick={() => router.push('/workspace')}
-  //           className="px-4 py-2 bg-violet-600 text-white rounded-md hover:bg-violet-700"
+  //           className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
   //         >
   //           Return to Workspace
   //         </button>
@@ -173,19 +173,19 @@ export default function AdminLayout({
           userInfo={userInfo} 
           onLogout={handleLogout}
         />
-        <SidebarInset className="bg-white flex-1 flex flex-col overflow-hidden">
-          <header className="flex h-16 w-full shrink-0 items-center gap-2 px-6 border-b border-gray-200 bg-white">
+        <SidebarInset className="bg-background flex-1 flex flex-col overflow-hidden">
+          <header className="flex h-16 w-full shrink-0 items-center gap-2 px-6 border-b border-border bg-card">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-violet-100 to-purple-100">
-                <Shield className="h-4 w-4 text-violet-600" />
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-brand-navy">
+                <Shield className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-gray-900">{pageTitle}</h1>
-                <p className="text-xs text-gray-500">Platform Administration</p>
+                <h1 className="text-lg font-semibold text-foreground">{pageTitle}</h1>
+                <p className="text-xs text-muted-foreground">Platform Administration</p>
               </div>
             </div>
           </header>
-          <main className="flex-1 w-full overflow-y-auto bg-gray-50">
+          <main className="flex-1 w-full overflow-y-auto bg-background">
             {children}
           </main>
         </SidebarInset>

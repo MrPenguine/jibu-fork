@@ -81,15 +81,15 @@ print(resp.json())`;
                   </TabsList>
                 </div>
                 <TabsContent value="curl" className="p-3">
-                  <pre className="overflow-auto rounded bg-slate-950 p-3 text-slate-100 text-xs"><code>{curl}</code></pre>
+                  <pre className="overflow-auto rounded bg-gray-950 p-3 text-gray-100 text-xs"><code>{curl}</code></pre>
                   <div className="mt-2 flex justify-end"><Button size="sm" onClick={() => copy(curl)}>Copy</Button></div>
                 </TabsContent>
                 <TabsContent value="node" className="p-3">
-                  <pre className="overflow-auto rounded bg-slate-950 p-3 text-slate-100 text-xs"><code>{node}</code></pre>
+                  <pre className="overflow-auto rounded bg-gray-950 p-3 text-gray-100 text-xs"><code>{node}</code></pre>
                   <div className="mt-2 flex justify-end"><Button size="sm" onClick={() => copy(node)}>Copy</Button></div>
                 </TabsContent>
                 <TabsContent value="python" className="p-3">
-                  <pre className="overflow-auto rounded bg-slate-950 p-3 text-slate-100 text-xs"><code>{python}</code></pre>
+                  <pre className="overflow-auto rounded bg-gray-950 p-3 text-gray-100 text-xs"><code>{python}</code></pre>
                   <div className="mt-2 flex justify-end"><Button size="sm" onClick={() => copy(python)}>Copy</Button></div>
                 </TabsContent>
               </Tabs>

@@ -219,13 +219,13 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
       case 'valid':
         return 'bg-green-600';
       case 'checking':
-        return 'bg-blue-600';
+        return 'bg-brand-mint';
       case 'not-registered':
         return 'bg-orange-500';
       case 'invalid':
       case 'exists':
       case 'already-invited':
-        return 'bg-red-600';
+        return 'bg-destructive';
       default:
         return 'bg-primary';
     }
@@ -251,7 +251,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg rounded-xl">
+      <DialogContent className="sm:max-w-lg rounded-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" /> Invite New Members
@@ -270,7 +270,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
                 placeholder="username@example.com"
                 value={currentEmail}
                 onChange={(e) => setCurrentEmail(e.target.value)}
-                className="flex-1 rounded-xl"
+                className="flex-1 rounded-lg"
                 disabled={!canInviteMembers || isSubmitting}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -316,7 +316,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
               {/* Status messages for invalid emails */}
               <div className="space-y-1">
                 {emailsWithStatus.filter(e => e.status !== 'valid' && e.status !== 'checking' && e.message).map((emailStatus, idx) => (
-                  <div key={`error-${idx}`} className="text-sm text-red-600 flex items-center gap-1">
+                  <div key={`error-${idx}`} className="text-sm text-destructive flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
                     <span>
                       <strong>{emailStatus.email}:</strong> {emailStatus.message}
@@ -334,10 +334,10 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
               onValueChange={setRole} 
               disabled={!canInviteMembers || isSubmitting}
             >
-              <SelectTrigger className="w-full rounded-xl">
+              <SelectTrigger className="w-full rounded-md">
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
-              <SelectContent className="max-h-56 overflow-y-auto rounded-xl border-0 p-1 shadow-lg">
+              <SelectContent className="max-h-56 overflow-y-auto rounded-md border-0 p-1 shadow-lg">
                 {userRole === 'owner' ? (
                   <>
                     <SelectItem 
@@ -345,7 +345,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
                       className="flex items-center gap-2 py-2 px-3 cursor-pointer rounded-lg data-[state=checked]:bg-primary/15 data-[state=checked]:text-primary data-[highlighted]:bg-primary/10"
                     >
                       <div className="flex items-center gap-2">
-                        <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                         </svg>
                         <span className="font-medium">Admin</span>
@@ -359,7 +359,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
                       className="flex items-center gap-2 py-2 px-3 cursor-pointer rounded-lg data-[state=checked]:bg-primary/15 data-[state=checked]:text-primary data-[highlighted]:bg-primary/10"
                     >
                       <div className="flex items-center gap-2">
-                        <svg className="h-4 w-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                           <circle cx="12" cy="7" r="4"/>
                         </svg>
@@ -376,7 +376,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
                     className="flex items-center gap-2 py-2 px-3 cursor-pointer rounded-lg data-[state=checked]:bg-primary/15 data-[state=checked]:text-primary data-[highlighted]:bg-primary/10"
                   >
                     <div className="flex items-center gap-2">
-                      <svg className="h-4 w-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                         <circle cx="12" cy="7" r="4"/>
                       </svg>
@@ -398,7 +398,7 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
               placeholder="Add a personal message..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="w-full rounded-xl"
+              className="w-full rounded-lg"
               disabled={!canInviteMembers || isSubmitting}
             />
           </div>
@@ -407,14 +407,14 @@ export function InviteMembers({ isOpen, onClose, workspaceId }: InviteMembersPro
         <DialogFooter className="gap-2">
           <Button 
             variant="outline" 
-            className="rounded-xl"
+            className="rounded-md"
             onClick={onClose}
             disabled={isSubmitting}
           >
             Cancel
           </Button>
           <Button 
-            className="rounded-xl"
+            className="rounded-md"
             disabled={!canInviteMembers || !allEmailsValid || emailsWithStatus.length === 0 || isSubmitting}
             onClick={handleInvite}
             title={!canInviteMembers ? "Only owners and admins can invite members" : 

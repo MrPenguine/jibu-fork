@@ -25,7 +25,7 @@ export function CreateFolderWidget({ onCreateFolder }: CreateFolderWidgetProps) 
   }
 
   return (
-    <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+    <Card className="bg-card shadow-sm transition-shadow">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">Create Folder</CardTitle>
         <CardDescription>Organize your agents into folders</CardDescription>

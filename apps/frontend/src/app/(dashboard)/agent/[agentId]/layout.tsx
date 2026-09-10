@@ -50,9 +50,9 @@ export default function AgentLayout({
   }, [agentId]);
 
   return (
-    <div className="flex h-screen w-full bg-white overflow-hidden relative">
+    <div className="flex h-screen w-full bg-background overflow-hidden relative">
       <AgentNavSidebar agentId={agentId} masterWorkflowId={masterWorkflowId} />
-      <main className="flex-1 overflow-y-auto h-screen bg-white text-gray-900">
+      <main className="flex-1 overflow-y-auto h-screen bg-background text-foreground">
         {children}
       </main>
       <FloatingAgentTester />

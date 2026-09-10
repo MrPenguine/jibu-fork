@@ -62,11 +62,11 @@ export default function AssistantsLayout({
       )}
       
       {/* Left Sidebar */}
-      <div className="w-[280px] flex flex-col bg-white relative z-10">
+      <div className="w-[280px] flex flex-col bg-card relative z-10">
         <div className="p-4">
           <div className="flex gap-2">
             <Button 
-              className="flex-grow bg-primary hover:bg-primary/90 text-white rounded-xl font-medium flex items-center justify-center gap-1"
+              className="flex-grow bg-primary hover:bg-primary/90 text-white rounded-md font-medium flex items-center justify-center gap-1"
               onClick={() => setIsCreateModalOpen(true)}
               data-create-assistant-button
             >
@@ -75,7 +75,7 @@ export default function AssistantsLayout({
             </Button>
             <div className="relative group">
               <Button 
-                className="h-full px-3 rounded-xl border-primary text-primary hover:bg-primary/10 bg-transparent"
+                className="h-full px-3 rounded-md border-primary text-primary hover:bg-primary/10 bg-transparent"
               >
                 <FolderPlus className="h-4 w-4" />
                 <span className="absolute left-1/2 -translate-x-1/2 -top-12 bg-black text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
@@ -87,7 +87,7 @@ export default function AssistantsLayout({
           <div className="mt-4 relative">
             <Input
               placeholder="Search Assistants"
-              className="rounded-full border border-gray-300"
+              className="rounded-full border border-border"
             />
           </div>
         </div>
@@ -95,13 +95,13 @@ export default function AssistantsLayout({
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-pulse flex flex-col space-y-4 w-[90%]">
-                <div className="h-8 bg-gray-200 rounded-xl w-full"></div>
-                <div className="h-8 bg-gray-200 rounded-xl w-full"></div>
-                <div className="h-8 bg-gray-200 rounded-xl w-full"></div>
+                <div className="h-8 bg-gray-200 rounded-lg w-full"></div>
+                <div className="h-8 bg-gray-200 rounded-lg w-full"></div>
+                <div className="h-8 bg-gray-200 rounded-lg w-full"></div>
               </div>
             </div>
           ) : assistants.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-500">
+            <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               No assistants yet.<br />
               Create your first assistant above.
             </div>
@@ -112,15 +112,15 @@ export default function AssistantsLayout({
               return (
                 <div
                   key={assistant.id}
-                  className={`mx-2 px-3 py-2 cursor-pointer rounded-xl transition-colors ${
+                  className={`mx-2 px-3 py-2 cursor-pointer rounded-lg transition-colors ${
                     isActive
-                      ? "bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300" 
-                      : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      ? "bg-accent dark:bg-violet-900/20 text-primary dark:text-violet-300" 
+                      : "hover:bg-background dark:hover:bg-gray-800"
                   }`}
                   onClick={() => handleAssistantSelect(assistant.id)}
                 >
                   <div className="font-bold text-base">{assistant.name}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     {assistant.firstMessage ? assistant.firstMessage.substring(0, 30) + (assistant.firstMessage.length > 30 ? '...' : '') : 'No description'}
                   </div>
                 </div>

@@ -42,7 +42,7 @@ const NodePaletteItem: React.FC<NodePaletteItemProps> = ({
   colorClass,
 }) => (
   <div
-    className={`flex items-center p-2 rounded-md border border-transparent hover:border-gray-300 hover:bg-gray-50 cursor-grab transition-all duration-150 ${colorClass}`}
+    className={`flex items-center p-2 rounded-md border border-transparent hover:border-border hover:bg-background cursor-grab transition-all duration-150 ${colorClass}`}
     onDragStart={(event) => onDragStart(event, nodeType)}
     draggable
   >
@@ -68,7 +68,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       id: 'assistant',
       label: 'Assistant',
       icon: Bot,
-      color: 'bg-slate-50 text-slate-700',
+      color: 'bg-background text-gray-700',
       nodes: [
         { type: AgentNodeType.ASSISTANT, label: 'Assistant', icon: Bot },
       ],
@@ -78,7 +78,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       id: 'talk',
       label: 'Talk',
       icon: MessageSquare,
-      color: 'bg-blue-50 text-blue-700',
+      color: 'bg-accent text-primary',
       nodes: [
         { type: AgentNodeType.MESSAGE, label: 'Message', icon: MessageSquare },
         { type: AgentNodeType.PROMPT, label: 'Prompt', icon: MessageSquare },
@@ -114,7 +114,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       id: 'dev',
       label: 'Dev',
       icon: Cpu,
-      color: 'bg-slate-50 text-slate-700',
+      color: 'bg-background text-gray-700',
       nodes: [
         { type: AgentNodeType.TOOL_CALL, label: 'Tool', icon: Puzzle },
         { type: AgentNodeType.FUNCTION, label: 'Function', icon: Code },
@@ -128,7 +128,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   ];
 
   return (
-    <div className="absolute top-4 left-20 z-10 bg-white border border-gray-200 rounded-lg shadow-lg p-1 w-16 flex flex-col gap-1">
+    <div className="absolute top-4 left-20 z-10 bg-card border border-border rounded-lg shadow-sm p-1 w-16 flex flex-col gap-1">
       <div className="flex flex-col gap-1 py-2">
         {nodeCategories.map((category) => (
           <Popover key={category.id} onOpenChange={(isOpen) => setActivePopover(isOpen ? category.id : null)}>
@@ -139,7 +139,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                 title={category.label}
               >
                 <category.icon className="h-5 w-5" />
-                <span className="text-[10px] leading-none text-gray-600">{category.label}</span>
+                <span className="text-[10px] leading-none text-muted-foreground">{category.label}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent side="right" align="start" className="w-64 p-2">

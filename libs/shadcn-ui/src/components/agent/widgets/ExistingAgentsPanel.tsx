@@ -40,7 +40,7 @@ export function ExistingAgentsPanel({
   onDeleteFolder
 }: ExistingAgentsPanelProps) {
   return (
-    <Card className="bg-white shadow-sm">
+    <Card className="bg-card shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">Existing Agents</CardTitle>
         <CardDescription>Your created agents and folders</CardDescription>
@@ -58,9 +58,9 @@ export function ExistingAgentsPanel({
               {/* Folders */}
               {folders.map((folder) => (
                 <div key={folder.id} className="border rounded-lg">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-t-lg border-b">
+                  <div className="flex items-center justify-between p-3 bg-background rounded-t-lg border-b">
                     <div className="flex items-center gap-2">
-                      <Folder className="h-4 w-4 text-slate-500" />
+                      <Folder className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">{folder.name}</span>
                       <Badge variant="outline" className="ml-2">{folder.agents.length}</Badge>
                     </div>
@@ -125,7 +125,7 @@ function AgentCard({
   onRun?: () => void
 }) {
   return (
-    <div className="border rounded-md p-3 mb-2 bg-white hover:bg-slate-50 transition-colors">
+    <div className="border rounded-md p-3 mb-2 bg-card hover:bg-background transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bot className="h-4 w-4 text-primary" />

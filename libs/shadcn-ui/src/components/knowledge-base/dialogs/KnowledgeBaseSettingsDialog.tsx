@@ -170,9 +170,9 @@ export function KnowledgeBaseSettingsDialog({
   };
 
   const providerColor: Record<string, string> = {
-    gemini: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    openai: "bg-blue-50 text-blue-700 border-blue-100",
-    ollama: "bg-violet-50 text-violet-700 border-violet-100",
+    gemini: "bg-green-50 text-green-700 border-green-100",
+    openai: "bg-accent text-primary border-green-200",
+    ollama: "bg-accent text-primary border-green-200",
   };
 
   const providerLabel = selectedSpec?.provider || "gemini";
@@ -180,15 +180,15 @@ export function KnowledgeBaseSettingsDialog({
 
   return (
     <Sheet open={open} onOpenChange={(v) => !saving && onOpenChange(v)} modal={false}>
-      <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-xl max-h-[100vh] overflow-y-auto border-l-0 bg-white p-0 shadow-2xl">
-        <SheetHeader className="sticky top-0 z-10 bg-gradient-to-r from-primary to-emerald-600 px-6 py-5 text-white">
+      <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-xl max-h-[100vh] overflow-y-auto border-l-0 bg-card p-0 shadow-2xl">
+        <SheetHeader className="sticky top-0 z-10 bg-gradient-to-r from-primary to-green-600 px-6 py-5 text-white">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-white/20 p-2">
+            <div className="rounded-lg bg-white/20 p-2">
               <Brain className="h-5 w-5 text-white" />
             </div>
             <div>
               <SheetTitle className="text-lg font-semibold text-white">Knowledge base settings</SheetTitle>
-              <SheetDescription className="text-emerald-50">
+              <SheetDescription className="text-green-50">
                 Configure the embedding model and retrieval behaviour for this knowledge base.
               </SheetDescription>
             </div>
@@ -197,35 +197,35 @@ export function KnowledgeBaseSettingsDialog({
 
         {loading ? (
           <div className="space-y-4 px-6 py-8">
-            <div className="h-9 w-full animate-pulse rounded-xl bg-slate-100" />
-            <div className="h-9 w-full animate-pulse rounded-xl bg-slate-100" />
-            <div className="h-9 w-full animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-9 w-full animate-pulse rounded-lg bg-background" />
+            <div className="h-9 w-full animate-pulse rounded-lg bg-background" />
+            <div className="h-9 w-full animate-pulse rounded-lg bg-background" />
           </div>
         ) : (
           <div className="space-y-5 px-6 py-5">
             <div className="space-y-2">
-              <Label className="text-slate-700 font-medium">Knowledge base name</Label>
+              <Label className="text-gray-700 font-medium">Knowledge base name</Label>
               <Input
                 value={kbName}
                 onChange={(e) => setKbName(e.target.value)}
                 placeholder="Knowledge base name"
-                className="rounded-xl border-slate-200 focus-visible:ring-primary"
+                className="rounded-md border-border focus-visible:ring-primary"
               />
             </div>
 
-            <Card className="border-0 shadow-sm bg-slate-50/60 rounded-xl overflow-hidden">
+            <Card className="shadow-sm bg-card/60 rounded-lg overflow-hidden">
               <CardHeader className="pb-3 pt-4 px-5">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                  <Sparkles className="h-4 w-4 text-violet-500" />
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                  <Sparkles className="h-4 w-4 text-primary" />
                   Embedding model
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-4">
                 <Select value={embeddingModel} onValueChange={handleModelChange} disabled={saving}>
-                  <SelectTrigger className="rounded-xl border-slate-200 bg-white focus:ring-primary">
+                  <SelectTrigger className="rounded-md border-border bg-card focus:ring-primary">
                     <SelectValue placeholder="Select an embedding model" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="rounded-md">
                     {models.map((m) => {
                       const isSelectable =
                         m.model === 'qwen3-embedding:0.6b' ||
@@ -242,7 +242,7 @@ export function KnowledgeBaseSettingsDialog({
                             <Badge variant="outline" className={providerColor[m.provider] || providerColor.gemini}>
                               {m.provider}
                             </Badge>
-                            <span className="text-xs text-slate-400">{m.dimension}d</span>
+                            <span className="text-xs text-gray-400">{m.dimension}d</span>
                           </div>
                         </SelectItem>
                       );
@@ -254,9 +254,9 @@ export function KnowledgeBaseSettingsDialog({
                   <Badge variant="outline" className={providerClasses}>
                     {providerLabel}
                   </Badge>
-                  <span className="text-xs text-slate-500">
-                    Max input <span className="font-medium text-slate-700">{maxChunkChars.toLocaleString()} chars</span> ·{" "}
-                    <span className="font-medium text-slate-700">{selectedSpec?.dimension ?? "?"} dimensions</span>
+                  <span className="text-xs text-muted-foreground">
+                    Max input <span className="font-medium text-gray-700">{maxChunkChars.toLocaleString()} chars</span> ·{" "}
+                    <span className="font-medium text-gray-700">{selectedSpec?.dimension ?? "?"} dimensions</span>
                   </span>
                   {selectedSpec?.provider === 'ollama' && onTestModel && (
                     <div className="flex items-center gap-2 w-full">
@@ -264,14 +264,14 @@ export function KnowledgeBaseSettingsDialog({
                         value={ollamaUrl}
                         onChange={(e) => setOllamaUrl(e.target.value)}
                         placeholder="http://127.0.0.1:11435 (optional)"
-                        className="rounded-xl border-slate-200 h-7 text-xs flex-1"
+                        className="rounded-md border-border h-7 text-xs flex-1"
                       />
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={handleTestModel}
                         disabled={testingModel}
-                        className="rounded-xl border-slate-200 h-7 gap-1.5 text-xs shrink-0"
+                        className="rounded-lg border-border h-7 gap-1.5 text-xs shrink-0"
                       >
                         {testingModel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Activity className="h-3 w-3" />}
                         Test model
@@ -281,23 +281,23 @@ export function KnowledgeBaseSettingsDialog({
                 </div>
 
                 {testStatus && (
-                  <div className={`rounded-xl px-4 py-3 text-xs border flex items-start gap-2 ${
+                  <div className={`rounded-md px-4 py-3 text-xs border flex items-start gap-2 ${
                     testStatus.available
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
+                      ? 'bg-green-50 text-green-800 border-green-100'
                       : 'bg-red-50 text-red-800 border-red-100'
                   }`}>
                     {testStatus.available ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
                     ) : (
-                      <XCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                      <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                     )}
                     <span>{testStatus.available ? testStatus.message : (testStatus.error || 'Model unavailable')}</span>
                   </div>
                 )}
 
                 {modelChanged && (
-                  <div className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800 border border-amber-100 flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-800 border border-amber-100 flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-brand-cinnabar shrink-0 mt-0.5" />
                     <span>
                       Changing the embedding model will <strong>re-embed every source</strong> in this knowledge base because the vector space differs. This may take a while.
                     </span>
@@ -306,18 +306,18 @@ export function KnowledgeBaseSettingsDialog({
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm bg-slate-50/60 rounded-xl overflow-hidden">
+            <Card className="shadow-sm bg-card/60 rounded-lg overflow-hidden">
               <CardHeader className="pb-3 pt-4 px-5">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                  <FileStack className="h-4 w-4 text-emerald-500" />
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                  <FileStack className="h-4 w-4 text-green-500" />
                   Chunking
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-5">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-slate-700 text-sm">Default chunk size</Label>
-                    <span className="text-xs font-medium text-slate-600 bg-white px-2 py-1 rounded-lg border border-slate-100">
+                    <Label className="text-gray-700 text-sm">Default chunk size</Label>
+                    <span className="text-xs font-medium text-muted-foreground bg-card px-2 py-1 rounded-lg border border-gray-100">
                       {chunkSize.toLocaleString()} chars
                     </span>
                   </div>
@@ -329,7 +329,7 @@ export function KnowledgeBaseSettingsDialog({
                     onValueChange={(v) => setChunkSize(v[0])}
                     disabled={saving}
                   />
-                  <div className="flex justify-between text-xs text-slate-400">
+                  <div className="flex justify-between text-xs text-gray-400">
                     <span>100</span>
                     <span>{maxChunkChars.toLocaleString()} (model max)</span>
                   </div>
@@ -337,8 +337,8 @@ export function KnowledgeBaseSettingsDialog({
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-slate-700 text-sm">Chunk overlap</Label>
-                    <span className="text-xs font-medium text-slate-600 bg-white px-2 py-1 rounded-lg border border-slate-100">
+                    <Label className="text-gray-700 text-sm">Chunk overlap</Label>
+                    <span className="text-xs font-medium text-muted-foreground bg-card px-2 py-1 rounded-lg border border-gray-100">
                       {chunkOverlap} chars
                     </span>
                   </div>
@@ -354,18 +354,18 @@ export function KnowledgeBaseSettingsDialog({
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm bg-slate-50/60 rounded-xl overflow-hidden">
+            <Card className="shadow-sm bg-card/60 rounded-lg overflow-hidden">
               <CardHeader className="pb-3 pt-4 px-5">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
-                  <SlidersHorizontal className="h-4 w-4 text-blue-500" />
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                  <SlidersHorizontal className="h-4 w-4 text-primary" />
                   Retrieval
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-5">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-slate-700 text-sm">Chunk limit (top-K)</Label>
-                    <span className="text-xs font-medium text-slate-600 bg-white px-2 py-1 rounded-lg border border-slate-100">
+                    <Label className="text-gray-700 text-sm">Chunk limit (top-K)</Label>
+                    <span className="text-xs font-medium text-muted-foreground bg-card px-2 py-1 rounded-lg border border-gray-100">
                       {topK}
                     </span>
                   </div>
@@ -374,8 +374,8 @@ export function KnowledgeBaseSettingsDialog({
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-slate-700 text-sm">Temperature</Label>
-                    <span className="text-xs font-medium text-slate-600 bg-white px-2 py-1 rounded-lg border border-slate-100">
+                    <Label className="text-gray-700 text-sm">Temperature</Label>
+                    <span className="text-xs font-medium text-muted-foreground bg-card px-2 py-1 rounded-lg border border-gray-100">
                       {temperature.toFixed(2)}
                     </span>
                   </div>
@@ -387,30 +387,30 @@ export function KnowledgeBaseSettingsDialog({
                     onValueChange={(v) => setTemperature(v[0])}
                     disabled={saving}
                   />
-                  <div className="flex justify-between text-xs text-slate-400">
+                  <div className="flex justify-between text-xs text-gray-400">
                     <span>Deterministic</span>
                     <span>Random</span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-slate-700 text-sm">Max tokens</Label>
+                  <Label className="text-gray-700 text-sm">Max tokens</Label>
                   <Input
                     type="number"
                     min={10}
                     max={8192}
                     value={maxTokens}
                     onChange={(e) => setMaxTokens(Number(e.target.value) || 0)}
-                    className="rounded-xl border-slate-200 focus-visible:ring-indigo-500"
+                    className="rounded-lg border-border focus-visible:ring-ring"
                     disabled={saving}
                   />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm bg-slate-50/60 rounded-xl overflow-hidden">
+            <Card className="shadow-sm bg-card/60 rounded-lg overflow-hidden">
               <CardHeader className="pb-3 pt-4 px-5">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-800">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
                   <TextQuote className="h-4 w-4 text-rose-500" />
                   System prompt
                 </CardTitle>
@@ -420,7 +420,7 @@ export function KnowledgeBaseSettingsDialog({
                   rows={6}
                   value={systemPrompt}
                   onChange={(e) => setSystemPrompt(e.target.value)}
-                  className="rounded-xl border-slate-200 focus-visible:ring-indigo-500 resize-none"
+                  className="rounded-md border-border focus-visible:ring-ring resize-none"
                   disabled={saving}
                 />
               </CardContent>
@@ -428,18 +428,18 @@ export function KnowledgeBaseSettingsDialog({
           </div>
         )}
 
-        <div className="sticky bottom-0 border-t border-slate-100 bg-white/80 backdrop-blur px-6 py-4">
+        <div className="sticky bottom-0 border-t border-gray-100 bg-card/80 backdrop-blur px-6 py-4">
           {saving && modelChanged && (
             <div className="mb-4 space-y-2">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                 <span className="flex items-center gap-2">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                   Re-indexing knowledge base…
                 </span>
                 <span>{Math.round(progress)}%</span>
               </div>
-              <Progress value={progress} className="h-2 rounded-full bg-slate-100" />
-              <p className="text-[11px] text-slate-400">Chunking and embedding every source. Keep this panel open.</p>
+              <Progress value={progress} className="h-2 rounded-full bg-muted" />
+              <p className="text-[11px] text-gray-400">Chunking and embedding every source. Keep this panel open.</p>
             </div>
           )}
 
@@ -448,7 +448,7 @@ export function KnowledgeBaseSettingsDialog({
               variant="ghost"
               onClick={resetToDefault}
               disabled={loading || saving}
-              className="text-slate-500 hover:text-slate-700 gap-2"
+              className="text-muted-foreground hover:text-gray-700 gap-2"
             >
               <RotateCcw className="h-4 w-4" />
               Reset
@@ -458,14 +458,14 @@ export function KnowledgeBaseSettingsDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={saving}
-                className="rounded-xl border-slate-200"
+                className="rounded-md border-border"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={loading || saving}
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                className="rounded-md bg-primary hover:bg-primary/90 text-white gap-2"
               >
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {saving ? "Saving…" : "Save settings"}

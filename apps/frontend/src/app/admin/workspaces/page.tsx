@@ -91,8 +91,8 @@ export default function WorkspacesPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workspace Management</h1>
-          <p className="text-sm text-gray-600 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Workspace Management</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             View and manage all workspaces on the platform
           </p>
         </div>
@@ -103,55 +103,55 @@ export default function WorkspacesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or email"
-              className="pl-3 pr-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-white min-w-[220px]"
+              className="pl-3 pr-2 py-1.5 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent bg-card min-w-[220px]"
             />
           </div>
           <button
             type="submit"
-            className="h-8 px-3 text-xs rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+            className="h-8 px-3 text-xs rounded-md border border-border bg-card text-gray-700 hover:bg-background"
           >
             Apply
           </button>
         </form>
       </div>
 
-      <Card className="p-0 overflow-hidden border-gray-200">
+      <Card className="p-0 overflow-hidden border-border">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-500">
+          <div className="p-8 text-center text-sm text-muted-foreground">
             Loading workspaces...
           </div>
         ) : error ? (
-          <div className="p-8 text-center text-sm text-red-600">
+          <div className="p-8 text-center text-sm text-destructive">
             {error}
           </div>
         ) : !data || data.items.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-500">
+          <div className="p-8 text-center text-sm text-muted-foreground">
             No workspaces found.
           </div>
         ) : (
           <div className="w-full overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-background border-b border-border">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Workspace
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Owner
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Members
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Agents
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Messages
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Plan
                   </th>
                 </tr>
@@ -160,14 +160,14 @@ export default function WorkspacesPage() {
                 {data.items.map((ws) => (
                   <tr
                     key={ws.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                    className="border-b border-gray-100 hover:bg-background cursor-pointer"
                     onClick={() => router.push(`/admin/workspaces/${ws.id}`)}
                   >
                     <td className="px-4 py-2">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900">{ws.name}</span>
+                        <span className="font-medium text-foreground">{ws.name}</span>
                         {ws.email && (
-                          <span className="text-xs text-gray-500">{ws.email}</span>
+                          <span className="text-xs text-muted-foreground">{ws.email}</span>
                         )}
                       </div>
                     </td>
@@ -178,8 +178,8 @@ export default function WorkspacesPage() {
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           ws.isSuspended
-                            ? "bg-red-100 text-red-700"
-                            : "bg-emerald-100 text-emerald-700"
+                            ? "bg-red-100 text-destructive"
+                            : "bg-green-100 text-green-700"
                         }`}
                       >
                         {ws.isSuspended ? "Suspended" : "Active"}
@@ -203,14 +203,14 @@ export default function WorkspacesPage() {
                 ))}
               </tbody>
             </table>
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-600">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-background text-xs text-muted-foreground">
               <div>
                 Page {data.page} of {data.totalPages}
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="h-7 px-2 text-xs rounded-md border border-gray-200 bg-white text-gray-700 disabled:opacity-50"
+                  className="h-7 px-2 text-xs rounded-md border border-border bg-card text-gray-700 disabled:opacity-50"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
@@ -218,7 +218,7 @@ export default function WorkspacesPage() {
                 </button>
                 <button
                   type="button"
-                  className="h-7 px-2 text-xs rounded-md border border-gray-200 bg-white text-gray-700 disabled:opacity-50"
+                  className="h-7 px-2 text-xs rounded-md border border-border bg-card text-gray-700 disabled:opacity-50"
                   disabled={!data || page >= data.totalPages}
                   onClick={() => setPage((p) => (!data ? p : Math.min(data.totalPages, p + 1)))}
                 >

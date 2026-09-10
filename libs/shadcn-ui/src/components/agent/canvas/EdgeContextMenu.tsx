@@ -42,7 +42,7 @@ export function EdgeContextMenu(props: EdgeContextMenuProps) {
       <div className="flex items-stretch divide-x divide-gray-200 relative">
         {/* Color */}
         <button
-          className="px-3 py-2 hover:bg-gray-100"
+          className="px-3 py-2 hover:bg-background"
           title="Change color"
           onClick={(e) => {
             e.stopPropagation();
@@ -57,7 +57,7 @@ export function EdgeContextMenu(props: EdgeContextMenuProps) {
         {/* Type selector: single button with submenu */}
         <div className="relative">
           <button
-            className="px-3 py-2 hover:bg-gray-100 min-w-[40px] text-slate-700 flex items-center justify-center"
+            className="px-3 py-2 hover:bg-background min-w-[40px] text-gray-700 flex items-center justify-center"
             title={`Edge type: ${currentType}`}
             aria-haspopup="menu"
             aria-expanded={typeMenuOpen}
@@ -71,7 +71,7 @@ export function EdgeContextMenu(props: EdgeContextMenuProps) {
             <div
               role="menu"
               aria-label="Choose edge type"
-              className="absolute left-1/2 -translate-x-1/2 top-full mt-2 bg-white border border-gray-200 rounded-md shadow-md z-[60] p-1 flex"
+              className="absolute left-1/2 -translate-x-1/2 top-full mt-2 bg-card border border-border rounded-md shadow-md z-[60] p-1 flex"
             >
               {[
                 { key: 'bezier', label: '∿' },
@@ -81,7 +81,7 @@ export function EdgeContextMenu(props: EdgeContextMenuProps) {
               ].map((opt) => (
                 <button
                   key={opt.key}
-                  className={`px-3 py-2 rounded-md hover:bg-gray-100 ${currentType === opt.key ? 'font-semibold text-slate-900' : 'text-slate-600'}`}
+                  className={`px-3 py-2 rounded-md hover:bg-background ${currentType === opt.key ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
                   title={`Set ${opt.key} edge`
                   }
                   onClick={(e) => { e.stopPropagation(); setType(opt.key as any); }}
@@ -94,7 +94,7 @@ export function EdgeContextMenu(props: EdgeContextMenuProps) {
         </div>
         {/* Label text */}
         <button
-          className="px-3 py-2 hover:bg-gray-100"
+          className="px-3 py-2 hover:bg-background"
           title="Edit label"
           onClick={(e) => {
             e.stopPropagation();
@@ -111,7 +111,7 @@ export function EdgeContextMenu(props: EdgeContextMenuProps) {
         </button>
         {/* Delete */}
         <button
-          className="px-3 py-2 hover:bg-gray-100 text-red-600"
+          className="px-3 py-2 hover:bg-background text-destructive"
           title="Delete edge"
           onClick={() => {
             setEdges((eds: any[]) => eds.filter((e: any) => e.id !== id));

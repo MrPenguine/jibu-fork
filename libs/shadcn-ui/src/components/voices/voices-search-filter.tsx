@@ -90,13 +90,13 @@ export const VoicesSearchFilter: React.FC<VoicesSearchFilterProps> = ({
       <div className="flex items-center justify-between w-full gap-4 mb-4">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+            <svg className="w-4 h-4 text-muted-foreground" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
               <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
             </svg>
           </div>
           <input 
             type="search" 
-            className="block w-full p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500" 
+            className="block w-full p-2 pl-10 text-sm text-foreground border border-border rounded-lg bg-background focus:ring-ring focus:border-ring" 
             placeholder="Search voices" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -108,10 +108,10 @@ export const VoicesSearchFilter: React.FC<VoicesSearchFilterProps> = ({
           {activeFilters && (
             <button 
               onClick={clearFilters} 
-              className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
+              className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-background focus:ring-4 focus:outline-none focus:ring-gray-200"
             >
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <svg className="w-4 h-4 text-muted-foreground" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 Clear
@@ -122,10 +122,10 @@ export const VoicesSearchFilter: React.FC<VoicesSearchFilterProps> = ({
           {/* Filter Button */}
           <button 
             onClick={handleFilterToggle} 
-            className="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
+            className="px-4 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-background focus:ring-4 focus:outline-none focus:ring-gray-200"
           >
             <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-muted-foreground" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7.75 4H19M7.75 4a2.25 2.25 0 0 1-4.5 0m4.5 0a2.25 2.25 0 0 0-4.5 0M1 4h2.25m13.5 6H19m-2.25 0a2.25 2.25 0 0 1-4.5 0m4.5 0a2.25 2.25 0 0 0-4.5 0M1 10h11.25m-4.5 6H19M14.5 16a2.25 2.25 0 0 1-4.5 0m4.5 0a2.25 2.25 0 0 0-4.5 0M1 16h9"/>
               </svg>
               Filter
@@ -136,7 +136,7 @@ export const VoicesSearchFilter: React.FC<VoicesSearchFilterProps> = ({
       
       {/* Show filtered count if available */}
       {activeFilters && filteredCount !== null && (
-        <div className="mb-4 p-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
+        <div className="mb-4 p-2 bg-background border border-border rounded-md text-sm text-gray-700">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <span>

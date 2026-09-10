@@ -14,7 +14,7 @@ export default function AgentSettingsLayout({ children }: { children: ReactNode 
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-white text-gray-900">
+    <div className="flex min-h-screen w-full bg-background text-foreground">
       {/* Fixed Settings sidebar positioned immediately after the 4rem agent rail */}
       <div
         className="fixed top-0 bottom-0 z-40"
@@ -27,7 +27,7 @@ export default function AgentSettingsLayout({ children }: { children: ReactNode 
       </div>
       {/* Content starts after the agent rail (4rem) + Settings sidebar (16rem) */}
       <div
-        className="flex-1 pl-0 min-h-screen bg-white overflow-y-auto"
+        className="flex-1 pl-0 min-h-screen bg-background overflow-y-auto"
         style={{ marginLeft: "calc(var(--sidebar-width) + 16rem)" }}
       >
         {/* Page content */}

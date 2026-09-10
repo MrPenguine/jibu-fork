@@ -814,7 +814,7 @@ function AgentCanvasContent() {
         {/* Context Menus */}
         {contextMenu.visible && (
           <div
-            className="absolute bg-white border border-gray-200 rounded-md shadow-lg z-50 text-sm select-none"
+            className="absolute bg-card border border-border rounded-md shadow-lg z-50 text-sm select-none"
             style={{ left: contextMenu.x, top: contextMenu.y, minWidth: 200 }}
             ref={contextMenuRef}
           >
@@ -839,7 +839,7 @@ function AgentCanvasContent() {
             {contextMenu.type === 'canvas' && (
               <div className="py-1">
                 <button
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                  className="w-full text-left px-3 py-2 hover:bg-background"
                   onClick={() => {
                     if (!lastFlowClickPos.current) return;
                     const pos = lastFlowClickPos.current;
@@ -850,7 +850,7 @@ function AgentCanvasContent() {
                   }}
                 >Add Trigger</button>
                 <button
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                  className="w-full text-left px-3 py-2 hover:bg-background"
                   onClick={() => {
                     if (!lastFlowClickPos.current) return;
                     const pos = lastFlowClickPos.current;
@@ -861,7 +861,7 @@ function AgentCanvasContent() {
                   }}
                 >Add Note</button>
                 <button
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100"
+                  className="w-full text-left px-3 py-2 hover:bg-background"
                   onClick={() => {
                     const start = nodes.find(n => String(n.type).toUpperCase() === 'START' || n.id === 'start');
                     if (start) {
@@ -923,7 +923,7 @@ function AgentCanvasContent() {
 
       {/* Assistant Inspector sidebar */}
       {inspectingAssistantNode && (
-        <div className="w-80 border-l border-border bg-white shadow-lg z-10" style={{ position: 'absolute', top: 0, right: 0, bottom: 0 }}>
+        <div className="w-80 border-l border-border bg-card shadow-sm z-10" style={{ position: 'absolute', top: 0, right: 0, bottom: 0 }}>
           <div className="relative h-full">
             <Button
               variant="ghost"

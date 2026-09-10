@@ -34,7 +34,7 @@ export function DeleteAgentWidget({ agents, onDeleteAgent }: DeleteAgentWidgetPr
   const hasAgents = agents.length > 0
 
   return (
-    <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
+    <Card className="bg-card shadow-sm transition-shadow">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">Delete Agent</CardTitle>
         <CardDescription>Remove an existing agent</CardDescription>
@@ -75,7 +75,7 @@ export function DeleteAgentWidget({ agents, onDeleteAgent }: DeleteAgentWidgetPr
               {selectedAgentId && (
                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
-                  <p className="text-sm text-red-700">
+                  <p className="text-sm text-destructive">
                     This will permanently delete the agent and all associated data. This action cannot be undone.
                   </p>
                 </div>

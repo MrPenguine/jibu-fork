@@ -323,7 +323,7 @@ export default function AgentGeneralSettingsPage({ params }: { params: Promise<{
       <div className="mt-6">
         <Card className="border-red-200">
           <CardHeader>
-            <CardTitle className="text-red-600">Danger zone</CardTitle>
+            <CardTitle className="text-destructive">Danger zone</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">

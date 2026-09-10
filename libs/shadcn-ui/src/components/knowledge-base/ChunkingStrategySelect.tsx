@@ -67,28 +67,28 @@ export function ChunkingStrategySelect({ value, onChange, placeholder = "Select 
           variant="outline"
           title={fullDisplay}
           aria-label="LLM chunking strategy"
-          className="h-10 w-full justify-between font-normal border rounded-md bg-white shadow-sm hover:bg-white px-3 text-left focus-visible:ring-2 focus-visible:ring-blue-500/60 [text-rendering:optimizeLegibility]"
+          className="h-10 w-full justify-between font-normal border rounded-md bg-card shadow-sm hover:bg-card px-3 text-left focus-visible:ring-2 focus-visible:ring-ring/60 [text-rendering:optimizeLegibility]"
         >
-          <span className={(selectedLabels.length === 0 ? "text-slate-500 " : "") + "truncate whitespace-nowrap max-w-[85%]"}>
+          <span className={(selectedLabels.length === 0 ? "text-muted-foreground " : "") + "truncate whitespace-nowrap max-w-[85%]"}>
             {compactDisplay}
           </span>
-          <span className="ml-2 text-slate-400">▾</span>
+          <span className="ml-2 text-gray-400">▾</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" side="left" className="w-80 rounded-xl shadow-lg border bg-white">
+      <PopoverContent align="start" side="left" className="w-80 rounded-md shadow-lg border bg-card">
         <div className="space-y-2 text-sm">
           {STRATEGIES.map((s) => (
             <label key={s.key} className="flex items-start gap-2">
               <input
                 type="checkbox"
-                className="mt-1 accent-blue-600"
+                className="mt-1 accent-primary"
                 checked={value.includes(s.key)}
                 onChange={() => toggle(s.key)}
               />
               <span>
                 {s.label}
                 <br />
-                <span className="text-slate-500">{s.description}</span>
+                <span className="text-muted-foreground">{s.description}</span>
               </span>
             </label>
           ))}

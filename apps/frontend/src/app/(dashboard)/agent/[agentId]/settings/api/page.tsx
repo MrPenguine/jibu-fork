@@ -56,7 +56,7 @@ export default function ApiSettingsPage() {
             <CardTitle className="text-base">Popular APIs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <ul className="text-sm text-blue-700 space-y-1">
+            <ul className="text-sm text-primary space-y-1">
               <li><a href="#" className="hover:underline">Dialog messages API</a></li>
               <li><a href="#" className="hover:underline">Knowledge base API</a></li>
               <li><a href="#" className="hover:underline">Transcripts API</a></li>

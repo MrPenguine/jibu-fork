@@ -81,7 +81,7 @@ const TypingIndicator: React.FC = () => (
 
 const MessageCard: React.FC<MessageCardProps> = ({ message }) => (
   <div className={`flex my-2 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-    <Card className={`p-3 max-w-xs lg:max-w-md rounded-2xl ${message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-gray-200'}`}>
+    <Card className={`p-3 max-w-xs lg:max-w-md rounded-lg ${message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-gray-200'}`}>
       <p className="text-sm whitespace-pre-wrap">{message.text}</p>
       {message.isLoading && <TypingIndicator />}
     </Card>
@@ -104,13 +104,13 @@ const ChatList: React.FC<ChatListProps> = ({ chats, isLoading, onSelectChat, onN
         <ScrollArea className="flex-grow">
         <div className="p-2">
             {chats.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">No chat history.</p>
+            <p className="text-center text-muted-foreground py-4">No chat history.</p>
             ) : (
             chats.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(chat => (
-                <Card key={chat.id} className="p-2 mb-2 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors">
+                <Card key={chat.id} className="p-2 mb-2 flex justify-between items-center cursor-pointer hover:bg-background transition-colors">
                 <div onClick={() => onSelectChat(chat.id)} className="flex-grow mr-2">
                     <p className="font-medium truncate">{chat.name || 'Untitled Chat'}</p>
-                    <p className="text-xs text-gray-500">{new Date(chat.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(chat.createdAt).toLocaleDateString()}</p>
                 </div>
                 <Button variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); onDeleteChat(chat.id)}} className="text-gray-400 hover:text-red-500 rounded-full w-8 h-8">
                     <IoClose size={16}/>
@@ -510,7 +510,7 @@ export default function AgentChat({
         <div className="flex-grow p-4 flex flex-col items-center justify-center text-center">
           <FaRobot size={40} className="text-gray-300 mb-4" />
           <h3 className="text-lg font-medium mb-2">Agent Not Published</h3>
-          <p className="text-gray-500">Please publish this agent before you can chat with it.</p>
+          <p className="text-muted-foreground">Please publish this agent before you can chat with it.</p>
         </div>
       );
     }
@@ -529,7 +529,7 @@ export default function AgentChat({
 
     return (
       <>
-        <ScrollArea className="flex-grow p-4 bg-gray-50/50">
+        <ScrollArea className="flex-grow p-4 bg-background/50">
           {messages.map((msg) => (
             <MessageCard key={msg.id} message={msg} />
           ))}
@@ -557,8 +557,8 @@ export default function AgentChat({
   };
 
   return (
-    <div className="fixed bottom-5 right-5 w-96 h-[70vh] z-50 bg-white rounded-lg shadow-2xl flex flex-col border">
-      <header className="flex items-center justify-between p-3 border-b bg-gray-50 rounded-t-lg">
+    <div className="fixed bottom-5 right-5 w-96 h-[70vh] z-50 bg-card rounded-lg shadow-2xl flex flex-col border">
+      <header className="flex items-center justify-between p-3 border-b bg-background rounded-t-lg">
         <div className="flex items-center">
           {!showingChatList && initialChatId === null && (
             <Button variant="ghost" size="icon" onClick={() => setShowingChatList(true)} className="rounded-full mr-2">

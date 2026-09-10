@@ -85,7 +85,7 @@ export function IntegrationNode({ id, data, selected }: NodeProps<IntegrationNod
       </div>
 
       {/* Node content */}
-      <div className="bg-white p-3">
+      <div className="bg-card p-3">
         <div className="flex flex-col space-y-3">
           <div className="flex items-center">
             <div className={`p-2 rounded-md bg-${colorScheme}-100 mr-2`}>
@@ -93,7 +93,7 @@ export function IntegrationNode({ id, data, selected }: NodeProps<IntegrationNod
             </div>
             <div>
               <h4 className="text-sm font-medium">{data.label}</h4>
-              <p className="text-xs text-gray-500">{data.integrationType}</p>
+              <p className="text-xs text-muted-foreground">{data.integrationType}</p>
             </div>
           </div>
 

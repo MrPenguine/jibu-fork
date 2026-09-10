@@ -42,14 +42,14 @@ export default function McpServersSettingsPage() {
       <Card className="max-w-2xl">
         <CardContent className="py-10">
           <div className="flex flex-col items-center text-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center">
+            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path d="M4 7h16v4H4zM4 13h16v4H4z" fill="currentColor" className="text-gray-400"/>
               </svg>
             </div>
             <div className="space-y-1">
               <div className="font-medium">No MCP servers added</div>
-              <div className="text-sm text-gray-500">Add an MCP server to start using supported tools. <a href="#" className="underline">Learn more</a></div>
+              <div className="text-sm text-muted-foreground">Add an MCP server to start using supported tools. <a href="#" className="underline">Learn more</a></div>
             </div>
             <Button onClick={() => setOpen(true)}>Add MCP server</Button>
           </div>

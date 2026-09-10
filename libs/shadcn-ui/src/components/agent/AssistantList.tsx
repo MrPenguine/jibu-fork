@@ -109,7 +109,7 @@ export function AssistantList({ agentId, searchQuery, onSelectAssistant }: Assis
         {capabilities.map((capability, index) => (
           <span 
             key={index} 
-            className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
+            className="px-2 py-0.5 bg-brand-mint text-brand-navy text-xs rounded-full"
           >
             {capability}
           </span>
@@ -121,7 +121,7 @@ export function AssistantList({ agentId, searchQuery, onSelectAssistant }: Assis
   const getStatusClassName = (status: string) => {
     return status === 'Active' 
       ? "px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800" 
-      : "px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800";
+      : "px-2 py-1 rounded-full text-xs font-medium bg-muted text-foreground";
   };
 
   if (isLoading) {
@@ -139,7 +139,7 @@ export function AssistantList({ agentId, searchQuery, onSelectAssistant }: Assis
   return (
     <div className="relative overflow-x-auto">
       <table className="w-full text-left">
-        <thead className="bg-gray-50 text-gray-700 text-sm font-medium">
+        <thead className="bg-background text-gray-700 text-sm font-medium">
           <tr>
             <th className="p-4 w-12">
               <input 
@@ -164,7 +164,7 @@ export function AssistantList({ agentId, searchQuery, onSelectAssistant }: Assis
           {filteredAssistants.map((assistant) => (
             <tr 
               key={assistant.id}
-              className="border-b cursor-pointer hover:bg-gray-50"
+              className="border-b cursor-pointer hover:bg-background"
               onClick={() => onSelectAssistant(assistant.id)}
             >
               <td className="p-4" onClick={(e) => e.stopPropagation()}>
@@ -176,7 +176,7 @@ export function AssistantList({ agentId, searchQuery, onSelectAssistant }: Assis
                 />
               </td>
               <td className="p-4 flex items-center">
-                <Bot className="mr-2 h-4 w-4 text-blue-600" />
+                <Bot className="mr-2 h-4 w-4 text-primary" />
                 <span className="font-medium">{assistant.name}</span>
               </td>
               <td className="p-4">{renderCapabilityBadges(assistant.capabilities)}</td>

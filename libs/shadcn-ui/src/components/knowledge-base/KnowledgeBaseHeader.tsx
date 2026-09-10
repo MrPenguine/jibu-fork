@@ -34,11 +34,11 @@ export function KnowledgeBaseHeader({
     <div className="w-full px-6 pb-4 pt-0">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-gradient-to-br from-primary to-emerald-600 p-2.5 shadow-sm">
+          <div className="rounded-lg bg-gradient-to-br from-primary to-green-600 p-2.5 shadow-sm">
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+            <h1 className="text-2xl font-bold text-foreground">{title}</h1>
             {isProcessing && (
               <div className="flex items-center gap-1.5 text-xs text-primary">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -53,26 +53,26 @@ export function KnowledgeBaseHeader({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search"
-              className="h-9 w-56 pl-3 pr-10 rounded-xl border-slate-200"
+              className="h-9 w-56 pl-3 pr-10 rounded-md border-border"
             />
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 select-none rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] leading-none text-slate-500">
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 select-none rounded-lg border border-border bg-background px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
               ⌘ K
             </span>
           </div>
           {/* Settings buttons (UI only) */}
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl border-slate-200" aria-label="Knowledge base settings" onClick={onOpenSettings}>
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-md border-border" aria-label="Knowledge base settings" onClick={onOpenSettings}>
             <SlidersHorizontal className="h-4 w-4" />
           </Button>
           {/* Browse chunks */}
           {onOpenChunks && (
-            <Button variant="outline" className="h-9 rounded-xl border-slate-200" onClick={onOpenChunks}>
+            <Button variant="outline" className="h-9 rounded-md border-border" onClick={onOpenChunks}>
               <Boxes className="h-4 w-4 mr-2" /> Chunks
             </Button>
           )}
           {/* Preview / retrieval test button */}
           <Button
             variant="outline"
-            className="h-9 rounded-xl border-slate-200"
+            className="h-9 rounded-md border-border"
             onClick={() => onTogglePreview(!preview)}
             disabled={isProcessing}
             title={isProcessing ? "Wait for indexing to finish before testing" : "Test retrieval"}
@@ -82,7 +82,7 @@ export function KnowledgeBaseHeader({
           </Button>
           <Button
             onClick={onOpenAddDataSource}
-            className="h-9 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2 shadow-sm"
+            className="h-9 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground gap-2 shadow-sm"
           >
             <Plus className="h-4 w-4" /> Add data source
           </Button>

@@ -503,7 +503,7 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   {isDirty && !isSaving && <span className="text-xs text-amber-500">Autosaving...</span>}
-                  {isSaving && <span className="text-xs text-blue-500">Saving...</span>}
+                  {isSaving && <span className="text-xs text-primary">Saving...</span>}
                   {!isSaving && !isDirty && !saveError && nodes.length > 0 && <span className="text-xs text-green-500">All changes saved</span>} 
                   {saveError && <span className="text-xs text-red-500">Error saving!</span>}
                 </div>
@@ -530,7 +530,7 @@ export const AgentDesigner: React.FC<AgentDesignerProps> = ({
       
       {/* Assistant Inspector Panel */}
       {inspectingAssistantNode && !readOnly && (
-        <div className="w-80 border-l border-border bg-white shadow-lg z-10">
+        <div className="w-80 border-l border-border bg-card z-10">
           <div className="relative h-full">
             <Button 
               variant="ghost" 

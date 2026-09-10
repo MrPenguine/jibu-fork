@@ -59,7 +59,7 @@ export function NavPlayground({
                   <TooltipContent 
                     side="right" 
                     align="center"
-                    className="rounded-xl border-0 bg-gray-100 dark:bg-gray-800 text-md px-3 py-2 font-medium"
+                    className="rounded-lg border-0 bg-background dark:bg-gray-800 text-md px-3 py-2 font-medium"
                   >
                     {item.title}
                   </TooltipContent>

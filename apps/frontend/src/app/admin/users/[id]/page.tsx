@@ -161,7 +161,7 @@ export default function AdminUserDetailPage() {
       <button
         type="button"
         onClick={() => router.push("/admin/users")}
-        className="flex items-center text-xs text-gray-500 hover:text-gray-700 mb-2"
+        className="flex items-center text-xs text-muted-foreground hover:text-gray-700 mb-2"
       >
         <ArrowLeft className="h-3 w-3 mr-1" />
         Back to Users
@@ -169,27 +169,23 @@ export default function AdminUserDetailPage() {
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <UsersTitleIcon />
             <span>{displayName}</span>
           </h1>
           {user?.email && (
-            <p className="text-sm text-gray-600 mt-1">{user.email}</p>
+            <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
           )}
           {user && (
             <div className="mt-2 flex flex-wrap gap-2">
               {user.isAdmin && (
-                <Badge className="bg-violet-100 text-violet-700">
+                <Badge variant="info">
                   <Shield className="h-3 w-3 mr-1" />
                   Admin
                 </Badge>
               )}
               <Badge
-                className={
-                  user.isSuspended
-                    ? "bg-red-100 text-red-700"
-                    : "bg-emerald-100 text-emerald-700"
-                }
+                variant={user.isSuspended ? "danger" : "success"}
               >
                 {user.isSuspended ? "Suspended" : "Active"}
               </Badge>
@@ -211,7 +207,7 @@ export default function AdminUserDetailPage() {
                 : "Suspend User"}
             </Button>
             {user.isSuspended && user.suspensionReason && (
-              <div className="flex items-start gap-1 text-xs text-red-700 max-w-xs">
+              <div className="flex items-start gap-1 text-xs text-destructive max-w-xs">
                 <AlertTriangle className="h-3 w-3 mt-0.5" />
                 <span>{user.suspensionReason}</span>
               </div>
@@ -221,18 +217,18 @@ export default function AdminUserDetailPage() {
       </div>
 
       {loading ? (
-        <Card className="p-6 text-sm text-gray-500">Loading user...</Card>
+        <Card className="p-6 text-sm text-muted-foreground">Loading user...</Card>
       ) : error ? (
-        <Card className="p-6 text-sm text-red-600">{error}</Card>
+        <Card className="p-6 text-sm text-destructive">{error}</Card>
       ) : !user ? (
-        <Card className="p-6 text-sm text-gray-500">User not found.</Card>
+        <Card className="p-6 text-sm text-muted-foreground">User not found.</Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <Card className="p-5 space-y-3 col-span-1">
-            <h2 className="text-sm font-semibold text-gray-800">
+            <h2 className="text-sm font-semibold text-foreground">
               Overview
             </h2>
-            <div className="text-xs text-gray-600 space-y-1">
+            <div className="text-xs text-muted-foreground space-y-1">
               <p>
                 <span className="font-medium">Joined:</span>{" "}
                 {new Date(user.createdAt).toLocaleString()}
@@ -264,24 +260,24 @@ export default function AdminUserDetailPage() {
 
           <Card className="p-5 space-y-3 col-span-1 lg:col-span-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800">
+              <h2 className="text-sm font-semibold text-foreground">
                 Workspaces
               </h2>
             </div>
             {user.workspaces.length === 0 ? (
-              <p className="text-xs text-gray-500">No workspaces.</p>
+              <p className="text-xs text-muted-foreground">No workspaces.</p>
             ) : (
               <div className="border border-gray-100 rounded-md overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-background">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Workspace
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Role
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Status
                       </th>
                     </tr>
@@ -291,11 +287,11 @@ export default function AdminUserDetailPage() {
                       <tr key={w.id} className="border-t border-gray-100">
                         <td className="px-3 py-2">
                           <div className="flex flex-col">
-                            <span className="font-medium text-gray-800">
+                            <span className="font-medium text-foreground">
                               {w.name || "Workspace"}
                             </span>
                             {w.email && (
-                              <span className="text-[11px] text-gray-500">
+                              <span className="text-[11px] text-muted-foreground">
                                 {w.email}
                               </span>
                             )}
@@ -317,31 +313,31 @@ export default function AdminUserDetailPage() {
 
           <Card className="p-5 space-y-3 col-span-1 lg:col-span-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-gray-500" />
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-muted-foreground" />
                 API Keys
               </h2>
             </div>
             {user.apiKeys.length === 0 ? (
-              <p className="text-xs text-gray-500">No API keys.</p>
+              <p className="text-xs text-muted-foreground">No API keys.</p>
             ) : (
               <div className="border border-gray-100 rounded-md overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-background">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Name
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Prefix
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Workspace
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Status
                       </th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-500">
+                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                         Last used
                       </th>
                     </tr>
@@ -349,7 +345,7 @@ export default function AdminUserDetailPage() {
                   <tbody>
                     {user.apiKeys.map((k) => (
                       <tr key={k.id} className="border-t border-gray-100">
-                        <td className="px-3 py-2 text-gray-800">{k.name}</td>
+                        <td className="px-3 py-2 text-foreground">{k.name}</td>
                         <td className="px-3 py-2 text-gray-700">{k.prefix}</td>
                         <td className="px-3 py-2 text-gray-700">
                           {k.workspaceId || "—"}
@@ -358,8 +354,8 @@ export default function AdminUserDetailPage() {
                           <span
                             className={
                               k.revoked
-                                ? "inline-flex px-2 py-0.5 rounded-full bg-red-100 text-red-700"
-                                : "inline-flex px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
+                                ? "inline-flex px-2 py-0.5 rounded-full bg-red-100 text-destructive"
+                                : "inline-flex px-2 py-0.5 rounded-full bg-green-100 text-green-700"
                             }
                           >
                             {k.revoked ? "Revoked" : "Active"}
@@ -385,7 +381,7 @@ export default function AdminUserDetailPage() {
 
 function UsersTitleIcon() {
   return (
-    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-violet-100 text-violet-700">
+    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-accent text-primary">
       <Users className="h-4 w-4" />
     </span>
   );

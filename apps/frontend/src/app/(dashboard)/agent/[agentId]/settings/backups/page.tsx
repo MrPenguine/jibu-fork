@@ -24,14 +24,14 @@ export default function BackupsSettingsPage() {
       <Card className="max-w-2xl">
         <CardContent className="py-10">
           <div className="flex flex-col items-center text-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center">
+            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path d="M5 20h14a1 1 0 001-1v-7a1 1 0 00-1-1h-4l-2-3H5a1 1 0 00-1 1v10a1 1 0 001 1z" fill="currentColor" className="text-gray-400"/>
               </svg>
             </div>
             <div className="space-y-1">
               <div className="font-medium">No backups exist</div>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted-foreground">
                 Publish your project or use the shortcut ⌘/Ctrl+S to create a backup.{' '}
                 <Link href="#" className="underline">Learn more</Link>
               </div>

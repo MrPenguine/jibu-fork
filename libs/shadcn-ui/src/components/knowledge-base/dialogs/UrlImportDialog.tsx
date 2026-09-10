@@ -67,7 +67,7 @@ export function UrlImportDialog({ open, onOpenChange, onImport }: UrlImportDialo
               className="h-24 resize-y"
               placeholder="Enter URL(s)"
             />
-            <p className="text-sm text-slate-500">One url per line.</p>
+            <p className="text-sm text-muted-foreground">One url per line.</p>
           </div>
 
           {/* Refresh Rate */}
@@ -84,7 +84,7 @@ export function UrlImportDialog({ open, onOpenChange, onImport }: UrlImportDialo
                 <SelectItem value="monthly">Monthly</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-sm text-slate-500">How often will the data source sync.</p>
+            <p className="text-sm text-muted-foreground">How often will the data source sync.</p>
           </div>
 
           {/* LLM Chunking Strategy (multi-select in dropdown) */}
@@ -106,7 +106,7 @@ export function UrlImportDialog({ open, onOpenChange, onImport }: UrlImportDialo
             </Select>
             <button
               type="button"
-              className="self-start text-sm text-blue-600 hover:underline"
+              className="self-start text-sm text-primary hover:underline"
               onClick={() => {
                 const name = window.prompt("Enter folder name");
                 if (name) console.log("Create folder:", name);

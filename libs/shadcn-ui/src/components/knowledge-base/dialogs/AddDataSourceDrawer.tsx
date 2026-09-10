@@ -188,16 +188,16 @@ function ChunkingStrategyBox({
             key={s.key}
             type="button"
             onClick={() => toggle(s.key)}
-            className={`flex flex-col items-start gap-1 rounded-2xl border p-3 text-left transition-all ${
+            className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-all ${
               selected
-                ? "border-primary bg-emerald-50 text-primary shadow-sm"
-                : "border-slate-100 bg-white hover:border-primary/30 hover:bg-slate-50"
+                ? "border-primary bg-green-50 text-primary shadow-sm"
+                : "border-gray-100 bg-card hover:border-primary/30 hover:bg-background"
             }`}
           >
-            <span className={`text-sm font-semibold ${selected ? "text-primary" : "text-slate-800"}`}>
+            <span className={`text-sm font-semibold ${selected ? "text-primary" : "text-foreground"}`}>
               {s.label}
             </span>
-            <span className="text-xs text-slate-500 leading-snug">{s.description}</span>
+            <span className="text-xs text-muted-foreground leading-snug">{s.description}</span>
           </button>
         );
       })}
@@ -218,12 +218,12 @@ function FolderSelect({
 }) {
   return (
     <div className="grid gap-2">
-      <Label className="text-slate-700 font-medium">Folder</Label>
+      <Label className="text-gray-700 font-medium">Folder</Label>
       <Select value={value || "__none__"} onValueChange={(v) => onChange(v === "__none__" ? "" : v)}>
-        <SelectTrigger className="rounded-xl border-slate-200">
+        <SelectTrigger className="rounded-md border-border">
           <SelectValue placeholder="Select folder" />
         </SelectTrigger>
-        <SelectContent className="rounded-xl">
+        <SelectContent className="rounded-md">
           <SelectItem value="__none__" className="rounded-lg">No folder</SelectItem>
           {folders.map((f) => (
             <SelectItem key={f.id} value={f.id} className="rounded-lg">
@@ -255,19 +255,19 @@ function RefreshRateSelect({
 }) {
   return (
     <div className="grid gap-2">
-      <Label className="text-slate-700 font-medium">Refresh rate</Label>
+      <Label className="text-gray-700 font-medium">Refresh rate</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="rounded-xl border-slate-200">
+        <SelectTrigger className="rounded-md border-border">
           <SelectValue placeholder="Select refresh rate" />
         </SelectTrigger>
-        <SelectContent className="rounded-xl">
+        <SelectContent className="rounded-md">
           <SelectItem value="never" className="rounded-lg">Never</SelectItem>
           <SelectItem value="daily" className="rounded-lg">Daily</SelectItem>
           <SelectItem value="weekly" className="rounded-lg">Weekly</SelectItem>
           <SelectItem value="monthly" className="rounded-lg">Monthly</SelectItem>
         </SelectContent>
       </Select>
-      <p className="text-xs text-slate-500">How often the data source will sync automatically.</p>
+      <p className="text-xs text-muted-foreground">How often the data source will sync automatically.</p>
     </div>
   );
 }
@@ -477,17 +477,17 @@ export function AddDataSourceDrawer({
 
   return (
     <Sheet open={open} onOpenChange={(v) => !uploadSubmitting && !urlSubmitting && !sitemapSubmitting && !plainSubmitting && onOpenChange(v)} modal={false}>
-      <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl border-l-0 bg-white p-0 shadow-2xl flex flex-col">
-        <SheetHeader className="sticky top-0 z-10 bg-gradient-to-r from-primary to-emerald-600 px-6 py-5 text-white shrink-0">
+      <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl border-l-0 bg-card p-0 shadow-2xl flex flex-col">
+        <SheetHeader className="sticky top-0 z-10 bg-gradient-to-r from-primary to-green-600 px-6 py-5 text-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-white/20 p-2">
+            <div className="rounded-lg bg-white/20 p-2">
               {page === "home" ? <Plus className="h-5 w-5 text-white" /> : iconForPage[page]}
             </div>
             <div>
               <SheetTitle className="text-lg font-semibold text-white">
                 {page === "home" ? "Add data source" : titleForPage[page]}
               </SheetTitle>
-              <SheetDescription className="text-emerald-50">
+              <SheetDescription className="text-green-50">
                 {page === "home"
                   ? "Choose how you want to add knowledge to this agent."
                   : descriptionForPage[page]}
@@ -497,11 +497,11 @@ export function AddDataSourceDrawer({
         </SheetHeader>
 
         {page !== "home" && (
-          <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
+          <div className="px-6 py-3 border-b border-gray-100 bg-background/50 shrink-0">
             <button
               type="button"
               onClick={() => navigate("home")}
-              className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-primary transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to sources
@@ -516,23 +516,23 @@ export function AddDataSourceDrawer({
                 <button
                   key={option.id}
                   onClick={() => navigate(option.id)}
-                  className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md hover:bg-emerald-50/30"
+                  className="group flex items-center gap-4 rounded-lg border border-gray-100 bg-card p-4 text-left shadow-sm transition-all hover:border-primary/30 hover:bg-green-50/30"
                 >
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-green-50 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
                     {option.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-800">{option.label}</span>
+                      <span className="font-semibold text-foreground">{option.label}</span>
                       {option.badge && (
-                        <Badge variant="outline" className="text-[10px] border-slate-200 bg-slate-50 text-slate-500">
+                        <Badge variant="outline" className="text-[10px] border-border bg-muted text-muted-foreground">
                           {option.badge}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500">{option.description}</p>
+                    <p className="text-sm text-muted-foreground">{option.description}</p>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-slate-300 transition-colors group-hover:text-primary" />
+                  <ArrowRight className="h-4 w-4 text-gray-300 transition-colors group-hover:text-primary" />
                 </button>
               ))}
             </div>
@@ -541,20 +541,20 @@ export function AddDataSourceDrawer({
           {page === "upload" && (
             <div className="grid gap-6">
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">Files</Label>
+                <Label className="text-gray-700 font-medium">Files</Label>
                 <div
                   {...getRootProps()}
-                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-colors ${
-                    isDragActive ? "border-primary bg-emerald-50" : "border-slate-200 hover:border-primary/50 bg-slate-50/50"
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                    isDragActive ? "border-primary bg-green-50" : "border-border hover:border-primary/50 bg-background/50"
                   }`}
                 >
                   <input {...getInputProps()} />
                   <div className="flex flex-col items-center gap-2">
-                    <div className="rounded-xl bg-emerald-50 p-3 text-primary">
+                    <div className="rounded-md bg-green-50 p-3 text-primary">
                       <Upload className="h-6 w-6" />
                     </div>
-                    <p className="text-slate-600 font-medium">Drop files here or click to browse</p>
-                    <p className="text-xs text-slate-400">PDF, TXT, MD, CSV, DOCX — up to 10 MB each</p>
+                    <p className="text-muted-foreground font-medium">Drop files here or click to browse</p>
+                    <p className="text-xs text-gray-400">PDF, TXT, MD, CSV, DOCX — up to 10 MB each</p>
                   </div>
                 </div>
 
@@ -566,13 +566,13 @@ export function AddDataSourceDrawer({
                       return (
                         <div
                           key={file.name}
-                          className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm flex flex-col gap-2"
+                          className="rounded-lg border border-gray-100 bg-card p-3 shadow-sm flex flex-col gap-2"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 min-w-0">
                               <FileText className="h-4 w-4 text-primary shrink-0" />
-                              <span className="text-sm font-medium text-slate-700 truncate">{file.name}</span>
-                              <span className="text-xs text-slate-400 shrink-0">
+                              <span className="text-sm font-medium text-gray-700 truncate">{file.name}</span>
+                              <span className="text-xs text-gray-400 shrink-0">
                                 {(file.size / 1024).toFixed(1)} KB
                               </span>
                             </div>
@@ -580,19 +580,19 @@ export function AddDataSourceDrawer({
                               type="button"
                               onClick={() => removeUploadFile(file.name)}
                               disabled={uploadSubmitting}
-                              className="text-slate-400 hover:text-red-500 disabled:opacity-50"
+                              className="text-gray-400 hover:text-red-500 disabled:opacity-50"
                             >
                               <X className="h-4 w-4" />
                             </button>
                           </div>
                           {progressItems ? (
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                               {progressItems.find((item) => item.name === file.name)?.status || 'queued'}
                             </div>
                           ) : uploadSubmitting ? (
                             <div className="space-y-1">
-                              <Progress value={progress} className="h-1.5 rounded-full bg-slate-100" />
-                              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                              <Progress value={progress} className="h-1.5 rounded-full bg-muted" />
+                              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   {done ? (
                                     <>
@@ -616,13 +616,13 @@ export function AddDataSourceDrawer({
               </div>
 
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">Chunking strategy</Label>
+                <Label className="text-gray-700 font-medium">Chunking strategy</Label>
                 <ChunkingStrategyBox value={uploadChunking} onChange={setUploadChunking} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-slate-700 font-medium">Chunk size</Label>
+                  <Label className="text-gray-700 font-medium">Chunk size</Label>
                   <Input
                     type="number"
                     min={100}
@@ -630,11 +630,11 @@ export function AddDataSourceDrawer({
                     step={100}
                     value={uploadChunkSize}
                     onChange={(e) => setUploadChunkSize(Number(e.target.value))}
-                    className="rounded-xl border-slate-200 focus-visible:ring-primary"
+                    className="rounded-lg border-border focus-visible:ring-primary"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label className="text-slate-700 font-medium">Chunk overlap</Label>
+                  <Label className="text-gray-700 font-medium">Chunk overlap</Label>
                   <Input
                     type="number"
                     min={0}
@@ -642,7 +642,7 @@ export function AddDataSourceDrawer({
                     step={50}
                     value={uploadChunkOverlap}
                     onChange={(e) => setUploadChunkOverlap(Number(e.target.value))}
-                    className="rounded-xl border-slate-200 focus-visible:ring-primary"
+                    className="rounded-md border-border focus-visible:ring-primary"
                   />
                 </div>
               </div>
@@ -654,18 +654,18 @@ export function AddDataSourceDrawer({
           {page === "url" && (
             <div className="grid gap-6">
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">URL(s)</Label>
+                <Label className="text-gray-700 font-medium">URL(s)</Label>
                 <Textarea
                   value={urlsText}
                   onChange={(e) => setUrlsText(e.target.value)}
-                  className="h-32 resize-y rounded-xl border-slate-200 focus-visible:ring-primary"
+                  className="h-32 resize-y rounded-md border-border focus-visible:ring-primary"
                   placeholder="https://example.com/page-1\nhttps://example.com/page-2"
                 />
-                <p className="text-xs text-slate-500">One URL per line.</p>
+                <p className="text-xs text-muted-foreground">One URL per line.</p>
               </div>
               <RefreshRateSelect value={urlRefreshRate} onChange={setUrlRefreshRate} />
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">Chunking strategy</Label>
+                <Label className="text-gray-700 font-medium">Chunking strategy</Label>
                 <ChunkingStrategyBox value={urlChunking} onChange={setUrlChunking} />
               </div>
               <FolderSelect value={urlFolder} onChange={setUrlFolder} folders={folders} onOpenCreateFolder={onOpenCreateFolder} />
@@ -675,18 +675,18 @@ export function AddDataSourceDrawer({
           {page === "sitemap" && (
             <div className="grid gap-6">
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">Sitemap URL</Label>
+                <Label className="text-gray-700 font-medium">Sitemap URL</Label>
                 <Input
                   value={sitemapUrl}
                   onChange={(e) => setSitemapUrl(e.target.value)}
                   placeholder="https://example.com/sitemap.xml"
-                  className="rounded-xl border-slate-200 focus-visible:ring-primary"
+                  className="rounded-lg border-border focus-visible:ring-primary"
                 />
-                <p className="text-xs text-slate-500">e.g. https://www.domain.com/sitemap.xml</p>
+                <p className="text-xs text-muted-foreground">e.g. https://www.domain.com/sitemap.xml</p>
               </div>
               <RefreshRateSelect value={sitemapRefreshRate} onChange={setSitemapRefreshRate} />
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">Chunking strategy</Label>
+                <Label className="text-gray-700 font-medium">Chunking strategy</Label>
                 <ChunkingStrategyBox value={sitemapChunking} onChange={setSitemapChunking} />
               </div>
               <FolderSelect value={sitemapFolder} onChange={setSitemapFolder} folders={folders} onOpenCreateFolder={onOpenCreateFolder} />
@@ -696,16 +696,16 @@ export function AddDataSourceDrawer({
           {page === "plainText" && (
             <div className="grid gap-6">
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">Content</Label>
+                <Label className="text-gray-700 font-medium">Content</Label>
                 <Textarea
                   value={plainText}
                   onChange={(e) => setPlainText(e.target.value)}
-                  className="h-48 resize-y rounded-xl border-slate-200 focus-visible:ring-primary"
+                  className="h-48 resize-y rounded-md border-border focus-visible:ring-primary"
                   placeholder="Paste or type text here..."
                 />
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-700 font-medium">Chunking strategy</Label>
+                <Label className="text-gray-700 font-medium">Chunking strategy</Label>
                 <ChunkingStrategyBox value={plainChunking} onChange={setPlainChunking} />
               </div>
               <FolderSelect value={plainFolder} onChange={setPlainFolder} folders={folders} onOpenCreateFolder={onOpenCreateFolder} />
@@ -714,26 +714,26 @@ export function AddDataSourceDrawer({
 
           {page === "zendesk" && (
             <div className="grid gap-6">
-              <Card className="border-0 shadow-sm bg-slate-50/60 rounded-2xl">
+              <Card className="shadow-sm bg-card/60 rounded-lg">
                 <CardContent className="p-5 space-y-4">
                   <div className="grid gap-2">
-                    <Label className="text-slate-700 font-medium">Platform</Label>
+                    <Label className="text-gray-700 font-medium">Platform</Label>
                     <Select defaultValue="zendesk-help-center">
-                      <SelectTrigger className="rounded-xl border-slate-200 bg-white">
+                      <SelectTrigger className="rounded-md border-border bg-card">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl">
+                      <SelectContent className="rounded-md">
                         <SelectItem value="zendesk-help-center" className="rounded-lg">Zendesk help center</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid gap-2">
-                    <Label className="text-slate-700 font-medium">Subdomain URL</Label>
+                    <Label className="text-gray-700 font-medium">Subdomain URL</Label>
                     <Input
                       placeholder="https://company.zendesk.com"
-                      className="rounded-xl border-slate-200 focus-visible:ring-primary"
+                      className="rounded-md border-border focus-visible:ring-primary"
                     />
-                    <p className="text-xs text-slate-500">e.g. https://company.zendesk.com</p>
+                    <p className="text-xs text-muted-foreground">e.g. https://company.zendesk.com</p>
                   </div>
                 </CardContent>
               </Card>
@@ -742,27 +742,27 @@ export function AddDataSourceDrawer({
 
           {page === "knowledgeApi" && (
             <div className="grid gap-4">
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted-foreground">
                 Use the Knowledge API to upload, query, and manage sources programmatically.
               </p>
-              <div className="rounded-2xl bg-slate-950 p-4 overflow-auto">
-                <pre className="text-xs text-slate-100 whitespace-pre-wrap">
+              <div className="rounded-lg bg-gray-950 p-4 overflow-auto">
+                <pre className="text-xs text-gray-100 whitespace-pre-wrap">
                   <code>{curl}</code>
                 </pre>
               </div>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted-foreground">
                 Authentication uses Bearer tokens with project or agent credentials.
               </p>
             </div>
           )}
         </div>
 
-        <div className="sticky bottom-0 border-t border-slate-100 bg-white/90 backdrop-blur px-6 py-4 flex justify-between shrink-0">
+        <div className="sticky bottom-0 border-t border-gray-100 bg-card/90 backdrop-blur px-6 py-4 flex justify-between shrink-0">
           <Button
             variant="outline"
             onClick={() => (page === "home" ? onOpenChange(false) : navigate("home"))}
             disabled={uploadSubmitting || urlSubmitting || sitemapSubmitting || plainSubmitting}
-            className="rounded-xl border-slate-200 gap-2"
+            className="rounded-md border-border gap-2"
           >
             {page === "home" ? "Cancel" : <><ArrowLeft className="h-4 w-4" /> Back</>}
           </Button>
@@ -771,7 +771,7 @@ export function AddDataSourceDrawer({
             <Button
               onClick={handleUpload}
               disabled={uploadFiles.length === 0 || uploadSubmitting}
-              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+              className="rounded-md bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
             >
               {uploadSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {uploadSubmitting ? "Uploading…" : `Upload ${uploadFiles.length > 0 ? uploadFiles.length : ""} file${uploadFiles.length === 1 ? "" : "s"}`}
@@ -782,7 +782,7 @@ export function AddDataSourceDrawer({
             <Button
               onClick={handleUrlImport}
               disabled={urlsText.trim().length === 0 || urlSubmitting}
-              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+              className="rounded-md bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
             >
               {urlSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {urlSubmitting ? "Importing…" : "Import URLs"}
@@ -793,7 +793,7 @@ export function AddDataSourceDrawer({
             <Button
               onClick={handleSitemapImport}
               disabled={!sitemapUrl.trim() || sitemapSubmitting}
-              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+              className="rounded-md bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
             >
               {sitemapSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {sitemapSubmitting ? "Importing…" : "Import sitemap"}
@@ -804,7 +804,7 @@ export function AddDataSourceDrawer({
             <Button
               onClick={handlePlainTextImport}
               disabled={!plainText.trim() || plainSubmitting}
-              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+              className="rounded-md bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
             >
               {plainSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {plainSubmitting ? "Importing…" : "Import text"}
@@ -814,7 +814,7 @@ export function AddDataSourceDrawer({
           {page === "zendesk" && (
             <Button
               onClick={handleZendeskConnect}
-              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+              className="rounded-md bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
             >
               Connect
             </Button>
@@ -824,7 +824,7 @@ export function AddDataSourceDrawer({
             <Button
               variant="outline"
               onClick={() => window.open("https://docs.example.com/knowledge-api", "_blank")}
-              className="rounded-xl border-slate-200"
+              className="rounded-md border-border"
             >
               Open docs
             </Button>
