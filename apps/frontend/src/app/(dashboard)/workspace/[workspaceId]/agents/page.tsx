@@ -56,12 +56,12 @@ export default function AgentsPage() {
     fetchAgents();
   }, [workspaceId]);
 
-  // Open the agent's content page (CMS workflows)
+  // Open the agent's config page
   const handleOpenAgent = async (agentId: string) => {
     // Store workspace ID in localStorage for the back button
     localStorage.setItem('currentWorkspaceId', workspaceId);
-    // Navigate to content page
-    router.push(`/agent/${agentId}/cms/workflows`);
+    // Navigate to the agent's config page
+    router.push(`/workspace/${workspaceId}/agents/${agentId}/config`);
   };
 
   const handleCreateAgent = async () => {
@@ -87,7 +87,7 @@ export default function AgentsPage() {
       setNewAgentName('');
       setNewAgentDescription('');
       localStorage.setItem('currentWorkspaceId', workspaceId);
-      router.push(`/agent/${newAgent.id}/cms/workflows`);
+      router.push(`/workspace/${workspaceId}/agents/${newAgent.id}/config`);
     } catch (error) {
       console.error("Failed to create agent:", error);
       alert("Failed to create agent. Please try again.");

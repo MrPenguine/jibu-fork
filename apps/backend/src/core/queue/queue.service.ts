@@ -2,13 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue, JobOptions, JobStatusClean } from 'bull';
 
-import { 
-  QUEUE_NAMES, 
+import {
+  QUEUE_NAMES,
   JOB_NAMES,
   IndexFileSourceJobData,
   DeindexSourceJobData,
   EmailJobData,
   WebhookPayload,
+  ExtractCallMemoryJobData,
+  ExtractChatMemoryJobData,
 } from '@jibu/queue-definitions';
 
 @Injectable()
@@ -20,6 +22,7 @@ export class QueueService {
     @InjectQueue(QUEUE_NAMES.INDEXING) private readonly indexingQueue: Queue,
     @InjectQueue(QUEUE_NAMES.WORKFLOW_PUBLISH) private readonly publishQueue: Queue,
     @InjectQueue(QUEUE_NAMES.WEBHOOK_DELIVERY) private readonly webhookQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.POST_CALL_ANALYSIS) private readonly postCallAnalysisQueue: Queue,
   ) {}
 
   /**
@@ -92,6 +95,36 @@ export class QueueService {
    */
   async getJob(jobId: string) {
     return this.defaultQueue.getJob(jobId);
+  }
+
+  /**
+   * Enqueue post-call analysis (currently: memory fact extraction from the
+   * full transcript, batched once at call end rather than per-turn — see
+   * MemoryService/AgentRuntimeService for the per-turn write hook this
+   * complements for text/WhatsApp). Fire-and-forget from the caller's side:
+   * CallConcurrencyService.release calls this without awaiting completion.
+   */
+  async addExtractCallMemoryJob(data: ExtractCallMemoryJobData, options?: JobOptions) {
+    try {
+      return await this.postCallAnalysisQueue.add(JOB_NAMES.EXTRACT_CALL_MEMORY, data, options);
+    } catch (error) {
+      this.logger.error(`Failed to enqueue extract-call-memory job for call ${data.callId}: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Chat's counterpart to addExtractCallMemoryJob — enqueued by
+   * ChatIdleSweepService when a chat is marked terminated. Same queue, same
+   * fire-and-forget contract from the caller's side.
+   */
+  async addExtractChatMemoryJob(data: ExtractChatMemoryJobData, options?: JobOptions) {
+    try {
+      return await this.postCallAnalysisQueue.add(JOB_NAMES.EXTRACT_CHAT_MEMORY, data, options);
+    } catch (error) {
+      this.logger.error(`Failed to enqueue extract-chat-memory job for chat ${data.chatId}: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**

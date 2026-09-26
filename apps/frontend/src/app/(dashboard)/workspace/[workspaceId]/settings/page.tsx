@@ -3,8 +3,8 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@libs/shadcn-ui/co
 import { Phone as PhoneIcon, CreditCard as CreditCardIcon, BarChart as BarChartIcon, Users as UsersIcon } from "lucide-react";
 
 const settingsCards = [
-  { title: "Members", description: "Invite and manage team members.", href: "/settings/members", icon: <UsersIcon className="w-5 h-5" /> },
-  { title: "Phone Numbers", description: "Buy and manage phone numbers.", href: "/settings/phone-numbers", icon: <PhoneIcon className="w-5 h-5" /> },
+  { title: "Members", description: "Invite and manage team members.", href: "/members", icon: <UsersIcon className="w-5 h-5" /> },
+  { title: "Phone Numbers", description: "Buy and manage phone numbers.", href: "/phone-numbers", icon: <PhoneIcon className="w-5 h-5" /> },
   { title: "Plans & Billing", description: "Manage billing and subscriptions.", href: "/settings/billing", icon: <CreditCardIcon className="w-5 h-5" /> },
   { title: "Usage", description: "View usage and quotas.", href: "/settings/usage", icon: <BarChartIcon className="w-5 h-5" /> },
 ];

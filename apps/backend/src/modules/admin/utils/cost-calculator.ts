@@ -9,8 +9,8 @@ export const PRICING = {
   DEEPGRAM: {
     seconds: 0.0043, // per second
   },
-  TWILIO: {
-    minutes: 0.0085, // per minute
+  TELEPHONY: {
+    minutes: 0.0085, // per minute (LiveKit SIP/PSTN estimate)
   },
 } as const;
 
@@ -35,6 +35,6 @@ export function calculateSTTCost(seconds: number): number {
 }
 
 export function calculateCallCost(minutes: number): number {
-  const usd = minutes * PRICING.TWILIO.minutes;
+  const usd = minutes * PRICING.TELEPHONY.minutes;
   return Math.round(usd * 1_000_000);
 }

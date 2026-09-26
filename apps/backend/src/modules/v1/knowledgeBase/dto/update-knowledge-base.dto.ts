@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsIn, MaxLength } from 'class-validator';
 
 export class UpdateKnowledgeBaseDto {
   @ApiProperty({
@@ -11,4 +11,13 @@ export class UpdateKnowledgeBaseDto {
   @IsOptional()
   @MaxLength(100)
   name?: string;
-} 
+
+  @ApiProperty({
+    description: 'AGENT: private, only usable by agents it is explicitly linked to. WORKSPACE: attachable by any agent in the workspace.',
+    enum: ['AGENT', 'WORKSPACE'],
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(['AGENT', 'WORKSPACE'])
+  visibility?: 'AGENT' | 'WORKSPACE';
+}

@@ -18,6 +18,7 @@ import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
+import { ContactService } from '../../../core/contact/contact.service';
 
 /**
  * ChatsController handles REST endpoints for chats, delegating to Prisma for chat rows and ChatsService for message diagnostics.
@@ -29,6 +30,7 @@ export class ChatsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatsService: ChatsService,
+    private readonly contactService: ContactService,
   ) {}
 
   @Get()
@@ -73,6 +75,15 @@ export class ChatsController {
     const sessionId = dto.sessionId || `session-${Date.now()}`;
     const sessionType = dto.sessionType || 'chat';
 
+    // Additive: only the new workspace test-chat picker (chats/page.tsx)
+    // sends contactExternalId — existing callers like FloatingAgentTester
+    // are unaffected and keep creating contact-less chats.
+    let contactId: string | undefined;
+    if (dto.contactExternalId) {
+      const contact = await this.contactService.resolve(workspaceId, dto.contactExternalId, dto.channel || 'phone');
+      contactId = contact?.id;
+    }
+
     const chat = await this.prisma.chat.create({
       data: {
         name: dto.name,
@@ -81,9 +92,31 @@ export class ChatsController {
         sessionId,
         sessionType,
         metadata: dto.metadata,
+        contactId,
       },
     });
 
+    return chat;
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single chat (for polling status/lifecycle)' })
+  async getChat(@Param('id') chatId: string, @Req() req) {
+    const workspaceId =
+      req.user?.lastWorkspaceId ||
+      req.user?.workspaceId ||
+      (req.headers['x-workspace-id'] as string);
+
+    if (!workspaceId) {
+      throw new BadRequestException('No workspace selected');
+    }
+
+    const chat = await this.prisma.chat.findFirst({
+      where: { workspaceId, OR: [{ id: chatId }, { sessionId: chatId }] },
+    });
+    if (!chat) {
+      throw new BadRequestException('Chat not found');
+    }
     return chat;
   }
 

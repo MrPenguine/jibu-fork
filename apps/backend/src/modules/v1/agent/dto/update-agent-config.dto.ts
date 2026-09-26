@@ -75,6 +75,15 @@ export class UpdateAgentConfigDto {
   @IsString({ each: true })
   toolIds?: string[];
 
+  // Full-replace, same pattern as toolIds. Attaching an intent expands its
+  // tools into toolIds server-side (union'd with any directly-attached
+  // tools) and its promptSnippet gets merged into the effective system
+  // prompt at runtime — see AgentService.updateConfig.
+  @IsArray()
+  @IsOptional()
+  @IsString({ each: true })
+  intentIds?: string[];
+
   @ValidateNested()
   @Type(() => AgentChannelsDto)
   @IsOptional()

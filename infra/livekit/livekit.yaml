@@ -1,0 +1,20 @@
+port: 7880
+rtc:
+  port_range_start: 50000
+  port_range_end: 50200
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: false
+redis:
+  address: redis:6379
+keys:
+  # LiveKit rejects secrets under 32 chars ("secret is too short") — the
+  # original jibuapisecret was 13 chars and only worked because that
+  # rejection is a logged warning, not a hard failure. This one actually
+  # meets the requirement. Keep this in sync with LIVEKIT_API_SECRET in
+  # apps/backend/.env.example and apps/livekit-agent/.env.example.
+  jibuapikey: JlqWGgv5djEifl4G2z-GLOWtdlWqFj4ZDjnmFuSrM44
+
+# Prometheus metrics configuration
+prometheus:
+  port: 6789

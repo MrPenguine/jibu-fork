@@ -30,6 +30,7 @@ import {
   DollarSign,
   BarChart3,
   FileText,
+  Phone,
 } from "lucide-react"
 
 function NavItem({ 
@@ -169,6 +170,9 @@ export function PlatformAdminSidebar({
           <SidebarMenu>
             <NavItem href="/admin/credentials" icon={<Key />}>
               Credentials
+            </NavItem>
+            <NavItem href="/admin/phone-numbers" icon={<Phone />}>
+              Phone Numbers
             </NavItem>
             <NavItem href="/admin/system-checks" icon={<Activity />}>
               System Checks

@@ -578,7 +578,7 @@ export class WorkspaceService {
       }
 
       // Admin can only assign member role
-      if (normalizedNewRole !== 'member' && normalizedNewRole !== 'editor' && normalizedNewRole !== 'viewer') {
+      if (normalizedNewRole !== 'member') {
         throw new HttpException(
           'Admins can only assign the member role.',
           HttpStatus.FORBIDDEN
@@ -588,9 +588,10 @@ export class WorkspaceService {
       throw new HttpException('Only owners and admins can update member roles.', HttpStatus.FORBIDDEN);
     }
 
-    // Validate the new role
+    // Validate the new role — only owner/admin/member are real roles; there is
+    // no editor/viewer concept anywhere else in the system.
     const normalizedRole = newRole.toLowerCase() === 'admin' ? 'admin' : 'member';
-    if (!['owner', 'admin', 'member', 'editor', 'viewer'].includes(newRole.toLowerCase())) {
+    if (!['owner', 'admin', 'member'].includes(newRole.toLowerCase())) {
       throw new HttpException('Invalid role specified.', HttpStatus.BAD_REQUEST);
     }
 

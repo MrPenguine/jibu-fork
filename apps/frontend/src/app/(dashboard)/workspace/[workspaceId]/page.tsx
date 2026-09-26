@@ -5,10 +5,63 @@ import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton";
 import { Separator } from "@libs/shadcn-ui/components/ui/separator";
 import { Input } from "@libs/shadcn-ui/components/ui/input";
 import { Button } from "@libs/shadcn-ui/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@libs/shadcn-ui/components/ui/card";
+import { Card, CardContent } from "@libs/shadcn-ui/components/ui/card";
 import { Badge } from "@libs/shadcn-ui/components/ui/badge";
-import { MessageSquare, LayoutGrid, Calendar, Users, HeadphonesIcon, FileText, Bot, Plus } from "lucide-react";
-import { useParams } from "next/navigation";
+import { TemplateCard, type AgentTemplate } from "@libs/shadcn-ui/components/workspace/TemplateCard";
+import { MessageSquare, LayoutGrid, Calendar, HeadphonesIcon, Bot, Plus } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+
+// Data, not markup — each template renders through the same <TemplateCard>,
+// so adding/editing a template means editing this array, not copy-pasting a
+// Card block. bgClass/textClass/iconWrapClass all reference real brand-*
+// tokens (tailwind.config.js), never one-off hex values.
+const AGENT_TEMPLATES: AgentTemplate[] = [
+  {
+    id: "basic",
+    icon: Bot,
+    title: "Basic template",
+    description: "Get up and running quickly with an AI that can answer questions about your business",
+    bgClass: "bg-brand-green",
+    textClass: "text-white",
+    iconWrapClass: "bg-white/20",
+  },
+  {
+    id: "customer-support",
+    icon: MessageSquare,
+    title: "Customer support",
+    description: "Handle customer inquiries with an AI that can respond to common questions and issues",
+    bgClass: "bg-brand-cinnabar",
+    textClass: "text-white",
+    iconWrapClass: "bg-white/20",
+  },
+  {
+    id: "lead-qualification",
+    icon: LayoutGrid,
+    title: "Lead qualification",
+    description: "Qualify leads by asking questions and routing them to the right team members",
+    bgClass: "bg-brand-mint",
+    textClass: "text-brand-navy",
+    iconWrapClass: "bg-brand-navy/10",
+  },
+  {
+    id: "appointment-scheduler",
+    icon: Calendar,
+    title: "Appointment scheduler",
+    description: "Book, update, reschedule, or cancel appointments for your business",
+    bgClass: "bg-brand-saffron",
+    textClass: "text-brand-charcoal",
+    iconWrapClass: "bg-brand-charcoal/10",
+  },
+  {
+    id: "ivr-collector",
+    icon: HeadphonesIcon,
+    title: "IVR collector",
+    description: "Collect information from callers with a voice-based interactive system",
+    bgClass: "bg-brand-palatinate",
+    textClass: "text-white",
+    iconWrapClass: "bg-white/20",
+  },
+];
 
 // Add shake animation styles
 const shakeStyles = `
@@ -23,6 +76,14 @@ export default function WorkspaceHomePage() {
   const params = useParams<{ workspaceId: string }>();
   const workspaceId = params?.workspaceId;
   const { activeWorkspace, loading } = useWorkspace();
+  const router = useRouter();
+
+  // Real navigation, not decoration — takes the user to the agents list to
+  // create one from this starting point. Pre-filling the template itself is
+  // a follow-up; this at least goes somewhere real instead of doing nothing.
+  const handleSelectTemplate = (template: AgentTemplate) => {
+    router.push(`/workspace/${workspaceId}/agents?template=${template.id}`);
+  };
 
   if (loading || !activeWorkspace) {
     return (
@@ -57,15 +118,15 @@ export default function WorkspaceHomePage() {
 
         {/* Central "What do you want to build" widget */}
         <div className="mt-8 flex flex-col items-center justify-center text-center">
-          <div className="max-w-2xl w-full bg-[#F0FAF5] rounded-lg p-8 shadow-sm border border-[#009959]/10">
+          <div className="max-w-2xl w-full bg-accent rounded-lg p-8 shadow-sm border border-brand-green/10">
             <h2 className="text-2xl font-semibold mb-4">Hi Jibu, what do you want to build?</h2>
             <div className="relative">
-              <Input 
-                className="w-full py-6 px-4 text-base rounded-md border-border focus:border-[#009959] focus:ring-[#009959]" 
-                placeholder="Describe what kind of agent is supposed to do - be specific" 
+              <Input
+                className="w-full py-6 px-4 text-base rounded-md border-border focus:border-brand-green focus:ring-brand-green"
+                placeholder="Describe what kind of agent is supposed to do - be specific"
               />
-              <Button 
-                className="absolute right-1 top-1 bottom-1 bg-[#009959] hover:bg-[#007a47] rounded-lg" 
+              <Button
+                className="absolute right-1 top-1 bottom-1 bg-brand-green hover:bg-brand-green/90 rounded-lg"
                 size="icon"
               >
                 <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -76,13 +137,13 @@ export default function WorkspaceHomePage() {
             
             {/* Category buttons */}
             <div className="flex flex-wrap justify-center gap-2 mt-4">
-              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-[#E6F7F0] hover:text-[#009959] hover:border-[#009959] hover:scale-105 transition-all duration-200">Customer support</Badge>
-              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-[#E6F7F0] hover:text-[#009959] hover:border-[#009959] hover:scale-105 transition-all duration-200">Receptionist</Badge>
-              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-[#E6F7F0] hover:text-[#009959] hover:border-[#009959] hover:scale-105 transition-all duration-200">Lead generation</Badge>
-              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-[#E6F7F0] hover:text-[#009959] hover:border-[#009959] hover:scale-105 transition-all duration-200">Outbound sales</Badge>
-              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-[#E6F7F0] hover:text-[#009959] hover:border-[#009959] hover:scale-105 transition-all duration-200">Rental service</Badge>
-              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-[#E6F7F0] hover:text-[#009959] hover:border-[#009959] hover:scale-105 transition-all duration-200">Appointment booking</Badge>
-              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-[#E6F7F0] hover:text-[#009959] hover:border-[#009959] hover:scale-105 transition-all duration-200">Product recommendation</Badge>
+              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-accent hover:text-brand-green hover:border-brand-green hover:scale-105 transition-all duration-200">Customer support</Badge>
+              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-accent hover:text-brand-green hover:border-brand-green hover:scale-105 transition-all duration-200">Receptionist</Badge>
+              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-accent hover:text-brand-green hover:border-brand-green hover:scale-105 transition-all duration-200">Lead generation</Badge>
+              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-accent hover:text-brand-green hover:border-brand-green hover:scale-105 transition-all duration-200">Outbound sales</Badge>
+              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-accent hover:text-brand-green hover:border-brand-green hover:scale-105 transition-all duration-200">Rental service</Badge>
+              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-accent hover:text-brand-green hover:border-brand-green hover:scale-105 transition-all duration-200">Appointment booking</Badge>
+              <Badge variant="outline" className="py-2 px-3 cursor-pointer rounded-full border-border hover:bg-accent hover:text-brand-green hover:border-brand-green hover:scale-105 transition-all duration-200">Product recommendation</Badge>
             </div>
           </div>
         </div>
@@ -90,14 +151,14 @@ export default function WorkspaceHomePage() {
         {/* Recent section */}
         <div className="mt-8">
           <h3 className="text-lg font-medium mb-4">Recent</h3>
-          <Card className="rounded-lg  bg-[#F5E6F3]  hover:scale-[1.02] transition-all duration-200 cursor-pointer">
+          <Card className="rounded-lg bg-brand-palatinate/10 hover:scale-[1.02] transition-all duration-200 cursor-pointer">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="bg-[#491344] p-3 rounded-lg">
+                <div className="bg-brand-palatinate p-3 rounded-lg">
                   <Bot size={20} className="text-white" />
                 </div>
                 <div>
-                  <h4 className="font-medium text-[#22262A]">Sales Prospector (Phone)</h4>
+                  <h4 className="font-medium text-brand-charcoal">Sales Prospector (Phone)</h4>
                   <p className="text-sm text-muted-foreground">Last used 7 days ago</p>
                 </div>
               </div>
@@ -109,72 +170,12 @@ export default function WorkspaceHomePage() {
         <div className="mt-8">
           <h3 className="text-lg font-medium mb-4">Templates</h3>
           <div className="flex gap-4 overflow-x-auto py-4 px-2">
-            {/* Template 1 - Shamrock Green */}
-            <Card className="bg-[#009959]  rounded-lg hover:scale-105 hover:shadow-2xl transition-all duration-200 cursor-pointer overflow-hidden h-[360px] w-[240px] flex-shrink-0 flex flex-col">
-              <CardHeader className="pb-4 pt-6 flex-grow">
-                <div className="h-16 w-16 bg-white/20 rounded-lg flex items-center justify-center mb-6">
-                  <Bot className="h-8 w-8 text-white" />
-                </div>
-                <CardTitle className="text-lg text-white mb-3">Basic template</CardTitle>
-                <CardDescription className="text-sm text-white/90 leading-relaxed">
-                  Get up and running quickly with an AI that can answer questions about your business
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            {AGENT_TEMPLATES.map((template) => (
+              <TemplateCard key={template.id} template={template} onSelect={handleSelectTemplate} />
+            ))}
 
-            {/* Template 2 - Cinnabar (Orange) */}
-            <Card className="bg-[#F45A10]  rounded-lg hover:scale-105 hover:shadow-2xl transition-all duration-200 cursor-pointer overflow-hidden h-[360px] w-[240px] flex-shrink-0 flex flex-col">
-              <CardHeader className="pb-4 pt-6 flex-grow">
-                <div className="h-16 w-16 bg-white/20 rounded-lg flex items-center justify-center mb-6">
-                  <MessageSquare className="h-8 w-8 text-white" />
-                </div>
-                <CardTitle className="text-lg text-white mb-3">Customer support</CardTitle>
-                <CardDescription className="text-sm text-white/90 leading-relaxed">
-                  Handle customer inquiries with an AI that can respond to common questions and issues
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Template 3 - Mint Green (Light Blue) */}
-            <Card className="bg-[#CBF3FC]  rounded-lg hover:scale-105 hover:shadow-2xl transition-all duration-200 cursor-pointer overflow-hidden h-[360px] w-[240px] flex-shrink-0 flex flex-col">
-              <CardHeader className="pb-4 pt-6 flex-grow">
-                <div className="h-16 w-16 bg-[#222E50]/10 rounded-lg flex items-center justify-center mb-6">
-                  <LayoutGrid className="h-8 w-8 text-[#222E50]" />
-                </div>
-                <CardTitle className="text-lg text-[#222E50] mb-3">Lead qualification</CardTitle>
-                <CardDescription className="text-sm text-[#222E50]/80 leading-relaxed">
-                  Qualify leads by asking questions and routing them to the right team members
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Template 4 - Saffron (Yellow) */}
-            <Card className="bg-[#F9C116]  rounded-lg hover:scale-105 hover:shadow-2xl transition-all duration-200 cursor-pointer overflow-hidden h-[360px] w-[240px] flex-shrink-0 flex flex-col">
-              <CardHeader className="pb-4 pt-6 flex-grow">
-                <div className="h-16 w-16 bg-[#22262A]/10 rounded-lg flex items-center justify-center mb-6">
-                  <Calendar className="h-8 w-8 text-[#22262A]" />
-                </div>
-                <CardTitle className="text-lg text-[#22262A] mb-3">Appointment scheduler</CardTitle>
-                <CardDescription className="text-sm text-[#22262A]/80 leading-relaxed">
-                  Book, update, reschedule, or cancel appointments for your business
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Template 5 - Palatinate (Purple) */}
-            <Card className="bg-[#491344]  rounded-lg hover:scale-105 hover:shadow-2xl transition-all duration-200 cursor-pointer overflow-hidden h-[360px] w-[240px] flex-shrink-0 flex flex-col">
-              <CardHeader className="pb-4 pt-6 flex-grow">
-                <div className="h-16 w-16 bg-white/20 rounded-lg flex items-center justify-center mb-6">
-                  <HeadphonesIcon className="h-8 w-8 text-white" />
-                </div>
-                <CardTitle className="text-lg text-white mb-3">IVR collector</CardTitle>
-                <CardDescription className="text-sm text-white/90 leading-relaxed">
-                  Collect information from callers with a voice-based interactive system
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* More Button */}
+            {/* More Button — a "browse more" CTA, not an agent template, so
+                it stays outside the AGENT_TEMPLATES data/TemplateCard pattern. */}
             <Card className="bg-card border-2 border-dashed border-border rounded-lg hover:bg-gray-200 hover:border-gray-400 transition-all duration-200 cursor-pointer h-[360px] w-[240px] flex-shrink-0 flex items-center justify-center">
               <div className="text-center">
                 <div className="h-16 w-16 bg-gray-200 rounded-lg flex items-center justify-center mb-4 mx-auto">
@@ -190,7 +191,7 @@ export default function WorkspaceHomePage() {
         {/* Tutorials section */}
         <div className="mt-8">
           <h3 className="text-lg font-medium mb-4">Tutorials</h3>
-          <div className="relative bg-[#222E50] rounded-lg overflow-hidden transition-shadow duration-200 cursor-pointer">
+          <div className="relative bg-brand-navy rounded-lg overflow-hidden transition-shadow duration-200 cursor-pointer">
             <div className="absolute inset-0 flex items-center justify-center z-10">
               <div className="h-16 w-16 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors duration-200">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -198,7 +199,7 @@ export default function WorkspaceHomePage() {
                 </svg>
               </div>
             </div>
-            <div className="h-48 bg-gradient-to-br from-[#222E50] to-[#009959]/20"></div>
+            <div className="h-48 bg-gradient-to-br from-brand-navy to-brand-green/20"></div>
             <div className="absolute bottom-0 left-0 p-6 text-white">
               <h4 className="font-semibold text-lg">Building an Agent</h4>
               <p className="text-sm text-white/80">1:43</p>

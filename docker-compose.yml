@@ -1,198 +1,31 @@
-services:
-  postgres:
-    image: postgres:17
-    restart: always
-    cpus: '2.0'
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=jibu
-    ports:
-      - '5432:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+# Each service's full definition lives in its own file under
+# infra/compose/ — this keeps a change to one service from touching any
+# other service's block, and makes each service reviewable/diffable on its
+# own. See docs/local-development.md for the local dev flow.
+#
+# Docker runs infra only — Postgres/Redis/Qdrant/Vault, the LiveKit media
+# server, observability, and optional tools. The 4 app processes (backend,
+# frontend, worker, livekit-agent) run via Nx/Poetry directly on the host —
+# see docs/local-development.md. infra/compose/{backend,frontend,worker,
+# livekit-agent}.yml still exist (and their Dockerfiles are real and, for
+# backend, build-tested) for a possible later full-containerization pass,
+# but are deliberately not included here.
+include:
+  # --- Data tier ---
+  - infra/compose/postgres.yml
+  - infra/compose/redis.yml
+  - infra/compose/qdrant.yml
+  - infra/compose/vault.yml
+  - infra/compose/minio.yml
 
-  vault:
-    image: hashicorp/vault:1.20
-    restart: always
-    cpus: '2.0'
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: root
-      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
-    ports:
-      - '8200:8200'
-    cap_add:
-      - IPC_LOCK
-    # For production, configure a persistent backend and remove dev mode
+  # --- Voice infra ---
+  - infra/compose/livekit.yml
 
-  qdrant:
-    image: qdrant/qdrant:v1.15.3
-    container_name: qdrant
-    restart: always
-    cpus: '2.0'
-    ports:
-      - 6333:6333
-      - 6334:6334
-    expose:
-      - 6333
-      - 6334
-      - 6335
-    volumes:
-      - qdrant_storage:/qdrant/storage
-      - ./infra/qdrant_config.yaml:/qdrant/config/production.yaml
+  # --- Observability ---
+  - infra/compose/prometheus.yml
+  - infra/compose/grafana.yml
+  - infra/compose/node-exporter.yml
 
-  livekit:
-    image: livekit/livekit-server:v1.9.0
-    container_name: livekit
-    restart: unless-stopped
-    cpus: '2.0'
-    ports:
-      - '7880:7880'
-      - '7881:7881'
-      - '7882:7882/udp'
-      - '50000-50200:50000-50200/udp'
-      - '6789:6789' # Prometheus metrics port
-    volumes:
-      - ./infra:/config
-    command: --config /config/livekit.yaml --node-ip=127.0.0.1
-    networks:
-      - livekit-network
-      - monitoring
-
-  redis:
-    image: redis:8.2
-    container_name: redis
-    restart: always
-    cpus: '2.0'
-    ports:
-      - 6379:6379
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    networks:
-      - default
-      - livekit-network
-
-  # Monitoring services
-  prometheus:
-    image: prom/prometheus:v2.53.5
-    container_name: prometheus
-    restart: unless-stopped
-    cpus: '2.0'
-    ports:
-      - '9090:9090'
-    volumes:
-      - ./infra/prometheus:/etc/prometheus
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-    networks:
-      - monitoring
-
-  grafana:
-    image: grafana/grafana:12.1.1
-    container_name: grafana
-    restart: unless-stopped
-    cpus: '2.0'
-    ports:
-      - '3100:3000'
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    networks:
-      - monitoring
-
-  node-exporter:
-    image: prom/node-exporter:v1.9.0
-    container_name: node-exporter
-    restart: unless-stopped
-    cpus: '2.0'
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
-    expose:
-      - 9100
-    networks:
-      - monitoring
-
-  n8n:
-    image: n8nio/n8n:1.123.4
-    container_name: n8n
-    restart: always
-    cpus: '2.0'
-    ports:
-      - '5678:5678'
-    environment:
-      - NODE_ENV=production
-      # Base URL configuration
-      - N8N_HOST=localhost
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - N8N_PATH=/
-      # Direct webhook URL override (most important for proper registration)
-      - WEBHOOK_URL=http://localhost:5678/
-      # Webhook handling settings
-      - N8N_WEBHOOK_TEST_TIMEOUT=10000
-      - N8N_WEBHOOKS_RETRY_ATTEMPTS=5
-      - N8N_WEBHOOKS_WAIT_FOR_REGISTRATION=true
-      - N8N_CAPTURE_WEBHOOK_LOGS=true
-      # Database configuration
-      - DB_TYPE=sqlite
-      - DB_SQLITE_VACUUM_ON_STARTUP=true
-      # General settings
-      - GENERIC_TIMEZONE=UTC
-      - N8N_LOG_LEVEL=debug
-      - N8N_DIAGNOSTICS_ENABLED=true
-      # Health check endpoints
-      - QUEUE_HEALTH_CHECK_ACTIVE=true
-      - N8N_METRICS=true
-      # Settings for better webhook reliability
-      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
-      - N8N_SAVE_EXECUTION_PROGRESS=true
-      - N8N_SAVE_MANUAL_EXECUTIONS=true
-    volumes:
-      - n8n_data:/home/node/.n8n
-    networks:
-      - default
-
-  # Local Ollama embedding backend. The model still needs to be pulled once
-  # before first use (e.g., docker exec -it ollama ollama pull nomic-embed-text-v2-moe).
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    restart: unless-stopped
-    cpus: '2.0'
-    # Use a non-default host port (11435) so the container does not clash with
-    # a native Windows Ollama service that may already be bound to 11434.
-    ports:
-      - '11435:11434'
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - default
-
-volumes:
-  postgres_data:
-  qdrant_storage:
-  redis_data:
-  prometheus_data:
-  grafana_data:
-  n8n_data:
-  ollama_data:
-
-networks:
-  default:
-  livekit-network:
-  monitoring:
+  # --- Optional tools ---
+  - infra/compose/n8n.yml
+  - infra/compose/ollama.yml

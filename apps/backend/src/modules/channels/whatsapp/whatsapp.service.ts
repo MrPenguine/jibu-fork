@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { AgentRuntimeService } from '../../../integrations/agent/agent-runtime.service';
+import { ContactService } from '../../../core/contact/contact.service';
 
 interface WhatsAppInboundMessage {
   from: string;
@@ -40,6 +41,7 @@ export class WhatsAppService {
     private readonly httpService: HttpService,
     private readonly prisma: PrismaService,
     private readonly agentRuntime: AgentRuntimeService,
+    private readonly contacts: ContactService,
   ) {}
 
   verifyWebhook(mode: string, token: string, challenge: string): string {
@@ -77,7 +79,7 @@ export class WhatsAppService {
     }
 
     const sessionId = `whatsapp:+${from.replace(/^\+/, '')}`;
-    const chat = await this.ensureChat(agent.id, agent.workspaceId, sessionId);
+    const chat = await this.ensureChat(agent.id, agent.workspaceId, sessionId, from);
 
     const result = await this.agentRuntime.runTurn({
       agentId: agent.id,
@@ -106,11 +108,12 @@ export class WhatsAppService {
     return null;
   }
 
-  private async ensureChat(agentId: string, workspaceId: string, sessionId: string) {
+  private async ensureChat(agentId: string, workspaceId: string, sessionId: string, from: string) {
     const existing = await this.prisma.chat.findFirst({ where: { workspaceId, agentId, sessionId } });
     if (existing) return existing;
+    const contact = await this.contacts.resolve(workspaceId, from, 'whatsapp');
     return this.prisma.chat.create({
-      data: { workspaceId, agentId, sessionId, sessionType: 'whatsapp', name: sessionId },
+      data: { workspaceId, agentId, sessionId, sessionType: 'whatsapp', name: sessionId, contactId: contact?.id },
     });
   }
 

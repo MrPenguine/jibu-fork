@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -5,6 +6,7 @@ import uuid
 from livekit.agents import JobContext, WorkerOptions, cli, AutoSubscribe
 from livekit.agents.voice import Agent, AgentSession
 from livekit.agents.llm import function_tool
+from livekit.agents.beta.tools.send_dtmf import send_dtmf_events
 from livekit.plugins import google, silero, deepgram, elevenlabs, openai, azure, cartesia
 from dotenv import load_dotenv
 
@@ -84,23 +86,23 @@ def _build_llm(cfg: dict):
 def _build_stt(cfg: dict):
     """Map agent STT config to a LiveKit STT plugin."""
     voice = (cfg or {}).get("voice") or {}
-    provider = (voice.get("sttProvider") or "").lower()
+    provider = (voice.get("sttProvider") or "deepgram").lower()
 
     if "google" in provider:
         return google.STT()
     if "azure" in provider:
         return azure.STT()
-    if "whisper" in provider or "openai" in provider:
-        # OpenAI Whisper via the openai plugin
+    if provider == "whisper" or "openai" in provider:
+        # OpenAI's own hosted Whisper via the openai plugin
         return openai.STT(model="whisper-1")
-    # Default: Deepgram Nova-3 (best real-time accuracy)
+    # Default: Deepgram — fast, reliable, no local infra required.
     return deepgram.STT()
 
 
 def _build_tts(cfg: dict):
     """Map agent TTS config to a LiveKit TTS plugin."""
     voice = (cfg or {}).get("voice") or {}
-    provider = (voice.get("ttsProvider") or "").lower()
+    provider = (voice.get("ttsProvider") or "deepgram").lower()
     voice_id = voice.get("voiceId") or ""
 
     if "eleven" in provider or "elevenlabs" in provider:
@@ -114,10 +116,10 @@ def _build_tts(cfg: dict):
     if "cartesia" in provider:
         # Cartesia Sonic-2 — 1M chars/month free, best real-time quality
         return cartesia.TTS(voice=voice_id) if voice_id else cartesia.TTS()
-    if "openai" in provider:
-        # OpenAI TTS-1 or TTS-1-HD
+    if provider == "openai":
+        # OpenAI's own hosted TTS-1 / TTS-1-HD
         return openai.TTS(voice=voice_id or "alloy")
-    # Default: Deepgram Aura (fast, low-latency)
+    # Default: Deepgram — fast, reliable, no local infra required.
     return deepgram.TTS()
 
 
@@ -127,7 +129,9 @@ def _build_tools(cfg: dict, workspace_id: str):
     When the LLM calls a tool, we POST a single fast call to the backend
     (`/livekit/execute-tool`) — never the whole conversation.
     """
-    tools = []
+    # Agents can send DTMF to navigate a third-party IVR (already implemented
+    # in the installed livekit-agents package — just wiring it in).
+    tools = [send_dtmf_events]
     for defn in (cfg or {}).get("tools", []) or []:
         tool_id = defn.get("toolId")
         name = defn.get("name")
@@ -158,6 +162,7 @@ async def entrypoint(ctx: JobContext):
     agent_id = meta.get("agent_id") or DEFAULT_AGENT_ID
     session_id = meta.get("session_id") or ctx.room.name
     workspace_id = meta.get("workspace_id")
+    phone_number_id = meta.get("phone_number_id")
     connection_id = f"lk_{ctx.room.name}_{uuid.uuid4().hex[:8]}"
 
     if not agent_id:
@@ -170,10 +175,35 @@ async def entrypoint(ctx: JobContext):
         return
     workspace_id = workspace_id or cfg.get("workspaceId")
 
-    # Enforce workspace concurrency limit before accepting the call.
+    # Caller identity (Contact resolution): LiveKit sets sip.phoneNumber /
+    # sip.trunkPhoneNumber as participant attributes on SIP-originated calls
+    # — read before acquire_call below so the caller's number can be logged
+    # onto the Call row from the moment it's created, not patched in later.
+    # wait_for_participant() has to move ahead of the concurrency check for
+    # this (was previously called after it, with no participant data used).
+    participant = await ctx.wait_for_participant()
+    logger.info("Participant joined: %s", participant.identity)
+    # SIP calls carry the caller's number as a participant attribute; browser
+    # test calls have none, but the tester's picked persona (if any) is
+    # threaded through as room metadata's caller_phone instead (see
+    # LivekitService.startVoiceSession) — either way, contact resolution in
+    # CallConcurrencyService.tryAcquire only needs a non-empty from_number.
+    from_number = (
+        participant.attributes.get("sip.phoneNumber")
+        if phone_number_id
+        else meta.get("caller_phone")
+    )
+
+    # Enforce workspace concurrency limit before accepting the call, and
+    # create this call's Call history row (phone_number_id present means
+    # this room was pre-seeded by PhoneNumber.assignAgent() for a SIP-
+    # originated call; absent means a browser-originated call).
     if workspace_id:
         result = await backend_client.acquire_call(
-            workspace_id, connection_id, agent_id, session_id, ctx.room.name
+            workspace_id, connection_id, agent_id, session_id, ctx.room.name,
+            phone_number_id=phone_number_id,
+            direction="inbound" if phone_number_id else None,
+            from_number=from_number,
         )
         if not result.get("acquired", False):
             logger.warning(
@@ -182,9 +212,6 @@ async def entrypoint(ctx: JobContext):
             )
             await ctx.disconnect()
             return
-
-    participant = await ctx.wait_for_participant()
-    logger.info("Participant joined: %s", participant.identity)
 
     system_prompt = cfg.get("systemPrompt") or "You are a helpful assistant."
     tools = _build_tools(cfg, workspace_id or "")
@@ -204,13 +231,40 @@ async def entrypoint(ctx: JobContext):
     chat_manager = ChatManager(ctx, session=session, system_prompt=system_prompt)
     idle_monitor = IdleMonitor(ctx)
 
+    def _on_sip_dtmf_received(ev) -> None:
+        # rtc.SipDTMF(code: int, digit: str, participant). Forward each digit
+        # into the same AgentSession driving voice/text — no new dispatch
+        # path, agent config branches on this via normal system-prompt/tool
+        # logic (IVR menus, PIN auth), same as any other turn. One digit per
+        # turn, not buffered: the LLM can track a running sequence ("received
+        # 2, 4...") across turns itself, which avoids inventing a separate
+        # buffering/timeout state machine here.
+        logger.info("DTMF digit received: %s", ev.digit)
+        asyncio.create_task(_handle_dtmf(ev.digit))
+
+    async def _handle_dtmf(digit: str):
+        try:
+            handle = session.generate_reply(user_input=f"[DTMF digit pressed: {digit}]")
+            if asyncio.iscoroutine(handle):
+                await handle
+        except Exception as e:  # noqa: BLE001
+            logger.error("Failed to process DTMF digit %s: %s", digit, e)
+
+    ctx.room.on("sip_dtmf_received", _on_sip_dtmf_received)
+
     async def _on_shutdown():
         if workspace_id:
+            # Exact rang-vs-dropped-vs-completed disconnect signal isn't
+            # wired up yet (needs checking against the room-disconnect API,
+            # tracked as a follow-up) — defaults to 'completed' server-side.
             await backend_client.release_call(workspace_id, connection_id)
 
     ctx.add_shutdown_callback(_on_shutdown)
 
     await session.start(agent_config, room=ctx.room)
+
+    if workspace_id:
+        await backend_client.mark_call_connected(workspace_id, connection_id)
 
     first_message = cfg.get("firstMessage")
     if first_message:

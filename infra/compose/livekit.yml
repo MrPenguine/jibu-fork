@@ -1,0 +1,29 @@
+services:
+  livekit:
+    image: livekit/livekit-server:v1.9.0
+    container_name: livekit
+    restart: unless-stopped
+    cpus: '2.0'
+    ports:
+      - '7880:7880'
+      - '7881:7881'
+      - '7882:7882/udp'
+      - '50000-50200:50000-50200/udp'
+      - '6789:6789' # Prometheus metrics port
+    volumes:
+      # Mount only livekit's own config file, not the whole infra/ tree —
+      # the previous `./infra:/config` mount exposed every other service's
+      # config (qdrant, prometheus, grafana provisioning, n8n) into this
+      # container for no reason.
+      - ../livekit/livekit.yaml:/config/livekit.yaml
+    command: --config /config/livekit.yaml --node-ip=127.0.0.1
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - livekit-network
+      - monitoring
+
+networks:
+  livekit-network:
+  monitoring:

@@ -23,6 +23,7 @@ import {
 } from './dto/workspace.dto';
 import { JwtAuthGuard } from '../../../core/auth/guards/jwt-auth.guard';
 import { OrganizationGuard } from '../../../core/auth/guards/organization.guard';
+import { OrganizationRoleGuard } from '../../../core/auth/guards/organization-role.guard';
 import { requestHeaders } from '../../../core/auth/request-headers';
 
 @UseGuards(JwtAuthGuard, OrganizationGuard)
@@ -83,6 +84,7 @@ export class WorkspaceController {
   }
 
   @Put(':id')
+  @UseGuards(OrganizationRoleGuard('ADMIN', 'OWNER'))
   async updateWorkspace(
     @Request() req: any,
     @Param('id') id: string,
@@ -96,11 +98,13 @@ export class WorkspaceController {
   }
 
   @Delete(':id')
+  @UseGuards(OrganizationRoleGuard('OWNER'))
   async deleteWorkspace(@Request() req: any, @Param('id') id: string) {
     return this.workspaceService.deleteWorkspace(req.user.id, id);
   }
 
   @Post(':id/invitations')
+  @UseGuards(OrganizationRoleGuard('ADMIN', 'OWNER'))
   async inviteMembers(
     @Request() req: any,
     @Param('id') id: string,
@@ -115,6 +119,7 @@ export class WorkspaceController {
   }
 
   @Put(':id/members/:memberId/role')
+  @UseGuards(OrganizationRoleGuard('ADMIN', 'OWNER'))
   async updateMemberRole(
     @Request() req: any,
     @Param('id') id: string,
@@ -130,6 +135,11 @@ export class WorkspaceController {
     );
   }
 
+  // No OrganizationRoleGuard here, deliberately: this endpoint also handles a
+  // member removing *themselves* (leaving the workspace), which every role
+  // must be able to do. WorkspaceService.removeMember() branches on whether
+  // it's self-removal vs. removing someone else and enforces owner/admin
+  // only for the latter case.
   @Delete(':id/members/:memberId')
   async removeMember(
     @Request() req: any,
@@ -140,6 +150,7 @@ export class WorkspaceController {
   }
 
   @Post(':id/transfer-ownership')
+  @UseGuards(OrganizationRoleGuard('OWNER'))
   async transferOwnership(
     @Request() req: any,
     @Param('id') id: string,

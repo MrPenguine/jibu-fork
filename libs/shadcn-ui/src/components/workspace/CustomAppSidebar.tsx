@@ -29,6 +29,7 @@ import {
   MessageSquare,
   Settings,
   Users,
+  Contact2,
   Phone,
   PhoneCall,
   BarChart,
@@ -177,8 +178,8 @@ export function CustomAppSidebar({
                 >
                   {t("Agents")}
                 </NavItem>
-                <NavItem 
-                  href={`${wsBase}/calls`} 
+                <NavItem
+                  href={`${wsBase}/calls`}
                   icon={<PhoneCall />}
                 >
                   {t("Calls")}
@@ -194,14 +195,20 @@ export function CustomAppSidebar({
                 Manage
               </SidebarGroupLabel>
               <SidebarMenu>
-                <NavItem 
-                  href={`${wsBase}/phone-numbers`} 
+                <NavItem
+                  href={`${wsBase}/phone-numbers`}
                   icon={<Phone />}
                 >
                   {t("Phone Numbers")}
                 </NavItem>
-                <NavItem 
-                  href={`${wsBase}/members`} 
+                <NavItem
+                  href={`${wsBase}/contacts`}
+                  icon={<Contact2 />}
+                >
+                  {t("Contacts")}
+                </NavItem>
+                <NavItem
+                  href={`${wsBase}/members`}
                   icon={<Users />}
                 >
                   {t("Members")}

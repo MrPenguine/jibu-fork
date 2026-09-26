@@ -1,0 +1,31 @@
+services:
+  worker:
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    container_name: worker
+    restart: unless-stopped
+    cpus: '2.0'
+    env_file:
+      - ../../apps/worker/.env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - QDRANT_URL=http://qdrant:6333
+      - N8N_API_URL=http://n8n:5678/api/v1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    # BullMQ queue consumer — no HTTP listener, no meaningful HEALTHCHECK
+    # target. Rely on restart: unless-stopped + Docker's exit detection.
+    networks:
+      - data
+      - app
+
+networks:
+  data:
+  app:

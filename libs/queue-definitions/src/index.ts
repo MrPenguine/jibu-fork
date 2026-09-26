@@ -48,6 +48,7 @@ export const QUEUE_NAMES = {
   WORKFLOW_EXECUTION: 'workflow-execution',
   WORKFLOW_PUBLISH: 'workflow-publish',
   WEBHOOK_DELIVERY: 'webhook-delivery',
+  POST_CALL_ANALYSIS: 'post-call-analysis',
 };
 
 // Job names
@@ -71,6 +72,14 @@ export const JOB_NAMES = {
 
   // Webhook delivery queue jobs
   DELIVER_WEBHOOK: 'deliver-webhook',
+
+  // Post-call analysis queue jobs — pluggable: new analysis types register
+  // their own job name/processor on this same queue without touching the
+  // enqueue call in CallConcurrencyService.release.
+  EXTRACT_CALL_MEMORY: 'extract-call-memory',
+  // Chat's end-of-conversation counterpart, enqueued by ChatIdleSweepService
+  // when a chat is marked terminated — same queue, same pluggable pattern.
+  EXTRACT_CHAT_MEMORY: 'extract-chat-memory',
 };
 
 // Job interfaces
@@ -162,6 +171,18 @@ export enum WebhookPriority {
  * Connection context for active voice calls
  * Used for connection state management in Redis
  */
+export interface ExtractCallMemoryJobData {
+  callId: string;
+  workspaceId: string;
+  contactId: string;
+}
+
+export interface ExtractChatMemoryJobData {
+  chatId: string;
+  workspaceId: string;
+  contactId: string;
+}
+
 export interface ConnectionContext {
   workflowId: string;
   sessionId: string;

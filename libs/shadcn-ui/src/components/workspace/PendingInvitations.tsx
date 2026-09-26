@@ -104,26 +104,26 @@ export function PendingInvitations({ workspaceId, refreshMembers }: PendingInvit
   }
 
   return (
-    <CustomCard className="mb-8">
-      <CustomCardHeader>
-        <CardTitle>Pending Invitations</CardTitle>
-        <CardDescription>These users have been invited but have not yet joined.</CardDescription>
+    <CustomCard className="mb-6 border border-border rounded-lg shadow-sm">
+      <CustomCardHeader className="border-b border-border">
+        <CardTitle className="font-display text-base font-bold">Pending Invitations</CardTitle>
+        <CardDescription className="text-xs">These users have been invited but have not yet joined.</CardDescription>
       </CustomCardHeader>
-      <CustomCardContent>
-        <div className="space-y-4">
+      <CustomCardContent className="p-0">
+        <div className="divide-y divide-border">
           {invitations.map((invite) => (
-            <div key={invite.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted dark:hover:bg-gray-800">
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-muted dark:bg-gray-700 rounded-full">
-                  <Mail className="h-5 w-5 text-muted-foreground dark:text-gray-400" />
+            <div key={invite.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-accent/40 transition-colors">
+              <div className="flex items-center gap-3.5">
+                <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <Mail className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="font-medium">{invite.email}</p>
-                  <p className="text-sm text-muted-foreground">Invited as {invite.role}</p>
+                  <p className="text-sm font-semibold">{invite.email}</p>
+                  <p className="text-xs text-muted-foreground">Invited as {invite.role}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   {new Date(invite.createdAt).toLocaleDateString()}
                 </span>
@@ -143,7 +143,7 @@ export function PendingInvitations({ workspaceId, refreshMembers }: PendingInvit
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="ghost" size="icon" onClick={() => cancelInvitation(invite.id)}>
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Cancel Invitation</TooltipContent>

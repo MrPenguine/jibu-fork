@@ -44,6 +44,12 @@ export class S3StorageService implements IStorageService {
       // Dynamic import of AWS SDK to avoid build errors
       const { S3Client } = require('@aws-sdk/client-s3');
 
+      // AWS_S3_ENDPOINT is optional — set it to point this at any
+      // S3-compatible store (e.g. a local MinIO container for dev) instead
+      // of real AWS. forcePathStyle is required for MinIO-style endpoints,
+      // which don't support virtual-hosted-style bucket addressing.
+      const endpoint = this.configService.get<string>('AWS_S3_ENDPOINT');
+
       // Initialize S3 client with the AWS SDK v3
       this.s3Client = new S3Client({
         region: this.region,
@@ -51,6 +57,7 @@ export class S3StorageService implements IStorageService {
           accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID'),
           secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY'),
         },
+        ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
       });
 
       this.logger.log(`S3StorageService initialized with bucket: ${this.bucketName} in region: ${this.region}`);

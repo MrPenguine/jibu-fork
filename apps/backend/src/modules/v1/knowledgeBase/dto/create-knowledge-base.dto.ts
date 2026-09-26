@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsOptional, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsUUID, IsIn } from 'class-validator';
 
 export class CreateKnowledgeBaseDto {
   @ApiProperty({
@@ -9,7 +9,7 @@ export class CreateKnowledgeBaseDto {
   @IsNotEmpty()
   @IsString()
   name: string;
-  
+
   @ApiProperty({
     description: 'Optional description of the knowledge base',
     example: 'Contains company policies and procedures',
@@ -28,4 +28,14 @@ export class CreateKnowledgeBaseDto {
   @IsUUID()
   @IsString()
   workspaceId?: string;
-} 
+
+  @ApiProperty({
+    description: 'AGENT: private, only usable by agents it is explicitly linked to. WORKSPACE: attachable by any agent in the workspace.',
+    enum: ['AGENT', 'WORKSPACE'],
+    default: 'AGENT',
+    required: false,
+  })
+  @IsOptional()
+  @IsIn(['AGENT', 'WORKSPACE'])
+  visibility?: 'AGENT' | 'WORKSPACE';
+}

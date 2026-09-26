@@ -11,11 +11,12 @@ const safeISO = (date: any) => {
 export interface ChatMessage {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   sequenceId: number;
   createdAt: string;
   updatedAt: string;
   type?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface Chat {
@@ -27,6 +28,11 @@ export interface Chat {
   agentId?: string;
   workflowId?: string;
   workspaceId?: string;
+  contactId?: string;
+  status?: 'active' | 'idle_warned' | 'terminated';
+  lastUserMessageAt?: string;
+  endedAt?: string;
+  disconnectReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,8 +79,93 @@ export async function getChatMessages(chatId: string): Promise<ChatMessage[]> {
         createdAt: safeISO(m.createdAt),
         updatedAt: safeISO(m.updatedAt),
         type: m.type || 'text',
+        metadata: m.metadata || undefined,
       }))
     : [];
+}
+
+/** Fetch a single chat row — used to poll Chat.status (active/idle_warned/
+ * terminated) since chat has no WebSocket to push lifecycle changes live. */
+export async function getChat(chatId: string): Promise<Chat | null> {
+  if (!chatId) return null;
+  const c = await fetchAPI(`/v1/chats/${chatId}`, { method: 'GET' });
+  if (!c) return null;
+  return {
+    id: String(c.id),
+    name: c.name,
+    sessionId: c.sessionId,
+    sessionType: c.sessionType,
+    agentId: c.agentId || undefined,
+    workspaceId: c.workspaceId || undefined,
+    contactId: c.contactId || undefined,
+    status: c.status,
+    lastUserMessageAt: c.lastUserMessageAt,
+    endedAt: c.endedAt,
+    disconnectReason: c.disconnectReason,
+    createdAt: safeISO(c.createdAt),
+    updatedAt: safeISO(c.updatedAt),
+  };
+}
+
+/** Workspace-scoped chat history for the current agent — GET /v1/chats
+ * already scopes to the workspace via auth headers when no agentId is
+ * given a narrower filter; here we always pass agentId for a per-agent list. */
+export async function listWorkspaceChats(agentId: string, sessionType: string = 'chat'): Promise<Chat[]> {
+  const params = new URLSearchParams({ agentId, sessionType });
+  const result = await fetchAPI(`/v1/chats?${params.toString()}`);
+  return Array.isArray(result)
+    ? result.map((c: any) => ({
+        id: String(c.id),
+        name: c.name,
+        sessionId: c.sessionId,
+        sessionType: c.sessionType,
+        agentId: c.agentId || undefined,
+        workspaceId: c.workspaceId || undefined,
+        contactId: c.contactId || undefined,
+        status: c.status,
+        lastUserMessageAt: c.lastUserMessageAt,
+        endedAt: c.endedAt,
+        disconnectReason: c.disconnectReason,
+        createdAt: safeISO(c.createdAt),
+        updatedAt: safeISO(c.updatedAt),
+      }))
+    : [];
+}
+
+/**
+ * Start a workspace test chat tied to a specific persona/phone number — the
+ * new picker-first flow (chats/page.tsx). Distinct from createChat() so
+ * FloatingAgentTester's existing lazy, no-picker flow is untouched.
+ */
+export async function createTestChat(opts: {
+  agentId: string;
+  name?: string;
+  contactExternalId?: string;
+  channel?: 'phone' | 'whatsapp' | 'widget';
+}): Promise<Chat | null> {
+  const created = await fetchAPI('/v1/chats', {
+    method: 'POST',
+    body: JSON.stringify({
+      agentId: opts.agentId,
+      name: opts.name,
+      sessionType: 'chat',
+      contactExternalId: opts.contactExternalId,
+      channel: opts.channel,
+    }),
+  });
+  if (!created) return null;
+  return {
+    id: String(created.id),
+    name: created.name,
+    sessionId: created.sessionId,
+    sessionType: created.sessionType,
+    agentId: created.agentId || undefined,
+    workspaceId: created.workspaceId || undefined,
+    contactId: created.contactId || undefined,
+    status: created.status,
+    createdAt: safeISO(created.createdAt),
+    updatedAt: safeISO(created.updatedAt),
+  };
 }
 
 /**
@@ -185,7 +276,7 @@ export async function sendChatMessage(
 export async function sendUserMessageWithReply(
   chatId: string,
   content: string
-): Promise<{ user: ChatMessage; assistant: ChatMessage | null }> {
+): Promise<{ user: ChatMessage; assistant: ChatMessage | null; replyError?: string }> {
   const existing = await getChatMessages(chatId);
   const sequenceId = existing.length;
 
@@ -206,11 +297,15 @@ export async function sendUserMessageWithReply(
     createdAt: safeISO(m.createdAt),
     updatedAt: safeISO(m.updatedAt),
     type: m.type || 'text',
+    metadata: m.metadata || undefined,
   });
 
   return {
     user: toMsg(created),
     assistant: created?.assistantMessage ? toMsg(created.assistantMessage) : null,
+    // The user's message DID persist even when the model call failed — the
+    // caller should keep it displayed and only surface this as the reply's error.
+    replyError: created.replyError,
   };
 }
 
