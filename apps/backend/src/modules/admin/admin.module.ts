@@ -24,9 +24,11 @@ import { AdminAuditLogsController } from './controllers/audit-logs.controller';
 import { AdminSystemChecksController } from './controllers/system-checks.controller';
 import { AdminAuditLogsService } from './services/audit-logs.service';
 import { AdminSystemChecksService } from './services/system-checks.service';
+import { AdminPhoneNumbersController } from './controllers/phone-numbers.controller';
+import { PhoneNumberModule } from '../v1/phone-number/phone-number.module';
 
 @Module({
-  imports: [DatabaseModule, ProviderCredentialsModule, RedisModule],
+  imports: [DatabaseModule, ProviderCredentialsModule, RedisModule, PhoneNumberModule],
   controllers: [
     AdminDashboardController,
     AdminUsersController,
@@ -37,6 +39,7 @@ import { AdminSystemChecksService } from './services/system-checks.service';
     AdminProviderCredentialsController,
     AdminAuditLogsController,
     AdminSystemChecksController,
+    AdminPhoneNumbersController,
   ],
   providers: [
     AdminDashboardService,

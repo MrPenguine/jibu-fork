@@ -35,6 +35,7 @@ export class LiveKitAgentService {
     const modelConfig = (metadata.model as Record<string, unknown>) || {};
 
     const tools = await this.loadToolDefs(agentId);
+    const baseSystemPrompt = (metadata.systemPrompt as string) || agent.voicemailMessage || 'You are a helpful assistant.';
 
     return {
       agentId: agent.id,
@@ -44,7 +45,7 @@ export class LiveKitAgentService {
         provider: (modelConfig.provider as string) || agent.llmProvider || null,
         model: (modelConfig.model as string) || agent.llmModel || null,
       },
-      systemPrompt: (metadata.systemPrompt as string) || agent.voicemailMessage || 'You are a helpful assistant.',
+      systemPrompt: await this.appendIntentPromptSnippets(agentId, baseSystemPrompt),
       firstMessage: agent.firstMessage || null,
       voice: {
         ttsProvider: agent.ttsProvider || null,
@@ -63,13 +64,25 @@ export class LiveKitAgentService {
     return this.toolExecutor.executeTool(toolId, args, { workspaceId });
   }
 
-  /** Resolve the agent that owns an inbound (dialed) phone number for SIP. */
-  async resolveAgentForNumber(dialedNumber: string): Promise<{ agentId: string; workspaceId: string } | null> {
-    const agents = await this.prisma.agent.findMany({
-      where: { metadata: { path: ['channels', 'voice', 'phoneNumber'], equals: dialedNumber } },
+  /**
+   * Resolve the agent that owns an inbound (dialed) phone number for SIP.
+   *
+   * This is a defensive fallback, not the primary routing mechanism: the
+   * primary path is PhoneNumberService.assignAgent() pre-seeding the SIP
+   * room's metadata at admin-action time, so the Python worker resolves the
+   * agent by reading room metadata on join — the same way it already does
+   * for browser-originated calls — with no per-call lookup here at all. This
+   * method exists for manual/debug lookups and any future webhook-driven
+   * verification path, not because anything calls it on the call's critical
+   * path today.
+   */
+  async resolveAgentForNumber(dialedNumber: string): Promise<{ agentId: string; workspaceId: string; phoneNumberId: string } | null> {
+    const phoneNumber = await this.prisma.phoneNumber.findUnique({
+      where: { number: dialedNumber },
+      select: { id: true, agentId: true, workspaceId: true, status: true },
     });
-    if (!agents.length) return null;
-    return { agentId: agents[0].id, workspaceId: agents[0].workspaceId };
+    if (!phoneNumber?.agentId || phoneNumber.status === 'released') return null;
+    return { agentId: phoneNumber.agentId, workspaceId: phoneNumber.workspaceId, phoneNumberId: phoneNumber.id };
   }
 
   private async loadToolDefs(
@@ -90,5 +103,25 @@ export class LiveKitAgentService {
       });
     }
     return defs;
+  }
+
+  /** Same authoring-time-only Intent merge as AgentRuntimeService's version —
+   * kept as a separate copy since voice config assembly is a distinct code
+   * path from the text/WhatsApp turn loop, not because the logic differs. */
+  private async appendIntentPromptSnippets(agentId: string, basePrompt: string): Promise<string> {
+    try {
+      const attached = await this.prisma.agentIntent.findMany({
+        where: { agentId, intent: { enabled: true } },
+        include: { intent: { select: { promptSnippet: true } } },
+      });
+      const snippets = attached
+        .map((a) => a.intent.promptSnippet?.trim())
+        .filter((s): s is string => Boolean(s));
+      if (!snippets.length) return basePrompt;
+      return `${basePrompt}\n\n${snippets.join('\n\n')}`;
+    } catch (e) {
+      this.logger.warn(`Could not load agent intents: ${(e as Error).message}`);
+      return basePrompt;
+    }
   }
 }

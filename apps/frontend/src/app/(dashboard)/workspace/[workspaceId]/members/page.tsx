@@ -27,16 +27,16 @@ export default function MembersPage() {
       <div className="max-w-[1600px] mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <User className="h-7 w-7 text-muted-foreground" /> Members
+            <h1 className="font-display text-xl font-bold tracking-tight flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" /> Members
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-0.5">
               Manage workspace members and their access levels.
             </p>
           </div>
 
           <Button
-            className="rounded-md"
+            className="rounded-md font-bold text-xs"
             onClick={() => setShowInviteModal(true)}
             disabled={!canInviteMembers}
             title={!canInviteMembers ? "Only owners and admins can invite members" : ""}

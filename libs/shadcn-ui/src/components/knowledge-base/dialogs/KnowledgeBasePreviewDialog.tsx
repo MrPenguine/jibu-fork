@@ -62,7 +62,7 @@ const PROVIDER_PRESETS: Record<string, { label: string; color: string; defaultMo
 
 export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: KnowledgeBasePreviewDialogProps) {
   const [question, setQuestion] = React.useState("");
-  const [answerProvider, setAnswerProvider] = React.useState("google");
+  const [answerProvider, setAnswerProvider] = React.useState("ollama");
   const [answerModel, setAnswerModel] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
@@ -74,7 +74,7 @@ export function KnowledgeBasePreviewDialog({ open, onOpenChange, onAsk }: Knowle
   React.useEffect(() => {
     if (!open) {
       setQuestion("");
-      setAnswerProvider("google");
+      setAnswerProvider("ollama");
       setAnswerModel("");
       setResult(null);
       setError(null);

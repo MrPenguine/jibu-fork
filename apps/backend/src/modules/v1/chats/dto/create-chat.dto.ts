@@ -30,4 +30,17 @@ export class CreateChatDto {
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;
-} 
+
+  @ApiPropertyOptional({
+    description:
+      'Phone number or other external identity to resolve into a Contact for this chat (e.g. the workspace test-chat picker). Additive — omitted by existing callers like the agent config tester.',
+  })
+  @IsString()
+  @IsOptional()
+  contactExternalId?: string;
+
+  @ApiPropertyOptional({ description: 'Channel for contactExternalId resolution', enum: ['phone', 'whatsapp', 'widget'] })
+  @IsEnum(['phone', 'whatsapp', 'widget'])
+  @IsOptional()
+  channel?: 'phone' | 'whatsapp' | 'widget';
+}

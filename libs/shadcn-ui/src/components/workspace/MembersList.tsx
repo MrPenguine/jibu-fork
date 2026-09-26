@@ -99,24 +99,35 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+        return 'bg-primary/10 text-primary'
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
       case 'rejected':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+        return 'bg-destructive/10 text-destructive'
       default:
-        return 'bg-background text-foreground dark:bg-gray-900/30 dark:text-gray-400'
+        return 'bg-muted text-muted-foreground'
+    }
+  }
+
+  const getRoleBadgeClass = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+      case 'admin':
+        return 'bg-primary/10 text-primary'
+      default:
+        return 'bg-muted text-muted-foreground'
     }
   }
 
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'owner':
-        return <Crown className="h-4 w-4 text-yellow-500" />
+        return <Crown className="h-3.5 w-3.5" />
       case 'admin':
-        return <Shield className="h-4 w-4 text-primary" />
+        return <Shield className="h-3.5 w-3.5" />
       default:
-        return <User className="h-4 w-4" />
+        return <User className="h-3.5 w-3.5" />
     }
   }
 
@@ -307,63 +318,61 @@ export const MembersList = React.forwardRef<MembersListHandle, MembersListProps>
 
   return (
     <>
-      <CustomCard>
-        <CustomCardHeader className="flex flex-row items-center justify-between">
+      <CustomCard className="border border-border rounded-lg shadow-sm">
+        <CustomCardHeader className="flex flex-row items-center justify-between border-b border-border">
           <div>
-            <CardTitle>Workspace Members</CardTitle>
-            <CardDescription>Manage members and their roles.</CardDescription>
+            <CardTitle className="font-display text-base font-bold">Workspace Members</CardTitle>
+            <CardDescription className="text-xs">Manage members and their access levels.</CardDescription>
           </div>
           {canInviteMembers && (
-            <Button onClick={() => setIsInviteModalOpen(true)}>
+            <Button onClick={() => setIsInviteModalOpen(true)} className="rounded-md font-bold text-xs">
               <UserPlus className="mr-2 h-4 w-4" />
               Invite Members
             </Button>
           )}
         </CustomCardHeader>
-        <CustomCardContent>
-          <div className="space-y-4">
+        <CustomCardContent className="p-0">
+          <div className="divide-y divide-border">
             {members.map((member) => {
               const isCurrentUser = member.email === currentUserEmail;
               return (
-                <div key={member.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-background dark:hover:bg-gray-800">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-muted dark:bg-gray-700 rounded-full">
-                      <User className="h-5 w-5 text-muted-foreground dark:text-gray-400" />
+                <div key={member.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-accent/40 transition-colors">
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="h-9 w-9 shrink-0 flex items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <User className="h-4 w-4" />
                     </div>
-                    <div>
-                      <p className="font-medium flex items-center gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold flex items-center gap-2 truncate">
                         {getMemberName(member)}
-                        {isCurrentUser && <span className="text-xs text-muted-foreground">(You)</span>}
+                        {isCurrentUser && <span className="text-xs font-normal text-muted-foreground">(You)</span>}
                       </p>
-                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm flex items-center gap-1 capitalize">
-                      {canChangeRole(member) ? (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 px-2 flex items-center gap-1 capitalize">
-                              {getRoleIcon(member.role)} {member.role} <ChevronDown className="h-3 w-3 ml-1" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-40 rounded-md">
-                            {getAvailableRoles().map((role) => (
-                              <DropdownMenuItem key={role} className="capitalize" onClick={() => changeMemberRole(member.id, role)}>
-                                {getRoleIcon(role)} {role}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      ) : (
-                        <div className="flex items-center gap-1 capitalize">
-                          {getRoleIcon(member.role)} {member.role}
-                        </div>
-                      )}
-                    </div>
-                    <div className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusBadgeClass(member.status)}`}>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {canChangeRole(member) ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold capitalize cursor-pointer ${getRoleBadgeClass(member.role)}`}>
+                            {getRoleIcon(member.role)} {member.role} <ChevronDown className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-40 rounded-md">
+                          {getAvailableRoles().map((role) => (
+                            <DropdownMenuItem key={role} className="capitalize" onClick={() => changeMemberRole(member.id, role)}>
+                              {getRoleIcon(role)} {role}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ${getRoleBadgeClass(member.role)}`}>
+                        {getRoleIcon(member.role)} {member.role}
+                      </span>
+                    )}
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full capitalize ${getStatusBadgeClass(member.status)}`}>
                       {member.status}
-                    </div>
+                    </span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">

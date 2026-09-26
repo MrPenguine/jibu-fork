@@ -11,11 +11,15 @@ export interface ToolExecutionContext {
   workspaceId: string;
   /** User on whose behalf the tool runs. Optional for channel-initiated calls (voice/whatsapp). */
   executedById?: string | null;
+  /** Chat id — needed to track pending confirmations for Tool.requiresConfirmation.
+   * Omitted callers (e.g. voice, which doesn't route through a Chat row today)
+   * just never get the confirmation gate — see executeTool's early-return. */
+  sessionId?: string;
 }
 
 export interface ToolExecutionResult {
   toolId: string;
-  status: 'completed' | 'failed';
+  status: 'completed' | 'failed' | 'confirmation_required';
   output?: unknown;
   error?: string;
 }
@@ -59,6 +63,20 @@ export class ToolExecutorService {
     }
     if (!tool.enabled) {
       return { toolId, status: 'failed', error: 'Tool is disabled' };
+    }
+
+    if (tool.requiresConfirmation && context.sessionId) {
+      const gate = await this.checkConfirmationGate(context.sessionId, toolId);
+      if (!gate.confirmed) {
+        return {
+          toolId,
+          status: 'confirmation_required',
+          output: {
+            message:
+              'This action requires the user\'s explicit confirmation before it runs. Restate exactly what you are about to do (using the arguments you were given) and ask the user to confirm. Do not call this tool again until they have replied affirmatively in a later message.',
+          },
+        };
+      }
     }
 
     const execution = await this.prisma.toolExecution.create({
@@ -136,11 +154,47 @@ export class ToolExecutorService {
       ...((metadata.headers as Record<string, string>) || {}),
       ...((args.headers as Record<string, string>) || {}),
     };
-    const params = (args.query as JsonArgs) || (args.params as JsonArgs) || undefined;
-    const data =
-      method === 'GET' || method === 'DELETE'
-        ? undefined
-        : (args.body as unknown) ?? (args.data as unknown) ?? args;
+    // A tool's function schema almost always declares its parameters flat
+    // (e.g. { school_id, query }, not { query: { school_id, query } }) —
+    // that's how LLM function-calling schemas are conventionally written.
+    // For GET/DELETE, default to using the LLM's actual arguments as the
+    // query string; args.query/args.params/args.body/args.data stay
+    // supported as an OPT-IN nested-object override for a tool that
+    // deliberately nests them, but are never required.
+    //
+    // Bug fixed here: "query"/"params"/"body"/"data" are also extremely
+    // common flat LLM-schema parameter names in their own right (e.g.
+    // lookup_student's own "query" arg = "admission number or name"). The
+    // old code treated ANY truthy args.query as the nested override —
+    // including a plain string — and handed that string to axios as
+    // `params`, which crashes deep in axios's URL-serializer with "target
+    // must be an object" (reproduced live: lookup_student's tool call was
+    // silently failing on every call because of this). Only a genuine
+    // plain-object value now counts as the nested override; a flat
+    // string/number arg named "query" correctly flows through flatArgs
+    // instead of being swallowed as framing.
+    const isPlainObject = (v: unknown): v is JsonArgs =>
+      typeof v === 'object' && v !== null && !Array.isArray(v);
+    const nestedQuery = isPlainObject(args.query) ? (args.query as JsonArgs) : undefined;
+    const nestedParams = isPlainObject(args.params) ? (args.params as JsonArgs) : undefined;
+    const nestedBody = isPlainObject(args.body) ? (args.body as JsonArgs) : undefined;
+    const nestedData = isPlainObject(args.data) ? (args.data as JsonArgs) : undefined;
+
+    const CONTROL_KEYS = new Set(['url', 'method', 'headers']);
+    const consumedAsNested = new Set<string>(
+      [
+        nestedQuery && 'query',
+        nestedParams && 'params',
+        nestedBody && 'body',
+        nestedData && 'data',
+      ].filter(Boolean) as string[],
+    );
+    const isGetLike = method === 'GET' || method === 'DELETE';
+    const flatArgs = Object.fromEntries(
+      Object.entries(args).filter(([k]) => !CONTROL_KEYS.has(k) && !consumedAsNested.has(k)),
+    );
+    const params = nestedQuery || nestedParams || (isGetLike && Object.keys(flatArgs).length ? flatArgs : undefined);
+    const data = isGetLike ? undefined : nestedBody || nestedData || args;
 
     const response = await firstValueFrom(
       this.httpService.request({ method, url, headers, params, data, timeout: 20000 }),
@@ -237,5 +291,44 @@ export class ToolExecutorService {
       }),
     );
     return { status: response.status, data: response.data };
+  }
+
+  /**
+   * Two-turn confirmation gate for Tool.requiresConfirmation. First time a
+   * given tool is called in a chat, mark it pending and refuse to execute
+   * (the caller gets a `confirmation_required` result to relay to the user).
+   * If it's called again in a later turn (meaning the user had a chance to
+   * respond in between), the pending marker already exists — clear it and
+   * let this call through.
+   *
+   * This is a pragmatic MVP gate: it confirms "this was asked about before,
+   * in a prior turn," not "the user definitely said yes" — the system
+   * prompt instructs the model to only re-call after an explicit yes, and
+   * this backstops same-turn silent execution, which was the actual bug.
+   * Scoped to Chat.metadata — voice sessions (no Chat row today) skip the
+   * gate entirely rather than block on it, per executeTool's `sessionId`
+   * check above.
+   */
+  private async checkConfirmationGate(sessionId: string, toolId: string): Promise<{ confirmed: boolean }> {
+    const chat = await this.prisma.chat.findUnique({ where: { id: sessionId }, select: { metadata: true } });
+    if (!chat) return { confirmed: false };
+
+    const metadata = (chat.metadata as Record<string, unknown>) || {};
+    const pending = (metadata.pendingConfirmations as Record<string, boolean>) || {};
+
+    if (pending[toolId]) {
+      delete pending[toolId];
+      await this.prisma.chat.update({
+        where: { id: sessionId },
+        data: { metadata: { ...metadata, pendingConfirmations: pending } },
+      });
+      return { confirmed: true };
+    }
+
+    await this.prisma.chat.update({
+      where: { id: sessionId },
+      data: { metadata: { ...metadata, pendingConfirmations: { ...pending, [toolId]: true } } },
+    });
+    return { confirmed: false };
   }
 }

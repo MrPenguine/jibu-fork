@@ -5,17 +5,36 @@ in the runtime: NestJS (`AgentRuntimeService`) for text/WhatsApp and the LiveKit
 Python agent for voice. n8n is no longer the conversational brain — it is only an
 optional per-tool integration backend invoked by `ToolExecutorService`.
 
-The following are **deprecated**. They are intentionally left in the tree (not
-deleted) for backward compatibility and possible re-enablement, but are removed
-from the default runtime and agent setup flow.
+## Removed (2026-09-22 cleanup)
+
+The items below were confirmed to have **zero references** anywhere in the
+codebase (no imports, no nav links, no routable Next.js `page.tsx` under
+`app/`) and were deleted outright rather than left in the tree. The decision to
+build self-serve agent config as an expanded form (not a revived visual
+workflow builder — see `implementation_plan.md` Phase D) confirmed these were
+safe to remove rather than "possible re-enablement":
+
+| Component | Former location | Why it was dead |
+|-----------|------------------|------------------|
+| Committed build output | `apps/worker/dist/` (139 files) | Already `.gitignore`d; should never have been committed; referenced already-deleted n8n processors. |
+| n8n orchestrator lib | `libs/n8n-orchestrator` | Zero imports anywhere in the repo. |
+| Old agent-builder UI tree | `apps/frontend/src/app/(dashboard)/agent/[agentId]/*` (cms, canvas, evaluations, interfaces, playground, transcripts, settings) | Not linked from any nav; superseded by `workspace/[workspaceId]/agents`. |
+| Old top-level routes | `apps/frontend/src/app/(dashboard)/{assistants,voices,n8n-management}` | Predate workspace-scoped routing; zero `href` references anywhere. |
+| ReactFlow canvas | `libs/shadcn-ui/.../agent/canvas/*`, `CanvasSidebar.tsx`, `AgentDesigner.tsx` | Already feature-flagged off; zero references outside itself once the old agent-builder tree was removed. |
+| Orphaned agent/assistant component libs | `libs/shadcn-ui/src/components/agent/`, `libs/shadcn-ui/src/components/assistants/` | Backed only the deleted old agent-builder tree; zero external references. |
+| Non-routable legacy tree | `apps/frontend/src/components/agents/[id]/cms/*` | `page.tsx`/`layout.tsx` files living outside `src/app/` — Next.js App Router never routed to these regardless of links. |
+
+## Still deprecated (kept, not deleted)
+
+These remain **intentionally** in the tree — not dead code in the same sense as
+above, either because they're still reachable/registered, or because deleting
+them touches data or live traffic and needs a separate explicit decision:
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| n8n orchestrator lib | `libs/n8n-orchestrator` | Deprecated — not in conversational path. Only reachable as a tool. |
-| Compile-context builder | `libs/n8n-orchestrator/.../compile-context.builder*` | Deprecated — graph compilation no longer used at runtime. |
-| Publish-workflow processor | `apps/worker` publish-workflow.processor | Deprecated — workflow publishing not part of agent config flow. |
-| Workflow versioning | `Workflow` / `WorkflowVersion` flows | Deprecated for agent editing; kept for data history. |
-| ReactFlow canvas (agent editor) | `apps/frontend/.../agent/[agentId]/canvas/*`, `libs/shadcn-ui/.../agent/canvas/*`, `AgentDesigner.tsx` | Feature-flagged. Hidden by default; set `NEXT_PUBLIC_ENABLE_CANVAS=true` to re-enable the "Canvas (beta)" nav item. |
+| Twilio webhook voice pipeline | `apps/backend/src/modules/voice/*` | Still registered in `app.module.ts`; functionally a no-op today (requires a `workflowId` nothing sets), but not deleted without confirming no live Twilio number still points at it. |
+| Workflow versioning | `Workflow` / `WorkflowVersion` tables | Deprecated for agent editing; kept for data history — no destructive migration without explicit sign-off. |
+| `Assistant` / `AssistantTool` / `AssistantKnowledgeBase` tables | `schema.prisma` | Superseded by `Agent`/`AgentTool`/`AgentKnowledgeBase`; kept for data history, same reason as above. |
 
 ## Replacement
 

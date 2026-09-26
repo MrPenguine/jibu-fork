@@ -162,6 +162,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Count the fields in a Redis hash
+   */
+  async hlen(key: string): Promise<number> {
+    try {
+      return await this.redisClient.hlen(key);
+    } catch (error) {
+      console.error(`Error counting hash fields for key ${key}:`, error);
+      return 0;
+    }
+  }
+
+  /**
    * Delete one or more hash fields from Redis
    */
   async hdel(key: string, field: string): Promise<boolean> {
@@ -172,6 +184,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       console.error(`Error deleting hash field ${field} for key ${key}:`, error);
       return false;
     }
+  }
+
+  /**
+   * Run a Lua script atomically. Use this instead of a read-then-write pair
+   * (get/set, hgetall/hset, etc.) whenever two concurrent callers checking
+   * the same condition before writing would be a race — a Lua script runs
+   * as a single atomic Redis operation, no other command can interleave.
+   */
+  async evalScript<T = unknown>(script: string, keys: string[], args: string[]): Promise<T> {
+    return this.redisClient.eval(script, keys.length, ...keys, ...args) as Promise<T>;
   }
 
   /**

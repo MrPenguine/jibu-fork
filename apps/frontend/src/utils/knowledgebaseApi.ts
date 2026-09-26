@@ -7,6 +7,8 @@ import type { SourceEvent as SharedSourceEvent } from '@jibu/queue-definitions';
 import { useWorkspace } from './workspaceContext';
 
 // Knowledge base types
+export type KnowledgeBaseVisibility = 'AGENT' | 'WORKSPACE';
+
 export interface KnowledgeBase {
   id: string;
   name: string;
@@ -14,6 +16,7 @@ export interface KnowledgeBase {
   createdAt: string;
   updatedAt: string;
   workspaceId: string;
+  visibility: KnowledgeBaseVisibility;
 }
 
 export async function listFoldersForKb(knowledgeBaseId: string, specificWorkspaceId?: string): Promise<{ id: string; name: string }[]> {
@@ -255,11 +258,33 @@ export async function listKnowledgeBases(specificWorkspaceId?: string): Promise<
 }
 
 /**
+ * Fetch a single knowledge base by ID.
+ */
+export async function getKnowledgeBase(knowledgeBaseId: string, specificWorkspaceId?: string): Promise<KnowledgeBase | null> {
+  try {
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    const headers = await getAuthHeaders(workspaceId || '');
+    const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}`, {
+      method: 'GET',
+      headers,
+    });
+    if (!response.ok) {
+      console.error(`[getKnowledgeBase] API error ${response.status}`);
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('[getKnowledgeBase] Error fetching knowledge base:', error);
+    return null;
+  }
+}
+
+/**
  * Update an existing knowledge base (rename or change description)
  */
 export async function updateKnowledgeBase(
   knowledgeBaseId: string,
-  payload: { name?: string; description?: string },
+  payload: { name?: string; description?: string; visibility?: KnowledgeBaseVisibility },
   specificWorkspaceId?: string
 ): Promise<KnowledgeBase | null> {
   try {
@@ -281,33 +306,56 @@ export async function updateKnowledgeBase(
 }
 
 /**
+ * Permanently delete a knowledge base (and its sources/chunks, cascaded by the backend).
+ */
+export async function deleteKnowledgeBase(knowledgeBaseId: string, specificWorkspaceId?: string): Promise<boolean> {
+  try {
+    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
+    const headers = await getAuthHeaders(workspaceId || '');
+    const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases/${knowledgeBaseId}`, {
+      method: 'DELETE',
+      headers,
+    });
+    return response.ok;
+  } catch (e) {
+    console.error('[deleteKnowledgeBase] Error deleting knowledge base:', e);
+    return false;
+  }
+}
+
+/**
  * Create a new knowledge base
  * @param name The name of the knowledge base
- * @param specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
+ * @param options.visibility 'AGENT' (private, default) or 'WORKSPACE' (attachable by any agent)
+ * @param options.specificWorkspaceId Optional: Provide a specific workspace ID, otherwise uses active workspace
  */
-export async function createKnowledgeBase(name: string, specificWorkspaceId?: string): Promise<KnowledgeBase> {
+export async function createKnowledgeBase(
+  name: string,
+  options?: { visibility?: KnowledgeBaseVisibility; specificWorkspaceId?: string },
+): Promise<KnowledgeBase> {
   try {
     // Use provided workspaceId, or get the current one consistently via getCurrentWorkspaceId
-    const workspaceId = getCurrentWorkspaceId(specificWorkspaceId);
-    
+    const workspaceId = getCurrentWorkspaceId(options?.specificWorkspaceId);
+
     if (!workspaceId) {
             const error = new Error('[createKnowledgeBase] No workspace ID available');
       console.error(error);
       throw error;
     }
-    
+
         console.log(`[createKnowledgeBase] Creating knowledge base "${name}" for workspace: ${workspaceId}`);
-    
+
     // Get auth headers with the workspace ID
     const headers = await getAuthHeaders(workspaceId);
-    
+
     // Call the backend API directly with the workspace ID explicitly in the body
     const response = await fetch(`${API_BASE_URL}/v1/knowledge-bases`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         name,
-        workspaceId
+        workspaceId,
+        visibility: options?.visibility || 'AGENT',
       })
     });
     

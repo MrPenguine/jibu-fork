@@ -87,8 +87,12 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Viewport
         className={cn(
           "p-1",
-          position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+          // Width-only for popper position — NOT height. Locking the
+          // viewport's height to the trigger's height (the old shadcn
+          // default) fights the Content's own max-h/overflow-y-auto and
+          // breaks natural mouse-wheel scrolling, leaving only the
+          // up/down chevron buttons as a way to move through the list.
+          position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)]"
         )}
       >
         {children}

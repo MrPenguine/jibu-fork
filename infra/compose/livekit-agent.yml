@@ -1,0 +1,26 @@
+services:
+  livekit-agent:
+    build:
+      context: ../..
+      dockerfile: apps/livekit-agent/Dockerfile
+    container_name: livekit-agent
+    restart: unless-stopped
+    cpus: '2.0'
+    env_file:
+      - ../../apps/livekit-agent/.env
+    environment:
+      - BACKEND_API_URL=http://backend:4000/api
+    depends_on:
+      livekit:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    # LiveKit Agents SDK worker — connects outbound, no listening port to
+    # healthcheck. Rely on restart: unless-stopped + Docker's exit detection.
+    networks:
+      - app
+      - livekit-network
+
+networks:
+  app:
+  livekit-network:

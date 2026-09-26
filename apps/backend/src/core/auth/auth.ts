@@ -13,6 +13,12 @@ const authPrisma = getSharedPrismaService();
 
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 const backendUrl = process.env.BETTER_AUTH_URL || 'http://localhost:4000';
+// Extra origins (a tunnel domain like ngrok, a staging domain, ...) that should
+// also be trusted for auth callbacks/cookies, alongside the primary frontend/backend.
+const additionalTrustedOrigins = (process.env.ADDITIONAL_TRUSTED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const runtimeEnv = process.env.NODE_ENV || 'development';
@@ -305,7 +311,7 @@ const databaseHooks: NonNullable<BetterAuthOptions['databaseHooks']> = {
 const authInstance = betterAuth({
   secret: betterAuthSecret,
   baseURL: backendUrl,
-  trustedOrigins: [frontendUrl, backendUrl],
+  trustedOrigins: [frontendUrl, backendUrl, ...additionalTrustedOrigins],
   database: prismaAdapter(authPrisma, {
     provider: 'postgresql',
     transaction: true,

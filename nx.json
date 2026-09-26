@@ -9,7 +9,7 @@
       "dependsOn": ["^build"]
     }
   },
-  "defaultBase": "master",
+  "defaultBase": "main",
   "plugins": [
     {
       "plugin": "@nx/next/plugin",

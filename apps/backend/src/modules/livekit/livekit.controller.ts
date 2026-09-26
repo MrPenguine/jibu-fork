@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Delete, Query, Param, Body, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { LiveKitService } from './livekit.service';
 import { LiveKitAgentService } from './livekit-agent.service';
 import { CallConcurrencyService } from './call-concurrency.service';
@@ -31,7 +32,11 @@ export class LiveKitController {
   @Public()
   @Get('voice/start')
   @ApiOperation({ summary: 'Start a voice room for an agent and mint a caller token' })
-  async startVoice(@Query('agentId') agentId: string, @Query('sessionId') sessionId?: string) {
+  async startVoice(
+    @Query('agentId') agentId: string,
+    @Query('sessionId') sessionId?: string,
+    @Query('callerPhone') callerPhone?: string,
+  ) {
     if (!agentId) throw new BadRequestException('agentId is required');
     // Resolves agent + workspace (throws NotFound if the agent does not exist).
     const config = await this.livekitAgentService.getAgentConfig(agentId);
@@ -39,6 +44,7 @@ export class LiveKitController {
       agentId,
       workspaceId: config.workspaceId,
       sessionId: sessionId || randomUUID(),
+      callerPhone,
     });
     return { ...session, agent: { id: config.agentId, name: config.name } };
   }
@@ -74,6 +80,7 @@ export class LiveKitController {
   }
 
   @Public()
+  @SkipThrottle() // one call per LLM tool invocation, from the livekit-agent host, can be frequent mid-conversation
   @Post('execute-tool')
   @ApiOperation({ summary: 'Execute a single tool requested by the voice agent LLM' })
   async executeTool(
@@ -97,10 +104,20 @@ export class LiveKitController {
 
   @Public()
   @Post('calls/acquire')
-  @ApiOperation({ summary: 'Reserve a concurrency slot for a new voice call' })
+  @ApiOperation({ summary: 'Reserve a concurrency slot for a new voice call and create its Call history row' })
   async acquire(
     @Body()
-    body: { workspaceId: string; connectionId: string; agentId?: string; sessionId?: string; room?: string },
+    body: {
+      workspaceId: string;
+      connectionId: string;
+      agentId?: string;
+      sessionId?: string;
+      room?: string;
+      phoneNumberId?: string;
+      direction?: string;
+      fromNumber?: string;
+      toNumber?: string;
+    },
   ) {
     if (!body?.workspaceId || !body?.connectionId) {
       throw new BadRequestException('workspaceId and connectionId are required');
@@ -110,10 +127,15 @@ export class LiveKitController {
       agentId: body.agentId,
       sessionId: body.sessionId,
       room: body.room,
+      phoneNumberId: body.phoneNumberId,
+      direction: body.direction,
+      fromNumber: body.fromNumber,
+      toNumber: body.toNumber,
     });
   }
 
   @Public()
+  @SkipThrottle() // sent every few seconds per active call, from the livekit-agent host, not a browser
   @Post('calls/heartbeat')
   async heartbeat(@Body() body: { workspaceId: string; connectionId: string }) {
     await this.concurrency.heartbeat(body.workspaceId, body.connectionId);
@@ -121,9 +143,23 @@ export class LiveKitController {
   }
 
   @Public()
+  @Post('calls/mark-connected')
+  @ApiOperation({ summary: 'Mark a Call in-progress once the agent session actually starts (audio flowing, not just room-joined)' })
+  async markConnected(@Body() body: { workspaceId: string; connectionId: string }) {
+    if (!body?.workspaceId || !body?.connectionId) {
+      throw new BadRequestException('workspaceId and connectionId are required');
+    }
+    await this.concurrency.markInProgress(body.workspaceId, body.connectionId);
+    return { ok: true };
+  }
+
+  @Public()
   @Post('calls/release')
-  async release(@Body() body: { workspaceId: string; connectionId: string }) {
-    await this.concurrency.release(body.workspaceId, body.connectionId);
+  async release(@Body() body: { workspaceId: string; connectionId: string; status?: string; disconnectReason?: string }) {
+    await this.concurrency.release(body.workspaceId, body.connectionId, {
+      status: body.status,
+      disconnectReason: body.disconnectReason,
+    });
     return { ok: true };
   }
 

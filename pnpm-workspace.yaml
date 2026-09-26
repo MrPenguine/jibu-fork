@@ -1,4 +1,7 @@
 packages:
-  - 'apps/*'
-  - 'libs/*'
-  - 'libs/queue-definitions' 
+  - apps/*
+  - libs/*
+  - libs/queue-definitions
+
+onlyBuiltDependencies:
+  - better-sqlite3

@@ -34,7 +34,8 @@ import { QueueHealthController } from './queue-health.controller';
       { name: QUEUE_NAMES.DEFAULT },
       { name: QUEUE_NAMES.INDEXING },
       { name: QUEUE_NAMES.WORKFLOW_PUBLISH },
-      { 
+      { name: QUEUE_NAMES.POST_CALL_ANALYSIS },
+      {
         name: QUEUE_NAMES.WEBHOOK_DELIVERY,
         // Voice-optimized settings
         defaultJobOptions: {

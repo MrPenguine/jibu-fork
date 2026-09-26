@@ -13,6 +13,9 @@ const nextConfig = {
     // See: https://github.com/gregberge/svgr
     svgr: false,
   },
+  // Standalone output for containerized deploys — only .next/standalone +
+  // .next/static + public are needed in the runtime image, not node_modules.
+  output: 'standalone',
   // Packages to transpile
   transpilePackages: ['ioredis'],
 
@@ -56,16 +59,19 @@ const nextConfig = {
 
     return config;
   },
-  // API Proxy
+  // API Proxy — server-side, so this must resolve to the in-network service
+  // name (e.g. http://backend:4000) when containerized, not localhost.
+  // Defaults to localhost:4000 for bare-process local dev.
   async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
     return [
       {
         source: '/api/auth/:path*',
-        destination: 'http://localhost:4000/api/auth/:path*',
+        destination: `${backendUrl}/api/auth/:path*`,
       },
       {
         source: '/api/backend/:path*',
-        destination: 'http://localhost:4000/api/:path*',
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },

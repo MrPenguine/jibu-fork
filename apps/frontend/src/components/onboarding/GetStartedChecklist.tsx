@@ -30,14 +30,14 @@ const GetStartedChecklist: React.FC<Props> = ({ status, workspaceId }) => {
       key: "addedNumber",
       title: "Add a phone number",
       description: "Buy or connect a number to route calls to your agent.",
-      href: workspaceId ? `/workspace/${workspaceId}/settings/phone-numbers` : "#",
+      href: workspaceId ? `/workspace/${workspaceId}/phone-numbers` : "#",
       done: status.addedNumber,
     },
     {
       key: "invitedMember",
       title: "Invite a teammate",
       description: "Collaborate with your team by inviting members.",
-      href: workspaceId ? `/workspace/${workspaceId}/settings/members` : "#",
+      href: workspaceId ? `/workspace/${workspaceId}/members` : "#",
       done: status.invitedMember,
     },
   ] as const;

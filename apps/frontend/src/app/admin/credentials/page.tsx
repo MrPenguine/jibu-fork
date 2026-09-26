@@ -47,9 +47,21 @@ function StatusBadge({ status }: { status: CredentialStatus }) {
   );
 }
 
+// Twilio is the one provider whose stored secret is two values combined into a
+// single "accountSid:authToken" string (see provider-registry.ts) — give it its
+// own two-field input instead of the generic single-password box so an admin
+// isn't expected to know to type "AC...:token" into one field themselves.
+const TWO_FIELD_PROVIDERS: Record<string, { fields: [string, string]; join: (a: string, b: string) => string }> = {
+  twilio: {
+    fields: ["Account SID", "Auth Token"],
+    join: (accountSid, authToken) => `${accountSid}:${authToken}`,
+  },
+};
+
 export default function CredentialsPage() {
   const [credentials, setCredentials] = React.useState<ProviderCredential[]>([]);
   const [drafts, setDrafts] = React.useState<Record<string, string>>({});
+  const [twoFieldDrafts, setTwoFieldDrafts] = React.useState<Record<string, [string, string]>>({});
   const [loading, setLoading] = React.useState(true);
   const [busyProvider, setBusyProvider] = React.useState<string | null>(null);
 
@@ -74,10 +86,21 @@ export default function CredentialsPage() {
   }, [loadCredentials]);
 
   const setCredential = async (provider: ProviderCredential) => {
-    const secret = drafts[provider.provider]?.trim();
-    if (!secret) {
-      toast({ title: "Enter a credential first", variant: "destructive" });
-      return;
+    const twoField = TWO_FIELD_PROVIDERS[provider.provider];
+    let secret: string | undefined;
+    if (twoField) {
+      const [a, b] = twoFieldDrafts[provider.provider] || ["", ""];
+      if (!a.trim() || !b.trim()) {
+        toast({ title: `Enter both ${twoField.fields[0]} and ${twoField.fields[1]}`, variant: "destructive" });
+        return;
+      }
+      secret = twoField.join(a.trim(), b.trim());
+    } else {
+      secret = drafts[provider.provider]?.trim();
+      if (!secret) {
+        toast({ title: "Enter a credential first", variant: "destructive" });
+        return;
+      }
     }
 
     try {
@@ -87,6 +110,7 @@ export default function CredentialsPage() {
         body: JSON.stringify({ secret }),
       });
       setDrafts((current) => ({ ...current, [provider.provider]: "" }));
+      setTwoFieldDrafts((current) => ({ ...current, [provider.provider]: ["", ""] }));
       toast({ title: `${provider.label} credential saved` });
       await loadCredentials();
     } catch (error: any) {
@@ -192,19 +216,51 @@ export default function CredentialsPage() {
                       </td>
                       <td className="px-6 py-4"><StatusBadge status={provider.status} /></td>
                       <td className="px-6 py-4">
-                        <div className="flex max-w-sm gap-2">
-                          <Input
-                            type="password"
-                            value={drafts[provider.provider] || ""}
-                            onChange={(event) => setDrafts((current) => ({ ...current, [provider.provider]: event.target.value }))}
-                            placeholder="Enter new credential"
-                            autoComplete="new-password"
-                            aria-label={`New ${provider.label} credential`}
-                          />
-                          <Button onClick={() => void setCredential(provider)} disabled={busy}>
-                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                          </Button>
-                        </div>
+                        {TWO_FIELD_PROVIDERS[provider.provider] ? (
+                          <div className="flex max-w-md gap-2 flex-wrap">
+                            <Input
+                              value={twoFieldDrafts[provider.provider]?.[0] || ""}
+                              onChange={(event) =>
+                                setTwoFieldDrafts((current) => ({
+                                  ...current,
+                                  [provider.provider]: [event.target.value, current[provider.provider]?.[1] || ""],
+                                }))
+                              }
+                              placeholder={TWO_FIELD_PROVIDERS[provider.provider].fields[0]}
+                              aria-label={`New ${provider.label} ${TWO_FIELD_PROVIDERS[provider.provider].fields[0]}`}
+                            />
+                            <Input
+                              type="password"
+                              value={twoFieldDrafts[provider.provider]?.[1] || ""}
+                              onChange={(event) =>
+                                setTwoFieldDrafts((current) => ({
+                                  ...current,
+                                  [provider.provider]: [current[provider.provider]?.[0] || "", event.target.value],
+                                }))
+                              }
+                              placeholder={TWO_FIELD_PROVIDERS[provider.provider].fields[1]}
+                              autoComplete="new-password"
+                              aria-label={`New ${provider.label} ${TWO_FIELD_PROVIDERS[provider.provider].fields[1]}`}
+                            />
+                            <Button onClick={() => void setCredential(provider)} disabled={busy}>
+                              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex max-w-sm gap-2">
+                            <Input
+                              type="password"
+                              value={drafts[provider.provider] || ""}
+                              onChange={(event) => setDrafts((current) => ({ ...current, [provider.provider]: event.target.value }))}
+                              placeholder="Enter new credential"
+                              autoComplete="new-password"
+                              aria-label={`New ${provider.label} credential`}
+                            />
+                            <Button onClick={() => void setCredential(provider)} disabled={busy}>
+                              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                            </Button>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">
                         {lastTest ? (

@@ -24,6 +24,15 @@ import {
 import { Mic, MicOff, PhoneCall, PhoneOff, Loader2 } from "lucide-react";
 import { fetchAPI } from "../../../../../utils/api";
 import { startVoiceSession, endVoiceSession, type VoiceSession } from "../../../../../utils/livekitVoiceApi";
+import { listCalls, getCallSummary, type CallRecord, type CallSummary } from "../../../../../utils/callApi";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@libs/shadcn-ui/components/ui/table";
 
 interface AgentLite {
   id: string;
@@ -46,6 +55,9 @@ export default function CallsPage() {
   const [session, setSession] = useState<VoiceSession | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [callHistory, setCallHistory] = useState<CallRecord[]>([]);
+  const [callSummary, setCallSummary] = useState<CallSummary | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -59,6 +71,30 @@ export default function CallsPage() {
       }
     })();
   }, [workspaceId]);
+
+  const refreshHistory = useCallback(async () => {
+    if (!workspaceId) return;
+    setLoadingHistory(true);
+    try {
+      const [historyData, summaryData] = await Promise.all([
+        listCalls({ pageSize: 10 }, workspaceId).catch(() => ({ calls: [] })),
+        getCallSummary(workspaceId).catch(() => null),
+      ]);
+      setCallHistory(historyData.calls);
+      setCallSummary(summaryData);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [workspaceId]);
+
+  useEffect(() => {
+    refreshHistory();
+  }, [refreshHistory]);
+
+  // Refresh call history when a browser-originated test call ends.
+  useEffect(() => {
+    if (!session) refreshHistory();
+  }, [session, refreshHistory]);
 
   const handleStart = useCallback(async () => {
     if (!selectedAgentId) return;
@@ -86,7 +122,7 @@ export default function CallsPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full flex-col items-center px-4 py-6">
+    <div className="flex h-[calc(100vh-4rem)] w-full flex-col items-center overflow-y-auto px-4 py-6">
       <div className="w-full max-w-2xl">
         <h1 className="mb-1 text-2xl font-semibold text-[#22262A]">Calls</h1>
         <p className="mb-6 text-sm text-muted-foreground">
@@ -153,6 +189,86 @@ export default function CallsPage() {
             <CallStage agentName={selectedAgent?.name || session.agent?.name || "Agent"} onEnd={handleEnd} />
           </LiveKitRoom>
         )}
+
+        <div className="mt-8">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+            Recent calls
+          </h2>
+
+          {callSummary && (
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[11px] font-bold uppercase text-muted-foreground">Avg duration</div>
+                <div className="text-lg font-bold">
+                  {Math.floor(callSummary.avgDurationSeconds / 60)}m {callSummary.avgDurationSeconds % 60}s
+                </div>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[11px] font-bold uppercase text-muted-foreground">Transferred</div>
+                <div className="text-lg font-bold">{callSummary.transferredCount}</div>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[11px] font-bold uppercase text-destructive">Failed</div>
+                <div className="text-lg font-bold text-destructive">{callSummary.failedCount}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>Agent / Number</TableHead>
+                  <TableHead>Duration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingHistory && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-6">
+                      <Loader2 className="h-4 w-4 animate-spin mx-auto text-primary" />
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loadingHistory && callHistory.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-6 text-sm text-muted-foreground">
+                      No calls yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {callHistory.map((call) => (
+                  <TableRow key={call.id}>
+                    <TableCell>
+                      <span
+                        className={
+                          "text-[11px] font-bold px-2 py-0.5 rounded-full capitalize " +
+                          (call.status === "in-progress" || call.status === "ringing"
+                            ? "bg-primary/10 text-primary"
+                            : call.status === "failed"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-muted text-muted-foreground")
+                        }
+                      >
+                        {call.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs capitalize">{call.direction}</TableCell>
+                    <TableCell className="text-xs">
+                      {call.agent?.name || "—"}
+                      {call.phoneNumber ? ` · ${call.phoneNumber.number}` : ""}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {call.durationSeconds != null ? `${Math.floor(call.durationSeconds / 60)}m ${call.durationSeconds % 60}s` : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
     </div>
   );

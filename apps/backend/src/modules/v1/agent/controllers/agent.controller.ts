@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ExtendedAgent } from '../interfaces/agent.interface';
 import { AgentService } from '../services/agent.service';
 import { AgentService as IntegrationsAgentService } from '../../../../integrations/agent/agent.service';
-import { CreateAgentDto, UpdateAgentDto, UpdateAgentConfigDto } from '../dto';
+import { CreateAgentDto, UpdateAgentDto, UpdateAgentConfigDto, CreateToolDto, UpdateToolDto, CreateIntentDto, UpdateIntentDto } from '../dto';
 import { JwtAuthGuard } from '../../../../core/auth/guards/jwt-auth.guard';
 import { OrganizationGuard } from '../../../../core/auth/guards/organization.guard';
 import { Public } from '../../../../core/auth/decorators/public.decorator';
@@ -22,6 +22,7 @@ interface StreamResponse {
 
 // Auth payload placed on req.user by the auth guard/strategy
 interface AuthUser {
+  id?: string;
   lastWorkspaceId?: string;
 }
 
@@ -132,6 +133,75 @@ export class AgentController {
     const workspaceId = req.user.lastWorkspaceId;
     if (!workspaceId) throw new BadRequestException('No workspace selected');
     return this.agentService.unlinkAgentKnowledgeBase(id, knowledgeBaseId, workspaceId);
+  }
+
+  // ── Tool CRUD (workspace-scoped, not agent-scoped — placed before the
+  // ':id' catch-all below so "tools"/"intents" don't get matched as an id) ──
+
+  @Post('tools')
+  @ApiOperation({ summary: 'Create a workspace tool' })
+  async createTool(@Body() dto: CreateToolDto, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.createTool(workspaceId, req.user?.id as string, dto);
+  }
+
+  @Get('tools')
+  @ApiOperation({ summary: 'List the workspace\'s tools (full CRUD view)' })
+  async listTools(@Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.listWorkspaceToolsFull(workspaceId);
+  }
+
+  @Put('tools/:toolId')
+  @ApiOperation({ summary: 'Update a workspace tool' })
+  async updateTool(@Param('toolId') toolId: string, @Body() dto: UpdateToolDto, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.updateTool(workspaceId, toolId, dto);
+  }
+
+  @Delete('tools/:toolId')
+  @ApiOperation({ summary: 'Delete a workspace tool' })
+  async deleteTool(@Param('toolId') toolId: string, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.deleteTool(workspaceId, toolId);
+  }
+
+  // ── Intent CRUD (authoring-time tool groupings) ───────────────────────
+
+  @Post('intents')
+  @ApiOperation({ summary: 'Create an intent (a named grouping of tools + prompt guidance)' })
+  async createIntent(@Body() dto: CreateIntentDto, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.createIntent(workspaceId, dto);
+  }
+
+  @Get('intents')
+  @ApiOperation({ summary: 'List intents (workspace templates + optionally one agent\'s own)' })
+  async listIntents(@Req() req, @Query('agentId') agentId?: string) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.listIntents(workspaceId, agentId);
+  }
+
+  @Put('intents/:intentId')
+  @ApiOperation({ summary: 'Update an intent' })
+  async updateIntent(@Param('intentId') intentId: string, @Body() dto: UpdateIntentDto, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.updateIntent(workspaceId, intentId, dto);
+  }
+
+  @Delete('intents/:intentId')
+  @ApiOperation({ summary: 'Delete an intent' })
+  async deleteIntent(@Param('intentId') intentId: string, @Req() req) {
+    const workspaceId = req.user.lastWorkspaceId;
+    if (!workspaceId) throw new BadRequestException('No workspace selected');
+    return this.agentService.deleteIntent(workspaceId, intentId);
   }
 
   @Get(':id')

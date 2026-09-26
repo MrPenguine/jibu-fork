@@ -9,9 +9,9 @@ datasource db {
 }
 
 model User {
-  id               String                   @id
-  email            String                   @unique
-  emailConfirmed   Boolean                  @default(false)
+  id               String                @id
+  email            String                @unique
+  emailConfirmed   Boolean               @default(false)
   firstName        String?
   lastName         String?
   fullName         String?
@@ -20,30 +20,30 @@ model User {
   providerIds      String[]
   lastSignInAt     DateTime?
   phoneNumber      String?
-  phoneConfirmed   Boolean                  @default(false)
-  isAnonymous      Boolean                  @default(false)
+  phoneConfirmed   Boolean               @default(false)
+  isAnonymous      Boolean               @default(false)
   metadata         Json? // For storing additional user_metadata
-  lastWorkspaceId        String? // Store the ID of the last organization the user accessed
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  lastWorkspaceId  String? // Store the ID of the last organization the user accessed
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
   memberships      WorkspaceMembership[] // Relation field
   files            File[] // Reverse relation
-  lastWorkspace          Workspace?            @relation("UserLastWorkspace", fields: [lastWorkspaceId], references: [id], onDelete: SetNull)
+  lastWorkspace    Workspace?            @relation("UserLastWorkspace", fields: [lastWorkspaceId], references: [id], onDelete: SetNull)
   sentInvitations  Invitation[] // Invitations sent by this user
   createdTools     Tool[] // Tools created by this user
   toolExecutions   ToolExecution[] // Tool executions performed by this user
   onboardingStatus OnboardingStatus? // Relation to onboarding status
   apiKeys          ApiKey[]
 
-  isAdmin          Boolean                  @default(false)
+  isAdmin          Boolean   @default(false)
   adminRole        String?
-  isSuspended      Boolean                  @default(false)
+  isSuspended      Boolean   @default(false)
   suspendedAt      DateTime?
   suspensionReason String?
 
-  adminAuditLogs   AdminAuditLog[]          @relation("AdminActions")
-  providerCredentials ProviderCredential[]  @relation("ProviderCredentialCreators")
-  authUser         AuthUser? @relation(fields: [id], references: [id], onDelete: Cascade)
+  adminAuditLogs      AdminAuditLog[]      @relation("AdminActions")
+  providerCredentials ProviderCredential[] @relation("ProviderCredentialCreators")
+  authUser            AuthUser?            @relation(fields: [id], references: [id], onDelete: Cascade)
 
   @@index([lastWorkspaceId])
 }
@@ -68,17 +68,17 @@ model AuthUser {
 }
 
 model AuthSession {
-  id        String   @id
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime
-  updatedAt DateTime
-  ipAddress String?
-  userAgent String?
+  id                   String   @id
+  expiresAt            DateTime
+  token                String   @unique
+  createdAt            DateTime
+  updatedAt            DateTime
+  ipAddress            String?
+  userAgent            String?
   activeOrganizationId String?
-  impersonatedBy String?
-  userId    String
-  user      AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy       String?
+  userId               String
+  user                 AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("auth_sessions")
@@ -118,19 +118,19 @@ model AuthVerification {
 }
 
 model Workspace {
-  id                   String                   @id @default(uuid())
+  id                   String                @id @default(uuid())
   name                 String
-  slug                 String                   @unique
+  slug                 String                @unique
   logo                 String?
   metadata             Json?
   email                String?
   settings             Json? // Store workspace settings as JSON
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
   memberships          WorkspaceMembership[] // Relation field
   credentials          Credential[] // Relation to credentials
   files                File[] // Reverse relation
-  usersLastWorkspace   User[]                   @relation("UserLastWorkspace") // Users who have this as their last workspace
+  usersLastWorkspace   User[]                @relation("UserLastWorkspace") // Users who have this as their last workspace
   invitations          Invitation[] // Invitations for this workspace
   apiKeys              ApiKey[] // API keys belonging to this workspace
   knowledgeBases       KnowledgeBase[] // Knowledge bases belonging to this workspace
@@ -142,30 +142,34 @@ model Workspace {
   folders              Folder[] // Folders belonging to this workspace
   assistants           Assistant[] // Assistants belonging to this workspace
   voices               Voice[] // Cloned/custom voices belonging to this workspace
+  phoneNumbers         PhoneNumber[] // Phone numbers belonging to this workspace
+  intents              Intent[] // Intent groupings (workspace-level templates + agent-specific)
+  calls                Call[] // Calls belonging to this workspace
+  contacts             Contact[] // End-customers of this workspace (Phase A7)
 
-  subscription         Subscription?
-  usageRecords         UsageRecord[]
+  subscription Subscription?
+  usageRecords UsageRecord[]
 
-  isSuspended          Boolean   @default(false)
-  suspendedAt          DateTime?
-  suspendedBy          String?
-  suspensionReason     String?
+  isSuspended      Boolean   @default(false)
+  suspendedAt      DateTime?
+  suspendedBy      String?
+  suspensionReason String?
 
   @@index([id])
 }
 
 model WorkspaceMembership {
-  id             String   @id @default(uuid())
+  id          String   @id @default(uuid())
   workspaceId String
-  userId         String? // Optional to handle invitations for non-users
-  email          String? // Store email for pending memberships with no user
-  role           String
-  status         String   @default("active") // Plugin members are active; legacy pending/revoked rows remain inaccessible
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  userId      String? // Optional to handle invitations for non-users
+  email       String? // Store email for pending memberships with no user
+  role        String
+  status      String   @default("active") // Plugin members are active; legacy pending/revoked rows remain inaccessible
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([workspaceId])
@@ -173,32 +177,31 @@ model WorkspaceMembership {
 }
 
 model Invitation {
-  id             String   @id @default(uuid())
-  email          String
+  id          String   @id @default(uuid())
+  email       String
   workspaceId String
-  role           String
-  token          String   @unique @default(uuid())
-  status         String   @default("pending")
-  invitedById    String
-  message        String? // Optional message to include with invitation
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  expiresAt      DateTime @default(dbgenerated("CURRENT_TIMESTAMP + interval '30 days'"))
+  role        String
+  token       String   @unique @default(uuid())
+  status      String   @default("pending")
+  invitedById String
+  message     String? // Optional message to include with invitation
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  expiresAt   DateTime @default(dbgenerated("CURRENT_TIMESTAMP + interval '30 days'"))
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  invitedBy    User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+  invitedBy User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
+  @@unique([email, workspaceId])
   @@index([workspaceId])
   @@index([invitedById])
   @@index([token])
   @@index([email])
-
-  @@unique([email, workspaceId])
 }
 
 model Credential {
   id                   String   @id @default(uuid())
-  workspaceId       String
+  workspaceId          String
   provider             String
   type                 String
   name                 String
@@ -209,7 +212,7 @@ model Credential {
   updatedAt            DateTime @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tools        Tool[] // Tools that use this credential
+  tools     Tool[] // Tools that use this credential
 
   @@unique([workspaceId, provider, name])
   @@index([workspaceId])
@@ -222,12 +225,12 @@ model File {
   storageKey      String   @unique
   mimeType        String
   sizeBytes       Int
-  workspaceId  String
+  workspaceId     String
   userId          String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   knowledgeBaseSources KnowledgeBaseSource[] // Relationship to knowledge base sources
   voices               Voice[] // Voices using this file as their sample
@@ -255,31 +258,31 @@ model Voice {
 }
 
 model Folder {
-  id             String       @id @default(cuid())
-  name           String
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  agents         Agent[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                   String                @id @default(cuid())
+  name                 String
+  workspaceId          String
+  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agents               Agent[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
   knowledgeBaseSources KnowledgeBaseSource[]
 }
 
 model ApiKey {
-  id             String       @id @default(cuid())
-  name           String
-  prefix         String       @unique
-  scopes         String[]
+  id          String     @id @default(cuid())
+  name        String
+  prefix      String     @unique
+  scopes      String[]
   workspaceId String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agentId        String?
-  agent          Agent?       @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  revoked        Boolean      @default(false)
-  lastUsedAt     DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @default(now())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId     String?
+  agent       Agent?     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  revoked     Boolean    @default(false)
+  lastUsedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now())
 
   @@index([workspaceId])
   @@index([userId])
@@ -300,53 +303,62 @@ model OnboardingStatus {
 }
 
 model KnowledgeBase {
-  id             String                @id @default(uuid())
-  name           String
-  workspaceId String
-  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id                 String                   @id @default(uuid())
+  name               String
+  workspaceId        String
+  workspace          Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   // Per-KB embedding model. Documents and queries must embed with the SAME model,
   // so this is stored once per KB and read at both index and query time.
-  embeddingProvider String?       // 'gemini' | 'openai'
-  embeddingModel    String?       // e.g. 'gemini-embedding-001', 'text-embedding-3-small'
+  embeddingProvider  String? // 'gemini' | 'openai'
+  embeddingModel     String? // e.g. 'gemini-embedding-001', 'text-embedding-3-small'
   // Retrieval + answer config: { topK, systemPrompt, temperature, maxTokens }
-  retrievalConfig   Json?
+  retrievalConfig    Json?
   // Default chunk config applied to new sources unless overridden per-source
   defaultChunkConfig Json?
-  sources        KnowledgeBaseSource[]
-  chunks         ChunkMetadata[] // Relation to chunks
-  assistantLinks AssistantKnowledgeBase[]
-  agentLinks     AgentKnowledgeBase[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  // AGENT: private to the agent(s) it's explicitly linked to. WORKSPACE: attachable
+  // by any agent in the workspace (surfaced in every agent's "workspace knowledge
+  // bases" picker). Set once at creation time.
+  visibility         KnowledgeBaseVisibility  @default(AGENT)
+  sources            KnowledgeBaseSource[]
+  chunks             ChunkMetadata[] // Relation to chunks
+  assistantLinks     AssistantKnowledgeBase[]
+  agentLinks         AgentKnowledgeBase[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
   @@index([workspaceId])
 }
 
+enum KnowledgeBaseVisibility {
+  AGENT
+  WORKSPACE
+}
+
 model KnowledgeBaseSource {
-  id                String          @id @default(uuid())
+  id                String                     @id @default(uuid())
   knowledgeBaseId   String
-  workspaceId    String
-  sourceType        String          @default("file") // file | url | sitemap
-  sourcePointer     String?         // Stores File ID for sourceType='file'
-  sourceUrl         String?         // Stores the URL for sourceType='url' | 'sitemap'
-  title             String?         // Human-friendly label (e.g. the URL or fetched page title)
-  refreshInterval   String?         // never | daily | weekly | monthly (url/sitemap only)
+  workspaceId       String
+  sourceType        String                     @default("file") // file | url | sitemap
+  sourcePointer     String? // Stores File ID for sourceType='file'
+  sourceUrl         String? // Stores the URL for sourceType='url' | 'sitemap'
+  title             String? // Human-friendly label (e.g. the URL or fetched page title)
+  refreshInterval   String? // never | daily | weekly | monthly (url/sitemap only)
   lastIndexedAt     DateTime?
-  indexingStatus    String          @default("PENDING")
+  indexingStatus    String                     @default("PENDING")
   lastError         String?
   progress          Int?
   chunkCount        Int?
-  hasIndexedContent Boolean         @default(false)
+  hasIndexedContent Boolean                    @default(false)
   folderId          String?
-  chunkConfig       Json?           // Per-source chunking config: { strategies, chunkSize, chunkOverlap }
-  knowledgeBase     KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
-  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  file              File?           @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
-  folder            Folder?         @relation(fields: [folderId], references: [id])
+  chunkConfig       Json? // Per-source chunking config: { strategies, chunkSize, chunkOverlap }
+  knowledgeBase     KnowledgeBase              @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  workspace         Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  file              File?                      @relation(fields: [sourcePointer], references: [id], onDelete: Cascade)
+  folder            Folder?                    @relation(fields: [folderId], references: [id])
   chunks            ChunkMetadata[] // Relation to chunks
   events            KnowledgeBaseSourceEvent[]
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
 
   @@index([knowledgeBaseId])
   @@index([workspaceId])
@@ -355,15 +367,15 @@ model KnowledgeBaseSource {
 }
 
 model KnowledgeBaseSourceEvent {
-  id          String   @id @default(uuid())
+  id          String              @id @default(uuid())
   sourceId    String
   workspaceId String
   stage       String
-  level       String   @default("info")
+  level       String              @default("info")
   message     String
   progress    Int?
   meta        Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime            @default(now())
   source      KnowledgeBaseSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
   @@index([sourceId, createdAt])
@@ -379,7 +391,7 @@ model ChunkMetadata {
   textPreview     String
   textLength      Int
   chunkType       String   @default("content") // e.g. content | faq_question
-  strategies      String[] @default([])         // ordered chunking strategies applied
+  strategies      String[] @default([]) // ordered chunking strategies applied
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -392,18 +404,24 @@ model ChunkMetadata {
 }
 
 model Chat {
-  id             String         @id @default(uuid())
-  name           String? // Optional name for the chat
+  id          String   @id @default(uuid())
+  name        String? // Optional name for the chat
   workspaceId String
-  agentId        String? // Optional: For agent-based chats
-  sessionId      String // Required: For calls: phone number, For chats: user identifier or anonymous session
-  sessionType    String         @default("chat") // "chat" or "call"
-  metadata       Json? // Additional metadata for the chat/call session
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  agentId     String? // Optional: For agent-based chats
+  sessionId   String // Required: For calls: phone number, For chats: user identifier or anonymous session
+  sessionType String   @default("chat") // "chat" or "call"
+  contactId   String? // resolved end-customer identity (Phase A7) — null if anonymous
+  metadata    Json? // Additional metadata for the chat/call session
+  status            String    @default("active") // "active" | "idle_warned" | "terminated" — mirrors Call.status's free-string convention
+  lastUserMessageAt DateTime? // stamped by ChatsService.createMessage on every role:'user' write; Chat.updatedAt never fires on message writes, so this is the real activity signal for the idle sweep
+  endedAt           DateTime?
+  disconnectReason  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   agent         Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  contact       Contact?       @relation(fields: [contactId], references: [id])
   messages      Message[]
   agentSessions AgentSession[] // Agent sessions associated with this chat
 
@@ -412,6 +430,8 @@ model Chat {
   @@index([agentId])
   @@index([sessionId])
   @@index([sessionType])
+  @@index([contactId])
+  @@index([sessionType, status, lastUserMessageAt]) // idle-sweep query (ChatIdleSweepService)
 }
 
 model Message {
@@ -434,27 +454,36 @@ model Message {
 }
 
 model Tool {
-  id             String   @id @default(uuid())
-  workspaceId String
-  name           String
-  description    String?
-  type           String // e.g., "google.calendar.availability.check", "google.sheets.row.append"
-  function       Json // Stores function name and parameters schema
-  messages       Json[] // Array of message configurations
-  metadata       Json? // Tool-specific configuration
-  credentialId   String? // Optional reference to a credential
-  enabled        Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  createdById    String
+  id                   String   @id @default(uuid())
+  workspaceId          String
+  name                 String
+  description          String?
+  type                 String // e.g., "google.calendar.availability.check", "google.sheets.row.append"
+  function             Json // Stores function name and parameters schema
+  messages             Json[] // Array of message configurations
+  metadata             Json? // Tool-specific configuration
+  credentialId         String? // Optional reference to a credential
+  enabled              Boolean  @default(true)
+  // Side-effecting tools (creates a booking, not just checks availability)
+  // should require the agent to restate the action back to the user and get
+  // an explicit yes before tool-executor.service.ts actually runs it.
+  requiresConfirmation Boolean  @default(false)
+  // Info the agent must have before calling this tool (e.g. ["date","time","service"]
+  // for a booking tool) — the runtime prompts for these instead of guessing
+  // or calling with placeholders when any are missing from context.
+  requiredSlots        String[] @default([])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  createdById          String
 
   // Relationships
-  workspace   Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace      Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   credential     Credential?     @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   createdBy      User            @relation(fields: [createdById], references: [id])
   toolExecutions ToolExecution[]
   assistantTools AssistantTool[]
   agentTools     AgentTool[]
+  intentTools    IntentTool[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -482,7 +511,6 @@ model ToolExecution {
   @@index([status])
 }
 
-
 // --- New Enums for Agent-level defaults ---
 enum LlmProvider {
   OPENAI
@@ -507,6 +535,13 @@ enum TtsProvider {
   OPENAI
   AZURE
   ELEVENLABS
+  // DEEPGRAM, GOOGLE, CARTESIA were already offered in the Agent Config UI's
+  // TTS dropdown but had no matching enum value — toEnum() silently dropped
+  // them on save, so selecting them did nothing. Added here to match reality.
+  DEEPGRAM
+  GOOGLE
+  CARTESIA
+  LOCAL
   CUSTOM
 }
 
@@ -515,28 +550,29 @@ enum SttProvider {
   AZURE
   DEEPGRAM
   GOOGLE
+  LOCAL
   CUSTOM
 }
 
 // --- Agent Definition ---
 model Agent {
-  id             String         @id @default(uuid())
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  name           String
-  description    String?
-  workspaceId    String
-  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  folderId       String?
-  folder         Folder?        @relation(fields: [folderId], references: [id])
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  name        String
+  description String?
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folderId    String?
+  folder      Folder?   @relation(fields: [folderId], references: [id])
 
   // --- Agent-level default settings (typed) ---
-  llmProvider    LlmProvider?
-  llmModel       String?
-  ttsProvider    TtsProvider?
-  ttsVoiceId     String?
-  sttProvider    SttProvider?
-  sttModel       String?
+  llmProvider LlmProvider?
+  llmModel    String?
+  ttsProvider TtsProvider? @default(DEEPGRAM)
+  ttsVoiceId  String?
+  sttProvider SttProvider? @default(DEEPGRAM)
+  sttModel    String?
 
   // --- Call/Channel Specific Settings (moved from Assistant) ---
   firstMessage               String?
@@ -552,15 +588,23 @@ model Agent {
   metadata                   Json? // For storing agent-specific settings, like system prompts
 
   // --- Optional links retained ---
-  chats          Chat[]
-  sessions       AgentSession[]
-  usageRecords   UsageRecord[]
-  apiKeys        ApiKey[]
-  assistants     Assistant[] // Added back-relation to Assistant
+  chats        Chat[]
+  sessions     AgentSession[]
+  usageRecords UsageRecord[]
+  apiKeys      ApiKey[]
+  assistants   Assistant[] // Added back-relation to Assistant
 
   // --- Single-brain config links (source of truth for runtime) ---
   tools          AgentTool[]
   knowledgeBases AgentKnowledgeBase[]
+
+  // --- Telephony (Phase A1/A2) ---
+  phoneNumbers PhoneNumber[]
+  calls        Call[]
+
+  // --- Intent authoring (agent-specific intents; see Intent.agentId) ---
+  intents      Intent[]
+  agentIntents AgentIntent[]
 
   @@index([workspaceId])
   @@index([folderId])
@@ -568,28 +612,28 @@ model Agent {
 
 // --- Assistant Models ---
 model Assistant {
-  id             String      @id @default(uuid())
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Ownership and isolation
-  agentId        String
-  agent          Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId String
+  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   // Denormalized for tenancy scoping and fast filters
-  workspaceId    String
-  workspace      Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   // Identity and settings (can override agent defaults)
-  name           String
-  description    String?
-  llmProvider    LlmProvider?
-  llmModel       String?
-  voiceId        String?
-  sttModel       String?
-  hipaaEnabled   Boolean     @default(false)
-  systemPrompt   String?
-  metadata       Json?
+  name         String
+  description  String?
+  llmProvider  LlmProvider?
+  llmModel     String?
+  voiceId      String?
+  sttModel     String?
+  hipaaEnabled Boolean      @default(false)
+  systemPrompt String?
+  metadata     Json?
 
   // Relations
   tools          AssistantTool[]
@@ -601,26 +645,26 @@ model Assistant {
 }
 
 model AssistantTool {
-  id           String    @id @default(uuid())
-  assistantId  String
-  toolId       String
+  id          String @id @default(uuid())
+  assistantId String
+  toolId      String
   // Optional per-assistant tool configuration
-  config       Json?
+  config      Json?
 
-  assistant    Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
-  tool         Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  assistant Assistant @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  tool      Tool      @relation(fields: [toolId], references: [id], onDelete: Cascade)
 
   @@unique([assistantId, toolId])
   @@index([toolId])
 }
 
 model AssistantKnowledgeBase {
-  id               String        @id @default(uuid())
-  assistantId      String
-  knowledgeBaseId  String
+  id              String @id @default(uuid())
+  assistantId     String
+  knowledgeBaseId String
 
-  assistant        Assistant     @relation(fields: [assistantId], references: [id], onDelete: Cascade)
-  knowledgeBase    KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  assistant     Assistant     @relation(fields: [assistantId], references: [id], onDelete: Cascade)
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
 
   @@unique([assistantId, knowledgeBaseId])
   @@index([knowledgeBaseId])
@@ -634,11 +678,66 @@ model AgentTool {
   // Optional per-agent tool configuration
   config  Json?
 
-  agent   Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  tool    Tool  @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tool  Tool  @relation(fields: [toolId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, toolId])
   @@index([toolId])
+}
+
+// Authoring-time grouping of tools + prompt guidance under a named intent
+// (e.g. "Booking", "Support"). Purely organizational: attaching an Intent to
+// an agent just upserts AgentTool rows for its tools — AgentTool stays the
+// single runtime source of truth (AgentRuntimeService.loadTools only ever
+// reads AgentTool), so no runtime code needs to know Intent exists.
+model Intent {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  agentId       String? // null = workspace-level reusable template; set = agent-specific
+  name          String
+  description   String?
+  promptSnippet String? // merged into the agent's system prompt while attached
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent        Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tools        IntentTool[]
+  agentIntents AgentIntent[]
+
+  @@index([workspaceId])
+  @@index([agentId])
+}
+
+model IntentTool {
+  id       String @id @default(uuid())
+  intentId String
+  toolId   String
+
+  intent Intent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+  tool   Tool   @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@unique([intentId, toolId])
+  @@index([toolId])
+}
+
+// The actual "is this intent turned on for this agent" relation — separate
+// from IntentTool (which tools belong to the intent) and from AgentTool
+// (the flattened runtime set every attached intent's tools expand into).
+// Needed to know which promptSnippets to merge at runtime, and to detach an
+// intent's tools safely without removing ones another still-attached intent
+// (or a direct manual attach) also needs.
+model AgentIntent {
+  id       String @id @default(uuid())
+  agentId  String
+  intentId String
+
+  agent  Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  intent Intent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, intentId])
+  @@index([intentId])
 }
 
 model AgentKnowledgeBase {
@@ -646,69 +745,168 @@ model AgentKnowledgeBase {
   agentId         String
   knowledgeBaseId String
 
-  agent           Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  agent         Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, knowledgeBaseId])
   @@index([knowledgeBaseId])
 }
 
 model AgentSession {
-  id             String       @id @default(uuid())
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  agentId        String
-  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  chatId         String?
-  chat           Chat?        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  status         String       @default("active") // e.g., active, completed, failed
-  currentNodeId  String?
-  variables      Json?
-  history        Json? // Log of executed nodes and I/O: Array<{ nodeId: string, input?: any, output?: any, timestamp: Date }>
-  callSid        String? // For voice: SID from the provider
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  agentId       String
+  agent         Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  chatId        String?
+  chat          Chat?     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  status        String    @default("active") // e.g., active, completed, failed
+  currentNodeId String?
+  variables     Json?
+  history       Json? // Log of executed nodes and I/O: Array<{ nodeId: string, input?: any, output?: any, timestamp: Date }>
+  callSid       String? // For voice: SID from the provider
+
+  calls Call[]
 
   @@index([agentId])
   @@index([chatId])
   @@index([workspaceId])
 }
 
+// --- Telephony (implementation_plan.md Phase A1/A2/A7) ---
+
+// Identity anchor for a business's own end-customer — scoped to one
+// workspace, never shared across workspaces. Resolved per channel: E.164
+// phone number for voice/WhatsApp, an authenticated widget user id for web
+// chat. A caller with neither stays session-scoped only, not persisted here.
+model Contact {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  externalId  String // E.164 phone (calls/WhatsApp) or authenticated widget user id
+  channel     String // "phone" | "whatsapp" | "widget"
+  displayName String? // learned over time ("my name is Wanjiru")
+  metadata    Json? // { lastIssue?: string, resolved?: boolean, updatedAt?: string } — written by PostCallAnalysisProcessor after each call/chat analysis pass
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  calls Call[]
+  chats Chat[]
+
+  @@unique([workspaceId, externalId])
+  @@index([workspaceId])
+}
+
+// Replaces Agent.metadata.channels.voice.phoneNumber — a real table so a
+// number can be provisioned/assigned/released through the API instead of a
+// manual JSON edit.
+// Platform-owned number marketplace: the platform holds carrier relationships
+// (Twilio master account, manually-onboarded Africa's Talking/Safaricom/Airtel
+// trunks) and workspaces *claim* a number from a shared, unowned pool rather
+// than bringing their own carrier account. workspaceId null = sitting unowned
+// in the pool; claiming sets it, releasing clears it back to null. See
+// modules/v1/phone-number for the claim/release flow.
+model PhoneNumber {
+  id                 String     @id @default(uuid())
+  workspaceId        String? // null = unowned, in the pool
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  // SetNull, not Cascade: deleting a workspace releases its numbers back to
+  // the pool — the platform still owns/pays for them, they don't vanish.
+  number             String     @unique // E.164
+  country            String // ISO country code — pool browsing/filtering
+  provider           String // "twilio" | "africastalking" | "safaricom_sip" | "airtel_sip" — all routed through LiveKit SIP
+  source             String     @default("platform_pool") // kept as a field, not hardcoded, in case a real BYOC need resurfaces later
+  sipInboundTrunkId  String? // LiveKit inbound SIP trunk id
+  sipOutboundTrunkId String? // LiveKit outbound SIP trunk id (created up front so a future outbound/batch feature doesn't need a second round-trip)
+  sipDispatchRuleId  String? // LiveKit dispatch rule id — set once an agent is assigned
+  providerConfig     Json? // non-secret only: transport, SIP address, IP allowlist. Carrier auth creds are platform-level, in Vault, not here.
+  agentId            String?
+  agent              Agent?     @relation(fields: [agentId], references: [id])
+  capabilities       String[]   @default([]) // ["voice", "sms"]
+  status             String     @default("active") // active | provisioning_partial | releasing | released
+  claimedAt          DateTime?
+  releasedAt         DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  calls Call[]
+
+  @@index([workspaceId])
+  @@index([agentId])
+  @@index([country])
+}
+
+// Replaces the loose `callSid` string on AgentSession — what admin analytics
+// and workspace-level call history query against.
+model Call {
+  id               String        @id @default(uuid())
+  workspaceId      String
+  workspace        Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agentId          String
+  agent            Agent         @relation(fields: [agentId], references: [id])
+  sessionId        String?
+  session          AgentSession? @relation(fields: [sessionId], references: [id])
+  phoneNumberId    String?
+  phoneNumber      PhoneNumber?  @relation(fields: [phoneNumberId], references: [id])
+  contactId        String? // resolved from fromNumber/toNumber (Phase A7)
+  contact          Contact?      @relation(fields: [contactId], references: [id])
+  direction        String // inbound | outbound
+  fromNumber       String?
+  toNumber         String?
+  status           String // ringing | in-progress | completed | failed | no-answer
+  disconnectReason String?
+  durationSeconds  Int?
+  recordingUrl     String?
+  transcript       Json?
+  cost             Decimal?      @db.Decimal(10, 4)
+  startedAt        DateTime?
+  endedAt          DateTime?
+  createdAt        DateTime      @default(now())
+
+  @@index([workspaceId])
+  @@index([agentId])
+  @@index([status])
+  @@index([contactId])
+  @@index([phoneNumberId])
+  @@index([sessionId])
+}
 
 model Plan {
-  id              String         @id @default(cuid())
-  name            String         // "Starter", "Pro", "Enterprise"
-  priceMonthly    Float?         // null for custom enterprise plans
+  id              String   @id @default(cuid())
+  name            String // "Starter", "Pro", "Enterprise"
+  priceMonthly    Float? // null for custom enterprise plans
   priceYearly     Float?
-  creditsIncluded Int            // e.g., 10_000 credits per month
-  features        Json           // { "apiAccess": true, "customVoices": false }
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  creditsIncluded Int // e.g., 10_000 credits per month
+  features        Json // { "apiAccess": true, "customVoices": false }
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  subscriptions   Subscription[]
+  subscriptions Subscription[]
 }
 
 model Subscription {
-  id               String     @id @default(cuid())
-  workspaceId      String     @unique
-  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  planId           String
-  plan             Plan       @relation(fields: [planId], references: [id])
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
 
-  status           String     // "active", "trialing", "past_due", "canceled"
-  stripeCustomerId String?    @unique
-  stripeSubId      String?    @unique
+  status           String // "active", "trialing", "past_due", "canceled"
+  stripeCustomerId String? @unique
+  stripeSubId      String? @unique
 
   currentPeriodEnd DateTime
 
   // Credits / limits
-  creditsUsed      Int        @default(0)
-  creditsLimit     Int?
+  creditsUsed  Int  @default(0)
+  creditsLimit Int?
 
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
   @@index([planId])
@@ -716,23 +914,23 @@ model Subscription {
 }
 
 model UsageRecord {
-  id             String     @id @default(cuid())
+  id String @id @default(cuid())
 
-  workspaceId    String
-  workspace      Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  agentId        String?
-  agent          Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  agentId String?
+  agent   Agent?  @relation(fields: [agentId], references: [id], onDelete: SetNull)
 
-  type           String     // "LLM_TOKENS" | "TTS_CHARACTERS" | "STT_SECONDS" | "CALL_MINUTES"
-  provider       String     // "OPENAI", "ELEVENLABS", "DEEPGRAM", etc.
-  modelUsed      String?    // "gpt-4o", "eleven_turbo_v2", etc.
-  unitsConsumed  Float      // 1500 (tokens), 2500 (characters), 60 (seconds)
-  costInMicroUSD Int        // Cost in millionths of USD (e.g., $0.01 = 10000)
+  type           String // "LLM_TOKENS" | "TTS_CHARACTERS" | "STT_SECONDS" | "CALL_MINUTES"
+  provider       String // "OPENAI", "ELEVENLABS", "DEEPGRAM", etc.
+  modelUsed      String? // "gpt-4o", "eleven_turbo_v2", etc.
+  unitsConsumed  Float // 1500 (tokens), 2500 (characters), 60 (seconds)
+  costInMicroUSD Int // Cost in millionths of USD (e.g., $0.01 = 10000)
 
-  sessionId      String?    // Link to AgentSession or Chat for debugging
+  sessionId String? // Link to AgentSession or Chat for debugging
 
-  timestamp      DateTime   @default(now())
+  timestamp DateTime @default(now())
 
   @@index([workspaceId, timestamp])
   @@index([type, timestamp])
@@ -741,19 +939,19 @@ model UsageRecord {
 }
 
 model AdminAuditLog {
-  id          String   @id @default(cuid())
+  id String @id @default(cuid())
 
   adminUserId String
-  adminUser   User     @relation("AdminActions", fields: [adminUserId], references: [id], onDelete: Cascade)
+  adminUser   User   @relation("AdminActions", fields: [adminUserId], references: [id], onDelete: Cascade)
 
-  action      String   // "SUSPEND_USER", "VIEW_WORKSPACE", "UPDATE_PLAN", etc.
-  targetType  String?  // "User" | "Workspace" | "Plan" | ...
-  targetId    String?
-  details     Json?    // Additional context about the action
-  ipAddress   String?
-  userAgent   String?
+  action     String // "SUSPEND_USER", "VIEW_WORKSPACE", "UPDATE_PLAN", etc.
+  targetType String? // "User" | "Workspace" | "Plan" | ...
+  targetId   String?
+  details    Json? // Additional context about the action
+  ipAddress  String?
+  userAgent  String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([adminUserId])
   @@index([targetType, targetId])
@@ -777,4 +975,110 @@ model ProviderCredential {
 
   @@unique([provider, scope])
   @@index([createdById])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Mock Zeraki backend — a realistic simulation of the school-management
+// system the "zeraki call assistant" agent's tools describe (lookup_student,
+// get_fee_statement, reconcile_mpesa_transaction, check_timetable_clashes,
+// send_sms_notification). Exists purely so those tools have a real,
+// queryable, manageable backend to test the Tool/Intent framework against —
+// not a real Zeraki integration. Separate model prefix (Mock*) keeps it
+// obviously distinct from the platform's own domain models.
+// ─────────────────────────────────────────────────────────────────────────
+
+model MockSchool {
+  id         String   @id @default(uuid())
+  code       String   @unique // "NHS" | "RJS"
+  name       String
+  curriculum String // "8-4-4" | "CBC" | "both"
+  createdAt  DateTime @default(now())
+
+  students     MockStudent[]
+  teachers     MockTeacher[]
+  transactions MockMpesaTransaction[]
+  timetable    MockTimetableSlot[]
+  smsLogs      MockSmsLog[]
+}
+
+model MockStudent {
+  id              String     @id @default(uuid())
+  schoolId        String
+  school          MockSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  admissionNumber String
+  fullName        String
+  className       String // e.g. "Form 3" or "Grade 6"
+  curriculumTrack String // "8-4-4" | "CBC"
+  guardianPhone   String
+
+  feeRecords MockFeeRecord[]
+
+  @@unique([schoolId, admissionNumber])
+  @@index([schoolId])
+}
+
+model MockFeeRecord {
+  id            String      @id @default(uuid())
+  studentId     String
+  student       MockStudent @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term          String // e.g. "Term 2 2026"
+  totalInvoiced Decimal     @db.Decimal(10, 2)
+  totalPaid     Decimal     @db.Decimal(10, 2)
+  waiverCredits Decimal     @default(0) @db.Decimal(10, 2)
+  arrears       Decimal     @default(0) @db.Decimal(10, 2)
+
+  @@index([studentId])
+}
+
+model MockMpesaTransaction {
+  id               String     @id @default(uuid())
+  schoolId         String
+  school           MockSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  mpesaCode        String     @unique
+  amount           Decimal    @db.Decimal(10, 2)
+  accountReference String // what the payer typed — may be a mistyped admission number
+  status           String // "MATCHED" | "UNMATCHED"
+  matchedStudentId String?
+  transactionDate  DateTime
+
+  @@index([schoolId])
+}
+
+model MockTeacher {
+  id       String     @id @default(uuid())
+  schoolId String
+  school   MockSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name     String
+  subject  String
+
+  timetable MockTimetableSlot[]
+
+  @@index([schoolId])
+}
+
+model MockTimetableSlot {
+  id        String      @id @default(uuid())
+  schoolId  String
+  school    MockSchool  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherId String
+  teacher   MockTeacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  day       String // "Monday".."Friday"
+  period    Int // 1..8
+  className String
+  subject   String
+
+  @@index([schoolId])
+  @@index([teacherId])
+}
+
+model MockSmsLog {
+  id             String     @id @default(uuid())
+  schoolId       String
+  school         MockSchool @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  recipientGroup String // "parents_with_arrears" | "all_parents" | ...
+  templateType   String // "fee_reminder" | "results_published" | ...
+  payload        Json
+  sentAt         DateTime   @default(now())
+
+  @@index([schoolId])
 }

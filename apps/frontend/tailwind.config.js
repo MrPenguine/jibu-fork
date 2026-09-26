@@ -49,55 +49,58 @@ module.exports = {
   				800: '#004d2d',
   				900: '#00331e'
   			},
-  			border: 'var(--border)',
-  			input: 'var(--input)',
-  			ring: 'var(--ring)',
-  			background: 'var(--background)',
-  			foreground: 'var(--foreground)',
+  			// All wrapped as hsl(var(--x) / <alpha-value>) — the CSS vars themselves
+  			// hold raw "H S% L%" triplets (see global.css), which is what lets
+  			// Tailwind actually honor opacity modifiers like border-border/60.
+  			border: 'hsl(var(--border) / <alpha-value>)',
+  			input: 'hsl(var(--input) / <alpha-value>)',
+  			ring: 'hsl(var(--ring) / <alpha-value>)',
+  			background: 'hsl(var(--background) / <alpha-value>)',
+  			foreground: 'hsl(var(--foreground) / <alpha-value>)',
   			primary: {
-  				DEFAULT: 'var(--primary)',
-  				foreground: 'var(--primary-foreground)'
+  				DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+  				foreground: 'hsl(var(--primary-foreground) / <alpha-value>)'
   			},
   			secondary: {
-  				DEFAULT: 'var(--secondary)',
-  				foreground: 'var(--secondary-foreground)'
+  				DEFAULT: 'hsl(var(--secondary) / <alpha-value>)',
+  				foreground: 'hsl(var(--secondary-foreground) / <alpha-value>)'
   			},
   			destructive: {
-  				DEFAULT: 'var(--destructive)',
-  				foreground: 'var(--destructive-foreground)'
+  				DEFAULT: 'hsl(var(--destructive) / <alpha-value>)',
+  				foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)'
   			},
   			muted: {
-  				DEFAULT: 'var(--muted)',
-  				foreground: 'var(--muted-foreground)'
+  				DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
+  				foreground: 'hsl(var(--muted-foreground) / <alpha-value>)'
   			},
   			accent: {
-  				DEFAULT: 'var(--accent)',
-  				foreground: 'var(--accent-foreground)'
+  				DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
+  				foreground: 'hsl(var(--accent-foreground) / <alpha-value>)'
   			},
   			popover: {
-  				DEFAULT: 'var(--popover)',
-  				foreground: 'var(--popover-foreground)'
+  				DEFAULT: 'hsl(var(--popover) / <alpha-value>)',
+  				foreground: 'hsl(var(--popover-foreground) / <alpha-value>)'
   			},
   			card: {
-  				DEFAULT: 'var(--card)',
-  				foreground: 'var(--card-foreground)'
+  				DEFAULT: 'hsl(var(--card) / <alpha-value>)',
+  				foreground: 'hsl(var(--card-foreground) / <alpha-value>)'
   			},
   			sidebar: {
-  				DEFAULT: 'hsl(var(--sidebar-background))',
-  				foreground: 'hsl(var(--sidebar-foreground))',
-  				primary: 'hsl(var(--sidebar-primary))',
-  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-  				accent: 'hsl(var(--sidebar-accent))',
-  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-  				border: 'hsl(var(--sidebar-border))',
-  				ring: 'hsl(var(--sidebar-ring))'
+  				DEFAULT: 'hsl(var(--sidebar-background) / <alpha-value>)',
+  				foreground: 'hsl(var(--sidebar-foreground) / <alpha-value>)',
+  				primary: 'hsl(var(--sidebar-primary) / <alpha-value>)',
+  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground) / <alpha-value>)',
+  				accent: 'hsl(var(--sidebar-accent) / <alpha-value>)',
+  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground) / <alpha-value>)',
+  				border: 'hsl(var(--sidebar-border) / <alpha-value>)',
+  				ring: 'hsl(var(--sidebar-ring) / <alpha-value>)'
   			},
   			chart: {
-  				'1': 'var(--chart-1)',
-  				'2': 'var(--chart-2)',
-  				'3': 'var(--chart-3)',
-  				'4': 'var(--chart-4)',
-  				'5': 'var(--chart-5)'
+  				'1': 'hsl(var(--chart-1) / <alpha-value>)',
+  				'2': 'hsl(var(--chart-2) / <alpha-value>)',
+  				'3': 'hsl(var(--chart-3) / <alpha-value>)',
+  				'4': 'hsl(var(--chart-4) / <alpha-value>)',
+  				'5': 'hsl(var(--chart-5) / <alpha-value>)'
   			}
   		},
   		borderRadius: {

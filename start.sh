@@ -275,9 +275,16 @@ if ! grep -q "PORT=" apps/backend/.env; then
 fi
 
 if ! grep -q "ENCRYPTION_MASTER_KEY=" apps/backend/.env || grep -q "ENCRYPTION_MASTER_KEY=$" apps/backend/.env; then
-    MASTER_KEY=$(openssl rand -hex 16 2>/dev/null || echo "0123456789abcdef0123456789abcdef")
+    # Must be exactly 64 hex chars (32 bytes) — vault.service.ts rejects anything else.
+    MASTER_KEY=$(openssl rand -hex 32 2>/dev/null || echo "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd")
     sed -i '/ENCRYPTION_MASTER_KEY=/d' apps/backend/.env 2>/dev/null || true
     echo "ENCRYPTION_MASTER_KEY=\"$MASTER_KEY\"" >> apps/backend/.env
+fi
+
+if ! grep -q "BETTER_AUTH_SECRET=" apps/backend/.env || grep -q "BETTER_AUTH_SECRET=$" apps/backend/.env; then
+    AUTH_SECRET=$(openssl rand -base64 32 2>/dev/null || echo "development-only-better-auth-secret-please-set-a-real-one")
+    sed -i '/BETTER_AUTH_SECRET=/d' apps/backend/.env 2>/dev/null || true
+    echo "BETTER_AUTH_SECRET=\"$AUTH_SECRET\"" >> apps/backend/.env
 fi
 
 # ==============================================================================
@@ -315,7 +322,12 @@ fi
 log_step "Step 4: Starting Docker Infrastructure Containers"
 
 log_info "Running '$DOCKER_COMPOSE up -d' for databases & middleware..."
-$DOCKER_COMPOSE up -d postgres redis qdrant vault livekit n8n ollama
+# Intentionally excludes backend/frontend/worker/livekit-agent — this script
+# runs those as bare processes (nx serve / pm2) later, not as containers.
+# Running `docker compose up -d` with no service list at all (bringing up
+# every service, apps included) is the separate all-container path — see
+# docs/local-development.md.
+$DOCKER_COMPOSE up -d postgres redis qdrant vault livekit prometheus grafana node-exporter n8n ollama
 
 # Wait for essential services
 log_info "Waiting for database and message brokers to be healthy..."

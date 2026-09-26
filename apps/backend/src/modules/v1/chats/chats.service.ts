@@ -113,6 +113,17 @@ export class ChatsService {
       `[DIAGNOSTIC][ChatsService] Message persisted to DB for chat ${chat.id} with agentId=${agentId ?? 'none'}`,
     );
 
+    // Real activity signal for the idle-timeout sweep (ChatIdleSweepService) —
+    // Chat.updatedAt never fires on message writes, only on direct chat.update
+    // calls. Resetting status to 'active' re-arms a fresh warn/terminate cycle
+    // for the *next* lull, rather than jumping straight to termination if the
+    // user replies after already having been warned once.
+    if (message.role === 'user') {
+      await this.prisma.chat
+        .update({ where: { id: chat.id }, data: { lastUserMessageAt: new Date(), status: 'active' } })
+        .catch((e) => this.logger.warn(`Failed to update chat activity for ${chat.id}: ${(e as Error).message}`));
+    }
+
     // Persistence-only callers (or non-user turns) stop here.
     if (!generateReply || message.role !== 'user') {
       return createdMessage;
@@ -136,7 +147,10 @@ export class ChatsService {
             role: 'assistant',
             type: 'text',
             sequenceId: (message.sequenceId ?? 0) + 1,
-            metadata: result.meta as any,
+            // toolCalls is included so the workspace test-chat UI (chats/page.tsx)
+            // can show which tools/intents actually fired in a conversation —
+            // it was previously computed by the runtime and silently dropped here.
+            metadata: { ...(result.meta as object), toolCalls: result.toolCalls ?? [] } as any,
           },
         });
 
@@ -149,7 +163,10 @@ export class ChatsService {
           `[ChatsService] ❌ Single-brain runTurn failed for agent ${agentId}: ${(error as Error).message}`,
           (error as Error).stack,
         );
-        return createdMessage;
+        // Surface the failure to the caller instead of silently returning only
+        // the user's own message — otherwise the UI has no way to distinguish
+        // "the agent is still thinking" from "the model call actually failed".
+        return { ...createdMessage, replyError: (error as Error).message };
       }
     }
 

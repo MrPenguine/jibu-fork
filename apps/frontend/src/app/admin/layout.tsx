@@ -34,6 +34,7 @@ export default function AdminLayout({
     
     if (lastPart === 'admin') return 'Cockpit View';
     if (lastPart === 'credentials') return 'Platform Credentials';
+    if (lastPart === 'phone-numbers') return 'Phone Number Inventory';
     if (lastPart === 'system-checks') return 'System Checks';
     if (lastPart === 'logs') return 'System Logs & Monitoring';
     if (lastPart === 'billing') return 'Billing & Finance';

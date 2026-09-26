@@ -5,6 +5,9 @@ import { CreateAgentDto } from '../dto/create-agent.dto';
 import { PrismaService } from '../../../../core/database/prisma.service';
 import { UpdateAgentDto } from '../dto/update-agent.dto';
 import { UpdateAgentConfigDto } from '../dto/update-agent-config.dto';
+import { CreateToolDto } from '../dto/create-tool.dto';
+import { UpdateToolDto } from '../dto/update-tool.dto';
+import { CreateIntentDto, UpdateIntentDto } from '../dto/create-intent.dto';
 import { LlmProvider, TtsProvider, SttProvider } from '@prisma/client';
 
 @Injectable()
@@ -193,6 +196,7 @@ export class AgentService {
       include: {
         tools: { select: { toolId: true } },
         knowledgeBases: { select: { knowledgeBaseId: true } },
+        agentIntents: { select: { intentId: true } },
       },
     });
     if (!agent) throw new NotFoundException(`Agent with ID ${id} not found`);
@@ -216,6 +220,7 @@ export class AgentService {
       firstMessage: agent.firstMessage ?? '',
       knowledgeBaseIds: agent.knowledgeBases.map((k) => k.knowledgeBaseId),
       toolIds: agent.tools.map((t) => t.toolId),
+      intentIds: agent.agentIntents.map((ai) => ai.intentId),
       channels: {
         chat: channels.chat ?? true,
         whatsapp: channels.whatsapp ?? false,
@@ -279,6 +284,33 @@ export class AgentService {
           });
         }
       }
+
+      // Attaching an intent is a full-replace of AgentIntent (same pattern as
+      // toolIds/knowledgeBaseIds above), then a union of each attached
+      // intent's tools into AgentTool — Intent never has its own runtime
+      // read path, it only ever expands into the AgentTool set every other
+      // service already reads. Runs after the toolIds block above so this
+      // union can't be clobbered by it.
+      if (dto.intentIds !== undefined) {
+        await tx.agentIntent.deleteMany({ where: { agentId: id } });
+        if (dto.intentIds.length) {
+          await tx.agentIntent.createMany({
+            data: dto.intentIds.map((intentId) => ({ agentId: id, intentId })),
+            skipDuplicates: true,
+          });
+          const intentToolIds = await tx.intentTool.findMany({
+            where: { intentId: { in: dto.intentIds } },
+            select: { toolId: true },
+          });
+          const uniqueToolIds = [...new Set(intentToolIds.map((t) => t.toolId))];
+          if (uniqueToolIds.length) {
+            await tx.agentTool.createMany({
+              data: uniqueToolIds.map((toolId) => ({ agentId: id, toolId })),
+              skipDuplicates: true,
+            });
+          }
+        }
+      }
     });
 
     return this.getConfig(id, workspaceId);
@@ -327,6 +359,129 @@ export class AgentService {
       select: { id: true, name: true, description: true, type: true, enabled: true },
       orderBy: { name: 'asc' },
     });
+  }
+
+  // ── Tool CRUD (the actual authoring surface — listWorkspaceTools above is
+  // the read-only attach-picker view used by the config form) ──────────────
+
+  /** Full tool rows — everything the Create/Edit Tool UI needs. */
+  async listWorkspaceToolsFull(workspaceId: string) {
+    return this.prisma.tool.findMany({
+      where: { workspaceId },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async createTool(workspaceId: string, createdById: string, dto: CreateToolDto) {
+    return this.prisma.tool.create({
+      data: {
+        workspaceId,
+        createdById,
+        name: dto.name,
+        description: dto.description,
+        type: dto.type,
+        function: dto.function as any,
+        messages: [],
+        metadata: dto.metadata as any,
+        credentialId: dto.credentialId,
+        requiresConfirmation: dto.requiresConfirmation ?? false,
+        requiredSlots: dto.requiredSlots ?? [],
+      },
+    });
+  }
+
+  async updateTool(workspaceId: string, toolId: string, dto: UpdateToolDto) {
+    const existing = await this.prisma.tool.findFirst({ where: { id: toolId, workspaceId } });
+    if (!existing) throw new NotFoundException(`Tool with ID ${toolId} not found`);
+
+    return this.prisma.tool.update({
+      where: { id: toolId },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.type !== undefined ? { type: dto.type } : {}),
+        ...(dto.function !== undefined ? { function: dto.function as any } : {}),
+        ...(dto.metadata !== undefined ? { metadata: dto.metadata as any } : {}),
+        ...(dto.credentialId !== undefined ? { credentialId: dto.credentialId } : {}),
+        ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+        ...(dto.requiresConfirmation !== undefined ? { requiresConfirmation: dto.requiresConfirmation } : {}),
+        ...(dto.requiredSlots !== undefined ? { requiredSlots: dto.requiredSlots } : {}),
+      },
+    });
+  }
+
+  async deleteTool(workspaceId: string, toolId: string) {
+    const existing = await this.prisma.tool.findFirst({ where: { id: toolId, workspaceId } });
+    if (!existing) throw new NotFoundException(`Tool with ID ${toolId} not found`);
+    await this.prisma.tool.delete({ where: { id: toolId } });
+    return { success: true };
+  }
+
+  // ── Intent CRUD — authoring-time groupings of tools + prompt guidance.
+  // AgentTool stays the single runtime source of truth; attaching an intent
+  // (via updateConfig's intentIds) just expands its tools into AgentTool. ──
+
+  async listIntents(workspaceId: string, agentId?: string) {
+    return this.prisma.intent.findMany({
+      where: { workspaceId, ...(agentId ? { OR: [{ agentId }, { agentId: null }] } : {}) },
+      include: { tools: { select: { toolId: true } } },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async createIntent(workspaceId: string, dto: CreateIntentDto) {
+    return this.prisma.intent.create({
+      data: {
+        workspaceId,
+        agentId: dto.agentId,
+        name: dto.name,
+        description: dto.description,
+        promptSnippet: dto.promptSnippet,
+        tools: dto.toolIds?.length
+          ? { create: dto.toolIds.map((toolId) => ({ toolId })) }
+          : undefined,
+      },
+      include: { tools: { select: { toolId: true } } },
+    });
+  }
+
+  async updateIntent(workspaceId: string, intentId: string, dto: UpdateIntentDto) {
+    const existing = await this.prisma.intent.findFirst({ where: { id: intentId, workspaceId } });
+    if (!existing) throw new NotFoundException(`Intent with ID ${intentId} not found`);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.intent.update({
+        where: { id: intentId },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.promptSnippet !== undefined ? { promptSnippet: dto.promptSnippet } : {}),
+          ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
+        },
+      });
+
+      if (dto.toolIds !== undefined) {
+        await tx.intentTool.deleteMany({ where: { intentId } });
+        if (dto.toolIds.length) {
+          await tx.intentTool.createMany({
+            data: dto.toolIds.map((toolId) => ({ intentId, toolId })),
+            skipDuplicates: true,
+          });
+        }
+      }
+    });
+
+    return this.prisma.intent.findUnique({
+      where: { id: intentId },
+      include: { tools: { select: { toolId: true } } },
+    });
+  }
+
+  async deleteIntent(workspaceId: string, intentId: string) {
+    const existing = await this.prisma.intent.findFirst({ where: { id: intentId, workspaceId } });
+    if (!existing) throw new NotFoundException(`Intent with ID ${intentId} not found`);
+    await this.prisma.intent.delete({ where: { id: intentId } });
+    return { success: true };
   }
 
   private toEnum<T extends Record<string, string>>(enumObj: T, value?: string): T[keyof T] | undefined {

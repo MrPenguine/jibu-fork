@@ -84,6 +84,51 @@ export const PROVIDER_REGISTRY: readonly ProviderDefinition[] = [
     label: 'n8n',
     envVars: ['N8N_API_KEY'],
   },
+  {
+    // Two-field credential (Account SID + Auth Token) stored as a single
+    // "accountSid:authToken" string — this registry's storage shape is a
+    // single secret string, and the Account SID isn't sensitive on its own
+    // (only the Auth Token is), so a combined string avoids touching the
+    // shared single-secret storage/CRUD used by every other provider here
+    // for the sake of one provider's two-field need. See
+    // phone-number/twilio.service.ts for the split.
+    key: 'twilio',
+    label: 'Twilio (phone number pool)',
+    // No env-var fallback: ProviderCredentialsResolver's generic fallback
+    // returns the first env var that's set, which can't correctly assemble
+    // a combined "sid:token" from two separate env vars — must be set via
+    // the admin credentials UI (Vault-backed) instead.
+    envVars: [],
+    test: async (secret) => {
+      const [accountSid, authToken] = secret.split(':');
+      if (!accountSid || !authToken) {
+        throw new Error('Expected "accountSid:authToken"');
+      }
+      await request(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`, {
+        auth: { username: accountSid, password: authToken },
+      });
+    },
+  },
+  {
+    // No self-serve API exists for these — the platform's relationship with
+    // each carrier is a manual process (KYC documents, IP whitelisting via
+    // their support team). This entry just gives admins a place to record
+    // that the relationship exists; there's deliberately no `test` function
+    // since there's nothing to call.
+    key: 'africastalking',
+    label: "Africa's Talking (manual)",
+    envVars: [],
+  },
+  {
+    key: 'safaricom_sip',
+    label: 'Safaricom SIP (manual)',
+    envVars: [],
+  },
+  {
+    key: 'airtel_sip',
+    label: 'Airtel SIP (manual)',
+    envVars: [],
+  },
 ];
 
 export function getProviderDefinition(provider: string): ProviderDefinition | undefined {

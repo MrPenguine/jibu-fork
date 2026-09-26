@@ -177,10 +177,10 @@ export class KnowledgeBaseController {
   @ApiResponse({ status: 404, description: 'Knowledge base not found' })
   @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
   async findOne(
-    @Req() req, 
+    @Req() req,
     @Param('id') id: string,
   ) {
-    return this.knowledgeBaseService.findKnowledgeBaseById(id, req.user.orgId);
+    return this.knowledgeBaseService.findKnowledgeBaseById(id, this.resolveOrgId(req));
   }
 
   @Get(':id/chunks')
@@ -266,7 +266,7 @@ export class KnowledgeBaseController {
   ) {
     return this.knowledgeBaseService.updateKnowledgeBase(
       id,
-      req.user.orgId,
+      this.resolveOrgId(req),
       updateKnowledgeBaseDto,
     );
   }
@@ -277,10 +277,10 @@ export class KnowledgeBaseController {
   @ApiResponse({ status: 404, description: 'Knowledge base not found' })
   @ApiParam({ name: 'id', description: 'Knowledge Base ID' })
   async remove(
-    @Req() req, 
+    @Req() req,
     @Param('id') id: string,
   ) {
-    return this.knowledgeBaseService.deleteKnowledgeBase(id, req.user.orgId);
+    return this.knowledgeBaseService.deleteKnowledgeBase(id, this.resolveOrgId(req));
   }
 
   @Post(':id/sources')

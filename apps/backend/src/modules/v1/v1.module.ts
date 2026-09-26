@@ -10,6 +10,9 @@ import { VoicesModule } from './voices/voices.module';
 import { FolderModule } from './folder/folder.module';
 import { InvitationModule } from './invitation/invitation.module';
 import { AssistantModule } from './assistant/assistant.module';
+import { PhoneNumberModule } from './phone-number/phone-number.module';
+import { CallModule } from './call/call.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 
 @Module({
@@ -25,6 +28,9 @@ import { AssistantModule } from './assistant/assistant.module';
     FolderModule,
     InvitationModule,
     AssistantModule,
+    PhoneNumberModule,
+    CallModule,
+    ContactsModule,
   ],
   exports: [
     FileModule,
@@ -38,6 +44,9 @@ import { AssistantModule } from './assistant/assistant.module';
     FolderModule,
     InvitationModule,
     AssistantModule,
+    PhoneNumberModule,
+    CallModule,
+    ContactsModule,
   ],
 })
 export class V1Module {}

@@ -411,8 +411,14 @@ export class VectorDbService {
         with_vector,
         filter
       });
-      
-      return response.data.result || [];
+
+      // Unlike /points/search (result is a flat array), Qdrant's
+      // /points/scroll wraps results as { points: [...], next_page_offset }
+      // — verified directly against a live collection. Pre-existing bug:
+      // this previously returned that whole wrapper object where an array
+      // was expected, undetected until MemoryService.listAll became the
+      // first real caller of scroll().
+      return response.data.result?.points || [];
     } catch (error) {
       this.logger.error(`Failed to scroll collection ${collection}: ${error.message}`);
       return [];

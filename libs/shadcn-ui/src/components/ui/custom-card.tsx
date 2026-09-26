@@ -2,20 +2,25 @@ import * as React from "react"
 import { cn } from "@libs/shadcn-ui/lib/utils"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./card"
 
-// Custom Card with rounded corners and no border
+// Rounded corners, no border — separation from the page comes from shadow-sm
+// alone. (Previously had `border border-border` despite this comment saying
+// otherwise — border-0 makes the two agree.)
 const CustomCard = React.forwardRef<
   React.ElementRef<typeof Card>,
   React.ComponentPropsWithoutRef<typeof Card>
 >(({ className, ...props }, ref) => (
   <Card
     ref={ref}
-    className={cn("rounded-lg border border-border bg-card shadow-sm", className)}
+    className={cn("rounded-lg border-0 bg-card shadow-sm", className)}
     {...props}
   />
 ))
 CustomCard.displayName = "CustomCard"
 
-// Custom Danger Card with rounded corners and no border (for danger zones)
+// Danger/warning card — deliberately DOES have a border: a tinted red border
+// reinforces the danger-zone signal alongside the red background, per
+// "don't use color alone to indicate state." Not the same "no border" intent
+// as CustomCard above.
 const CustomDangerCard = React.forwardRef<
   React.ElementRef<typeof Card>,
   React.ComponentPropsWithoutRef<typeof Card>

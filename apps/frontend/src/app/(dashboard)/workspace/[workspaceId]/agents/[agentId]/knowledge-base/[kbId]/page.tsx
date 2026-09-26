@@ -1,0 +1,977 @@
+"use client";
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  getKnowledgeBase,
+  deleteKnowledgeBase,
+  listFoldersForKb,
+  createFolderForKb,
+  deleteFolderForKb,
+  linkFileToKnowledgeBase,
+  listKnowledgeBaseSources,
+  deleteSourceFromKb,
+  updateKnowledgeBase,
+  linkUrlsToKnowledgeBase,
+  getKnowledgeBaseSettings,
+  updateKnowledgeBaseSettings,
+  testEmbeddingModel,
+  browseKnowledgeBaseChunks,
+  getKnowledgeBaseChunk,
+  updateKnowledgeBaseChunk,
+  deleteKnowledgeBaseChunk,
+  retrieveTestKnowledgeBase,
+  retryKnowledgeBaseSource,
+  type KnowledgeBaseSettings,
+  type ChunkMetadata,
+  type RefreshRate,
+} from "../../../../../../../../utils/knowledgebaseApi";
+import { useKnowledgeBaseEvents } from "../../../../../../../../hooks/useKnowledgeBaseEvents";
+import { linkAgentKnowledgeBase } from "../../../../../../../../utils/agentConfigApi";
+import { uploadFile, getFileDownloadUrl } from "../../../../../../../../utils/fileApi";
+import { useWorkspace } from "../../../../../../../../utils/workspaceContext";
+import { toast } from "@libs/shadcn-ui/components/ui/use-toast";
+import {
+  KnowledgeBaseHeader,
+  KnowledgeBaseEmptyState,
+  KnowledgeBaseList,
+  type KnowledgeBaseSource,
+  FolderCard,
+  CreateFolderDialog,
+  type UrlImportPayload,
+  type SitemapImportPayload,
+  type UploadFilePayload,
+  type PlainTextPayload,
+  KnowledgeBasePreviewDialog,
+  KnowledgeBaseSettingsDialog,
+  ChunkBrowserDialog,
+  AddDataSourceDrawer,
+} from "@libs/shadcn-ui";
+import { Skeleton } from "@libs/shadcn-ui/components/ui/skeleton";
+import { Button } from "@libs/shadcn-ui/components/ui/button";
+import { FileText, Download, Trash2, Loader2, ArrowLeft } from "lucide-react";
+import { Progress } from "@libs/shadcn-ui/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@libs/shadcn-ui/components/ui/alert-dialog";
+
+export default function AgentKnowledgeBasePage() {
+  const params = useParams<{ workspaceId: string; agentId: string; kbId: string }>();
+  const workspaceId = (params?.workspaceId as string) || "";
+  const agentId = (params?.agentId as string) || "";
+  const kbId = (params?.kbId as string) || "";
+  const router = useRouter();
+  const { activeWorkspace } = useWorkspace();
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [preview, setPreview] = useState(false);
+  const [sources, setSources] = useState<KnowledgeBaseSource[]>([]);
+  const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
+  const [kbName, setKbName] = useState("Knowledge base");
+  const [folders, setFolders] = useState<{ id: string; name: string }[]>([]);
+  const [openCreateFolder, setOpenCreateFolder] = useState(false);
+  const [openPreview, setOpenPreview] = useState(false);
+  const [openKbSettings, setOpenKbSettings] = useState(false);
+  const [kbSettings, setKbSettings] = useState<KnowledgeBaseSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [openChunks, setOpenChunks] = useState(false);
+  const [chunkItems, setChunkItems] = useState<ChunkMetadata[]>([]);
+  const [chunkTotal, setChunkTotal] = useState(0);
+  const [chunkPage, setChunkPage] = useState(1);
+  const [chunksLoading, setChunksLoading] = useState(false);
+  const CHUNK_PAGE_SIZE = 20;
+  const [openAddDataSource, setOpenAddDataSource] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [allSourcesExpanded, setAllSourcesExpanded] = useState(true);
+  const [uploadProgressItems, setUploadProgressItems] = useState<Array<{ name: string; status: "uploading" | "queued" | "error" }>>([]);
+  const { eventsBySource, latestBySource, connected } = useKnowledgeBaseEvents(knowledgeBaseId);
+  const refreshedTerminalEvents = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const load = async () => {
+      if (!agentId || !kbId) {
+        router.push(`/workspace/${workspaceId}/agents/${agentId}/config`);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const kb = await getKnowledgeBase(kbId);
+        if (!kb) {
+          toast({ title: "Not found", description: "This knowledge base no longer exists.", variant: "destructive" });
+          router.push(`/workspace/${workspaceId}/agents/${agentId}/config`);
+          return;
+        }
+
+        // Make sure this agent is (still) linked — a WORKSPACE-visibility KB can be
+        // opened from a card before it's explicitly attached to this agent.
+        await linkAgentKnowledgeBase(agentId, kb.id).catch(() => {});
+
+        setKnowledgeBaseId(kb.id);
+        setKbName(kb.name);
+
+        await loadFolders(kb.id);
+        await loadSources(kb.id);
+      } catch (e) {
+        console.error("Failed to load knowledge base:", e);
+        setSources([]);
+        setKnowledgeBaseId(null);
+        toast({
+          title: "Error",
+          description: "Failed to load this knowledge base. Please retry.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [agentId, kbId, workspaceId, router]);
+
+  // ---- PR-4: KB settings (embedding model + retrieval config) ----
+  const handleOpenKbSettings = async () => {
+    if (!knowledgeBaseId) return;
+    setOpenKbSettings(true);
+    setSettingsLoading(true);
+    try {
+      const s = await getKnowledgeBaseSettings(knowledgeBaseId);
+      setKbSettings(s);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load settings", variant: "destructive" });
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleSaveKbSettings = async (payload: {
+    name: string;
+    embeddingModel: string;
+    retrievalConfig: { topK: number; systemPrompt: string; temperature: number; maxTokens: number };
+    defaultChunkConfig: { chunkSize: number; chunkOverlap: number };
+  }) => {
+    if (!knowledgeBaseId) return;
+    setSettingsSaving(true);
+    try {
+      if (payload.name && payload.name !== kbName) {
+        const renamed = await updateKnowledgeBase(knowledgeBaseId, { name: payload.name });
+        if (renamed) setKbName(renamed.name);
+      }
+      const updated = await updateKnowledgeBaseSettings(knowledgeBaseId, {
+        embeddingModel: payload.embeddingModel,
+        retrievalConfig: payload.retrievalConfig,
+        defaultChunkConfig: payload.defaultChunkConfig,
+      });
+      setKbSettings(updated);
+      const reindexed = updated.reindexedSources || 0;
+      toast({
+        title: "Settings saved",
+        description: reindexed > 0
+          ? `Embedding model changed — re-embedding ${reindexed} source${reindexed === 1 ? "" : "s"}.`
+          : "Knowledge base settings updated.",
+      });
+      setOpenKbSettings(false);
+      if (reindexed > 0) await loadSources(knowledgeBaseId);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to save settings", variant: "destructive" });
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  // ---- PR-5: Chunk management ----
+  const loadChunks = async (page: number) => {
+    if (!knowledgeBaseId) return;
+    setChunksLoading(true);
+    try {
+      const res = await browseKnowledgeBaseChunks(knowledgeBaseId, { page, pageSize: CHUNK_PAGE_SIZE });
+      setChunkItems(res.items);
+      setChunkTotal(res.total);
+      setChunkPage(res.page);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to load chunks", variant: "destructive" });
+    } finally {
+      setChunksLoading(false);
+    }
+  };
+
+  const handleOpenChunks = async () => {
+    setOpenChunks(true);
+    await loadChunks(1);
+  };
+
+  const handleViewChunk = async (chunkId: string): Promise<ChunkMetadata> => {
+    if (!knowledgeBaseId) throw new Error("No knowledge base");
+    return getKnowledgeBaseChunk(knowledgeBaseId, chunkId);
+  };
+
+  const handleEditChunk = async (chunkId: string, text: string) => {
+    if (!knowledgeBaseId) return;
+    await updateKnowledgeBaseChunk(knowledgeBaseId, chunkId, text);
+    toast({ title: "Re-embedding", description: "Chunk queued for re-embedding." });
+  };
+
+  const handleDeleteChunk = async (chunkId: string) => {
+    if (!knowledgeBaseId) return;
+    await deleteKnowledgeBaseChunk(knowledgeBaseId, chunkId);
+    toast({ title: "Deleted", description: "Chunk removed." });
+    await loadChunks(chunkPage);
+  };
+
+  // ---- PR-5: real retrieval test ----
+  const handleAskRetrieval = async (question: string, opts: { answerProvider?: string; answerModel?: string }) => {
+    if (!knowledgeBaseId) throw new Error("No knowledge base");
+    return retrieveTestKnowledgeBase(knowledgeBaseId, question, undefined, opts);
+  };
+
+  // ---- PR-3: URL ingestion ----
+  const handleImportUrls = async (payload: UrlImportPayload) => {
+    if (!knowledgeBaseId) {
+      toast({ title: "Error", description: "Knowledge base not ready", variant: "destructive" });
+      return;
+    }
+    try {
+      const strategies = (payload.chunkingStrategy || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await linkUrlsToKnowledgeBase(knowledgeBaseId, {
+        urls: payload.urls,
+        refreshRate: (payload.refreshRate as RefreshRate) || "never",
+        folderId: payload.folderId,
+        chunkConfig: strategies.length > 0 ? { strategies } : undefined,
+      });
+      toast({ title: "Importing", description: `Fetching ${payload.urls.length} URL(s)…` });
+      await loadSources(knowledgeBaseId);
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed to import URLs", variant: "destructive" });
+    }
+  };
+
+  const filtered = useMemo(() => {
+    if (!search) return sources;
+    const q = search.toLowerCase();
+    return sources.filter((s) => s.name.toLowerCase().includes(q) || s.type.toLowerCase().includes(q));
+  }, [sources, search]);
+
+  const processingCount = useMemo(
+    () => sources.filter((s) => s.indexingStatus === 'PENDING' || s.indexingStatus === 'PROCESSING').length,
+    [sources],
+  );
+
+  // Refresh persisted source fields after terminal events; live status comes from SSE.
+  useEffect(() => {
+    if (!knowledgeBaseId) return;
+    const terminalEvent = Object.values(latestBySource).find((event) =>
+      event.stage === "COMPLETED" || event.stage === "FAILED" || event.stage === "DEINDEXED");
+    if (!terminalEvent || refreshedTerminalEvents.current.has(terminalEvent.id)) return;
+    refreshedTerminalEvents.current.add(terminalEvent.id);
+    const timer = setTimeout(() => loadSources(knowledgeBaseId), 500);
+    return () => clearTimeout(timer);
+  }, [knowledgeBaseId, latestBySource]);
+
+  const loadFolders = async (kbId: string) => {
+    try {
+      const folderList = await listFoldersForKb(kbId);
+      console.log('[loadFolders] Loaded folders:', folderList);
+      setFolders(folderList);
+    } catch (e) {
+      console.error("Failed to load folders:", e);
+      setFolders([]);
+    }
+  };
+
+  const loadSources = async (kbId: string) => {
+    try {
+      const sourcesList = await listKnowledgeBaseSources(kbId);
+      console.log('[loadSources] Loaded sources:', sourcesList);
+      
+      // Map API response to component format
+      const mappedSources = sourcesList.map((source: any) => ({
+        id: source.id,
+        name: source.file?.name || 'Unknown',
+        type: source.sourceType || 'file',
+        folder: source.folder,
+        fileId: source.file?.id,
+        mimeType: source.file?.mimeType,
+        sizeBytes: source.file?.sizeBytes,
+        indexingStatus: source.indexingStatus,
+        progress: source.progress,
+        lastError: source.lastError,
+        chunkCount: source.chunkCount,
+        createdAt: source.createdAt,
+      }));
+      
+      setSources(mappedSources);
+    } catch (e) {
+      console.error("Failed to load sources:", e);
+      setSources([]);
+    }
+  };
+
+  const handleCreateFolder = async (name: string) => {
+    if (!knowledgeBaseId) {
+      toast({
+        title: "Error",
+        description: "Knowledge base not initialized",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      console.log('[handleCreateFolder] Creating folder:', name, 'for KB:', knowledgeBaseId);
+      const newFolder = await createFolderForKb(knowledgeBaseId, name);
+      console.log('[handleCreateFolder] Created folder:', newFolder);
+      if (newFolder) {
+        toast({
+          title: "Success",
+          description: `Folder "${name}" created successfully`,
+        });
+        // Refresh folder list
+        console.log('[handleCreateFolder] Refreshing folders...');
+        await loadFolders(knowledgeBaseId);
+        console.log('[handleCreateFolder] Folders after refresh:', folders);
+        setOpenCreateFolder(false);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create folder",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      console.error("Error creating folder:", e);
+      toast({
+        title: "Error",
+        description: "Failed to create folder",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    if (!knowledgeBaseId) {
+      toast({
+        title: "Error",
+        description: "Knowledge base not initialized",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const success = await deleteFolderForKb(knowledgeBaseId, folderId);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Folder deleted successfully",
+        });
+        // Refresh folder list
+        await loadFolders(knowledgeBaseId);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete folder",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      console.error("Error deleting folder:", e);
+      toast({
+        title: "Error",
+        description: "Failed to delete folder",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUploadFiles = async (payload: UploadFilePayload) => {
+    if (!knowledgeBaseId) {
+      toast({
+        title: "Error",
+        description: "Knowledge base not initialized",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgressItems(payload.files.map((file) => ({ name: file.name, status: "queued" })));
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      let next = 0;
+      const worker = async () => {
+        while (next < payload.files.length) {
+          const file = payload.files[next++];
+          setUploadProgressItems((items) => items.map((item) => item.name === file.name ? { ...item, status: "uploading" } : item));
+        try {
+          console.log('[handleUploadFiles] Uploading file:', file.name);
+          console.log('[handleUploadFiles] Payload folderId:', payload.folderId);
+          
+          // Upload file to storage with workspace context
+          const uploadedFile = await uploadFile(file, undefined, activeWorkspace?.id);
+          console.log('[handleUploadFiles] File uploaded:', uploadedFile);
+
+          // Link file to knowledge base with optional folder
+          // Support both UUID and CUID formats
+          let validFolderId: string | undefined = undefined;
+          if (payload.folderId && payload.folderId.trim() !== '') {
+            const trimmedFolderId = payload.folderId.trim();
+            // UUID format: 8-4-4-4-12 characters (e.g., 550e8400-e29b-41d4-a716-446655440000)
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            // CUID format: c + timestamp + counter + fingerprint (e.g., cjld2cjxh0000qzrmn831i7rn)
+            const cuidRegex = /^c[a-z0-9]{24,}$/i;
+            
+            if (uuidRegex.test(trimmedFolderId) || cuidRegex.test(trimmedFolderId)) {
+              validFolderId = trimmedFolderId;
+            } else {
+              console.warn('[handleUploadFiles] Invalid folder ID format:', trimmedFolderId);
+            }
+          }
+          console.log('[handleUploadFiles] Validated folderId:', validFolderId);
+          
+          await linkFileToKnowledgeBase(
+            knowledgeBaseId,
+            uploadedFile.id,
+            undefined,
+            validFolderId,
+            {
+              strategies: payload.chunkingStrategy
+                ? payload.chunkingStrategy.split(',').map((s) => s.trim()).filter(Boolean)
+                : undefined,
+              chunkSize: payload.chunkSize,
+              chunkOverlap: payload.chunkOverlap,
+            }
+          );
+          console.log('[handleUploadFiles] File linked to KB');
+
+          successCount++;
+          setUploadProgressItems((items) => items.map((item) => item.name === file.name ? { ...item, status: "queued" } : item));
+        } catch (error: any) {
+          console.error('[handleUploadFiles] Error uploading file:', file.name, error);
+          console.error('[handleUploadFiles] Error details:', error?.message || error);
+          failCount++;
+          setUploadProgressItems((items) => items.map((item) => item.name === file.name ? { ...item, status: "error" } : item));
+        }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, payload.files.length) }, worker));
+
+      // Show result toast
+      if (successCount > 0) {
+        toast({
+          title: "Success",
+          description: `${successCount} file(s) uploaded successfully${failCount > 0 ? `, ${failCount} failed` : ''}`,
+        });
+        
+        // Refresh sources list
+        await loadSources(knowledgeBaseId);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to upload files",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('[handleUploadFiles] Upload error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload files",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handlePlainTextImport = async (payload: PlainTextPayload) => {
+    if (!knowledgeBaseId) {
+      toast({
+        title: "Error",
+        description: "Knowledge base not initialized",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!payload.text || payload.text.trim() === "") {
+      toast({
+        title: "Error",
+        description: "Please enter some text to import",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Reuse the file pipeline: wrap the pasted text in a .txt file so the
+      // worker indexes it through the same chunk/embed path as uploaded files.
+      const fileName = `pasted-text-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`;
+      const textFile = new File([payload.text.trim()], fileName, { type: "text/plain" });
+
+      const uploadedFile = await uploadFile(textFile, undefined, activeWorkspace?.id);
+
+      let validFolderId: string | undefined = undefined;
+      if (payload.folderId && payload.folderId.trim() !== "") {
+        const trimmedFolderId = payload.folderId.trim();
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const cuidRegex = /^c[a-z0-9]{24,}$/i;
+        if (uuidRegex.test(trimmedFolderId) || cuidRegex.test(trimmedFolderId)) {
+          validFolderId = trimmedFolderId;
+        }
+      }
+
+      await linkFileToKnowledgeBase(knowledgeBaseId, uploadedFile.id, undefined, validFolderId);
+
+      toast({
+        title: "Success",
+        description: "Text imported and queued for indexing",
+      });
+      await loadSources(knowledgeBaseId);
+    } catch (error: any) {
+      console.error("[handlePlainTextImport] Error importing text:", error);
+      toast({
+        title: "Error",
+        description: "Failed to import text",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteSource = async (sourceId: string) => {
+    if (!knowledgeBaseId) {
+      toast({
+        title: "Error",
+        description: "Knowledge base not initialized",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const success = await deleteSourceFromKb(knowledgeBaseId, sourceId);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Source deleted successfully",
+        });
+        // Refresh sources list
+        await loadSources(knowledgeBaseId);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete source",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      console.error("Error deleting source:", e);
+      toast({
+        title: "Error",
+        description: "Failed to delete source",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadFile = async (fileId: string, fileName: string) => {
+    try {
+      console.log('[handleDownloadFile] Downloading file:', fileId, fileName);
+      
+      // Get download URL from backend using fileApi
+      const downloadUrl = await getFileDownloadUrl(fileId, activeWorkspace?.id);
+      console.log('[handleDownloadFile] Got download URL, opening...');
+      
+      // Open download URL in new tab (browser will handle the download)
+      window.open(downloadUrl, '_blank');
+
+      toast({
+        title: "Success",
+        description: `Downloading ${fileName}...`,
+      });
+    } catch (e: any) {
+      console.error("Error downloading file:", e);
+      toast({
+        title: "Error",
+        description: e.message || "Failed to download file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteKnowledgeBase = async () => {
+    if (!knowledgeBaseId) return;
+    const ok = await deleteKnowledgeBase(knowledgeBaseId);
+    if (!ok) {
+      toast({ title: "Failed to delete knowledge base", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Knowledge base deleted" });
+    router.push(`/workspace/${workspaceId}/agents/${agentId}/config`);
+  };
+
+  const openCreateFolderDialog = () => setOpenCreateFolder(true);
+
+  const handleToggleFolderExpand = (folderId: string, expanded: boolean) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (expanded) {
+        newSet.add(folderId);
+      } else {
+        newSet.delete(folderId);
+      }
+      return newSet;
+    });
+  };
+
+  const getFileCountForFolder = (folderId: string): number => {
+    return sources.filter(s => s.folder?.id === folderId).length;
+  };
+
+  const getFilesForFolder = (folderId: string) => {
+    return sources.filter(s => s.folder?.id === folderId);
+  };
+
+  const getProcessingCountForFolder = (folderId: string): number => {
+    return sources.filter(
+      s => s.folder?.id === folderId && (s.indexingStatus === 'PENDING' || s.indexingStatus === 'PROCESSING')
+    ).length;
+  };
+
+  const handleToggleAllSources = () => {
+    setAllSourcesExpanded(prev => !prev);
+  };
+
+  // When header toggles preview, open/close the preview dialog (UI only)
+  const handleTogglePreview = (v: boolean) => {
+    setPreview(v);
+    setOpenPreview(v);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="w-full px-6 pb-6 pt-0">
+        <Skeleton className="h-10 w-1/3" />
+        <div className="mt-6">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full">
+      <div className="px-6 pt-6 pb-1 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => router.push(`/workspace/${workspaceId}/agents/${agentId}/config`)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-brand-green transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back to Knowledge Bases
+        </button>
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 rounded-md border-border text-destructive hover:text-destructive hover:bg-red-50 gap-1.5">
+              <Trash2 className="h-3.5 w-3.5" /> Delete Knowledge Base
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-lg border-0 shadow-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-foreground">Delete knowledge base?</AlertDialogTitle>
+              <AlertDialogDescription className="text-muted-foreground">
+                This permanently deletes "{kbName}" and all its data sources and indexed chunks. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-lg border-border">Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteKnowledgeBase} className="rounded-lg bg-destructive text-white hover:bg-red-700">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+      <KnowledgeBaseHeader
+        title={kbName}
+        search={search}
+        onSearchChange={setSearch}
+        preview={preview}
+        onTogglePreview={handleTogglePreview}
+        onOpenSettings={handleOpenKbSettings}
+        onOpenChunks={handleOpenChunks}
+        onOpenAddDataSource={() => setOpenAddDataSource(true)}
+        processingCount={processingCount}
+      />
+      <div className="px-6 pt-4 text-sm text-muted-foreground">
+        {sources.filter((source) => (latestBySource[source.id]?.stage || source.indexingStatus) === "COMPLETED" || source.indexingStatus === "INDEXED").length} ready ·{" "}
+        {sources.filter((source) => ["QUEUED", "DOWNLOADING", "EXTRACTING", "CHUNKING", "EMBEDDING", "UPSERTING"].includes(latestBySource[source.id]?.stage || "") || source.indexingStatus === "PENDING" || source.indexingStatus === "PROCESSING").length} indexing ·{" "}
+        {sources.filter((source) => (latestBySource[source.id]?.stage || source.indexingStatus) === "FAILED").length} failed
+        <span className="ml-2 text-xs">{connected ? "Live updates connected" : "Reconnecting…"}</span>
+      </div>
+
+      <div className="px-6 pb-6 space-y-6">
+        {/* Folders Section */}
+        {folders.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Folders</h2>
+              <button
+                onClick={openCreateFolderDialog}
+                className="text-sm text-primary hover:underline"
+              >
+                + Create folder
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {folders.map((folder) => {
+                const folderFiles = getFilesForFolder(folder.id);
+                const isExpanded = expandedFolders.has(folder.id);
+                
+                return (
+                  <FolderCard
+                    key={folder.id}
+                    id={folder.id}
+                    name={folder.name}
+                    fileCount={getFileCountForFolder(folder.id)}
+                    processingCount={getProcessingCountForFolder(folder.id)}
+                    onDelete={handleDeleteFolder}
+                    onToggleExpand={handleToggleFolderExpand}
+                    isExpanded={isExpanded}
+                  >
+                    {folderFiles.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-100 bg-background/40">
+                              <th className="text-left p-3 font-semibold text-gray-700">File Name</th>
+                              <th className="text-left p-3 font-semibold text-gray-700">Type</th>
+                              <th className="text-left p-3 font-semibold text-gray-700">File Size</th>
+                              <th className="text-left p-3 font-semibold text-gray-700">Status</th>
+                              <th className="text-right p-3 font-semibold text-gray-700">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {folderFiles.map((source) => {
+                              const latest = latestBySource[source.id];
+                              const status = latest?.stage === 'COMPLETED' ? 'COMPLETED'
+                                : latest?.stage === 'FAILED' ? 'FAILED'
+                                : latest?.stage === 'QUEUED' ? 'PENDING'
+                                : latest?.stage && latest.stage !== 'DEINDEXED' ? 'PROCESSING'
+                                : source.indexingStatus || 'PENDING';
+                              const isProcessing = status === 'PENDING' || status === 'PROCESSING';
+                              const progress = latest?.progress ?? source.progress ?? (status === 'COMPLETED' ? 100 : 0);
+                              const timeline = eventsBySource[source.id] || [];
+                              return (
+                                <tr key={source.id} className="border-b border-gray-100 hover:bg-background transition-colors">
+                                  <td className="p-3">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                                      <span className="font-medium text-foreground truncate">{source.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-3 text-muted-foreground">{source.type || 'N/A'}</td>
+                                  <td className="p-3 text-muted-foreground">
+                                    {source.sizeBytes ? (() => {
+                                      const bytes = source.sizeBytes;
+                                      const k = 1024;
+                                      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                                      const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                      return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+                                    })() : 'N/A'}
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="space-y-1.5 min-w-[120px]">
+                                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                                        status === 'COMPLETED' || status === 'INDEXED'
+                                          ? 'bg-green-50 text-green-700 border-green-100'
+                                          : isProcessing
+                                          ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                          : status === 'FAILED'
+                                          ? 'bg-red-50 text-destructive border-red-100'
+                                          : 'bg-background text-gray-700 border-border'
+                                      }`}>
+                                        {isProcessing && <Loader2 className="h-3 w-3 animate-spin" />}
+                                        {status === 'COMPLETED' || status === 'INDEXED' ? 'Ready' : status}
+                                      </span>
+                                      {isProcessing && (
+                                        <Progress value={progress} className="h-1.5 rounded-full bg-muted" />
+                                      )}
+                                      {latest && <span className="text-[11px] text-muted-foreground">{latest.message}</span>}
+                                      {status === 'FAILED' && source.lastError && <span className="text-[11px] text-destructive">{source.lastError}</span>}
+                                      {timeline.length > 0 && (
+                                        <details className="text-[11px] text-muted-foreground">
+                                          <summary className="cursor-pointer">Timeline ({timeline.length})</summary>
+                                          {timeline.map((event) => <div key={event.id}>{event.stage} · {new Date(event.createdAt).toLocaleString()} — {event.message}</div>)}
+                                        </details>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="flex gap-2 justify-end">
+                                      {source.fileId && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 rounded-lg border-border"
+                                          onClick={() => handleDownloadFile(source.fileId!, source.name)}
+                                          disabled={isProcessing}
+                                        >
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Download
+                                        </Button>
+                                      )}
+                                      {status === 'FAILED' && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 rounded-lg border-border"
+                                          onClick={async () => {
+                                            if (!knowledgeBaseId) return;
+                                            const ok = await retryKnowledgeBaseSource(knowledgeBaseId, source.id);
+                                            toast({ title: ok ? "Retry queued" : "Retry failed", variant: ok ? undefined : "destructive" });
+                                          }}
+                                        >
+                                          Retry
+                                        </Button>
+                                      )}
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button variant="outline" size="sm" className="h-8 rounded-lg border-border text-destructive hover:text-destructive hover:bg-red-50">
+                                            <Trash2 className="h-3 w-3 mr-1" />
+                                            Delete
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent className="rounded-lg border-0 shadow-2xl">
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle className="text-foreground">Delete source?</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-muted-foreground">
+                                              Are you sure you want to delete "{source.name}"? This action cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel className="rounded-lg border-border">Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteSource(source.id)} className="rounded-lg bg-destructive text-white hover:bg-red-700">
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No files in this folder yet
+                      </p>
+                    )}
+                  </FolderCard>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Sources Section */}
+        {filtered.length === 0 ? (
+          <KnowledgeBaseEmptyState
+            onCreateFolder={openCreateFolderDialog}
+            onAddDataSource={() => setOpenAddDataSource(true)}
+          />
+        ) : (
+          <KnowledgeBaseList 
+            sources={filtered} 
+            onCreateFolder={openCreateFolderDialog}
+            onDelete={handleDeleteSource}
+            onDownload={handleDownloadFile}
+            isExpanded={allSourcesExpanded}
+            onToggleExpand={handleToggleAllSources}
+            eventsBySource={eventsBySource}
+            latestBySource={latestBySource}
+            onRetry={async (sourceId) => {
+              if (!knowledgeBaseId) return;
+              const ok = await retryKnowledgeBaseSource(knowledgeBaseId, sourceId);
+              toast({ title: ok ? "Retry queued" : "Retry failed", description: ok ? "Indexing has been queued again." : "Could not queue indexing.", variant: ok ? undefined : "destructive" });
+              if (ok) await loadSources(knowledgeBaseId);
+            }}
+          />
+        )}
+      </div>
+
+      {/* Dialogs */}
+      <AddDataSourceDrawer
+        open={openAddDataSource}
+        onOpenChange={setOpenAddDataSource}
+        folders={folders}
+        onUploadFiles={handleUploadFiles}
+        progressItems={isUploading ? uploadProgressItems : undefined}
+        onImportUrls={handleImportUrls}
+        onImportSitemap={(payload: SitemapImportPayload) => {
+          console.log('Sitemap import:', payload, 'agent', agentId);
+        }}
+        onImportPlainText={handlePlainTextImport}
+        onOpenCreateFolder={openCreateFolderDialog}
+        onConnectZendesk={() => {
+          toast({ title: "Zendesk", description: "Zendesk integration setup is coming soon." });
+        }}
+      />
+
+      <CreateFolderDialog open={openCreateFolder} onOpenChange={setOpenCreateFolder} onCreate={handleCreateFolder} />
+
+      {/* Real retrieval test */}
+      <KnowledgeBasePreviewDialog
+        open={openPreview}
+        onOpenChange={(v) => { setOpenPreview(v); if (!v) setPreview(false); }}
+        onAsk={handleAskRetrieval}
+      />
+
+      {/* KB settings: embedding model + model-aware chunk size + retrieval config */}
+      <KnowledgeBaseSettingsDialog
+        open={openKbSettings}
+        onOpenChange={setOpenKbSettings}
+        name={kbName}
+        settings={kbSettings}
+        loading={settingsLoading}
+        saving={settingsSaving}
+        onSave={handleSaveKbSettings}
+        onTestModel={testEmbeddingModel}
+      />
+
+      {/* Chunk browser */}
+      <ChunkBrowserDialog
+        open={openChunks}
+        onOpenChange={setOpenChunks}
+        items={chunkItems}
+        total={chunkTotal}
+        page={chunkPage}
+        pageSize={CHUNK_PAGE_SIZE}
+        loading={chunksLoading}
+        onPageChange={(p) => loadChunks(p)}
+        onView={handleViewChunk}
+        onSaveEdit={handleEditChunk}
+        onDelete={handleDeleteChunk}
+      />
+
+    </div>
+  );
+}

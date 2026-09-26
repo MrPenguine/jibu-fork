@@ -128,6 +128,7 @@ export class KnowledgeBaseService {
     const data = {
       name: dto.name,
       workspaceId: workspaceId,
+      visibility: (dto.visibility === 'WORKSPACE' ? 'WORKSPACE' : 'AGENT') as 'WORKSPACE' | 'AGENT',
       ...(dto.description && { description: dto.description }),
     };
 
@@ -210,6 +211,7 @@ export class KnowledgeBaseService {
       },
       data: {
         ...(dto.name && { name: dto.name }),
+        ...(dto.visibility && { visibility: dto.visibility }),
       },
     });
   }
@@ -985,7 +987,9 @@ export class KnowledgeBaseService {
       'You are a helpful assistant. Answer using only the provided context.';
     const temperature = retrievalConfig.temperature ?? 0.7;
     const maxTokens = retrievalConfig.maxTokens ?? 1024;
-    const provider = (opts?.answerProvider || '').toLowerCase();
+    // No explicit provider: prefer the locally available Ollama model over a
+    // cloud provider that may not have a configured/valid API key.
+    const provider = (opts?.answerProvider || 'ollama').toLowerCase();
     const model = opts?.answerModel;
 
     try {

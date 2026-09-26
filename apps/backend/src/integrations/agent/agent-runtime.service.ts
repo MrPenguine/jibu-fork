@@ -6,6 +6,7 @@ import { PrismaService } from '../../core/database/prisma.service';
 import { RagService } from './providers/langchain/rag.service';
 import { ToolExecutorService } from './tool-executor.service';
 import { ProviderCredentialsResolver } from '../../core/provider-credentials/provider-credentials.resolver';
+import { MemoryService } from '../../core/memory/memory.service';
 
 export type AgentChannel = 'chat' | 'whatsapp' | 'voice';
 
@@ -83,6 +84,7 @@ export class AgentRuntimeService {
     private readonly ragService: RagService,
     private readonly toolExecutor: ToolExecutorService,
     private readonly providerCredentials: ProviderCredentialsResolver,
+    private readonly memory: MemoryService,
   ) {
     this.xaiClient = new OpenAI({ apiKey: 'dummy-key', baseURL: 'https://api.x.ai/v1' });
     this.mistralClient = new OpenAI({ apiKey: 'dummy-key', baseURL: 'https://api.mistral.ai/v1' });
@@ -103,12 +105,45 @@ export class AgentRuntimeService {
     if (ctx.provider === 'google') {
       const result = await this.runGeminiLoop(ctx);
       await this.maybePersist(params, ctx.workspaceId, result.output);
+      this.fireMemoryWrite(ctx, params.input, result.output);
       return result;
     }
 
     const result = await this.runOpenAiLoop(ctx);
     await this.maybePersist(params, ctx.workspaceId, result.output);
+    this.fireMemoryWrite(ctx, params.input, result.output);
     return result;
+  }
+
+  /**
+   * Wraps a tool result before it goes back to the model, with a directive
+   * placed right next to a failure/confirmation-required status instead of
+   * relying solely on a general rule buried in the system prompt — a
+   * failed tool call was observed leading a small local model to fabricate
+   * a plausible-looking answer instead of reporting the failure; putting
+   * the instruction adjacent to the actual failure is a much stronger
+   * signal than the same instruction stated once, far away, in the prompt.
+   */
+  private toolMessageContent(result: unknown): string {
+    const status = (result as { status?: string } | null)?.status;
+    if (status === 'failed') {
+      return JSON.stringify({
+        ...(result as object),
+        instruction:
+          'This tool call FAILED. Do not invent or guess data to fill the gap. Tell the user the lookup failed and what information you would need to try again.',
+      });
+    }
+    if (status === 'confirmation_required') {
+      return JSON.stringify(result);
+    }
+    return JSON.stringify(result);
+  }
+
+  /** Fire-and-forget: never awaited by callers, must never add latency to a
+   * turn the caller/chatter already has a response for. */
+  private fireMemoryWrite(ctx: { workspaceId: string; contactId: string | null }, input: string, output: string): void {
+    if (!ctx.contactId) return;
+    this.memory.write(ctx.workspaceId, ctx.contactId, `User: ${input}\nAssistant: ${output}`).catch(() => {});
   }
 
   /**
@@ -126,6 +161,7 @@ export class AgentRuntimeService {
       yield { output: result.output, meta: { ...result.meta, type: 'chunk' } };
       yield { output: '', meta: { type: 'final', modelUsed: ctx.modelUsed } };
       await this.maybePersist(params, ctx.workspaceId, result.output);
+      this.fireMemoryWrite(ctx, params.input, result.output);
       return;
     }
 
@@ -176,6 +212,7 @@ export class AgentRuntimeService {
 
     yield { output: '', meta: { type: 'final', modelUsed: ctx.modelUsed } };
     await this.maybePersist(params, ctx.workspaceId, full);
+    this.fireMemoryWrite(ctx, params.input, full);
   }
 
   // ---------------------------------------------------------------------------
@@ -196,8 +233,9 @@ export class AgentRuntimeService {
     const { provider, modelName, modelUsed } = this.determineProvider(modelConfig);
     if (!provider) throw new Error('No valid API key configured for any provider');
 
-    const systemPrompt =
+    const baseSystemPrompt =
       (metadata.systemPrompt as string) || agent.voicemailMessage || 'You are a helpful assistant.';
+    const systemPrompt = await this.appendIntentPromptSnippets(agentId, baseSystemPrompt);
 
     // RAG context across all linked knowledge bases (+ overrides).
     const kbIds = await this.resolveKnowledgeBaseIds(agentId, metadata, params.knowledgeBaseId);
@@ -206,14 +244,28 @@ export class AgentRuntimeService {
     // History (last ~10 messages) keyed by sessionId == chatId.
     const history = await this.getChatHistory(sessionId);
 
+    // Cross-session recall (Phase 3 memory layer) — only for a resolved
+    // Contact (voice/WhatsApp callers), never fabricated for an anonymous
+    // web-chat session. Cheap vector lookup, no LLM call, safe on the
+    // critical path.
+    const contactId = await this.resolveContactId(sessionId);
+    const memories = contactId ? await this.memory.read(workspaceId, contactId, input) : [];
+
     // Tools -> function definitions.
-    const { functionDefs, nameToToolId } = await this.loadTools(agentId);
+    const { functionDefs, nameToToolId, slotGuide } = await this.loadTools(agentId);
 
     const messages: ChatMsg[] = [{ role: 'system', content: systemPrompt }];
     if (context) messages.push({ role: 'system', content: `Context information:\n${context}` });
+    if (memories.length) {
+      messages.push({ role: 'system', content: `What you remember about this person:\n${memories.join('\n')}` });
+    }
     for (const m of history) {
       messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content });
     }
+    // Placed right before the new input (after history, not up in the
+    // system prompt) so it's the freshest thing in context at the exact
+    // moment the model decides whether to ask for more info or call a tool.
+    if (slotGuide) messages.push({ role: 'system', content: slotGuide });
     messages.push({ role: 'user', content: input });
 
     return {
@@ -230,7 +282,24 @@ export class AgentRuntimeService {
       temperature: (modelConfig.temperature as number) ?? 0.7,
       maxTokens: (modelConfig.maxTokens as number) ?? 2048,
       executedById: params.executedById ?? null,
+      contactId,
+      sessionId,
     };
+  }
+
+  /** Chat.contactId for the given sessionId (chatId) — null for an anonymous
+   * session (no Chat row, or one with no resolved Contact). Voice sessions
+   * don't set params.sessionId to a Chat id the same way, so this only ever
+   * resolves for text/WhatsApp today; voice memory would need its own
+   * lookup path (out of scope for this pass — see plan). */
+  private async resolveContactId(sessionId: string): Promise<string | null> {
+    if (!sessionId) return null;
+    try {
+      const chat = await this.prisma.chat.findUnique({ where: { id: sessionId }, select: { contactId: true } });
+      return chat?.contactId ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async refreshProviderCredentials(): Promise<void> {
@@ -273,6 +342,11 @@ export class AgentRuntimeService {
     }));
     const messages = ctx.messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[];
     const toolCalls: ToolCallRecord[] = [];
+    // Dedup identical (toolId, args) calls within this single turn — a
+    // small local model retrying the same call hoping for a different
+    // answer (e.g. on an UNMATCHED/not-found result) was a real failure
+    // mode; this makes it structurally impossible regardless of model.
+    const seenCalls = new Map<string, unknown>();
 
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
       const completion = await client.chat.completions.create({
@@ -302,14 +376,23 @@ export class AgentRuntimeService {
         } catch {
           /* leave args empty on parse error */
         }
-        const result = toolId
-          ? await this.toolExecutor.executeTool(toolId, args, {
-              workspaceId: ctx.workspaceId,
-              executedById: ctx.executedById,
-            })
-          : { status: 'failed', error: `Unknown tool ${fn.name}` };
+
+        const callKey = `${toolId}:${JSON.stringify(args, Object.keys(args).sort())}`;
+        let result: unknown;
+        if (toolId && seenCalls.has(callKey)) {
+          result = seenCalls.get(callKey);
+        } else {
+          result = toolId
+            ? await this.toolExecutor.executeTool(toolId, args, {
+                workspaceId: ctx.workspaceId,
+                executedById: ctx.executedById,
+                sessionId: ctx.sessionId,
+              })
+            : { status: 'failed', error: `Unknown tool ${fn.name}` };
+          if (toolId) seenCalls.set(callKey, result);
+        }
         toolCalls.push({ toolId: toolId || '', name: fn.name, arguments: args, result });
-        messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: this.toolMessageContent(result) });
       }
     }
 
@@ -356,6 +439,7 @@ export class AgentRuntimeService {
     const chat = model.startChat({ history: historyContents });
 
     const toolCalls: ToolCallRecord[] = [];
+    const geminiSeenCalls = new Map<string, unknown>();
     let message: Array<{ text?: string; functionResponse?: unknown }> | string = ctx.messages[ctx.messages.length - 1].content;
 
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
@@ -375,15 +459,24 @@ export class AgentRuntimeService {
       for (const call of calls) {
         const toolId = ctx.nameToToolId[call.name];
         const args = (call.args as Record<string, unknown>) || {};
-        const execResult = toolId
-          ? await this.toolExecutor.executeTool(toolId, args, {
-              workspaceId: ctx.workspaceId,
-              executedById: ctx.executedById,
-            })
-          : { status: 'failed', error: `Unknown tool ${call.name}` };
+
+        const callKey = `${toolId}:${JSON.stringify(args, Object.keys(args).sort())}`;
+        let execResult: unknown;
+        if (toolId && geminiSeenCalls.has(callKey)) {
+          execResult = geminiSeenCalls.get(callKey);
+        } else {
+          execResult = toolId
+            ? await this.toolExecutor.executeTool(toolId, args, {
+                workspaceId: ctx.workspaceId,
+                executedById: ctx.executedById,
+                sessionId: ctx.sessionId,
+              })
+            : { status: 'failed', error: `Unknown tool ${call.name}` };
+          if (toolId) geminiSeenCalls.set(callKey, execResult);
+        }
         toolCalls.push({ toolId: toolId || '', name: call.name, arguments: args, result: execResult });
         functionResponses.push({
-          functionResponse: { name: call.name, response: { result: execResult } as object },
+          functionResponse: { name: call.name, response: JSON.parse(this.toolMessageContent(execResult)) },
         });
       }
       message = functionResponses as unknown as string;
@@ -532,9 +625,10 @@ export class AgentRuntimeService {
 
   private async loadTools(
     agentId: string,
-  ): Promise<{ functionDefs: FunctionDef[]; nameToToolId: Record<string, string> }> {
+  ): Promise<{ functionDefs: FunctionDef[]; nameToToolId: Record<string, string>; slotGuide: string }> {
     const functionDefs: FunctionDef[] = [];
     const nameToToolId: Record<string, string> = {};
+    const slotLines: string[] = [];
     try {
       const links = await this.prisma.agentTool.findMany({
         where: { agentId },
@@ -548,11 +642,44 @@ export class AgentRuntimeService {
         const parameters = (fn.parameters as Record<string, unknown>) || { type: 'object', properties: {} };
         functionDefs.push({ name, description: (fn.description as string) || tool.description || undefined, parameters });
         nameToToolId[name] = tool.id;
+        if (tool.requiredSlots?.length) {
+          slotLines.push(`- ${name} needs: ${tool.requiredSlots.join(', ')}`);
+        }
       }
     } catch (e) {
       this.logger.warn(`Could not load agent tools: ${(e as Error).message}`);
     }
-    return { functionDefs, nameToToolId };
+    // A small local model was observed re-asking for information the user
+    // already gave a couple of turns earlier instead of doing proper
+    // slot-filling — this exists to fix that structurally rather than rely
+    // on the model to infer required parameters from the JSON schema alone.
+    const slotGuide = slotLines.length
+      ? `Tools and the information each one needs before it can be called:\n${slotLines.join('\n')}\n\nBefore asking the user for anything, re-read the ENTIRE conversation above for values already given — even several messages back. If some required information is already known, do not ask for it again. Ask only for the specific piece(s) still missing, by name (e.g. "What's the admission number?"), not a vague open-ended question.`
+      : '';
+    return { functionDefs, nameToToolId, slotGuide };
+  }
+
+  /**
+   * Intent is purely an authoring-time grouping (see Intent/AgentIntent in
+   * schema.prisma) — tools always flow through AgentTool regardless, so this
+   * only needs to append each attached, enabled intent's promptSnippet.
+   * Cheap: one query per turn, same cost class as loadTools() above.
+   */
+  private async appendIntentPromptSnippets(agentId: string, basePrompt: string): Promise<string> {
+    try {
+      const attached = await this.prisma.agentIntent.findMany({
+        where: { agentId, intent: { enabled: true } },
+        include: { intent: { select: { promptSnippet: true } } },
+      });
+      const snippets = attached
+        .map((a) => a.intent.promptSnippet?.trim())
+        .filter((s): s is string => Boolean(s));
+      if (!snippets.length) return basePrompt;
+      return `${basePrompt}\n\n${snippets.join('\n\n')}`;
+    } catch (e) {
+      this.logger.warn(`Could not load agent intents: ${(e as Error).message}`);
+      return basePrompt;
+    }
   }
 
   private async maybePersist(params: RunTurnParams, workspaceId: string, output: string): Promise<void> {

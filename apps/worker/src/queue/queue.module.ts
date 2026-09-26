@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QUEUE_NAMES } from '@jibu/queue-definitions';
 import { QueueProcessor } from './queue.processor';
 import { IndexingProcessor } from './indexing.processor';
+import { PostCallAnalysisProcessor } from './post-call-analysis.processor';
 import { PrismaService } from '../../../backend/src/core/database/prisma.service';
 import { FileService } from '../../../backend/src/modules/v1/file/file.service';
 import { DatabaseModule } from '../../../backend/src/core/database/database.module';
@@ -37,7 +38,7 @@ import { SourceEventsService } from './source-events.service';
     }),
     BullModule.registerQueue(
       { name: QUEUE_NAMES.DEFAULT },
-      { 
+      {
         name: QUEUE_NAMES.INDEXING,
         defaultJobOptions: {
           attempts: 3,
@@ -53,6 +54,7 @@ import { SourceEventsService } from './source-events.service';
           duration: 1000, // Duration in milliseconds for rate limiting
         }
       },
+      { name: QUEUE_NAMES.POST_CALL_ANALYSIS },
     ),
     DatabaseModule,
     FileModule,
@@ -61,8 +63,9 @@ import { SourceEventsService } from './source-events.service';
     VectorDbModule,
   ],
   providers: [
-    QueueProcessor, 
+    QueueProcessor,
     IndexingProcessor,
+    PostCallAnalysisProcessor,
     SourceEventsService,
   ],
   exports: [BullModule],

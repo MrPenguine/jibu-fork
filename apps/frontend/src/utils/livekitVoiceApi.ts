@@ -8,9 +8,14 @@ export interface VoiceSession {
   agent: { id: string; name: string };
 }
 
-/** Start (or reuse) a voice room for an agent and get a caller token. */
-export async function startVoiceSession(agentId: string): Promise<VoiceSession> {
-  const session = await fetchAPI(`/livekit/voice/start?agentId=${encodeURIComponent(agentId)}`);
+/** Start (or reuse) a voice room for an agent and get a caller token.
+ * `callerPhone` (a picked persona's number) is optional — when given, the
+ * browser test call resolves a Contact just like voice/WhatsApp already do
+ * for real callers, instead of staying anonymous. */
+export async function startVoiceSession(agentId: string, callerPhone?: string): Promise<VoiceSession> {
+  const params = new URLSearchParams({ agentId });
+  if (callerPhone) params.set('callerPhone', callerPhone);
+  const session = await fetchAPI(`/livekit/voice/start?${params.toString()}`);
   if (!session?.token || !session?.url || !session?.room) {
     throw new Error('Voice session did not return a token/url/room.');
   }
